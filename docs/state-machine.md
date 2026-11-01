@@ -14,11 +14,13 @@ stateDiagram-v2
     held --> held: change_detected
     held --> needs_review: command_failed
     held --> needs_review: deadline_reached
+    held --> held: hold_confirmed [readback_ok]
     held --> needs_review: no_provable_number
     held --> calling: number_resolved [number_selected]
     calling --> deciding: call_ended [answers_recorded]
     calling --> needs_review: call_ended [no_person_tries_exhausted]
     calling --> retry_wait: call_ended [no_person_tries_left]
+    calling --> calling: call_started [call_attempt_matches]
     calling --> needs_review: call_timeout
     calling --> held: change_detected
     calling --> needs_review: command_failed
@@ -56,11 +58,13 @@ stateDiagram-v2
 | held | `change_detected` | system | `always` | held | Another change: version + 1 |
 | held | `command_failed` | system | `always` | needs_review | A command kept failing; hold stays on |
 | held | `deadline_reached` | system | `always` | needs_review | Deadline passed; hold stays on |
+| held | `hold_confirmed` | system | `readback_ok` | held | Hold confirmed again after another change (version + 1) |
 | held | `no_provable_number` | system | `always` | needs_review | No number with two independent sources that predate the request |
 | held | `number_resolved` | system | `number_selected` | calling | The Trust Ledger rule passed |
 | calling | `call_ended` | system | `answers_recorded` | deciding | Answers recorded |
 | calling | `call_ended` | system | `no_person_tries_exhausted` | needs_review | No person reached; no tries left |
 | calling | `call_ended` | system | `no_person_tries_left` | retry_wait | No person reached; tries left |
+| calling | `call_started` | system | `call_attempt_matches` | calling | The voice service accepted the call; pins the current call |
 | calling | `call_timeout` | system | `always` | needs_review | The call never reported back |
 | calling | `change_detected` | system | `always` | held | Another change: back to held, version + 1 |
 | calling | `command_failed` | system | `always` | needs_review | A command kept failing; hold stays on |

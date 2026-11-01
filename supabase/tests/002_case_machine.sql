@@ -11,6 +11,7 @@ declare
   c2       uuid;
   v_change uuid;
   v_before bigint;
+  v_call   uuid;
 begin
   f := pg_temp.setup_fixture();
 
@@ -53,11 +54,12 @@ begin
          jsonb_build_object('contact_point_id', gen_random_uuid(), 'number_selection_id', gen_random_uuid(), 'rule_version', 'sel-v1'));
   assert r ->> 'to_state' = 'calling', r::text;
   assert (select call_attempts = 1 from app.cases where id = c1), 'attempt 1';
-  assert exists (select 1 from app.outbox where case_id = c1 and command = 'place_call' and idempotency_key = c1 || ':call:1'), 'call 1 queued';
+  assert exists (select 1 from app.outbox where case_id = c1 and command = 'place_call' and idempotency_key = c1 || ':call:v1:1'), 'call 1 queued';
 
   -- Call 1: nobody answered, tries left -> retry_wait with a timer.
-  r := app.apply_case_event(c1, 'call_ended', pg_temp.sys(), c1 || ':call:1:ended',
-         jsonb_build_object('call_id', gen_random_uuid(), 'result', 'no_answer', 'attempt', 1));
+  v_call := pg_temp.start_call(c1);
+  r := app.apply_case_event(c1, 'call_ended', pg_temp.sys(), c1 || ':call:' || v_call || ':ended',
+         jsonb_build_object('call_id', v_call, 'result', 'no_answer', 'attempt', 1));
   assert r ->> 'to_state' = 'retry_wait', r::text;
   assert exists (select 1 from app.timers where case_id = c1 and kind = 'retry_call' and status = 'scheduled'), 'retry timer';
 
@@ -67,9 +69,9 @@ begin
   assert r ->> 'to_state' = 'calling' and (select call_attempts = 2 from app.cases where id = c1), 'attempt 2';
 
   -- Call 2: answers recorded -> deciding, decide command queued.
-  r := app.apply_case_event(c1, 'call_ended', pg_temp.sys(), c1 || ':call:2:ended',
-         jsonb_build_object('call_id', gen_random_uuid(), 'result', 'answers_recorded', 'attempt', 2,
-                            'answers', jsonb_build_object('requested_change', 'yes', 'last_four', 'match')));
+  v_call := pg_temp.start_call(c1);
+  r := app.apply_case_event(c1, 'call_ended', pg_temp.sys(), c1 || ':call:' || v_call || ':ended',
+         jsonb_build_object('call_id', v_call, 'result', 'answers_recorded', 'attempt', 2, 'last_four_result', 'match'));
   assert r ->> 'to_state' = 'deciding', r::text;
   assert exists (select 1 from app.outbox where case_id = c1 and command = 'decide'), 'decide queued';
 
@@ -112,7 +114,7 @@ begin
   assert (select closed_at is not null from app.cases where id = c1), 'closed';
   assert (select status = 'released' and released_at is not null from app.holds where case_id = c1), 'hold released';
   assert not exists (select 1 from app.timers where case_id = c1 and status = 'scheduled'), 'timers cancelled';
-  assert (select count(*) from audit.evidence_events where case_id = c1) = 9, 'nine events in the chain';
+  assert (select count(*) from audit.evidence_events where case_id = c1) = 11, 'eleven events in the chain';
   assert (select ok from audit.verify_chain(f.chain_id)), 'chain intact';
   assert (select count(*) from audit.evidence_events e where e.case_id = c1 and e.actor_kind = 'person' and e.actor_id = f.approver1) = 1, 'approval in the chain';
 
@@ -125,7 +127,9 @@ begin
   -- A change during an open case joins it: back to held, version 2, decision void, old commands dropped.
   perform app.apply_case_event(c2, 'hold_confirmed', pg_temp.sys(), c2 || ':hold:v1:confirmed', '{"readback_ok": true}');
   perform app.apply_case_event(c2, 'number_resolved', pg_temp.sys(), c2 || ':select:v1', jsonb_build_object('contact_point_id', gen_random_uuid()));
-  perform app.apply_case_event(c2, 'call_ended', pg_temp.sys(), c2 || ':call:1:ended', '{"result": "answers_recorded"}');
+  v_call := pg_temp.start_call(c2);
+  perform app.apply_case_event(c2, 'call_ended', pg_temp.sys(), c2 || ':call:' || v_call || ':ended',
+            jsonb_build_object('call_id', v_call, 'result', 'answers_recorded', 'attempt', 1));
   perform app.apply_case_event(c2, 'decision_made', pg_temp.sys(), c2 || ':decide:v1:1',
             jsonb_build_object('outcome', 'verified', 'inputs_hash', repeat('b', 64), 'engine_version', 'dec-0.1'));
   assert pg_temp.state_of(c2) = 'awaiting_release', 'c2 awaiting release';
@@ -143,11 +147,17 @@ begin
 
   -- Three calls with nobody home -> needs_review, hold still on.
   perform app.apply_case_event(c2, 'number_resolved', pg_temp.sys(), c2 || ':select:v2', jsonb_build_object('contact_point_id', gen_random_uuid()));
-  perform app.apply_case_event(c2, 'call_ended', pg_temp.sys(), c2 || ':v2:call:1:ended', '{"result": "voicemail"}');
+  v_call := pg_temp.start_call(c2);
+  perform app.apply_case_event(c2, 'call_ended', pg_temp.sys(), c2 || ':call:' || v_call || ':ended',
+            jsonb_build_object('call_id', v_call, 'result', 'voicemail', 'attempt', 1));
   perform app.apply_case_event(c2, 'retry_timer_fired', pg_temp.sys(), c2 || ':v2:retry:1', '{"in_window": true}');
-  perform app.apply_case_event(c2, 'call_ended', pg_temp.sys(), c2 || ':v2:call:2:ended', '{"result": "no_answer"}');
+  v_call := pg_temp.start_call(c2);
+  perform app.apply_case_event(c2, 'call_ended', pg_temp.sys(), c2 || ':call:' || v_call || ':ended',
+            jsonb_build_object('call_id', v_call, 'result', 'no_answer', 'attempt', 2));
   perform app.apply_case_event(c2, 'retry_timer_fired', pg_temp.sys(), c2 || ':v2:retry:2', '{"in_window": true}');
-  r := app.apply_case_event(c2, 'call_ended', pg_temp.sys(), c2 || ':v2:call:3:ended', '{"result": "no_answer"}');
+  v_call := pg_temp.start_call(c2);
+  r := app.apply_case_event(c2, 'call_ended', pg_temp.sys(), c2 || ':call:' || v_call || ':ended',
+         jsonb_build_object('call_id', v_call, 'result', 'no_answer', 'attempt', 3));
   assert r ->> 'to_state' = 'needs_review', r::text;
   assert (select released_at is null from app.holds where case_id = c2), 'hold still on';
 
