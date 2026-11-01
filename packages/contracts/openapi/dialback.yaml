@@ -1,0 +1,554 @@
+openapi: 3.1.0
+info:
+  title: Dialback dashboard API (dashboard to core)
+  version: 0.1.0
+  description: |
+    What the dashboard (apps/web) reads from and sends to the core service (apps/core).
+    Owner: Abhi. Spec: specs/0002-skeleton-integration.md, D9 and D12.
+
+    - Every request carries the signed-in user's JWT. The core verifies it and runs the
+      request in Postgres as that user (`set local role authenticated` plus the JWT claims),
+      so `auth.uid()` is the person and row-level security applies. A release reaches
+      `app.release_case()` under the approver's own identity (ADR-9).
+    - The dashboard never decides who may act. `permissions` in a case detail is a hint for
+      the UI; the database refuses the changer, the reviewer and a stale version anyway.
+    - Every sentence that explains a decision (`summary`, `explanation`, `reasons`) comes from
+      a template in the core, never from a model, and says "provable" or "not provable",
+      never "safe".
+    - Times are RFC 3339 UTC. For lab datasets, event times are the dataset's simulated time.
+
+servers:
+  - url: http://localhost:8001
+    description: Core service (local)
+
+security:
+  - userJwt: []
+
+paths:
+  /api/me:
+    get:
+      operationId: getMe
+      summary: The signed-in user and their roles
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Me' }
+              example:
+                user_id: a9b8c7d6-e5f4-4321-8abc-def012345678
+                display_name: Riley Approver
+                roles: [approver]
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+
+  /api/datasets:
+    get:
+      operationId: listDatasets
+      summary: Datasets that are not retired, newest first
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [datasets]
+                properties:
+                  datasets:
+                    type: array
+                    items: { $ref: '#/components/schemas/Dataset' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+
+  /api/datasets/{dataset_id}/chain:
+    get:
+      operationId: getChainStatus
+      summary: Recompute the dataset's evidence chain (the "chain intact" badge)
+      parameters:
+        - $ref: '#/components/parameters/DatasetId'
+      responses:
+        '200':
+          description: OK, whether or not the chain is intact
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ChainStatus' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/datasets/{dataset_id}/alerts:
+    get:
+      operationId: listOpenAlerts
+      summary: Unresolved alerts for a dataset, critical first
+      parameters:
+        - $ref: '#/components/parameters/DatasetId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [alerts]
+                properties:
+                  alerts:
+                    type: array
+                    items: { $ref: '#/components/schemas/Alert' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/cases:
+    get:
+      operationId: listCases
+      summary: The case queue
+      parameters:
+        - name: dataset_id
+          in: query
+          required: true
+          schema: { $ref: '../schemas/evidence-event.schema.json#/$defs/Uuid' }
+        - name: state
+          in: query
+          required: false
+          description: Filter by state. Repeat the parameter for several states. Default is every unfinished state.
+          schema:
+            type: array
+            items: { $ref: '../schemas/evidence-event.schema.json#/$defs/CaseState' }
+          style: form
+          explode: true
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 200, default: 100 }
+      responses:
+        '200':
+          description: Unfinished cases by state and age, oldest first
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [cases]
+                properties:
+                  cases:
+                    type: array
+                    items: { $ref: '#/components/schemas/CaseSummary' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '422': { $ref: '#/components/responses/InvalidRequest' }
+
+  /api/cases/{case_id}:
+    get:
+      operationId: getCase
+      summary: Everything the case detail page and the release console show
+      parameters:
+        - $ref: '#/components/parameters/CaseId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CaseDetail' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/cases/{case_id}/release:
+    post:
+      operationId: releaseCase
+      summary: Approve or reject the release of a verified case (four-eyes, in SQL)
+      description: |
+        Calls `app.release_case()` as the signed-in user. When the changer is unknown, the
+        first approval returns `awaiting_second_approver` and a different approver releases.
+      parameters:
+        - $ref: '#/components/parameters/CaseId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReleaseRequest' }
+            example:
+              expected_version: 1
+              action: approve
+              reason: Vendor's AR manager confirmed on the contract number; last four match.
+      responses:
+        '200':
+          description: Applied, or the same request was already applied
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ActionResult' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/InvalidRequest' }
+
+  /api/cases/{case_id}/review:
+    post:
+      operationId: reviewCase
+      summary: Clear or block a case that is in needs_review
+      description: |
+        Clearing sends the case to awaiting_release, where a different person must still
+        approve the release. The person who entered the change cannot clear it.
+      parameters:
+        - $ref: '#/components/parameters/CaseId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReviewRequest' }
+            example:
+              expected_version: 2
+              action: clear
+              reason: Reached the vendor's CFO on the number from the 2023 contract; confirmed the change.
+      responses:
+        '200':
+          description: Applied, or the same request was already applied
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ActionResult' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/InvalidRequest' }
+
+components:
+  securitySchemes:
+    userJwt:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: The signed-in user's Supabase access token (a dev token in local development).
+
+  parameters:
+    DatasetId:
+      name: dataset_id
+      in: path
+      required: true
+      schema: { $ref: '../schemas/evidence-event.schema.json#/$defs/Uuid' }
+    CaseId:
+      name: case_id
+      in: path
+      required: true
+      schema: { $ref: '../schemas/evidence-event.schema.json#/$defs/Uuid' }
+
+  responses:
+    Unauthenticated:
+      description: Missing, expired or invalid token
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Forbidden:
+      description: The rules refuse this person (for example the changer, the reviewer, or a missing role)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { code: forbidden, message: The person who entered the change cannot release it (R5). }
+    NotFound:
+      description: No such dataset or case
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Conflict:
+      description: The case changed since the page loaded (version_conflict), or it is not in a state that allows this (transition_refused)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { code: version_conflict, message: This case changed since you loaded it. Reload to see version 2. }
+    InvalidRequest:
+      description: Malformed request
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+  schemas:
+    Uuid:
+      $ref: '../schemas/evidence-event.schema.json#/$defs/Uuid'
+    Timestamp:
+      type: string
+      format: date-time
+
+    Role:
+      type: string
+      enum: [clerk, approver, auditor]
+
+    Me:
+      type: object
+      additionalProperties: false
+      required: [user_id, display_name, roles]
+      properties:
+        user_id: { $ref: '#/components/schemas/Uuid' }
+        display_name: { type: string }
+        roles:
+          type: array
+          items: { $ref: '#/components/schemas/Role' }
+
+    Person:
+      description: A Dialback user, shown by name.
+      type: object
+      additionalProperties: false
+      required: [id, display_name]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        display_name: { type: string }
+
+    Dataset:
+      type: object
+      additionalProperties: false
+      required: [id, kind, label, chain_id, created_at]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        kind: { type: string, enum: [dev, demo, lab] }
+        label: { type: string }
+        chain_id: { $ref: '#/components/schemas/Uuid' }
+        created_at: { $ref: '#/components/schemas/Timestamp' }
+        sim_now:
+          description: Lab datasets only; the dataset's simulated time.
+          oneOf: [{ $ref: '#/components/schemas/Timestamp' }, { type: 'null' }]
+
+    ChainStatus:
+      type: object
+      additionalProperties: false
+      required: [chain_id, ok, checked, first_bad_seq, detail, tip_seq, tip_hash]
+      properties:
+        chain_id: { $ref: '#/components/schemas/Uuid' }
+        ok: { type: boolean }
+        checked: { type: integer, minimum: 0, description: Events verified before the first break, or all of them. }
+        first_bad_seq:
+          oneOf: [{ type: integer, minimum: 1 }, { type: 'null' }]
+        detail: { type: string, description: '"chain intact", or why the first bad row fails.' }
+        tip_seq:
+          oneOf: [{ type: integer, minimum: 1 }, { type: 'null' }]
+        tip_hash:
+          oneOf: [{ $ref: '../schemas/evidence-event.schema.json#/$defs/Sha256Hex' }, { type: 'null' }]
+      example:
+        chain_id: 0f3b7f2e-4d2a-4b1e-9c3d-1a2b3c4d5e6f
+        ok: false
+        checked: 6
+        first_bad_seq: 7
+        detail: content_hash does not match body_jcs (body edited)
+        tip_seq: 12
+        tip_hash: 9b74c9897bac770ffc029102a200c5de3ce2d1b9b1b0d6c1a2e3f4a5b6c7d8e9
+
+    Alert:
+      type: object
+      additionalProperties: false
+      required: [id, kind, severity, message, raised_at, case_id]
+      properties:
+        id: { type: integer }
+        case_id:
+          oneOf: [{ $ref: '#/components/schemas/Uuid' }, { type: 'null' }]
+        kind:
+          type: string
+          description: hold_not_confirmed, vendor_not_held, chain_broken, command_stuck, bad_webhook_signature, no_provable_number, deadline_reached, not_verified
+        severity: { type: string, enum: [info, warning, critical] }
+        message: { type: string }
+        raised_at: { $ref: '#/components/schemas/Timestamp' }
+
+    HoldStatus:
+      type: string
+      enum: [placing, confirmed, failed, releasing, released]
+
+    CaseSummary:
+      description: One row of the case queue.
+      type: object
+      additionalProperties: false
+      required: [id, dataset_id, vendor, state, outcome, version, opened_at, updated_at, deadline_at, hold_status, bills_held, next_payment_date, unknown_changer]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        dataset_id: { $ref: '#/components/schemas/Uuid' }
+        vendor:
+          type: object
+          additionalProperties: false
+          required: [id, legal_name]
+          properties:
+            id: { $ref: '#/components/schemas/Uuid' }
+            legal_name: { type: string }
+        state: { $ref: '../schemas/evidence-event.schema.json#/$defs/CaseState' }
+        outcome:
+          oneOf: [{ $ref: '../schemas/evidence-event.schema.json#/$defs/Outcome' }, { type: 'null' }]
+        version: { type: integer, minimum: 1, description: The change generation. Send it back as expected_version. }
+        opened_at: { $ref: '#/components/schemas/Timestamp' }
+        updated_at: { $ref: '#/components/schemas/Timestamp' }
+        deadline_at:
+          oneOf: [{ $ref: '#/components/schemas/Timestamp' }, { type: 'null' }]
+        hold_status:
+          oneOf: [{ $ref: '#/components/schemas/HoldStatus' }, { type: 'null' }]
+        bills_held: { type: integer, minimum: 0, description: Unpaid bills in the saved schedule. }
+        next_payment_date:
+          description: Earliest saved payment date among held bills, so bills near their due date stand out.
+          oneOf: [{ $ref: '../schemas/evidence-event.schema.json#/$defs/IsoDate' }, { type: 'null' }]
+        unknown_changer: { type: boolean, description: True when release needs two approvers (ADR-10). }
+
+    AccountRef:
+      description: A bank account as Dialback stores it. Never the full number (ADR-8).
+      type: object
+      additionalProperties: false
+      required: [routing_number, last4]
+      properties:
+        routing_number: { type: string }
+        last4: { type: string, pattern: '^[0-9]{4}$' }
+
+    ChangeInfo:
+      type: object
+      additionalProperties: false
+      required: [detected_via, detected_at, old_account, new_account, changed_by, unknown_changer]
+      properties:
+        detected_via: { type: string, enum: [webhook, poll, email] }
+        detected_at: { $ref: '#/components/schemas/Timestamp' }
+        old_account:
+          oneOf: [{ $ref: '#/components/schemas/AccountRef' }, { type: 'null' }]
+        new_account: { $ref: '#/components/schemas/AccountRef' }
+        changed_by:
+          oneOf: [{ $ref: '#/components/schemas/Person' }, { type: 'null' }]
+        unknown_changer: { type: boolean }
+
+    HoldInfo:
+      type: object
+      additionalProperties: false
+      required: [status, ramp_ref, placed_at, confirmed_at, released_at, schedule, last_error]
+      properties:
+        status: { $ref: '#/components/schemas/HoldStatus' }
+        ramp_ref: { type: [string, 'null'] }
+        placed_at:
+          oneOf: [{ $ref: '#/components/schemas/Timestamp' }, { type: 'null' }]
+        confirmed_at:
+          oneOf: [{ $ref: '#/components/schemas/Timestamp' }, { type: 'null' }]
+        released_at:
+          oneOf: [{ $ref: '#/components/schemas/Timestamp' }, { type: 'null' }]
+        schedule:
+          type: array
+          items: { $ref: '../schemas/evidence-event.schema.json#/$defs/ScheduleEntry' }
+        last_error: { type: [string, 'null'] }
+
+    DecisionInfo:
+      type: object
+      additionalProperties: false
+      required: [outcome, rules_fired, engine_version, last_four_result, decided_at, explanation]
+      properties:
+        outcome: { $ref: '../schemas/evidence-event.schema.json#/$defs/Outcome' }
+        rules_fired:
+          type: array
+          items: { type: string }
+        engine_version: { type: string }
+        last_four_result:
+          oneOf: [{ $ref: '../schemas/evidence-event.schema.json#/$defs/LastFourResult' }, { type: 'null' }]
+        decided_at: { $ref: '#/components/schemas/Timestamp' }
+        explanation:
+          description: One templated sentence per rule that fired.
+          type: array
+          items: { type: string }
+
+    ReleaseRecord:
+      type: object
+      additionalProperties: false
+      required: [actor, action, reason, case_version, created_at]
+      properties:
+        actor: { $ref: '#/components/schemas/Person' }
+        action: { type: string, enum: [approve, reject] }
+        reason: { type: string }
+        case_version: { type: integer, minimum: 1 }
+        created_at: { $ref: '#/components/schemas/Timestamp' }
+
+    TimelineEntry:
+      description: One evidence event, as the case detail timeline shows it.
+      type: object
+      additionalProperties: false
+      required: [seq, type, occurred_at, actor, from_state, to_state, version, summary, hash]
+      properties:
+        seq: { type: integer, minimum: 1 }
+        type: { $ref: '../schemas/evidence-event.schema.json#/$defs/EventType' }
+        occurred_at: { $ref: '#/components/schemas/Timestamp' }
+        actor:
+          type: object
+          additionalProperties: false
+          required: [kind, id, display_name]
+          properties:
+            kind: { type: string, enum: [system, person] }
+            id:
+              oneOf: [{ $ref: '#/components/schemas/Uuid' }, { type: 'null' }]
+            display_name: { type: string, description: '"Dialback" for the system.' }
+        from_state:
+          oneOf: [{ $ref: '../schemas/evidence-event.schema.json#/$defs/CaseState' }, { type: 'null' }]
+        to_state: { $ref: '../schemas/evidence-event.schema.json#/$defs/CaseState' }
+        version: { type: integer, minimum: 1 }
+        summary: { type: string, description: A templated sentence. }
+        hash: { $ref: '../schemas/evidence-event.schema.json#/$defs/Sha256Hex' }
+
+    Permissions:
+      description: What the signed-in user may do right now. A hint for the UI; SQL decides.
+      type: object
+      additionalProperties: false
+      required: [can_approve, can_reject, can_review, reasons]
+      properties:
+        can_approve: { type: boolean }
+        can_reject: { type: boolean }
+        can_review: { type: boolean }
+        reasons:
+          description: Why an action is not offered, one templated sentence each.
+          type: array
+          items: { type: string }
+
+    CaseDetail:
+      type: object
+      additionalProperties: false
+      required: [case, change, hold, decision, releases, timeline, chain, permissions, entered_by, reviewed_by]
+      properties:
+        case: { $ref: '#/components/schemas/CaseSummary' }
+        entered_by:
+          oneOf: [{ $ref: '#/components/schemas/Person' }, { type: 'null' }]
+        reviewed_by:
+          oneOf: [{ $ref: '#/components/schemas/Person' }, { type: 'null' }]
+        change: { $ref: '#/components/schemas/ChangeInfo' }
+        hold:
+          oneOf: [{ $ref: '#/components/schemas/HoldInfo' }, { type: 'null' }]
+        decision:
+          description: The latest decision for the current version, or null.
+          oneOf: [{ $ref: '#/components/schemas/DecisionInfo' }, { type: 'null' }]
+        releases:
+          type: array
+          items: { $ref: '#/components/schemas/ReleaseRecord' }
+        timeline:
+          type: array
+          items: { $ref: '#/components/schemas/TimelineEntry' }
+        chain: { $ref: '#/components/schemas/ChainStatus' }
+        permissions: { $ref: '#/components/schemas/Permissions' }
+
+    ReleaseRequest:
+      type: object
+      additionalProperties: false
+      required: [expected_version, action, reason]
+      properties:
+        expected_version: { type: integer, minimum: 1, description: The case version the person saw. }
+        action: { type: string, enum: [approve, reject] }
+        reason: { type: string, minLength: 1, maxLength: 2000 }
+
+    ReviewRequest:
+      type: object
+      additionalProperties: false
+      required: [expected_version, action, reason]
+      properties:
+        expected_version: { type: integer, minimum: 1 }
+        action: { type: string, enum: [clear, block] }
+        reason: { type: string, minLength: 1, maxLength: 2000 }
+
+    ActionResult:
+      type: object
+      additionalProperties: false
+      required: [status, case_id, from_state, to_state, version]
+      properties:
+        status: { type: string, enum: [applied, already_applied, awaiting_second_approver] }
+        case_id: { $ref: '#/components/schemas/Uuid' }
+        from_state:
+          oneOf: [{ $ref: '../schemas/evidence-event.schema.json#/$defs/CaseState' }, { type: 'null' }]
+        to_state: { $ref: '../schemas/evidence-event.schema.json#/$defs/CaseState' }
+        version: { type: integer, minimum: 1 }
+        evidence_seq: { type: [integer, 'null'] }
+
+    Error:
+      type: object
+      additionalProperties: false
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          enum: [unauthenticated, forbidden, not_found, version_conflict, transition_refused, invalid_request]
+        message: { type: string }

@@ -17,7 +17,15 @@ from pathlib import Path
 import rfc8785
 
 ROOT = Path(__file__).resolve().parents[1]
-EXAMPLES = sorted((ROOT / "examples").glob("evidence-event.*.json"))
+# A fixed list, not a glob: adding an example for a new event type must not change the golden
+# vectors that SQL replays (and two branches adding examples must not fight over this file).
+# To cover a new shape in the chain, add it here on purpose and regenerate.
+VECTOR_EXAMPLES = [
+    "evidence-event.change_detected.json",
+    "evidence-event.decision_made.json",
+    "evidence-event.release_approved.json",
+]
+EXAMPLES = [ROOT / "examples" / name for name in VECTOR_EXAMPLES]
 OUT = ROOT / "vectors" / "evidence-chain.json"
 GENESIS = "0" * 64
 

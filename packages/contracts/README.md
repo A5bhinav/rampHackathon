@@ -32,7 +32,7 @@ first hour and CI catches drift between spec and code.
 ## Commands
 
 ```bash
-uv run --with jsonschema --with rfc8785 python packages/contracts/scripts/validate.py
+uv run --with jsonschema --with rfc8785 --with pyyaml --with openapi-spec-validator python packages/contracts/scripts/validate.py
 ```
 
 ```bash

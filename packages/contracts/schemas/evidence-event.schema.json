@@ -31,6 +31,7 @@
     { "if": { "properties": { "type": { "const": "hold_failed" } } },            "then": { "properties": { "body": { "$ref": "#/$defs/HoldFailedBody" } } } },
     { "if": { "properties": { "type": { "const": "number_resolved" } } },        "then": { "properties": { "body": { "$ref": "#/$defs/NumberResolvedBody" } } } },
     { "if": { "properties": { "type": { "const": "no_provable_number" } } },     "then": { "properties": { "body": { "$ref": "#/$defs/NoProvableNumberBody" } } } },
+    { "if": { "properties": { "type": { "const": "call_started" } } },           "then": { "properties": { "body": { "$ref": "#/$defs/CallStartedBody" } } } },
     { "if": { "properties": { "type": { "const": "call_ended" } } },             "then": { "properties": { "body": { "$ref": "#/$defs/CallEndedBody" } } } },
     { "if": { "properties": { "type": { "const": "call_timeout" } } },           "then": { "properties": { "body": { "$ref": "#/$defs/CallTimeoutBody" } } } },
     { "if": { "properties": { "type": { "const": "retry_timer_fired" } } },      "then": { "properties": { "body": { "$ref": "#/$defs/RetryTimerFiredBody" } } } },
@@ -57,11 +58,16 @@
       "enum": ["open", "held", "calling", "retry_wait", "deciding", "awaiting_release", "needs_review", "blocked", "releasing", "released"]
     },
     "Outcome": { "type": "string", "enum": ["verified", "not_verified", "needs_review"] },
+    "LastFourResult": {
+      "description": "How the spoken digits compared with the case's accounts, computed in memory by packages/decision (tested in this order: inconsistent, ambiguous, match, matches_old_account, near_miss, mismatch; fewer than four digits, don't know or refused is not_provided). The digits themselves are never stored.",
+      "type": "string",
+      "enum": ["match", "matches_old_account", "near_miss", "mismatch", "not_provided", "ambiguous", "inconsistent"]
+    },
     "EventType": {
       "type": "string",
       "enum": [
         "change_detected", "hold_confirmed", "hold_failed", "number_resolved", "no_provable_number",
-        "call_ended", "call_timeout", "retry_timer_fired", "decision_made",
+        "call_started", "call_ended", "call_timeout", "retry_timer_fired", "decision_made",
         "review_cleared", "review_blocked", "release_co_approved", "release_approved", "release_rejected",
         "hold_release_confirmed", "deadline_reached", "command_failed"
       ]
@@ -139,8 +145,19 @@
         "reason": { "type": "string" }
       }
     },
+    "CallStartedBody": {
+      "description": "The voice service accepted the call and returned its id. Pins the case's current call, so a report from an earlier generation's call is refused (spec 0002, D6).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["call_id", "attempt"],
+      "properties": {
+        "call_id": { "$ref": "#/$defs/Uuid" },
+        "attempt": { "type": "integer", "minimum": 1, "maximum": 3 }
+      }
+    },
     "CallEndedBody": {
       "type": "object",
+      "additionalProperties": false,
       "required": ["call_id", "result", "attempt"],
       "properties": {
         "call_id": { "$ref": "#/$defs/Uuid" },
@@ -152,8 +169,31 @@
         "agent_version": { "type": "string" },
         "answers": {
           "$ref": "./call-answers.schema.json",
-          "$comment": "Owned by Sami: the answer slots and allowed values shared by the voice tools, the text line and decide(). Code builds this from the agent's record_answer tool calls; the AI emits no events (I4)."
-        }
+          "$comment": "Owned by Sami: the answer slots and allowed values shared by the voice tools, the text line and decide(). Code builds this from the agent's record_answer tool calls; the AI emits no events (I4). The stored shape: account digits only as a keyed hash."
+        },
+        "last_four_result": {
+          "$ref": "#/$defs/LastFourResult",
+          "description": "Computed by the core from the in-transit digits when the report arrives, before the digits are discarded (spec 0002, D7). Absent when no answers were recorded."
+        },
+        "contact_point_id": {
+          "$ref": "#/$defs/Uuid",
+          "description": "The Trust Ledger contact point that was dialed."
+        },
+        "checks": { "$ref": "#/$defs/CallChecks" }
+      }
+    },
+    "CallChecks": {
+      "description": "Computed by code in the voice service after the call, never by the model. Shared by the stored CallEndedBody and the core-voice report (openapi/internal.yaml). Checks that need case or ledger data (company match against the vendor's names, whether the speaker first appeared in the change thread) stay with the core.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["disclosure_first", "answers_grounded", "agent_spoke_account_digits", "new_number_accepted", "policy_violations", "speech_guard_trips"],
+      "properties": {
+        "disclosure_first": { "type": "boolean", "description": "The fixed AI and recording disclosure played in full as the first turn." },
+        "answers_grounded": { "type": "boolean", "description": "Every recorded answer appears in the transcript turn it cites." },
+        "agent_spoke_account_digits": { "type": "boolean", "description": "Must be false. True is a script violation." },
+        "new_number_accepted": { "type": "boolean", "description": "Must be false. True is a script violation." },
+        "policy_violations": { "type": "integer", "minimum": 0, "description": "Unknown tools or invalid tool arguments." },
+        "speech_guard_trips": { "type": "integer", "minimum": 0 }
       }
     },
     "CallTimeoutBody": {
@@ -183,7 +223,7 @@
         "inputs_hash": { "$ref": "#/$defs/Sha256Hex" },
         "engine_version": { "type": "string" },
         "strict_mode": { "type": "boolean" },
-        "last_four_result": { "type": "string", "enum": ["match", "matches_old_account", "near_miss", "mismatch", "not_provided", "ambiguous", "inconsistent"] },
+        "last_four_result": { "$ref": "#/$defs/LastFourResult" },
         "source": { "type": "string", "enum": ["call", "manual"] }
       }
     },

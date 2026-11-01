@@ -46,7 +46,7 @@ python3 scripts/db/render_state_machine.py docs/state-machine.md
 
 if command -v uv >/dev/null 2>&1; then
   echo "check  contracts: schema, examples, hash vectors (python == sql)"
-  uv run --quiet --with jsonschema --with rfc8785 python packages/contracts/scripts/validate.py
+  uv run --quiet --with jsonschema --with rfc8785 --with pyyaml --with openapi-spec-validator python packages/contracts/scripts/validate.py
   uv run --quiet --with rfc8785 python packages/contracts/scripts/make_vectors.py --check
 else
   echo "skip   contract checks (uv not installed)"
