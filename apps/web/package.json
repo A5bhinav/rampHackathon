@@ -1,0 +1,27 @@
+{
+  "name": "@dialback/web",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3000",
+    "build": "next build",
+    "start": "next start -p 3000",
+    "typecheck": "tsc --noEmit",
+    "gen:api": "openapi-typescript ../../packages/contracts/openapi/dialback.yaml -o ../../packages/contracts/generated/ts/dialback.ts",
+    "check:api": "openapi-typescript ../../packages/contracts/openapi/dialback.yaml -o node_modules/.cache/dialback-api-check.ts && diff -q node_modules/.cache/dialback-api-check.ts ../../packages/contracts/generated/ts/dialback.ts"
+  },
+  "dependencies": {
+    "jose": "6.2.15",
+    "next": "16.4.3",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "server-only": "0.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "openapi-typescript": "7.13.0",
+    "typescript": "5.9.3"
+  }
+}

@@ -1,0 +1,85 @@
+:root {
+  --bg: #f7f7f5;
+  --surface: #ffffff;
+  --text: #1c1c1a;
+  --muted: #5f5f5a;
+  --line: #e2e2dc;
+  --accent: #3b4fd8;
+  --ok-bg: #e6f4ea;
+  --ok: #1e6b35;
+  --warn-bg: #fff4d6;
+  --warn: #7a5600;
+  --bad-bg: #fde8e6;
+  --bad: #a1271b;
+  --info-bg: #e8edfb;
+  --info: #2c3c9e;
+  --radius: 8px;
+  --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #141413;
+    --surface: #1d1d1b;
+    --text: #ededea;
+    --muted: #a3a39c;
+    --line: #34342f;
+    --accent: #8d9cff;
+    --ok-bg: #16301f;
+    --ok: #8fd6a3;
+    --warn-bg: #352a0c;
+    --warn: #f0cd6e;
+    --bad-bg: #3b1714;
+    --bad: #ff9c90;
+    --info-bg: #1d2445;
+    --info: #b3bfff;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+a { color: var(--accent); }
+h1 { font-size: 1.4rem; margin: 0 0 4px; }
+h2 { font-size: 1.05rem; margin: 0 0 12px; }
+.shell { max-width: 1120px; margin: 0 auto; padding: 0 16px 48px; }
+.topbar { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; justify-content: space-between; padding: 14px 0; border-bottom: 1px solid var(--line); margin-bottom: 20px; }
+.brand { font-weight: 700; letter-spacing: 0.01em; text-decoration: none; color: var(--text); }
+.nav { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+.nav a { text-decoration: none; }
+.who { color: var(--muted); font-size: 0.9rem; display: flex; gap: 10px; align-items: center; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; margin-bottom: 16px; }
+.grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+.muted { color: var(--muted); }
+.mono { font-family: var(--mono); font-size: 0.85rem; }
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); font-weight: 600; }
+.table-wrap { overflow-x: auto; }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 0.8rem; font-weight: 600; white-space: nowrap; }
+.tone-ok { background: var(--ok-bg); color: var(--ok); }
+.tone-warn { background: var(--warn-bg); color: var(--warn); }
+.tone-bad { background: var(--bad-bg); color: var(--bad); }
+.tone-info { background: var(--info-bg); color: var(--info); }
+.tone-muted { background: var(--line); color: var(--muted); }
+.banner { border-radius: var(--radius); padding: 12px 14px; margin-bottom: 12px; font-weight: 600; }
+.banner.critical { background: var(--bad-bg); color: var(--bad); }
+.banner.warning { background: var(--warn-bg); color: var(--warn); }
+dl.facts { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 0; }
+dl.facts dt { color: var(--muted); }
+dl.facts dd { margin: 0; }
+ol.timeline { list-style: none; margin: 0; padding: 0; }
+ol.timeline li { padding: 10px 0; border-bottom: 1px solid var(--line); display: grid; grid-template-columns: 3.5rem 1fr; gap: 12px; }
+ol.timeline li:last-child { border-bottom: 0; }
+.seq { color: var(--muted); font-family: var(--mono); font-size: 0.85rem; }
+ul.plain { margin: 0; padding-left: 18px; }
+form.console { display: grid; gap: 10px; }
+textarea { width: 100%; min-height: 84px; padding: 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--text); font: inherit; }
+select, button { font: inherit; }
+button { border: 1px solid var(--line); background: var(--surface); color: var(--text); padding: 8px 14px; border-radius: 6px; cursor: pointer; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button.danger { color: var(--bad); }
+button:disabled { opacity: 0.6; cursor: not-allowed; }
+.actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.result { padding: 8px 10px; border-radius: 6px; }
+.result.error { background: var(--bad-bg); color: var(--bad); }
+.result.ok { background: var(--ok-bg); color: var(--ok); }
+.signin { max-width: 420px; margin: 10vh auto; }
+.signin form { display: grid; gap: 12px; }
