@@ -1,0 +1,47 @@
+name: py
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  py:
+    name: lint and tests (core, Ramp mock, decision engine)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # The tests create a fresh database on this server for each session (scripts/db/pgtemp.py).
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Install psql
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+      - name: Install the Python workspace
+        run: uv sync --all-packages --locked
+      - name: Lint
+        run: uv run --no-project --with ruff ruff check apps packages scripts
+      - name: Decision engine
+        run: cd packages/decision && uv run pytest -q
+      - name: Ramp mock
+        run: cd apps/ramp-mock && uv run pytest -q
+      - name: Core (with the Ramp mock in process)
+        run: cd apps/core && uv run pytest -q
+
+  boundaries:
+    name: no imports between apps
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/ci/boundaries.py

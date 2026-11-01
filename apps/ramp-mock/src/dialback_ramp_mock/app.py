@@ -155,6 +155,7 @@ class SettingsPatch(Strict):
     rate_limit_per_10s: int | None = Field(default=None, ge=1, le=10_000)
     fail_next_hold: bool | None = None
     fail_next_release: bool | None = None
+    fail_holds: bool | None = None
     hold_readback_lag_ms: int | None = Field(default=None, ge=0, le=600_000)
 
 
@@ -389,7 +390,7 @@ def create_app(settings: Settings, pool: AsyncConnectionPool | None = None,
     @app.post(f"{API}/vendors/{{vendor_id}}/hold")
     async def place_hold(vendor_id: UUID, s: ScopeDep, body: HoldRequest | None = None):
         await owned_vendor(s, vendor_id)
-        if await _switch(s, "fail_next_hold"):
+        if await _switch(s, "fail_next_hold") or await _switch(s, "fail_holds"):
             # Return, don't raise: the transaction commits, so the one-shot switch stays spent.
             return error(500, "internal_error", "Simulated failure placing the hold.")
         hold_id = (await (await s.conn.execute(

@@ -135,7 +135,9 @@ def permissions(case: dict[str, Any], user: UUID, roles: list[str], approved_thi
         reasons.append("You cleared this case's review, so a different approver must release it.")
     if awaiting and approved_this_version:
         reasons.append("This change has no known author, so it needs two approvers; you have already approved.")
-    if not awaiting and case["state"] != "needs_review":
+    if case["state"] == "released":
+        reasons.append("This case is released; the hold is off and nothing is left to decide.")
+    elif not awaiting and case["state"] != "needs_review":
         reasons.append(f"This case is {case['state'].replace('_', ' ')}; there is nothing to release or review yet.")
     return {
         "can_approve": awaiting and approver and not is_changer and not is_reviewer and not approved_this_version,

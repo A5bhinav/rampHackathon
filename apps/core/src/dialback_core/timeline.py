@@ -31,6 +31,22 @@ CALL_RESULT = {
 }
 
 
+# Written by the worker when the voice service refuses a call (worker.place_call), and the
+# refusal codes from Sami's internal.yaml (PreDialRefusal.code).
+PRE_DIAL = "pre-dial check refused:"
+PRE_DIAL_REASON = {
+    "case_not_held": "the case was not held",
+    "case_finished": "the case had already finished",
+    "number_not_selected": "no number was selected",
+    "number_opted_out": "the number opted out of calls",
+    "outside_calling_window": "outside the vendor's calling hours",
+    "attempt_cap_reached": "the case has used its call attempts",
+    "number_cap_reached": "the number has had its calls this month",
+    "not_on_dial_allowlist": "the number is not on the demo's dial allowlist",
+    "voice_not_configured": "no voice service is configured",
+}
+
+
 def _plural(n: int, word: str) -> str:
     return f"{n} {word}" + ("" if n == 1 else "s")
 
@@ -79,6 +95,11 @@ def summary(event_type: str, body: dict[str, Any], actor_name: str) -> str:
         case "deadline_reached":
             return "Three business days passed without a decision; the hold stays on and a person must review."
         case "command_failed":
+            error = str(b.get("last_error", ""))
+            if b.get("command") == "place_call" and error.startswith(PRE_DIAL):
+                code = error.removeprefix(PRE_DIAL).strip() or "unknown"
+                return (f"The voice service checked the call and did not place it ({PRE_DIAL_REASON.get(code, code)}); "
+                        "the hold stays on and a person must review.")
             return f"A step kept failing ({b.get('command', 'unknown')}); the hold stays on and a person must review."
         case _:
             return "An event was recorded."

@@ -36,6 +36,7 @@ from .events import TransitionRefused, apply_event
 from .ports import CallerError, CallPlacer, NumberResolver, PreDialRefused
 from .ramp import RampConnector, RampError, RampNotFound, RampPort
 from .settings import Settings
+from .timeline import PRE_DIAL
 
 log = logging.getLogger(__name__)
 HOLD_REASON = "Dialback: the vendor's bank details changed; verifying with the vendor before paying."
@@ -327,7 +328,7 @@ class Worker:
         except PreDialRefused as refused:
             # No call was placed and none will be: a person takes over, the hold stays on.
             await self._emit(case, "command_failed", f"{cmd.key}:refused",
-                             {"command": "place_call", "attempts": cmd.attempts, "last_error": f"pre-dial check refused: {refused.code}"})
+                             {"command": "place_call", "attempts": cmd.attempts, "last_error": f"{PRE_DIAL} {refused.code}"})
             return
         await self._emit(case, "call_started", f"{cmd.key}:started", {"call_id": str(call_id), "attempt": attempt})
 

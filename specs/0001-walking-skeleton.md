@@ -18,17 +18,27 @@ answers (`call-answers.schema.json`, Sami).
 
 ## Acceptance
 
-- [ ] `POST /_mock/vendors/{id}/bank-change` on `apps/ramp-mock` sends a signed `vendors.updated` webhook to `apps/core`.
-- [ ] `apps/core` verifies the signature, stores the delivery in `app.inbound_webhooks`, answers 2xx within 10 seconds, and a duplicate delivery is stored once and still answered 2xx.
-- [ ] The worker diffs the vendor's accounts against `app.bank_accounts`, writes one `app.bank_change_events` row, and calls `apply_case_event(... 'change_detected' ...)`; the case is `open` with the deadline timer set.
-- [ ] The `place_hold` command saves the bill schedule, places the hold on the mock, reads it back, and emits `hold_confirmed {readback_ok: true, ramp_ref, original_schedule}`; the case is `held` and the mock's bills show `payment_date` cleared.
-- [ ] `DIALBACK_RESOLVER=stub` returns a contract example; the worker emits `number_resolved`; the case is `calling`.
-- [ ] `DIALBACK_VOICE=text` returns a scripted `call_ended` with `answers_recorded`; the worker emits `decision_made {outcome: verified}` from a stub `decide()`; the case is `awaiting_release`.
-- [ ] The release console shows the case to an approver who is not the changer; a release with a reason calls `app.release_case()` under the approver's token; the case is `releasing`.
-- [ ] The `release_hold` command releases on the mock, reads it back, restores the saved payment dates, and emits `hold_release_confirmed`; the case is `released`.
-- [ ] `audit.verify_chain` reports the dataset's chain intact, and the case-detail page shows the timeline and the green badge.
-- [ ] A reset starts a new dataset and chain; nothing is deleted.
-- [ ] Failure path: with `fail_next_hold` set on the mock, the command retries, then emits `hold_failed`; the case is `needs_review` and the dashboard shows "Hold not confirmed".
+Status as of the `abhi/*` branches (spec 0002 has the branch plan). Each item names where
+it is proven.
+
+- [x] `POST /_mock/vendors/{id}/bank-change` on `apps/ramp-mock` sends a signed `vendors.updated` webhook to `apps/core`. (`apps/ramp-mock/tests`, the smoke run)
+- [x] `apps/core` verifies the signature, stores the delivery in `app.inbound_webhooks`, answers 2xx, and a duplicate delivery is stored once and still answered 2xx. (`apps/core/tests/test_detection.py`)
+- [x] The worker diffs the vendor's accounts against `app.bank_accounts`, writes one `app.bank_change_events` row, and calls `apply_case_event(... 'change_detected' ...)`; the case is `open` with the deadline timer set. (`test_detection.py`, SQL test 002)
+- [x] The `place_hold` command saves the bill schedule, places the hold on the mock, reads it back, and emits `hold_confirmed {readback_ok: true, ramp_ref, original_schedule}`; the case is `held` and the mock's bills show `payment_date` cleared. (`test_worker.py`)
+- [x] The resolver picks a number and the worker emits `number_resolved`; the case is `calling`. **Uses a test double** for Inesh's `select_number` until the ledger's stub lands; the real resolver already fails closed without it. (`test_worker.py`)
+- [x] A call is placed and reported per `internal.yaml`, `decide()` runs, and the case is `awaiting_release`. **Uses a test double** for Sami's voice service until the text line lands; the core side (call start, digits compared then hashed, only the current call counts) is real. (`test_worker.py`, the smoke run)
+- [x] The release console shows the case to an approver who is not the changer; a release with a reason calls `app.release_case()` under the approver's token; the case is `releasing`. (`apps/core/tests/test_api.py`, checked in a browser)
+- [x] The `release_hold` command releases on the mock, reads it back, restores the saved payment dates, and emits `hold_release_confirmed`; the case is `released`. (`test_worker.py`, the smoke run)
+- [x] `audit.verify_chain` reports the dataset's chain intact, and the case-detail page shows the timeline and the green badge; a hand-edited row turns it red at that row. (`test_api.py`, checked in a browser)
+- [x] A reset starts a new dataset and chain; nothing is deleted. (`dialback-core new-dataset`, `retire-dataset`; a dashboard button comes with demo mode on Nov 8)
+- [x] Failure path: with Ramp's hold endpoint down (the mock's `fail_holds`), the command retries, then emits `hold_failed`; the case is `needs_review` and the dashboard shows "Hold not confirmed". (the smoke run, `test_worker.py`)
+
+## Follow-ups found while building
+
+- Alerts are never resolved, so banners stay up after the cause is handled. Resolve an alert when its case moves on (or a person dismisses it, logged).
+- The poller (Nov 2) and the five-minute reconciliation that re-checks every unfinished case is still held in Ramp are not built yet; `import_all` is the sweep they will call.
+- Supabase sign-in waits for the project (spec 0002, Q5); dev sign-in is local only.
+- The demo's evening calls fall outside the 9:00 to 16:30 window (spec 0002, Q7); the local stack opens the window all day.
 
 ## Tests (written first)
 
@@ -57,5 +67,9 @@ scripts/db/test.sh
 ```
 
 ```bash
-uv run --package dialback-core pytest
+cd apps/core && uv run pytest
+```
+
+```bash
+uv run python scripts/dev/stack.py --smoke
 ```

@@ -99,6 +99,7 @@ async def test_queue_detail_and_release(world):
     await world.worker.drain(world.dataset.id)
     detail = await get(world, f"/api/cases/{cid}", "approver1", "/api/cases/{case_id}")
     assert detail["case"]["state"] == "released" and detail["hold"]["status"] == "released"
+    assert detail["permissions"]["reasons"] == ["This case is released; the hold is off and nothing is left to decide."]
     assert detail["timeline"][-1]["summary"] == "The hold was lifted in Ramp and 2 payment dates restored."
     assert detail["releases"][0]["actor"]["display_name"] == "Approver1"
 
@@ -129,6 +130,9 @@ async def test_review_then_a_different_approver_releases(world):
     refused = await post(world, f"/api/cases/{cid}/release", "approver1", "/api/cases/{case_id}/release", release, status=403)
     assert refused["code"] == "forbidden"
     assert (await post(world, f"/api/cases/{cid}/release", "approver2", "/api/cases/{case_id}/release", release))["to_state"] == "releasing"
+    detail = await get(world, f"/api/cases/{cid}", "approver2", "/api/cases/{case_id}")
+    refusal = next(e for e in detail["timeline"] if e["type"] == "command_failed")
+    assert refusal["summary"].startswith("The voice service checked the call and did not place it (outside the vendor's calling hours)")
 
 
 async def test_alerts_and_a_hand_edited_evidence_row(world, database_url):

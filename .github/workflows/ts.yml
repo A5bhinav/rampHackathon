@@ -1,0 +1,29 @@
+name: ts
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  ts:
+    name: dashboard typecheck, build, generated types
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Generated API types match dialback.yaml
+        run: cd apps/web && pnpm check:api
+      - name: Typecheck
+        run: cd apps/web && pnpm typecheck
+      - name: Build
+        run: cd apps/web && pnpm build
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"

@@ -51,7 +51,7 @@ The rules are SQL functions in `supabase/migrations/mock_ramp/`, tested in
 | `GET /developer/v1/audit-logs/events` (`target_id`, `event_type`, `from_occurred_at`) | Audit events with the actor |
 | `POST /_mock/seed` | Create the token's business if needed, then add users, vendors (accounts, contacts, bills), webhook subscriptions and settings. Every entity can carry a `ref`; the response maps refs to ids. For Inesh's demo seed and Sami's lab. |
 | `POST /_mock/vendors/{id}/bank-change` | A bank change (optionally by a seeded user): new active account, audit event, webhook unless silent |
-| `PATCH /_mock/settings` | Chaos switches: `duplicate_webhooks`, `reorder_webhooks`, `silent_changes`, `webhook_delay_ms`, `rate_limit_per_10s`, `fail_next_hold`, `fail_next_release`, `hold_readback_lag_ms` |
+| `PATCH /_mock/settings` | Chaos switches: `duplicate_webhooks`, `reorder_webhooks`, `silent_changes`, `webhook_delay_ms`, `rate_limit_per_10s`, `fail_next_hold`, `fail_next_release`, `fail_holds` (stays on: the hold endpoint is down), `hold_readback_lag_ms` |
 | `POST /_mock/payment-run` (`as_of`) | Pay every approved, unpaid bill due by `as_of`, unless it or its vendor is held. This is how the demo shows R1. |
 | `POST /_mock/webhooks/deliver` | Send this dataset's queued webhooks now, in scheduled order |
 
