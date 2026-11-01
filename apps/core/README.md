@@ -156,6 +156,7 @@ If this slice is behind at the Nov 4 checkpoint, `packages/decision` moves to In
 | Ports to Inesh's `select_number` and Sami's `POST /calls`, both failing closed when the other side is missing | `ports.py` | `abhi/core-worker` |
 | Company-name match, calling window | `company.py`, `calling_window.py` | `abhi/core-worker` |
 | CLI: `serve`, `new-dataset`, `import-vendors`, `retire-dataset` | `main.py` | `abhi/core-worker` |
+| The dashboard API per `dialback.yaml`: me, datasets, chain status, alerts, queue, case detail (timeline, decision, permissions), release and review, each run in Postgres as the signed-in person | `api.py`, `auth.py`, `timeline.py` | `abhi/core-api` |
 
 ### Configuration
 
@@ -173,6 +174,7 @@ If this slice is behind at the Nov 4 checkpoint, `packages/decision` moves to In
 | `DIALBACK_RESOLVER` | no | `stub` (default) calls the ledger's `select_number_stub`; `ledger` its `select_number` |
 | `DIALBACK_CALLING_TZ`, `DIALBACK_CALLING_WINDOW`, `DIALBACK_CALLING_DAYS` | no | Default `America/Los_Angeles`, `09:00-16:30`, `mon-fri` |
 | `DIALBACK_RUN_WORKER` | no | `0` runs the API without the worker |
+| `DIALBACK_JWT_SECRET` | yes | Verifies the dashboard's JWTs (Supabase's signing secret; a dev secret locally). 32+ characters |
 
 Secrets live in Railway variables and Supabase Vault; never in the repo or in logs.
 

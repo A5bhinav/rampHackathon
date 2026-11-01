@@ -114,6 +114,7 @@ These extend the design doc; none contradict it. Shout if any is wrong.
 7. **Deadline** is three business days (weekends skipped, no holiday calendar).
 8. **`mock_ramp` field names** marked "confirm" in the migration are to be checked against Ramp's OpenAPI spec.
 9. **Migration `app/0004`** (spec `specs/0002-skeleton-integration.md`) adds the dataset clock (D2), the `call_started` event that pins `cases.current_call_id` so only the current call's report counts (D6), version-qualified call keys, `hold_confirmed` from `held` for re-holds, and a `decide` command that carries the stored call body (D8). Tests `006` and `007` fail without it.
+10. **Migration `app/0005`**: a repeated release request (a double click) returns its first result instead of a refusal, and only for the same person's own request. Test `008`.
 
 ## Hosted project setup (once, by Abhi)
 

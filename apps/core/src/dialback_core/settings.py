@@ -44,6 +44,9 @@ class Settings:
     lease_seconds: int = 300
     worker_poll_seconds: float = 1.0
     run_worker: bool = True
+    # The dashboard's JWTs (Supabase's signing secret; a dev secret locally). HS256 for now (spec 0002, Q5).
+    jwt_secret: bytes = b""
+    jwt_audience: str = "authenticated"
     extra: dict[str, str] = field(default_factory=dict)
 
     @classmethod
@@ -73,4 +76,5 @@ class Settings:
             calling_window=env.get("DIALBACK_CALLING_WINDOW", "09:00-16:30"),
             calling_days=env.get("DIALBACK_CALLING_DAYS", "mon-fri"),
             run_worker=env.get("DIALBACK_RUN_WORKER", "1") != "0",
+            jwt_secret=_secret(env, "DIALBACK_JWT_SECRET", 32),
         )
