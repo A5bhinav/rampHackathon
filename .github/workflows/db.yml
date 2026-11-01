@@ -1,0 +1,33 @@
+name: db
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  db:
+    name: migrations, SQL tests, contracts
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Install psql
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+      - name: Apply migrations, run SQL tests, check contracts
+        run: scripts/db/test.sh
+      - name: State-machine doc matches the transition table
+        run: git diff --exit-code -- docs/state-machine.md

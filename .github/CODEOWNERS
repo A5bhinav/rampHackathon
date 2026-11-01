@@ -1,0 +1,31 @@
+# Every path has two owners: the owner and their partner, so the author's partner can approve.
+# Replace the two placeholder handles with Inesh's and Sami's GitHub logins.
+# Required code-owner reviews work on public repos with GitHub Free; a private repo needs a
+# paid plan. Decide on day 1: make the repo public (it gets submitted anyway) or treat this
+# file as advisory.
+
+*                                   @A5bhinav @INESH_GITHUB_HANDLE @SAMI_GITHUB_HANDLE
+
+/apps/core/                         @A5bhinav @SAMI_GITHUB_HANDLE
+/apps/ramp-mock/                    @A5bhinav @SAMI_GITHUB_HANDLE
+/packages/decision/                 @A5bhinav @INESH_GITHUB_HANDLE
+/packages/evidence/                 @A5bhinav @SAMI_GITHUB_HANDLE
+/supabase/migrations/app/           @A5bhinav @SAMI_GITHUB_HANDLE
+/supabase/migrations/audit/         @A5bhinav @SAMI_GITHUB_HANDLE
+/supabase/migrations/mock_ramp/     @A5bhinav @SAMI_GITHUB_HANDLE
+/supabase/tests/                    @A5bhinav @SAMI_GITHUB_HANDLE
+
+/packages/ledger/                   @INESH_GITHUB_HANDLE @A5bhinav
+/corpus/                            @INESH_GITHUB_HANDLE @A5bhinav
+/supabase/migrations/ledger/        @INESH_GITHUB_HANDLE @A5bhinav
+
+/apps/voice/                        @SAMI_GITHUB_HANDLE @INESH_GITHUB_HANDLE
+/packages/policy/                   @SAMI_GITHUB_HANDLE @INESH_GITHUB_HANDLE
+/evals/                             @SAMI_GITHUB_HANDLE @INESH_GITHUB_HANDLE
+/supabase/migrations/voice/         @SAMI_GITHUB_HANDLE @INESH_GITHUB_HANDLE
+/supabase/migrations/lab/           @SAMI_GITHUB_HANDLE @INESH_GITHUB_HANDLE
+
+/packages/contracts/                @A5bhinav @INESH_GITHUB_HANDLE @SAMI_GITHUB_HANDLE
+/apps/web/                          @A5bhinav @INESH_GITHUB_HANDLE @SAMI_GITHUB_HANDLE
+/docs/                              @A5bhinav @INESH_GITHUB_HANDLE @SAMI_GITHUB_HANDLE
+/AGENTS.md                          @A5bhinav @INESH_GITHUB_HANDLE @SAMI_GITHUB_HANDLE

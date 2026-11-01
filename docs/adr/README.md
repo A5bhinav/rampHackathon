@@ -1,0 +1,22 @@
+# Architecture decision records
+
+Nygard format: `NNNN-title.md` with Title, Status, Context, Decision, Consequences. Numbered
+once and never reused. A reversed decision is marked superseded rather than deleted. The
+short versions from the design doc follow; each gets its own file as it is written up.
+
+| ADR | Decision | Rejected |
+|---|---|---|
+| 1 | **Postgres is the referee.** The state machine, four-eyes release and evidence chain live in three SQL functions behind row-level security: `apply_case_event`, `release_case`, `append_evidence`. They hold even if a service has a bug, a key leaks or an agent gets something wrong. | Rules only in application code; XState in the app. |
+| 2 | **Python services on Railway, dashboard on Vercel.** A live call holds a WebSocket for minutes; Vercel's close at 300 s on Hobby. Python has the parsing and eval libraries, and one backend language lets the lab import the real code. | Everything on Vercel with Python serverless functions. Fly.io or Render would do as well as Railway. |
+| 3 | **Postgres tables instead of a workflow engine.** Every wait is a case state plus an `outbox` or `timers` row the worker claims with `FOR UPDATE SKIP LOCKED`. | Vercel Workflows; Temporal (the production path, too much for ten days); Inngest. |
+| 4 | **AI collects, code decides.** Models only label documents and hold conversations. A pure function decides; only code picks a number, places or lifts a hold. Follows the action-selector, dual-LLM and context-minimization patterns. | An LLM grading the call. |
+| 5 | **Our own dialogue loop on Twilio ConversationRelay.** The same `policy.step()` runs live and in the lab; text in and out makes the speech guard possible. Fallback: Retell by Nov 4. | Vapi, ElevenLabs Agents, OpenAI speech-to-speech. |
+| 6 | **Ramp's REST holds, polling as the truth for changes.** Ramp has no bank-account history endpoint and `vendors.updated` on bank changes is unconfirmed, so Dialback diffs accounts itself. | Bill-level holds alone; Ramp's agent tools (`ramp_hold`) through an agent identity (early access). |
+| 7 | **A hash-chained evidence log.** RFC 8785 canonical JSON, SHA-256, linked in SQL. Tamper-evident, not tamper-proof: the tip hash is committed to GitHub with each scorecard as an outside witness. Production: a daily Merkle root timestamped externally. | |
+| 8 | **Last four digits plus a keyed fingerprint.** Routing number, last four and `HMAC-SHA256(key, routing + account)`; never the full number. A plain hash would be brute-forceable. Each fingerprint records its key version. | |
+| 9 | **Four-eyes in SQL, with the user's own token.** `release_case()` takes the caller from `auth.uid()` and checks the approver role, not the changer, and the case version. The server key never touches a human decision. | |
+| 10 | **An unknown changer means two approvers.** A vendor-supplied or ERP-synced change may have no Dialback user behind it, so "not the changer" can't be checked; release then needs two different approvers. | Leaving such cases in needs_review. |
+| 11 | **The attack lab runs production code on a simulated clock.** It imports the real packages, uses the real doors, reads outcomes through the real API. Every component reads time from `Clock` and respects `dataset_id`. | Hosted voice simulators and red-team frameworks as the harness (their attack ideas are borrowed). |
+| 12 | **Contracts first.** OpenAPI 3.1 and JSON Schema in `packages/contracts`, frozen on day 1, generated types, a Prism mock. A contract change takes its own PR approved by every affected owner. | |
+| 13 | **Sources are counted by how they reached us, and all email counts once.** A mailbox takeover controls every address on a domain and any lookalike. The scorecard shows the looser variants side by side. | |
+| 14 | **PDFs are read locally, with per-character checks.** pdfplumber's color, size and position data caught hidden white, tiny and off-page text that every text extractor passed through. Scans go to Claude's vision input and stay about 5% of the corpus. | AI OCR services as the text layer. |

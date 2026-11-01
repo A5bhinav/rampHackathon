@@ -1,0 +1,36 @@
+# secrets and local config
+.env
+.env.*
+!.env.example
+*.pem
+
+# python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.hypothesis/
+.ruff_cache/
+
+# node
+node_modules/
+.next/
+dist/
+.turbo/
+
+# supabase local
+supabase/.branches/
+supabase/.temp/
+
+# lab output and media never enter the repo
+evals/out/
+*.wav
+*.mp3
+*.m4a
+recordings/
+transcripts/raw/
+
+# editors and OS
+.DS_Store
+.idea/
+.vscode/

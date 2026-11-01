@@ -1,0 +1,224 @@
+{
+  "generated_by": "packages/contracts/scripts/make_vectors.py (python rfc8785 + hashlib)",
+  "rules": {
+    "body_jcs": "RFC 8785 canonical JSON of the envelope",
+    "content_hash": "hex(sha256(utf8(body_jcs)))",
+    "hash": "hex(sha256(utf8(prev_hash || content_hash)))",
+    "genesis_prev_hash": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "jcs": [
+    {
+      "name": "keys sorted, escapes, nesting",
+      "input": {
+        "b": 1,
+        "a": {
+          "z": [
+            true,
+            null,
+            "x\"y"
+          ],
+          "y": "é",
+          "t": "a\tb",
+          "u": "\u0001/"
+        },
+        "c": -5,
+        "A": false
+      },
+      "jcs": "{\"A\":false,\"a\":{\"t\":\"a\\tb\",\"u\":\"\\u0001/\",\"y\":\"é\",\"z\":[true,null,\"x\\\"y\"]},\"b\":1,\"c\":-5}",
+      "content_hash": "e103a8a96ad7cc41b4b3785573a614efcd4a9da4c4b4bc7d68d5e91bf7a7f321"
+    },
+    {
+      "name": "empty containers",
+      "input": {
+        "o": {},
+        "l": []
+      },
+      "jcs": "{\"l\":[],\"o\":{}}",
+      "content_hash": "111c683c055d4f0a50ce55366e2dfc66644f79266248039a271dd7e25cd5b104"
+    },
+    {
+      "name": "unicode above the BMP stays literal",
+      "input": {
+        "emoji": "🐍",
+        "cjk": "漢字"
+      },
+      "jcs": "{\"cjk\":\"漢字\",\"emoji\":\"🐍\"}",
+      "content_hash": "6d8835eabe9244e530b9da2c5ec3948ac1824813a1bd3a60c8559de5b54d09d2"
+    },
+    {
+      "name": "evidence-event.change_detected.json",
+      "input": {
+        "v": 1,
+        "chain_id": "0f3b7f2e-4d2a-4b1e-9c3d-1a2b3c4d5e6f",
+        "dataset_id": "7a1c9d2e-0b3f-4e5a-8c6d-9e0f1a2b3c4d",
+        "case_id": "c0ffee00-1111-4222-8333-444455556666",
+        "event_id": "e0000001-0000-4000-8000-000000000001",
+        "type": "change_detected",
+        "actor": {
+          "kind": "system",
+          "id": null
+        },
+        "occurred_at": "2026-11-01T17:04:05.123456Z",
+        "idempotency_key": "evt_9f8e7d:detected",
+        "from_state": null,
+        "to_state": "open",
+        "version": 1,
+        "body": {
+          "change_event_id": "b1a2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+          "policy_version": "v0",
+          "detected_via": "webhook",
+          "source_event_id": "evt_9f8e7d"
+        }
+      },
+      "jcs": "{\"actor\":{\"id\":null,\"kind\":\"system\"},\"body\":{\"change_event_id\":\"b1a2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d\",\"detected_via\":\"webhook\",\"policy_version\":\"v0\",\"source_event_id\":\"evt_9f8e7d\"},\"case_id\":\"c0ffee00-1111-4222-8333-444455556666\",\"chain_id\":\"0f3b7f2e-4d2a-4b1e-9c3d-1a2b3c4d5e6f\",\"dataset_id\":\"7a1c9d2e-0b3f-4e5a-8c6d-9e0f1a2b3c4d\",\"event_id\":\"e0000001-0000-4000-8000-000000000001\",\"from_state\":null,\"idempotency_key\":\"evt_9f8e7d:detected\",\"occurred_at\":\"2026-11-01T17:04:05.123456Z\",\"to_state\":\"open\",\"type\":\"change_detected\",\"v\":1,\"version\":1}",
+      "content_hash": "7c1ef95d45af2384dbf039534495deb228f890ca8ef876da301757349dc96198"
+    },
+    {
+      "name": "evidence-event.decision_made.json",
+      "input": {
+        "v": 1,
+        "chain_id": "0f3b7f2e-4d2a-4b1e-9c3d-1a2b3c4d5e6f",
+        "dataset_id": "7a1c9d2e-0b3f-4e5a-8c6d-9e0f1a2b3c4d",
+        "case_id": "c0ffee00-1111-4222-8333-444455556666",
+        "event_id": "e0000001-0000-4000-8000-000000000002",
+        "type": "decision_made",
+        "actor": {
+          "kind": "system",
+          "id": null
+        },
+        "occurred_at": "2026-11-01T17:21:40.000001Z",
+        "idempotency_key": "c0ffee00-1111-4222-8333-444455556666:decide:v1:2",
+        "from_state": "deciding",
+        "to_state": "awaiting_release",
+        "version": 1,
+        "body": {
+          "outcome": "verified",
+          "rules_fired": [
+            "V01_number_eligible",
+            "V02_outbound_dial",
+            "V07_right_person_confirmed",
+            "V08_digits_match"
+          ],
+          "inputs_hash": "9b74c9897bac770ffc029102a200c5de3ce2d1b9b1b0d6c1a2e3f4a5b6c7d8e9",
+          "engine_version": "decision-0.1.0",
+          "strict_mode": false,
+          "last_four_result": "match",
+          "source": "call"
+        }
+      },
+      "jcs": "{\"actor\":{\"id\":null,\"kind\":\"system\"},\"body\":{\"engine_version\":\"decision-0.1.0\",\"inputs_hash\":\"9b74c9897bac770ffc029102a200c5de3ce2d1b9b1b0d6c1a2e3f4a5b6c7d8e9\",\"last_four_result\":\"match\",\"outcome\":\"verified\",\"rules_fired\":[\"V01_number_eligible\",\"V02_outbound_dial\",\"V07_right_person_confirmed\",\"V08_digits_match\"],\"source\":\"call\",\"strict_mode\":false},\"case_id\":\"c0ffee00-1111-4222-8333-444455556666\",\"chain_id\":\"0f3b7f2e-4d2a-4b1e-9c3d-1a2b3c4d5e6f\",\"dataset_id\":\"7a1c9d2e-0b3f-4e5a-8c6d-9e0f1a2b3c4d\",\"event_id\":\"e0000001-0000-4000-8000-000000000002\",\"from_state\":\"deciding\",\"idempotency_key\":\"c0ffee00-1111-4222-8333-444455556666:decide:v1:2\",\"occurred_at\":\"2026-11-01T17:21:40.000001Z\",\"to_state\":\"awaiting_release\",\"type\":\"decision_made\",\"v\":1,\"version\":1}",
+      "content_hash": "be30d047f247a5c8b4d198d39e9913550dc6a45d37d965174a783e9049791a81"
+    },
+    {
+      "name": "evidence-event.release_approved.json",
+      "input": {
+        "v": 1,
+        "chain_id": "0f3b7f2e-4d2a-4b1e-9c3d-1a2b3c4d5e6f",
+        "dataset_id": "7a1c9d2e-0b3f-4e5a-8c6d-9e0f1a2b3c4d",
+        "case_id": "c0ffee00-1111-4222-8333-444455556666",
+        "event_id": "e0000001-0000-4000-8000-000000000003",
+        "type": "release_approved",
+        "actor": {
+          "kind": "person",
+          "id": "a9b8c7d6-e5f4-4321-8abc-def012345678"
+        },
+        "occurred_at": "2026-11-01T18:02:11.654321Z",
+        "idempotency_key": "c0ffee00-1111-4222-8333-444455556666:approve:v1:a9b8c7d6-e5f4-4321-8abc-def012345678",
+        "from_state": "awaiting_release",
+        "to_state": "releasing",
+        "version": 1,
+        "body": {
+          "reason": "Vendor's CFO confirmed on the contract number; last four match. Entered by J. Lin, released by me.",
+          "expected_version": 1
+        }
+      },
+      "jcs": "{\"actor\":{\"id\":\"a9b8c7d6-e5f4-4321-8abc-def012345678\",\"kind\":\"person\"},\"body\":{\"expected_version\":1,\"reason\":\"Vendor's CFO confirmed on the contract number; last four match. Entered by J. Lin, released by me.\"},\"case_id\":\"c0ffee00-1111-4222-8333-444455556666\",\"chain_id\":\"0f3b7f2e-4d2a-4b1e-9c3d-1a2b3c4d5e6f\",\"dataset_id\":\"7a1c9d2e-0b3f-4e5a-8c6d-9e0f1a2b3c4d\",\"event_id\":\"e0000001-0000-4000-8000-000000000003\",\"from_state\":\"awaiting_release\",\"idempotency_key\":\"c0ffee00-1111-4222-8333-444455556666:approve:v1:a9b8c7d6-e5f4-4321-8abc-def012345678\",\"occurred_at\":\"2026-11-01T18:02:11.654321Z\",\"to_state\":\"releasing\",\"type\":\"release_approved\",\"v\":1,\"version\":1}",
+      "content_hash": "f7af0870c5f105306c1fe0297204975da7014ef3133cdefe5da517fe208e09c2"
+    }
+  ],
+  "chain": {
+    "chain_id": "0f3b7f2e-4d2a-4b1e-9c3d-1a2b3c4d5e6f",
+    "events": [
+      {
+        "v": 1,
+        "chain_id": "0f3b7f2e-4d2a-4b1e-9c3d-1a2b3c4d5e6f",
+        "dataset_id": "7a1c9d2e-0b3f-4e5a-8c6d-9e0f1a2b3c4d",
+        "case_id": "c0ffee00-1111-4222-8333-444455556666",
+        "event_id": "e0000001-0000-4000-8000-000000000001",
+        "type": "change_detected",
+        "actor": {
+          "kind": "system",
+          "id": null
+        },
+        "occurred_at": "2026-11-01T17:04:05.123456Z",
+        "idempotency_key": "evt_9f8e7d:detected",
+        "from_state": null,
+        "to_state": "open",
+        "version": 1,
+        "body": {
+          "change_event_id": "b1a2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+          "policy_version": "v0",
+          "detected_via": "webhook",
+          "source_event_id": "evt_9f8e7d"
+        }
+      },
+      {
+        "v": 1,
+        "chain_id": "0f3b7f2e-4d2a-4b1e-9c3d-1a2b3c4d5e6f",
+        "dataset_id": "7a1c9d2e-0b3f-4e5a-8c6d-9e0f1a2b3c4d",
+        "case_id": "c0ffee00-1111-4222-8333-444455556666",
+        "event_id": "e0000001-0000-4000-8000-000000000002",
+        "type": "decision_made",
+        "actor": {
+          "kind": "system",
+          "id": null
+        },
+        "occurred_at": "2026-11-01T17:21:40.000001Z",
+        "idempotency_key": "c0ffee00-1111-4222-8333-444455556666:decide:v1:2",
+        "from_state": "deciding",
+        "to_state": "awaiting_release",
+        "version": 1,
+        "body": {
+          "outcome": "verified",
+          "rules_fired": [
+            "V01_number_eligible",
+            "V02_outbound_dial",
+            "V07_right_person_confirmed",
+            "V08_digits_match"
+          ],
+          "inputs_hash": "9b74c9897bac770ffc029102a200c5de3ce2d1b9b1b0d6c1a2e3f4a5b6c7d8e9",
+          "engine_version": "decision-0.1.0",
+          "strict_mode": false,
+          "last_four_result": "match",
+          "source": "call"
+        }
+      },
+      {
+        "v": 1,
+        "chain_id": "0f3b7f2e-4d2a-4b1e-9c3d-1a2b3c4d5e6f",
+        "dataset_id": "7a1c9d2e-0b3f-4e5a-8c6d-9e0f1a2b3c4d",
+        "case_id": "c0ffee00-1111-4222-8333-444455556666",
+        "event_id": "e0000001-0000-4000-8000-000000000003",
+        "type": "release_approved",
+        "actor": {
+          "kind": "person",
+          "id": "a9b8c7d6-e5f4-4321-8abc-def012345678"
+        },
+        "occurred_at": "2026-11-01T18:02:11.654321Z",
+        "idempotency_key": "c0ffee00-1111-4222-8333-444455556666:approve:v1:a9b8c7d6-e5f4-4321-8abc-def012345678",
+        "from_state": "awaiting_release",
+        "to_state": "releasing",
+        "version": 1,
+        "body": {
+          "reason": "Vendor's CFO confirmed on the contract number; last four match. Entered by J. Lin, released by me.",
+          "expected_version": 1
+        }
+      }
+    ],
+    "hashes": [
+      "67a56d15de47b0a23304e99806f917425c9cfb542790ff025e2573583e68b09b",
+      "3f8ba882a4abb14bf36b671c276a196866845918e97e3d3563ecbc67bc3f3da2",
+      "009aa6909ea4b3af48cf8020bd3660da43a0260171dea6625b01ca52f06e351e"
+    ]
+  }
+}

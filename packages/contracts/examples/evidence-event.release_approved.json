@@ -1,0 +1,18 @@
+{
+  "v": 1,
+  "chain_id": "0f3b7f2e-4d2a-4b1e-9c3d-1a2b3c4d5e6f",
+  "dataset_id": "7a1c9d2e-0b3f-4e5a-8c6d-9e0f1a2b3c4d",
+  "case_id": "c0ffee00-1111-4222-8333-444455556666",
+  "event_id": "e0000001-0000-4000-8000-000000000003",
+  "type": "release_approved",
+  "actor": { "kind": "person", "id": "a9b8c7d6-e5f4-4321-8abc-def012345678" },
+  "occurred_at": "2026-11-01T18:02:11.654321Z",
+  "idempotency_key": "c0ffee00-1111-4222-8333-444455556666:approve:v1:a9b8c7d6-e5f4-4321-8abc-def012345678",
+  "from_state": "awaiting_release",
+  "to_state": "releasing",
+  "version": 1,
+  "body": {
+    "reason": "Vendor's CFO confirmed on the contract number; last four match. Entered by J. Lin, released by me.",
+    "expected_version": 1
+  }
+}

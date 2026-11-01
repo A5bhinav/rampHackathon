@@ -1,0 +1,32 @@
+# uv workspace root. Python 3.13; three services and five packages, one owner each.
+# `uv sync --all-packages` installs everything; `uv run --package dialback-core pytest` tests one.
+[project]
+name = "dialback-workspace"
+version = "0.0.0"
+requires-python = ">=3.13"
+dependencies = []
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = [
+  "apps/core",
+  "apps/voice",
+  "apps/ramp-mock",
+  "packages/decision",
+  "packages/evidence",
+  "packages/ledger",
+  "packages/policy",
+  "evals",
+]
+
+[tool.uv.sources]
+dialback-decision = { workspace = true }
+dialback-evidence = { workspace = true }
+dialback-ledger   = { workspace = true }
+dialback-policy   = { workspace = true }
+
+[tool.ruff]
+line-length = 110
+target-version = "py313"
