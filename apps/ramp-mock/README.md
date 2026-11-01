@@ -2,67 +2,79 @@
 
 **Owner: Abhi. Partner reviewer: Sami.**
 
-A small FastAPI service on Railway that copies Ramp's paths, field names and behavior, so
-the whole product runs end to end before sandbox access arrives, and so the attack lab can
-push changes through a real door. `apps/core` talks to it through the same `RampPort`
-interface it uses for the real API; `DIALBACK_RAMP=mock` selects it.
+A small FastAPI service that copies Ramp's paths, field names and behavior, so the whole
+product runs end to end before sandbox access arrives, and so the attack lab can push
+changes through a real door. The core talks to it with the same HTTP adapter it will use
+for Ramp's sandbox (`DIALBACK_RAMP=mock` only changes the base URL and the credentials;
+spec 0002, D1).
 
-## What it must copy
+## Run it
 
-- Vendor holds that clear every unpaid bill's payment date, and releases that do not reschedule them.
-- Thin, HMAC-signed webhooks (`X-Ramp-Signature` over the raw body) with retries.
-- A switch that duplicates and reorders deliveries, and a "silent change" mode that sends no webhook at all, so the poller has to find the change.
-- Last-four masking on account numbers.
-- 429 responses past the rate limit (200 requests per 10 seconds per IP).
-- An audit log whose events name the actor, or no actor for a vendor-supplied or ERP-synced change.
+```bash
+DATABASE_URL=postgresql://... MOCK_RAMP_SECRET=$(openssl rand -hex 24) uv run --package dialback-ramp-mock dialback-ramp-mock
+```
 
-## Where the behavior lives
+`PORT` defaults to 8003. `MOCK_RAMP_DELIVER_WEBHOOKS=0` turns off the background webhook
+sender (deliveries then go out only through `POST /_mock/webhooks/deliver`).
 
-The rules above are SQL functions in the `mock_ramp` schema
-(`supabase/migrations/mock_ramp/0001_mock_ramp.sql`), tested in `supabase/tests/004_mock_ramp.sql`.
-The FastAPI layer is thin: it authenticates, rate-limits in memory, maps a route to a query or
-a function call, and runs the webhook sender loop.
+## One business per dataset, one token per dataset
 
-| Route | Backed by |
+Every request carries `Authorization: Bearer mock.<dataset_id>.<hex HMAC-SHA256(MOCK_RAMP_SECRET, dataset_id)>`.
+The mock serves only that dataset's business, so the lab's parallel scenarios and the demo
+never see each other's vendors. Whoever holds the secret (the core, the lab) mints tokens;
+nothing is stored. `dialback_ramp_mock.tokens.mint()` is the reference implementation.
+
+## What it must copy, and where that lives
+
+The rules are SQL functions in `supabase/migrations/mock_ramp/`, tested in
+`supabase/tests/004_mock_ramp.sql`; this service is the HTTP layer over them.
+
+- Vendor holds clear every unpaid bill's payment date; releases do not reschedule them.
+- Thin, HMAC-signed webhooks (`X-Ramp-Signature`, hex, over the raw body) with retries and backoff.
+- Switches that duplicate and reorder deliveries, delay them, or send none at all ("silent change"), so the poller has to find the change.
+- Account numbers masked to the last four digits. The full number never leaves the mock.
+- 429 with `Retry-After` past the rate limit (200 requests per 10 seconds per IP by default).
+- An audit log whose bank-change events name the actor, or no actor for a vendor-supplied or ERP-synced change.
+
+## Routes
+
+| Route | What it does |
 |---|---|
-| `GET /developer/v1/vendors`, `?from_updated_at=` | `mock_ramp.vendors` |
-| `GET /developer/v1/vendors/{id}` | `mock_ramp.vendors` |
-| `GET /developer/v1/vendors/{id}/accounts` | `mock_ramp.vendor_accounts_api` (masked view) |
-| `GET /developer/v1/vendors/{id}/contacts` | `mock_ramp.vendor_contacts` |
-| `GET /developer/v1/bills` (pages of 100) | `mock_ramp.bills` |
-| `POST /developer/v1/vendors/{id}/hold` | `mock_ramp.place_hold()` |
-| `POST /developer/v1/vendors/{id}/release` | `mock_ramp.release_hold()` |
-| bill update for `payment_date` (path to confirm) | `mock_ramp.bills` |
-| `GET /developer/v1/audit-logs/events` | `mock_ramp.audit_events` |
-| `POST /_mock/vendors/{id}/bank-change` (lab and demo only) | `mock_ramp.change_bank_account()` |
-| `PATCH /_mock/settings` (lab only) | `mock_ramp.settings`: duplicate, reorder, silent, delay, fail-next-hold, fail-next-release, read-back lag |
+| `GET /developer/v1/vendors` (`from_updated_at`, `page_size`, `start`) | Vendors, oldest first, with `page.next` |
+| `GET /developer/v1/vendors/{id}` | One vendor, with its active `hold` or null |
+| `GET /developer/v1/vendors/{id}/accounts` | Accounts, masked: `account_number_last4` only |
+| `GET /developer/v1/vendors/{id}/contacts` | Contacts |
+| `POST /developer/v1/vendors/{id}/hold` | Place a vendor hold (idempotent); clears unpaid bills' payment dates |
+| `POST /developer/v1/vendors/{id}/release` | Lift the hold; dates stay cleared |
+| `GET /developer/v1/bills` (`vendor_id`, `page_size`, `start`) | Bills, with `is_on_hold` and `payment_date` |
+| `PATCH /developer/v1/bills/{id}` | Set an unpaid bill's `payment_date` (how Dialback restores a schedule) |
+| `GET /developer/v1/audit-logs/events` (`target_id`, `event_type`, `from_occurred_at`) | Audit events with the actor |
+| `POST /_mock/seed` | Create the token's business if needed, then add users, vendors (accounts, contacts, bills), webhook subscriptions and settings. Every entity can carry a `ref`; the response maps refs to ids. For Inesh's demo seed and Sami's lab. |
+| `POST /_mock/vendors/{id}/bank-change` | A bank change (optionally by a seeded user): new active account, audit event, webhook unless silent |
+| `PATCH /_mock/settings` | Chaos switches: `duplicate_webhooks`, `reorder_webhooks`, `silent_changes`, `webhook_delay_ms`, `rate_limit_per_10s`, `fail_next_hold`, `fail_next_release`, `hold_readback_lag_ms` |
+| `POST /_mock/payment-run` (`as_of`) | Pay every approved, unpaid bill due by `as_of`, unless it or its vendor is held. This is how the demo shows R1. |
+| `POST /_mock/webhooks/deliver` | Send this dataset's queued webhooks now, in scheduled order |
 
-The one-shot switches (`fail_next_hold`, `fail_next_release`) are read with
-`mock_ramp.consume_switch(business_id, name)` in the route's own transaction *before* the
-hold or release function runs; when it returns true the route commits and answers 500, so
-the switch is spent even though the request failed.
+The one-shot failure switches are consumed in the request's own transaction and answered
+with 500, so a switch is spent even though the request failed.
 
-The webhook sender claims `mock_ramp.webhook_deliveries` rows that are due, signs the
-payload with the subscription secret, POSTs, records the response status, and retries
-failures with backoff.
-
-## One mock business per dataset
-
-`mock_ramp.businesses.dataset_id` ties a mock business to an `app.datasets` row, so each
-attack-lab scenario and each demo reset gets a fresh business with its own vendors, bills
-and chaos settings, and scenarios run in parallel without touching each other.
+**Webhook subscriptions point at the core per dataset:** `{core}/webhooks/ramp/{dataset_id}`
+(spec 0002, D3), with the secret the core verifies.
 
 ## Fields to confirm against Ramp's OpenAPI spec
 
-Column comments in the migration mark them: vendor `status`, `type`, `payment_method`;
-account `account_type`; bill `status`; user `role` and `status`; the audit event type for a
-bank-account change. Commit Ramp's OpenAPI spec to `packages/contracts/openapi/ramp-developer-api.json`
-when you have it, and adjust the mock in one PR.
+`hold` on a vendor and `is_on_hold` on a bill (Q4), the webhook signature encoding and
+payload shape (Q3), the bill update path, the audit event type for a bank-account change,
+and the status and role enums marked "confirm" in the migration. Commit Ramp's spec to
+`packages/contracts/openapi/ramp-developer-api.json` when we have it, and adjust the mock in
+one PR.
 
-## Start here
+## Tests
 
-1. `scripts/db/test.sh` and read `supabase/tests/004_mock_ramp.sql`: it is the behavior spec.
-2. Scaffold `src/dialback_ramp_mock/main.py` with the routes above, a bearer-token check, and an in-memory token bucket per client IP.
-3. Write the webhook sender as a background task in the same process.
-4. Seed script: one business, three vendors, a few bills with payment dates, one subscription pointing at `apps/core`.
-5. Nov 6: chaos mode wired to `/_mock/settings` for the lab.
+```bash
+cd apps/ramp-mock && uv run pytest
+```
+
+The tests start a throwaway Postgres (or use `DATABASE_URL`), migrate it with the same
+scripts as `scripts/db/test.sh`, run the app in process, and capture outgoing webhooks with a
+fake receiver. Each test seeds its own dataset.

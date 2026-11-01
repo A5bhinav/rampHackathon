@@ -1,1 +1,1 @@
-"""dialback-ramp-mock. See the README in this folder."""
+"""A Ramp-shaped mock of the Developer API. See the README in apps/ramp-mock."""

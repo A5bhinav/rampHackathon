@@ -17,7 +17,7 @@ schemas' own `$id`s (https://dialback.dev/schemas/...) map to schemas/. Nothing 
 import json
 import sys
 from pathlib import Path
-from urllib.parse import urldefrag, urlparse
+from urllib.parse import urlparse
 
 import yaml
 from jsonschema import Draft202012Validator
@@ -137,7 +137,7 @@ def check_openapi() -> int:
         uri = doc_path.as_uri()
         try:
             validate_spec(doc, base_uri=uri)
-        except Exception as exc:  # the validator raises its own error types
+        except Exception as exc:  # noqa: BLE001  (the validator raises several unrelated error types)
             failures += 1
             print(f"openapi BAD  {doc_path.name}: {str(exc).splitlines()[0]}")
             continue
