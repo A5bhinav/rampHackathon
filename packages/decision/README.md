@@ -58,7 +58,18 @@ inside this package; the caller passes everything in.
 - A Hypothesis property: for random facts, `decide()` never raises, and anything it cannot classify is `needs_review`.
 - `inputs_hash` is stable across dict ordering (canonicalize with `rfc8785` before hashing).
 
-## Start here
+## What exists (skeleton engine, `decision-0.1.0-skeleton`)
+
+- `last_four.compare_last_four()`: the full comparison, in the designed order, with property tests. The core runs it when a call report arrives, so the digits never leave memory (spec 0002, D7).
+- `decide()`: Not verified (4 rules), Needs review (17 rules), Verified (10 conditions, all required), anything else Needs review, any error Needs review. Each rule carries the templated sentence the dashboard shows.
+- Three facts need data no slice supplies yet: whether the speaker first appeared in the change thread and whether an offered number came from the request (the ledger's change context), and whether one person gave both the confirmation and the digits (per-turn speaker identity). The skeleton engine records them in `rules_fired` as `U01`, `U02`, `U03` ("not checked by this engine version") instead of guessing, so the evidence shows exactly what was not checked. The Nov 4 engine must fail closed on them.
+- `inputs_hash` is SHA-256 over the RFC 8785 form of the facts.
+
+```bash
+cd packages/decision && uv run pytest
+```
+
+## Start here (for the Nov 4 engine)
 
 1. Write `specs/NNNN-decision-engine.md` with the rule table as the acceptance list.
 2. `src/dialback_decision/facts.py` (`CaseFacts`, Pydantic, frozen), `last_four.py`, `rules.py` (the table), `engine.py` (`decide`).

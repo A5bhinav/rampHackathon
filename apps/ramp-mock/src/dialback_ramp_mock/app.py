@@ -276,9 +276,18 @@ async def owned_vendor(s: Scope, vendor_id: UUID, lock: bool = False) -> dict:
     return v
 
 
+async def readback_lag(s: Scope) -> int:
+    row = await (await s.conn.execute(
+        "select hold_readback_lag_ms from mock_ramp.settings where business_id = %s", (s.business_id,))).fetchone()
+    return row["hold_readback_lag_ms"] if row else 0
+
+
 async def active_hold(s: Scope, vendor_id: UUID) -> dict | None:
+    """The vendor's hold as a read shows it: a hold younger than hold_readback_lag_ms isn't
+    visible yet, so the core's read-back has to wait (a chaos switch for the lab)."""
     return await (await s.conn.execute(
-        "select * from mock_ramp.vendor_holds where vendor_id = %s and released_at is null", (vendor_id,))).fetchone()
+        "select * from mock_ramp.vendor_holds where vendor_id = %s and released_at is null "
+        "and placed_at <= clock_timestamp() - make_interval(secs => %s / 1000.0)", (vendor_id, await readback_lag(s)))).fetchone()
 
 
 def page(request: Request, rows: list[dict], size: int, shape) -> dict:
@@ -406,6 +415,12 @@ def create_app(settings: Settings, pool: AsyncConnectionPool | None = None,
             params += (vendor_id,)
         rows = await (await s.conn.execute(
             f"select * from mock_ramp.bills where {where} order by created_at, id limit %s", (*params, page_size + 1))).fetchall()
+        lag = await readback_lag(s)
+        if lag:
+            fresh = {r["vendor_id"] for r in await (await s.conn.execute(
+                "select vendor_id from mock_ramp.vendor_holds where business_id = %s and released_at is null "
+                "and placed_at > clock_timestamp() - make_interval(secs => %s / 1000.0)", (s.business_id, lag))).fetchall()}
+            rows = [dict(r, is_on_hold=False) if r["vendor_id"] in fresh else r for r in rows]
         return page(request, rows, page_size, bill_json)
 
     @app.patch(f"{API}/bills/{{bill_id}}")  # confirm: Ramp's path for updating a bill's payment date

@@ -78,6 +78,8 @@ name = "dialback-core"
 version = "0.0.0"
 source = { editable = "apps/core" }
 dependencies = [
+    { name = "dialback-decision" },
+    { name = "dialback-ledger" },
     { name = "fastapi" },
     { name = "httpx" },
     { name = "psycopg", extra = ["binary"] },
@@ -95,6 +97,8 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "dialback-decision", editable = "packages/decision" },
+    { name = "dialback-ledger", editable = "packages/ledger" },
     { name = "fastapi", specifier = ">=0.115" },
     { name = "httpx", specifier = ">=0.28" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2" },
@@ -112,8 +116,11 @@ dev = [
 
 [[package]]
 name = "dialback-decision"
-version = "0.0.0"
+version = "0.1.0"
 source = { editable = "packages/decision" }
+dependencies = [
+    { name = "rfc8785" },
+]
 
 [package.dev-dependencies]
 dev = [
@@ -122,6 +129,7 @@ dev = [
 ]
 
 [package.metadata]
+requires-dist = [{ name = "rfc8785", specifier = ">=0.1.4" }]
 
 [package.metadata.requires-dev]
 dev = [
@@ -629,6 +637,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/79/42/bb4641652e58dedeac2ec51abc1f8cae4fee4ec63899a0999016229a0f2a/pytest-9.2.0.tar.gz", hash = "sha256:97c4f3b1f3c7414aa36465e09b8220f1d03627993bd51b1282e193753c80557b", size = 1797555, upload-time = "2026-10-27T21:30:20.728Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/51/39/1f5d8c8877a0fa327db959c19341d4be61660de1ab6b7391f9eb805bcd67/pytest-9.2.0-py3-none-any.whl", hash = "sha256:07acdcf88ec174f907dc01af70bf52d49b014bbab03faeeade31c96b18c2e588", size = 411776, upload-time = "2026-10-27T21:30:19.131Z" },
+]
+
+[[package]]
+name = "rfc8785"
+version = "0.1.4"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/ef/2f/fa1d2e740c490191b572d33dbca5daa180cb423c24396b856f5886371d8b/rfc8785-0.1.4.tar.gz", hash = "sha256:e545841329fe0eee4f6a3b44e7034343100c12b4ec566dc06ca9735681deb4da", size = 14321, upload-time = "2024-09-27T16:33:31.206Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/4d/78/119878110660b2ad709888c8a1614fce7e2fab39080ab960656dc8605bf6/rfc8785-0.1.4-py3-none-any.whl", hash = "sha256:520d690b448ecf0703691c76e1a34a24ddcd4fc5bc41d589cb7c58ec651bcd48", size = 9240, upload-time = "2024-09-27T16:33:29.683Z" },
 ]
 
 [[package]]
