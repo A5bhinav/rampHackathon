@@ -1,0 +1,191 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dialback.dev/schemas/call-answers.schema.json",
+  "title": "CallAnswers",
+  "description": "Answers the voice agent recorded during one call through its record_answer tool, as stored (in CallEndedBody.answers and voice.call_answers). Code builds this object from the tool calls; the model emits no events (I4). Spoken account digits never appear here: account_last4 holds only a keyed hash and a digit count. The shape that carries the digits to decide() in memory is $defs/CallAnswersInTransit, used only in the core-voice API (openapi/internal.yaml).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "call_id", "answers"],
+  "properties": {
+    "schema_version": {
+      "description": "Version of this contract.",
+      "const": "call-answers/v0"
+    },
+    "call_id": {
+      "description": "The call these answers came from (voice.calls.id).",
+      "$ref": "./evidence-event.schema.json#/$defs/Uuid"
+    },
+    "answers": {
+      "description": "In the order recorded. A slot may appear more than once; decide() treats conflicting values as inconsistent.",
+      "type": "array",
+      "maxItems": 50,
+      "items": { "$ref": "#/$defs/StoredAnswer" }
+    }
+  },
+  "$defs": {
+    "Slot": {
+      "description": "Fixed list. The agent cannot invent slots.",
+      "type": "string",
+      "enum": [
+        "recording_consent",
+        "company_named",
+        "department",
+        "speaker_name",
+        "speaker_role",
+        "change_requested",
+        "account_last4",
+        "offered_number",
+        "flag"
+      ]
+    },
+    "ShortText": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "AnswerBase": {
+      "description": "Fields and per-slot value types shared by both shapes. account_last4 is typed separately in StoredAnswer and TransitAnswer.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["slot", "value", "turn_id", "tool_call_id", "captured_at", "capture_method"],
+      "properties": {
+        "slot": { "$ref": "#/$defs/Slot" },
+        "value": { "description": "Typed per slot below." },
+        "turn_id": {
+          "description": "Transcript turn the answer came from. Code checks the value appears in that turn.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "tool_call_id": {
+          "description": "The record_answer tool call ID, or the keypad event ID when capture_method is keypad.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "captured_at": {
+          "description": "When the answer was captured (UTC).",
+          "type": "string",
+          "format": "date-time"
+        },
+        "capture_method": {
+          "description": "speech: the agent heard it and recorded it with record_answer. keypad: the callee pressed keys (DTMF) and code captured them, not the model.",
+          "type": "string",
+          "enum": ["speech", "keypad"]
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "slot": { "const": "recording_consent" } } },
+          "then": { "properties": { "value": { "type": "string", "enum": ["yes", "no"] } } }
+        },
+        {
+          "if": { "properties": { "slot": { "enum": ["company_named", "department", "speaker_name", "speaker_role"] } } },
+          "then": { "properties": { "value": { "$ref": "#/$defs/ShortText" } } }
+        },
+        {
+          "if": { "properties": { "slot": { "const": "change_requested" } } },
+          "then": { "properties": { "value": { "type": "string", "enum": ["yes", "no", "unsure"] } } }
+        },
+        {
+          "if": { "properties": { "slot": { "const": "offered_number" } } },
+          "then": {
+            "description": "A number the callee asked us to call instead. Recorded as heard and never dialed.",
+            "properties": { "value": { "type": "string", "minLength": 1, "maxLength": 32 } }
+          }
+        },
+        {
+          "if": { "properties": { "slot": { "const": "flag" } } },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "string",
+                "enum": [
+                  "pressure_to_approve",
+                  "opt_out",
+                  "asked_what_is_checked",
+                  "asked_to_call_another_number",
+                  "other"
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    "NoDigits": {
+      "description": "The callee didn't give digits.",
+      "type": "string",
+      "enum": ["dont_know", "refused"]
+    },
+    "StoredAnswer": {
+      "description": "An answer as stored. account_last4 is a keyed hash, never digits.",
+      "allOf": [
+        { "$ref": "#/$defs/AnswerBase" },
+        {
+          "if": { "properties": { "slot": { "const": "account_last4" } } },
+          "then": {
+            "properties": {
+              "value": {
+                "oneOf": [
+                  { "$ref": "#/$defs/NoDigits" },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["digits_hmac", "digit_count", "key_version"],
+                    "properties": {
+                      "digits_hmac": {
+                        "description": "HMAC-SHA256 of the spoken digits with the server-side key, as lowercase hex.",
+                        "$ref": "./evidence-event.schema.json#/$defs/Sha256Hex"
+                      },
+                      "digit_count": {
+                        "description": "How many digits were given. Fewer than 4 counts as not_provided.",
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 4
+                      },
+                      "key_version": {
+                        "description": "Which HMAC key was used, so keys can rotate.",
+                        "type": "integer",
+                        "minimum": 1
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    "TransitAnswer": {
+      "description": "An answer on its way from the voice service to the core. account_last4 carries the digits, held only in memory for decide().",
+      "allOf": [
+        { "$ref": "#/$defs/AnswerBase" },
+        {
+          "if": { "properties": { "slot": { "const": "account_last4" } } },
+          "then": {
+            "properties": {
+              "value": {
+                "oneOf": [
+                  { "$ref": "#/$defs/NoDigits" },
+                  { "type": "string", "pattern": "^[0-9]{1,4}$" }
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    "CallAnswersInTransit": {
+      "description": "Same as the root object, but account_last4 holds the digits. Only in the call_ended request to the core; never stored or logged by either service. The core runs decide(), then stores the root shape.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "call_id", "answers"],
+      "properties": {
+        "schema_version": { "const": "call-answers/v0" },
+        "call_id": { "$ref": "./evidence-event.schema.json#/$defs/Uuid" },
+        "answers": {
+          "type": "array",
+          "maxItems": 50,
+          "items": { "$ref": "#/$defs/TransitAnswer" }
+        }
+      }
+    }
+  }
+}

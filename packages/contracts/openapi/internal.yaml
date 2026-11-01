@@ -1,0 +1,282 @@
+openapi: 3.1.0
+info:
+  title: Dialback internal API (core and voice)
+  version: 0.1.0
+  description: |
+    How the core service (Abhi) asks the voice service (Sami) to place a call, and how the
+    voice service reports the call back.
+
+    - The core sends only `{case_id, attempt}`. The voice service reads the chosen number
+      from the database itself, so nothing in this request can change who gets called.
+    - Every request carries an `Idempotency-Key`; a replayed key returns the first result.
+    - The call report mirrors `CallEndedBody` in `evidence-event.schema.json`, except that
+      `answers` uses `CallAnswersInTransit`, which carries the spoken last four digits. The
+      core runs `decide()` on them in memory, replaces them with the keyed hash, and appends
+      the stored `CallEndedBody`. Neither service logs or stores the digits.
+
+servers:
+  - url: http://localhost
+    description: Each path names its own service below; ports are placeholders.
+
+security:
+  - serviceToken: []
+
+paths:
+  /calls:
+    servers:
+      - url: http://localhost:8002
+        description: Voice service
+    post:
+      operationId: placeCall
+      summary: Ask the voice service to call the case's chosen number
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlaceCallRequest'
+            example:
+              case_id: c0ffee00-1111-4222-8333-444455556666
+              attempt: 1
+      responses:
+        '202':
+          description: Call accepted. The report arrives later at /internal/calls/{call_id}/ended.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlaceCallAccepted'
+        '200':
+          description: Same Idempotency-Key as an earlier request; returns that call.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlaceCallAccepted'
+        '409':
+          description: A pre-dial check failed and no call was placed. The core sends the case to needs_review.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PreDialRefusal'
+        '422':
+          description: Malformed request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /internal/calls/{call_id}/ended:
+    servers:
+      - url: http://localhost:8001
+        description: Core service
+    post:
+      operationId: reportCallEnded
+      summary: Report a finished call, whether or not anyone answered
+      parameters:
+        - name: call_id
+          in: path
+          required: true
+          schema:
+            $ref: '../schemas/evidence-event.schema.json#/$defs/Uuid'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CallEndedRequest'
+            example:
+              call_id: 6b1e2f0a-4c3d-4e5f-8a9b-0c1d2e3f4a5b
+              case_id: c0ffee00-1111-4222-8333-444455556666
+              result: answers_recorded
+              attempt: 1
+              recording_sha256: a3f1c2d4e5b6a7980f1e2d3c4b5a69788f7e6d5c4b3a2918f7e6d5c4b3a29180
+              agent_version: agent-0.1.0
+              answers:
+                schema_version: call-answers/v0
+                call_id: 6b1e2f0a-4c3d-4e5f-8a9b-0c1d2e3f4a5b
+                answers:
+                  - slot: change_requested
+                    value: 'yes'
+                    turn_id: 7
+                    tool_call_id: tc_06
+                    captured_at: '2026-11-01T17:20:44Z'
+                    capture_method: speech
+                  - slot: account_last4
+                    value: '4821'
+                    turn_id: 9
+                    tool_call_id: dtmf_01
+                    captured_at: '2026-11-01T17:21:02Z'
+                    capture_method: keypad
+      responses:
+        '204':
+          description: Applied. The case moves to deciding, retry_wait or needs_review.
+        '200':
+          description: Same Idempotency-Key as an earlier report; already applied.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [status]
+                properties:
+                  status:
+                    const: already_applied
+        '409':
+          description: The case isn't in the calling state for this call.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: Malformed request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  securitySchemes:
+    serviceToken:
+      type: http
+      scheme: bearer
+      description: Shared service-to-service token from the environment (placeholder until agreed).
+
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: '`{case_id}:call:{attempt}` for placeCall; `{case_id}:call:{attempt}:ended` for reportCallEnded.'
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 200
+
+  schemas:
+    PlaceCallRequest:
+      type: object
+      additionalProperties: false
+      required: [case_id, attempt]
+      properties:
+        case_id:
+          $ref: '../schemas/evidence-event.schema.json#/$defs/Uuid'
+        attempt:
+          description: 1 to 3; the case allows three attempts.
+          type: integer
+          minimum: 1
+          maximum: 3
+
+    PlaceCallAccepted:
+      type: object
+      additionalProperties: false
+      required: [call_id, case_id, attempt]
+      properties:
+        call_id:
+          $ref: '../schemas/evidence-event.schema.json#/$defs/Uuid'
+        case_id:
+          $ref: '../schemas/evidence-event.schema.json#/$defs/Uuid'
+        attempt:
+          type: integer
+          minimum: 1
+          maximum: 3
+
+    PreDialRefusal:
+      type: object
+      additionalProperties: false
+      required: [code, message]
+      properties:
+        code:
+          description: Which pre-dial check failed.
+          type: string
+          enum:
+            - case_not_held
+            - case_finished
+            - number_not_selected
+            - number_opted_out
+            - outside_calling_window
+            - attempt_cap_reached
+            - number_cap_reached
+            - not_on_dial_allowlist
+        message:
+          type: string
+
+    CallEndedRequest:
+      description: |
+        `CallEndedBody` plus `case_id`, with `answers` in the in-transit shape. Field types point
+        at `CallEndedBody` so the two can't drift. The optional fields after `answers` are
+        proposed additions to `CallEndedBody`, pending Abhi's review.
+      type: object
+      additionalProperties: false
+      required: [call_id, case_id, result, attempt]
+      properties:
+        call_id:
+          $ref: '../schemas/evidence-event.schema.json#/$defs/CallEndedBody/properties/call_id'
+        case_id:
+          $ref: '../schemas/evidence-event.schema.json#/$defs/Uuid'
+        result:
+          $ref: '../schemas/evidence-event.schema.json#/$defs/CallEndedBody/properties/result'
+        attempt:
+          $ref: '../schemas/evidence-event.schema.json#/$defs/CallEndedBody/properties/attempt'
+        retry_at:
+          $ref: '../schemas/evidence-event.schema.json#/$defs/CallEndedBody/properties/retry_at'
+        recording_sha256:
+          $ref: '../schemas/evidence-event.schema.json#/$defs/CallEndedBody/properties/recording_sha256'
+        transcript_sha256:
+          $ref: '../schemas/evidence-event.schema.json#/$defs/CallEndedBody/properties/transcript_sha256'
+        agent_version:
+          $ref: '../schemas/evidence-event.schema.json#/$defs/CallEndedBody/properties/agent_version'
+        answers:
+          description: Present when result is answers_recorded.
+          $ref: '../schemas/call-answers.schema.json#/$defs/CallAnswersInTransit'
+        contact_point_id:
+          description: Proposed. The Trust Ledger contact point that was dialed.
+          $ref: '../schemas/evidence-event.schema.json#/$defs/Uuid'
+        checks:
+          $ref: '#/components/schemas/CallChecks'
+
+    CallChecks:
+      description: |
+        Proposed. Computed by code in the voice service after the call, never by the model. Checks
+        that need case or ledger data (company match against the vendor's names, whether the
+        speaker first appeared in the change thread) stay with the core.
+      type: object
+      additionalProperties: false
+      required:
+        - disclosure_first
+        - answers_grounded
+        - agent_spoke_account_digits
+        - new_number_accepted
+        - policy_violations
+        - speech_guard_trips
+      properties:
+        disclosure_first:
+          description: The fixed AI and recording disclosure played in full as the first turn.
+          type: boolean
+        answers_grounded:
+          description: Every recorded answer appears in the transcript turn it cites.
+          type: boolean
+        agent_spoke_account_digits:
+          description: Must be false. True is a script violation.
+          type: boolean
+        new_number_accepted:
+          description: Must be false. True is a script violation.
+          type: boolean
+        policy_violations:
+          description: Unknown tools or invalid tool arguments.
+          type: integer
+          minimum: 0
+        speech_guard_trips:
+          type: integer
+          minimum: 0
+
+    Error:
+      type: object
+      additionalProperties: false
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
