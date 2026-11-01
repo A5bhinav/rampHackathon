@@ -77,18 +77,36 @@ wheels = [
 name = "dialback-core"
 version = "0.0.0"
 source = { editable = "apps/core" }
+dependencies = [
+    { name = "fastapi" },
+    { name = "httpx" },
+    { name = "psycopg", extra = ["binary"] },
+    { name = "psycopg-pool" },
+    { name = "pydantic" },
+    { name = "uvicorn" },
+]
 
 [package.dev-dependencies]
 dev = [
-    { name = "hypothesis" },
+    { name = "anyio" },
+    { name = "dialback-ramp-mock" },
     { name = "pytest" },
 ]
 
 [package.metadata]
+requires-dist = [
+    { name = "fastapi", specifier = ">=0.115" },
+    { name = "httpx", specifier = ">=0.28" },
+    { name = "psycopg", extras = ["binary"], specifier = ">=3.2" },
+    { name = "psycopg-pool", specifier = ">=3.2" },
+    { name = "pydantic", specifier = ">=2.9" },
+    { name = "uvicorn", specifier = ">=0.32" },
+]
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "hypothesis", specifier = ">=6" },
+    { name = "anyio", specifier = ">=4" },
+    { name = "dialback-ramp-mock", editable = "apps/ramp-mock" },
     { name = "pytest", specifier = ">=8" },
 ]
 
