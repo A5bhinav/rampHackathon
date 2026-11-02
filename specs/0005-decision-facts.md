@@ -17,7 +17,7 @@ Three more facts (U01–U03) are never supplied at all. This spec fixes what `Ca
 2. **Earlier calls count against, never for.** The design says a redial's answers are "never combined" with the dropped call's. So the worker passes `earlier_calls`: for each earlier `call_ended` of the case's current version, its `change_requested` values, `last_four_result`, flags and consent. A "no" or wrong digits on any of them still decides Not verified. Nothing from an earlier call can help verify.
 3. **The call order is checked by code**, from each answer's `turn_id`:
    - `consent_first`: consent is the first answer, so a voicemail greeting can't supply a name before consent.
-   - `answers_in_order`: the name comes before the change answer, and the change answer before the digits.
+   - `answers_in_order`: the name is not after the change answer, and the change answer is not after the digits. The same turn counts as in order ("Jordan here, and yes, we asked").
    - The consent and change answers cite different turns, so one "yes" can't answer both.
 4. **One person, by declared name.** `same_person_yes_and_digits` is:
    - `True` only if exactly one distinct normalized `speaker_name` is recorded, and it is recorded before the change answer;
@@ -30,7 +30,7 @@ Three more facts (U01–U03) are never supplied at all. This spec fixes what `Ca
    - `offered_number_from_request`
    - `speaker_known_before_request` (strict mode)
 
-   It returns `None` until Inesh's ledger ships. Test doubles, labeled as such, stand in for it in core tests and `scripts/dev/stack.py`, and production code never contains one.
+   It calls `dialback_ledger.change_context(case_id, dataset_id, vendor_id, cutoff, speaker_names, offered_numbers)`, which returns those three keys. Any value that isn't a boolean counts as unknown. It returns `None` until Inesh's ledger ships. Test doubles, labeled as such, stand in for it in core tests and `scripts/dev/stack.py`, and production code never contains one.
 6. **Telephony facts come from the voice report, not from core's own bookkeeping:**
    - `dialed_out` (Twilio direction)
    - `dialed_number_is_pick` (the adapter's own check, design step 2)
