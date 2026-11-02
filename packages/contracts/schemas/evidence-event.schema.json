@@ -159,11 +159,17 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["call_id", "result", "attempt"],
+      "if": { "properties": { "result": { "const": "callback_requested" } }, "required": ["result"] },
+      "then": { "required": ["retry_at"] },
       "properties": {
         "call_id": { "$ref": "#/$defs/Uuid" },
-        "result": { "type": "string", "enum": ["answers_recorded", "no_answer", "voicemail", "busy", "failed", "machine", "declined"] },
+        "result": {
+          "type": "string",
+          "enum": ["answers_recorded", "no_answer", "voicemail", "busy", "failed", "machine", "declined", "callback_requested"],
+          "description": "callback_requested: a person asked to be called back (the agent's schedule_callback tool); retry_at is when (spec 0007, D1)."
+        },
         "attempt": { "type": "integer", "minimum": 1 },
-        "retry_at": { "type": "string" },
+        "retry_at": { "type": "string", "description": "When to call again: the voice service's suggestion after no answer, or the time the vendor asked for with callback_requested." },
         "recording_sha256": { "$ref": "#/$defs/Sha256Hex" },
         "transcript_sha256": { "$ref": "#/$defs/Sha256Hex" },
         "agent_version": { "type": "string" },
