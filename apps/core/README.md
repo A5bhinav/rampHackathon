@@ -178,7 +178,8 @@ If this slice is behind at the Nov 4 checkpoint, `packages/decision` moves to In
 | `DIALBACK_RUN_WORKER` | no | `0` runs the API without the worker |
 | `DIALBACK_RUN_JOBS` | no | `0` turns off the scheduled jobs: poller, reconciliation, chain check (specs 0003, 0004) |
 | `DIALBACK_POLL_SECONDS`, `DIALBACK_RECONCILE_SECONDS`, `DIALBACK_FULL_SWEEP_SECONDS`, `DIALBACK_VERIFY_SECONDS` | no | Job intervals on the dataset clock; default 60, 300, 86400 and 300 |
-| `DIALBACK_JWT_SECRET` | yes | Verifies the dashboard's JWTs (Supabase's signing secret; a dev secret locally). 32+ characters |
+| `SUPABASE_URL` | one of these two | The Supabase project's URL (`https://<ref>.supabase.co`). The core verifies the dashboard's tokens with the project's public signing keys and checks they were issued by it (spec 0010). Production sets only this one |
+| `DIALBACK_JWT_SECRET` | one of these two | A shared HS256 secret for the dashboard's tokens: the local dev sign-in, or a project still on Supabase's legacy secret. 32+ characters. Leave unset in production |
 
 Secrets live in Railway variables and Supabase Vault; never in the repo or in logs.
 

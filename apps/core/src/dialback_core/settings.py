@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field
+from urllib.parse import urlsplit
 
 from .flags import RampMode, ResolverMode, read_flag
 
@@ -16,6 +17,38 @@ def _secret(environ: dict[str, str], name: str, min_len: int = 16) -> bytes:
     if len(value) < min_len:
         raise ConfigurationError(f"{name} is required (at least {min_len} characters)")
     return value.encode()
+
+
+# Secrets committed to this repo for the local stack and tests. A core built from the
+# environment (a deployment) refuses them, so nobody can mint a token with a value anyone can read.
+COMMITTED_DEV_SECRETS = frozenset({"dev-jwt-secret-0123456789abcdef0123456789", "jwt-secret-for-tests-only-0123456789abcdef"})
+
+
+def _supabase_url(environ: dict[str, str]) -> str | None:
+    """The project's origin, exactly: https, a host, no user, path, query or fragment. A local
+    Supabase (or the stand-in) is only reachable through scripts/dev/stack.py, never from the env."""
+    raw = environ.get("SUPABASE_URL", "").strip()
+    if not raw:
+        return None
+    parts = urlsplit(raw)
+    if (parts.scheme != "https" or not parts.hostname or parts.username is not None or parts.password is not None
+            or parts.path not in ("", "/") or parts.query or parts.fragment):
+        raise ConfigurationError("SUPABASE_URL must be the project's address alone, like https://<ref>.supabase.co")
+    return f"https://{parts.netloc}"
+
+
+def _jwt_secret(environ: dict[str, str], supabase_url: str | None) -> bytes:
+    raw = environ.get("DIALBACK_JWT_SECRET", "")
+    if not raw:
+        if supabase_url is None:
+            raise ConfigurationError("Set SUPABASE_URL (Supabase sign-in) or DIALBACK_JWT_SECRET (local dev sign-in)")
+        return b""
+    if raw in COMMITTED_DEV_SECRETS:
+        raise ConfigurationError("DIALBACK_JWT_SECRET is a secret committed to the repo for local use; a deployed core never trusts it")
+    if supabase_url is not None and environ.get("DIALBACK_TRUST_LEGACY_SECRET") != "1":
+        raise ConfigurationError("DIALBACK_JWT_SECRET is set alongside SUPABASE_URL. Supabase advises against trusting the shared "
+                                 "secret: unset it, or set DIALBACK_TRUST_LEGACY_SECRET=1 only while the project moves off it")
+    return _secret(environ, "DIALBACK_JWT_SECRET", 32)
 
 
 @dataclass(frozen=True)
@@ -51,7 +84,10 @@ class Settings:
     reconcile_interval_seconds: int = 300
     verify_interval_seconds: int = 300
     job_lease_seconds: int = 600
-    # The dashboard's JWTs (Supabase's signing secret; a dev secret locally). HS256 for now (spec 0002, Q5).
+    # The dashboard's JWTs (spec 0010). At least one key source: the Supabase project, whose
+    # public signing keys and issuer come from its URL, and/or a shared HS256 secret (local dev,
+    # or a project still on Supabase's legacy secret).
+    supabase_url: str | None = None
     jwt_secret: bytes = b""
     jwt_audience: str = "authenticated"
     extra: dict[str, str] = field(default_factory=dict)
@@ -63,6 +99,7 @@ class Settings:
         if not url:
             raise ConfigurationError("DATABASE_URL is required")
         ramp_mode = read_flag("DIALBACK_RAMP", RampMode, RampMode.MOCK, env)
+        supabase_url = _supabase_url(env)
         base = env.get("RAMP_BASE_URL")
         if not base:
             raise ConfigurationError("RAMP_BASE_URL is required (the mock's URL, or Ramp's sandbox API)")
@@ -88,5 +125,6 @@ class Settings:
             full_sweep_interval_seconds=int(env.get("DIALBACK_FULL_SWEEP_SECONDS", "86400")),
             reconcile_interval_seconds=int(env.get("DIALBACK_RECONCILE_SECONDS", "300")),
             verify_interval_seconds=int(env.get("DIALBACK_VERIFY_SECONDS", "300")),
-            jwt_secret=_secret(env, "DIALBACK_JWT_SECRET", 32),
+            supabase_url=supabase_url,
+            jwt_secret=_jwt_secret(env, supabase_url),
         )
