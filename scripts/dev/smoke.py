@@ -155,28 +155,35 @@ class Smoke:
             chain = (await approver.get(f"/api/datasets/{self.dataset_id}/chain")).json()
             self.check(chain["ok"], f"the evidence chain is intact ({chain['checked']} events)")
 
-        # The demo's sixth beat: someone with owner rights edits one evidence row by hand.
+        # The demo's sixth beat: someone with owner rights edits one evidence row by hand, mid-chain.
+        # One transaction, so the append-only trigger is back on when it ends, whatever happens.
         async with self.pool.connection() as owner:
+            db = (await (await owner.execute("select current_database() as name")).fetchone())["name"]
+            if not db.startswith("dialback_test_"):
+                raise SystemExit(f"refusing to edit evidence in {db}: the smoke run only edits a throwaway database")
             await owner.execute("alter table audit.evidence_events disable trigger evidence_events_no_update")
-            try:
-                # Every envelope carries "v":1 (followed by "version", keys being sorted), so this edit
-                # always lands, whichever door found the change.
-                edited = await (await owner.execute(
-                    "update audit.evidence_events set body_jcs = replace(body_jcs, '\"v\":1,', '\"v\":9,') "
-                    "where chain_id = %s and seq = 1 and body_jcs like '%%\"v\":1,%%' returning seq", (chain["chain_id"],))).fetchone()
-            finally:
-                await owner.execute("alter table audit.evidence_events enable trigger evidence_events_no_update")
-        self.check(edited is not None, "one evidence row is edited by hand, as the demo shows")
+            # Every envelope carries "v":1 (followed by "version", keys being sorted), so this edit
+            # always lands, whichever door found the change.
+            edited = await (await owner.execute(
+                "update audit.evidence_events set body_jcs = replace(body_jcs, '\"v\":1,', '\"v\":9,') "
+                "where chain_id = %s and seq = %s and body_jcs like '%%\"v\":1,%%' returning seq, case_id",
+                (chain["chain_id"], chain["checked"] // 2))).fetchone()
+            await owner.execute("alter table audit.evidence_events enable trigger evidence_events_no_update")
+        self.check(edited is not None, f"one evidence row is edited by hand, as the demo shows (event #{chain['checked'] // 2})")
 
-        async def caught() -> bool:
+        async def caught() -> list[dict]:
             async with self.core() as approver:
                 alerts = (await approver.get(f"/api/datasets/{self.dataset_id}/alerts")).json()["alerts"]
-            return any(a["kind"] == "chain_broken" for a in alerts)
+            return [a for a in alerts if a["kind"] == "chain_broken"]
         await self.until("the scheduled chain check raises 'Evidence chain broken'", caught)
+        [alert] = await caught()
         async with self.core() as approver:
             chain = (await approver.get(f"/api/datasets/{self.dataset_id}/chain")).json()
-            self.check(not chain["ok"] and chain["first_bad_seq"] == edited["seq"],
-                       f"it points straight at the edited row (event #{chain['first_bad_seq']})")
+        self.check(not chain["ok"] and chain["first_bad_seq"] == edited["seq"],
+                   f"the chain badge points straight at the edited row (event #{chain['first_bad_seq']})")
+        case_id = str(edited["case_id"]) if edited["case_id"] else None
+        self.check(f"event #{edited['seq']}:" in alert["message"] and alert["case_id"] == case_id,
+                   "the alert names that event and its case")
 
         failed = [what for ok, what in self.results if not ok]
         print(f"\n{len(self.results) - len(failed)} of {len(self.results)} checks passed.")

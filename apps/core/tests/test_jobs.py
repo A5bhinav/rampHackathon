@@ -1,5 +1,6 @@
-"""The poller and reconciliation (spec 0003): silent changes are found, missing holds go
-back on, and jobs run once at a time on the dataset's clock."""
+"""The scheduled jobs: the poller and reconciliation (spec 0003) find silent changes and put
+missing holds back; the chain check (spec 0004) finds a hand-edited, deleted or rewritten
+evidence row. Jobs run once at a time on the dataset's clock."""
 from __future__ import annotations
 
 import datetime as dt
@@ -150,7 +151,8 @@ async def test_reconciliation_leaves_open_and_releasing_cases_alone(world):
 async def test_jobs_are_due_on_the_lab_clock(pool):
     start = dt.datetime(2026, 11, 3, 18, 0, tzinfo=dt.UTC)
     world = await make_world(pool, kind="lab", sim_now=start,
-                             settings=core_settings(run_jobs=True, poll_interval_seconds=60, reconcile_interval_seconds=300))
+                             settings=core_settings(run_jobs=True, poll_interval_seconds=60, verify_interval_seconds=120,
+                                                    reconcile_interval_seconds=300))
     try:
         async def runs() -> dict[str, int]:
             async with system_tx(pool) as conn:
@@ -170,8 +172,10 @@ async def test_jobs_are_due_on_the_lab_clock(pool):
         assert (await runs())["poll"][0] == 1, "not due before the interval"
         await advance(start + dt.timedelta(seconds=60))
         assert {job: n for job, (n, _) in (await runs()).items()} == {"poll": 2, "full_sweep": 1, "reconcile": 1, "verify_chain": 1}
+        await advance(start + dt.timedelta(seconds=120))
+        assert {job: n for job, (n, _) in (await runs()).items()} == {"poll": 3, "full_sweep": 1, "reconcile": 1, "verify_chain": 2}
         await advance(start + dt.timedelta(seconds=300))
-        assert {job: n for job, (n, _) in (await runs()).items()} == {"poll": 3, "full_sweep": 1, "reconcile": 2, "verify_chain": 2}
+        assert {job: n for job, (n, _) in (await runs()).items()} == {"poll": 4, "full_sweep": 1, "reconcile": 2, "verify_chain": 3}
 
         # A silent change on the lab dataset is found by moving the clock, as a scenario would.
         await world.mock_settings(silent_changes=True)
@@ -218,39 +222,118 @@ async def test_a_release_waits_behind_a_reconciliation_lock(world):
             await person.execute("select app.lock_case(%s)", (case["id"],))
 
 
-async def test_an_intact_chain_is_recorded_quietly(world):
+async def by_hand(database_url: str, sql: str, *params) -> None:
+    """Someone with owner rights changes evidence rows directly, append-only triggers off. One
+    transaction, so the triggers are back on when it ends, whatever happens."""
+    import psycopg
+    async with await psycopg.AsyncConnection.connect(database_url) as owner:
+        await owner.execute("alter table audit.evidence_events disable trigger user")
+        await owner.execute(sql, params)
+        await owner.execute("alter table audit.evidence_events enable trigger user")
+
+
+async def a_case_with_evidence(world) -> tuple[dict, int]:
+    """A case that has reached `calling`, and the seq of its hold_confirmed row (mid-chain)."""
     await import_all(world.pool, world.ramp, world.keys, world.dataset.id)
     await change_and_detect(world)
+    case = await case_of(world)
+    row = await one(world.pool, "select seq from audit.evidence_events where case_id = %s and type = 'hold_confirmed'", case["id"])
+    return case, row["seq"]
+
+
+async def verify(world, times: int = 1) -> dict:
+    for _ in range(times):
+        await world.worker.jobs.run(world.dataset.id, "verify_chain", force=True)
+    return await job_row(world, "verify_chain")
+
+
+async def test_an_intact_chain_is_recorded_quietly(world):
+    await a_case_with_evidence(world)
     assert await world.worker.jobs.run(world.dataset.id, "verify_chain") == 0
     result = (await job_row(world, "verify_chain"))["last_result"]
-    events = (await one(world.pool, "select count(*) as n from audit.evidence_events where chain_id = %s", world.dataset.chain_id))["n"]
-    assert result["ok"] is True and result["checked"] == events == result["tip_seq"] and result["first_bad_seq"] is None
-    assert len(result["tip_hash"]) == 64
+    tip = await one(world.pool, "select seq, hash from audit.evidence_events where chain_id = %s order by seq desc limit 1",
+                    world.dataset.chain_id)
+    assert result["ok"] is True and result["checked"] == tip["seq"] == result["tip_seq"] and result["first_bad_seq"] is None
+    assert result["tip_hash"] == tip["hash"]
     assert await alerts(world, "chain_broken") == []
 
 
 async def test_a_hand_edited_row_raises_one_alert_at_that_row(world, database_url):
-    import psycopg
+    case, seq = await a_case_with_evidence(world)
+    edit = "update audit.evidence_events set body_jcs = replace(body_jcs, %s, %s) where chain_id = %s and seq = %s"
+    await by_hand(database_url, edit, '"bills_held":2', '"bills_held":0', world.dataset.chain_id, seq)
 
-    await import_all(world.pool, world.ramp, world.keys, world.dataset.id)
-    await change_and_detect(world)
-    case = await case_of(world)
-    target = await one(world.pool, "select seq from audit.evidence_events where case_id = %s and type = 'hold_confirmed'", case["id"])
-
-    async with await psycopg.AsyncConnection.connect(database_url, autocommit=True) as owner:
-        await owner.execute("alter table audit.evidence_events disable trigger evidence_events_no_update")
-        try:
-            await owner.execute("update audit.evidence_events set body_jcs = replace(body_jcs, '\"bills_held\":2', '\"bills_held\":0') "
-                                "where chain_id = %s and seq = %s", (world.dataset.chain_id, target["seq"]))
-        finally:
-            await owner.execute("alter table audit.evidence_events enable trigger evidence_events_no_update")
-
-    for _ in range(2):
-        await world.worker.jobs.run(world.dataset.id, "verify_chain", force=True)
+    row = await verify(world, times=2)
     [alert] = await alerts(world, "chain_broken")
     assert alert["severity"] == "critical" and alert["case_id"] == case["id"]
-    assert alert["message"].startswith(f"The evidence chain is broken at event #{target['seq']}: content_hash does not match")
-    result = (await job_row(world, "verify_chain"))["last_result"]
-    assert (result["ok"], result["first_bad_seq"]) == (False, target["seq"])
-    assert (await job_row(world, "verify_chain"))["last_ok"] is True, "a broken chain is a finding, not a job failure"
+    assert alert["message"].startswith(f"The evidence chain is broken at event #{seq}: content_hash does not match")
+    assert (row["last_result"]["ok"], row["last_result"]["first_bad_seq"]) == (False, seq)
+    assert row["last_ok"] is True, "a broken chain is a finding, not a job failure"
+
+    await by_hand(database_url, edit, '"bills_held":0', '"bills_held":2', world.dataset.chain_id, seq)
+    assert (await verify(world))["last_result"]["ok"] is True, "the row is put back"
+    [still] = await alerts(world, "chain_broken")
+    assert still["resolved_at"] is None, "a chain that was once broken stays on record"
+
+
+async def test_a_row_that_lies_about_its_case_still_raises_the_alert(world, database_url):
+    _, seq = await a_case_with_evidence(world)
+    await by_hand(database_url, "update audit.evidence_events set body_jcs = body_jcs || ' ', case_id = %s "
+                  "where chain_id = %s and seq = %s", uuid.uuid4(), world.dataset.chain_id, seq)
+    row = await verify(world)
+    [alert] = await alerts(world, "chain_broken")
+    assert alert["case_id"] is None and f"event #{seq}" in alert["message"]
+    assert row["last_ok"] is True
+
+
+async def test_a_deleted_row_is_a_gap_and_names_no_case(world, database_url):
+    _, seq = await a_case_with_evidence(world)
+    await by_hand(database_url, "delete from audit.evidence_events where chain_id = %s and seq = %s", world.dataset.chain_id, seq)
+    await verify(world)
+    [alert] = await alerts(world, "chain_broken")
+    assert alert["case_id"] is None, "the row after a gap belongs to another event"
+    assert alert["message"] == f"The evidence chain is broken at event #{seq + 1}: gap: expected seq {seq}, found {seq + 1}."
+
+
+async def test_a_shortened_chain_is_caught_by_the_last_tip(world, database_url):
+    await a_case_with_evidence(world)
+    seen = (await verify(world))["last_result"]
+    jobs = world.worker.jobs
+
+    async def broken(dataset_id, claimed):
+        raise RuntimeError("database went away")
+    jobs.verify_chain = broken
+    try:
+        failed = await verify(world)
+    finally:
+        del jobs.verify_chain
+    assert failed["last_ok"] is False and failed["last_result"] == seen, "a failed run keeps the tip to compare against"
+
+    await by_hand(database_url, "delete from audit.evidence_events where chain_id = %s and seq = %s",
+                  world.dataset.chain_id, seen["tip_seq"])
+    ok_alone = await one(world.pool, "select ok from audit.verify_chain(%s)", world.dataset.chain_id)
+    assert ok_alone["ok"] is True, "the shorter chain is internally consistent"
+    row = await verify(world)
+    [alert] = await alerts(world, "chain_broken")
+    assert (row["last_result"]["ok"], row["last_result"]["first_bad_seq"]) == (False, seen["tip_seq"])
+    assert alert["case_id"] is None and "the tip the last check saw is gone" in alert["message"]
+
+
+async def test_a_recomputed_tip_is_caught(world, database_url):
+    case, _ = await a_case_with_evidence(world)
+    seen = (await verify(world))["last_result"]
+    # Rewrite the tip and recompute its hashes, so the chain checks out on its own.
+    await by_hand(database_url, "update audit.evidence_events set body_jcs = body_jcs || ' ', "
+                  "content_hash = audit.content_hash(body_jcs || ' '), "
+                  "hash = audit.chain_hash(prev_hash, audit.content_hash(body_jcs || ' ')) "
+                  "where chain_id = %s and seq = %s", world.dataset.chain_id, seen["tip_seq"])
+    assert (await one(world.pool, "select ok from audit.verify_chain(%s)", world.dataset.chain_id))["ok"] is True
+    await verify(world)
+    [alert] = await alerts(world, "chain_broken")
+    assert "the row at the last check's tip was rewritten" in alert["message"] and alert["case_id"] == case["id"]
+
+
+async def test_every_worker_has_its_own_lease_name(world):
+    from dialback_core.jobs import unique_worker_name
+    assert world.worker.jobs.name == world.worker.name != unique_worker_name()
 

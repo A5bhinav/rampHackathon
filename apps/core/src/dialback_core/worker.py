@@ -34,7 +34,7 @@ from .company import company_matches
 from .db import dataset_now, system_tx
 from .detection import Keys, process_inbound_webhooks
 from .events import TransitionRefused, apply_event
-from .jobs import Jobs
+from .jobs import Jobs, unique_worker_name
 from .ports import CallerError, CallPlacer, NumberResolver, PreDialRefused
 from .ramp import RampConnector, RampError, RampNotFound, RampPort
 from .settings import Settings
@@ -108,12 +108,12 @@ select c.*, v.ramp_vendor_id, v.legal_name, v.trade_names, ce.detected_at, ce.ra
 
 class Worker:
     def __init__(self, pool: AsyncConnectionPool, settings: Settings, connector: RampConnector, resolver: NumberResolver,
-                 caller: CallPlacer, name: str = "core-worker", sleep=asyncio.sleep) -> None:
+                 caller: CallPlacer, name: str | None = None, sleep=asyncio.sleep) -> None:
         self.pool, self.settings, self.connector = pool, settings, connector
-        self.resolver, self.caller, self.name, self._sleep = resolver, caller, name, sleep
+        self.resolver, self.caller, self.name, self._sleep = resolver, caller, name or unique_worker_name(), sleep
         self.keys = Keys(settings.fingerprint_key, settings.fingerprint_key_version)
         self.window = CallingWindow.parse(settings.calling_tz, settings.calling_window, settings.calling_days)
-        self.jobs = Jobs(pool, settings, connector, self.keys, name)
+        self.jobs = Jobs(pool, settings, connector, self.keys, self.name)
         self.handlers = {
             "place_hold": self.place_hold, "select_number": self.select_number, "place_call": self.place_call,
             "decide": self.decide, "release_hold": self.release_hold, "notify": self.notify,
