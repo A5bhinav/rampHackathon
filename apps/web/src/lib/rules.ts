@@ -4,11 +4,15 @@
 
 export type RuleGroup = { key: string; title: string; tone: "ok" | "warn" | "bad" | "muted"; rules: { id: string; sentence: string }[] };
 
+// The titles say what the rules are, not where a fact came from: a condition can be a Trust
+// Ledger fact (V01) or a check run after the call (V08, V09), not only something said on it.
 const GROUPS: { key: string; title: string; tone: RuleGroup["tone"]; test: (id: string) => boolean }[] = [
   { key: "not_verified", title: "Not verified because", tone: "bad", test: (id) => id.startsWith("NV") },
   { key: "review", title: "Sent to a person because", tone: "warn", test: (id) => /^NR\d\d_/.test(id) && !id.startsWith("NR99") },
-  { key: "unmet", title: "Not shown on the call", tone: "warn", test: (id) => id.startsWith("NR99") || id.endsWith("_unmet") },
-  { key: "shown", title: "Shown on the call", tone: "ok", test: (id) => /^(V|S)\d\d_/.test(id) },
+  { key: "unmet", title: "Conditions not met", tone: "warn", test: (id) => id.startsWith("NR99") || id.endsWith("_unmet") },
+  // The skeleton engine adds U01-U03 to every verified decision: facts no slice supplies yet.
+  { key: "unchecked", title: "Not checked by this engine version", tone: "warn", test: (id) => /^U\d\d_/.test(id) },
+  { key: "met", title: "Conditions met", tone: "ok", test: (id) => /^(V|S)\d\d_/.test(id) },
 ];
 
 export function groupRules(ids: readonly string[], sentences: readonly string[]): RuleGroup[] | null {

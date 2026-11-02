@@ -41,3 +41,9 @@ export function relative(iso: string | null | undefined, now: Date): string {
   const span = `${n} ${unit}${n === 1 ? "" : "s"}`;
   return ms >= 0 ? `in ${span}` : `${span} ago`;
 }
+
+/** How long ago something happened, or nothing if the dataset's clock is set before it (a lab
+ *  dataset whose simulated clock was moved back), rather than "in 300 days". */
+export function ago(iso: string | null | undefined, now: Date): string {
+  return iso && Date.parse(iso) <= now.getTime() ? relative(iso, now) : "";
+}

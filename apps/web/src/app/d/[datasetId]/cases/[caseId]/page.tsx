@@ -35,6 +35,7 @@ export default async function CaseDetailPage({ params, searchParams }: {
   // ADR-10: with no known changer, the first approval for this version waits for a second approver.
   const firstApproval = c.unknown_changer && c.state === "awaiting_release"
     ? detail.releases.find((r) => r.action === "approve" && r.case_version === c.version) : undefined;
+  const lastStep = detail.timeline.at(-1);  // its summary is the core's template, so the reason is never guessed here
 
   return (
     <main>
@@ -57,8 +58,8 @@ export default async function CaseDetailPage({ params, searchParams }: {
       </p>
       {firstApproval ? (
         <p className="result ok" role="status">
-          {firstApproval.actor.display_name} approved this change {when(firstApproval.created_at)}. Nobody in Dialback made it, so a second,
-          different approver must release it.
+          {firstApproval.actor.display_name} approved this change {when(firstApproval.created_at)}. The change has no known author, so
+          a second, different approver must release it.
         </p>
       ) : null}
 
@@ -107,8 +108,8 @@ export default async function CaseDetailPage({ params, searchParams }: {
           <h2 id="decision-h">The decision</h2>
           {decision ? <DecisionDetail decision={decision} /> : (
             <p className="muted">
-              {["needs_review", "blocked"].includes(c.state)
-                ? "Code made no decision: this case went to a person before a call finished. The timeline says why."
+              {["needs_review", "blocked"].includes(c.state) && lastStep
+                ? <>Code made no decision for this version. The last step: {lastStep.summary}</>
                 : "No decision yet for this version."}
             </p>
           )}

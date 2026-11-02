@@ -2,7 +2,7 @@ import Link from "next/link";
 import { OutcomeBadge, StateBadge } from "@/components/badges";
 import type { CaseState, CaseSummary } from "@/lib/api-types";
 import { core } from "@/lib/core";
-import { datasetNow, date, dueLabel, relative, when } from "@/lib/format";
+import { ago, datasetNow, date, dueLabel, relative, when } from "@/lib/format";
 
 // Case queue: unfinished cases by state and age, and held bills near their due date (design,
 // "Dashboard"). Cases waiting on a person come first, soonest saved payment date first, then
@@ -29,10 +29,10 @@ export default async function CaseQueue({ params }: { params: Promise<{ datasetI
     <main>
       <h1>Case queue</h1>
       <p className="muted">Every vendor whose bank details changed. Payments stay on hold until a different person releases them.</p>
-      <div className="summary" aria-label="Summary">
+      <div className="summary" role="group" aria-label="Summary">
         <span className="badge tone-warn">{waiting.length} waiting on a person</span>
         <span className="badge tone-info">{working.length} in progress</span>
-        {dueSoon > 0 ? <span className="badge tone-bad">{dueSoon} with a payment due within 3 days</span> : null}
+        {dueSoon > 0 ? <span className="badge tone-bad">{dueSoon} with a payment overdue or due within 3 days</span> : null}
         {unconfirmed > 0 ? <span className="badge tone-bad">{unconfirmed} hold not confirmed</span> : null}
       </div>
       {cases.length === 0 ? <div className="card"><p className="muted">No open cases.</p></div> : null}
@@ -66,10 +66,12 @@ function QueueTable({ title, cases, datasetId, now }: { title: string; cases: Ca
                   {date(c.next_payment_date)}
                   {due ? <div><span className={`badge ${due.soon ? "tone-bad" : "tone-muted"}`}>{due.text}</span></div> : null}
                 </td>
-                <td>{when(c.opened_at)}<div className="muted sub">{relative(c.opened_at, now)}</div></td>
+                <td>{when(c.opened_at)}<div className="muted sub">{ago(c.opened_at, now)}</div></td>
                 <td>
                   {when(c.deadline_at)}
-                  {c.deadline_at ? <div className="muted sub">{Date.parse(c.deadline_at) < now.getTime() ? "passed" : relative(c.deadline_at, now)}</div> : null}
+                  {c.deadline_at && c.state !== "releasing" ? (  // as on the case page: no countdown once a release is under way
+                    <div className="muted sub">{Date.parse(c.deadline_at) < now.getTime() ? "passed" : relative(c.deadline_at, now)}</div>
+                  ) : null}
                 </td>
               </tr>
             );

@@ -4,7 +4,7 @@ import { groupRules } from "@/lib/rules";
 import { OutcomeBadge } from "./badges";
 
 /** The decision with every rule that fired, grouped: why it isn't verified, why a person must
- *  look, what the call didn't show, and what it did. Rule ids are shown for auditors. */
+ *  look, which conditions weren't met, and which were. Rule ids are shown for auditors. */
 export function DecisionDetail({ decision }: { decision: DecisionInfo }) {
   const groups = groupRules(decision.rules_fired, decision.explanation);
   return (
@@ -19,7 +19,12 @@ export function DecisionDetail({ decision }: { decision: DecisionInfo }) {
             ))}
           </ul>
         </div>
-      )) : <ul className="plain">{decision.explanation.map((s) => <li key={s}>{s}</li>)}</ul>}
+      )) : (
+        <>
+          <ul className="plain">{decision.explanation.map((s, i) => <li key={i}>{s}</li>)}</ul>
+          <p className="muted">Rules fired: <span className="mono">{decision.rules_fired.join(", ") || "none"}</span></p>
+        </>
+      )}
     </>
   );
 }

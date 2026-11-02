@@ -23,6 +23,8 @@ jobs:
         run: cd apps/web && pnpm check:api
       - name: Typecheck
         run: cd apps/web && pnpm typecheck
+      - name: Unit tests
+        run: cd apps/web && pnpm test
       - name: Build
         run: cd apps/web && pnpm build
         env:
