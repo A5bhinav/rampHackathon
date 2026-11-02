@@ -12,6 +12,8 @@
     "check:api": "openapi-typescript ../../packages/contracts/openapi/dialback.yaml -o node_modules/.cache/dialback-api-check.ts && diff -q node_modules/.cache/dialback-api-check.ts ../../packages/contracts/generated/ts/dialback.ts"
   },
   "dependencies": {
+    "@supabase/ssr": "0.12.7",
+    "@supabase/supabase-js": "2.118.0",
     "jose": "6.2.15",
     "next": "16.4.3",
     "react": "19.3.1",

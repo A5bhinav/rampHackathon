@@ -72,6 +72,7 @@ ol.timeline li:last-child { border-bottom: 0; }
 ul.plain { margin: 0; padding-left: 18px; }
 form.console { display: grid; gap: 10px; }
 textarea { width: 100%; min-height: 84px; padding: 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--text); font: inherit; }
+input[type="email"] { width: 100%; padding: 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--text); font: inherit; }
 select, button { font: inherit; }
 button { border: 1px solid var(--line); background: var(--surface); color: var(--text); padding: 8px 14px; border-radius: 6px; cursor: pointer; }
 button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
