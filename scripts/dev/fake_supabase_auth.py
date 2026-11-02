@@ -31,7 +31,9 @@ class Auth:
         self.base, self.expires = base, expires
         self.users: dict[str, str] = {}         # email -> user id
         self.passwords: dict[str, str] = {}     # email -> password
-        self.refresh: dict[str, str] = {}       # refresh token -> email, rotated on use
+        self.refresh: dict[str, tuple[str, str]] = {}  # refresh token -> (email, session id), rotated on use
+        self.signed_in: dict[str, int] = {}     # session id -> when its sign-in happened (amr)
+        self.backdate: dict[str, int] = {}      # email -> hours to backdate its next sign-in, for tests
 
     def user(self, email: str) -> dict:
         now = datetime.now(UTC).isoformat()
@@ -39,13 +41,16 @@ class Auth:
                 "email_confirmed_at": now, "app_metadata": {"provider": "email", "providers": ["email"]},
                 "user_metadata": {}, "identities": [], "created_at": now, "updated_at": now, "is_anonymous": False}
 
-    def session(self, email: str) -> dict:
+    def session(self, email: str, session_id: str | None = None) -> dict:
         now = int(time.time())
+        if session_id is None:  # a new sign-in; a refresh keeps its session and sign-in time
+            session_id = str(uuid.uuid4())
+            self.signed_in[session_id] = now - 3600 * self.backdate.pop(email, 0)
         claims = {"iss": f"{self.base}/auth/v1", "sub": self.users[email], "aud": "authenticated", "role": "authenticated",
-                  "email": email, "iat": now, "exp": now + self.expires, "session_id": str(uuid.uuid4()),
-                  "is_anonymous": False, "aal": "aal1", "amr": [{"method": "password", "timestamp": now}]}
+                  "email": email, "iat": now, "exp": now + self.expires, "session_id": session_id, "is_anonymous": False,
+                  "aal": "aal1", "amr": [{"method": "password", "timestamp": self.signed_in[session_id]}]}
         refresh = secrets.token_urlsafe(24)
-        self.refresh[refresh] = email
+        self.refresh[refresh] = (email, session_id)
         return {"access_token": jwt.encode(claims, KEY, algorithm="ES256", headers={"kid": KID}), "token_type": "bearer",
                 "expires_in": self.expires, "expires_at": now + self.expires, "refresh_token": refresh, "user": self.user(email)}
 
@@ -84,6 +89,9 @@ def handler(auth: Auth) -> type[BaseHTTPRequestHandler]:
                 auth.users[body["email"].lower()] = body["id"]
                 auth.passwords[body["email"].lower()] = body["password"]
                 return self._send(200, {})
+            if url.path == "/_fake/backdate":  # the next sign-in for this email happened N hours ago
+                auth.backdate[body["email"].lower()] = int(body["hours"])
+                return self._send(200, {})
             grant = parse_qs(url.query).get("grant_type", [""])[0]
             if url.path == "/auth/v1/token" and grant == "password":
                 email = str(body.get("email", "")).lower()
@@ -93,18 +101,20 @@ def handler(auth: Auth) -> type[BaseHTTPRequestHandler]:
                     return self._send(400, {"code": "invalid_credentials", "msg": "Invalid login credentials"})
                 return self._send(200, auth.session(email))
             if url.path == "/auth/v1/token" and grant == "refresh_token":
-                email = auth.refresh.pop(str(body.get("refresh_token", "")), None)
-                if email is None:
+                owner = auth.refresh.pop(str(body.get("refresh_token", "")), None)
+                if owner is None:
                     return self._send(400, {"code": "refresh_token_not_found", "msg": "Invalid Refresh Token"})
-                return self._send(200, auth.session(email))
-            if url.path == "/auth/v1/logout":  # revoke every refresh token of the bearer, as scope=global does
+                return self._send(200, auth.session(*owner))
+            if url.path == "/auth/v1/logout":  # scope=local ends this session; global (the default) all of them
                 try:
-                    email = jwt.decode(self.headers.get("Authorization", "")[7:], KEY.public_key(), algorithms=["ES256"],
-                                       audience="authenticated")["email"]
+                    claims = jwt.decode(self.headers.get("Authorization", "")[7:], KEY.public_key(), algorithms=["ES256"],
+                                        audience="authenticated")
                 except jwt.PyJWTError:
                     return self._send(401, {"code": "bad_jwt", "msg": "invalid JWT"})
-                for token in [t for t, owner in auth.refresh.items() if owner == email]:
-                    del auth.refresh[token]
+                local = parse_qs(url.query).get("scope", ["global"])[0] == "local"
+                for token, (email, session_id) in list(auth.refresh.items()):
+                    if email == claims["email"] and (not local or session_id == claims["session_id"]):
+                        del auth.refresh[token]
                 return self._send(204)
             return self._send(404, {"code": "not_found", "msg": url.path})
 

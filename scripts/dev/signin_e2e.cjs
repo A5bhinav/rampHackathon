@@ -22,13 +22,14 @@ const check = (ok, what) => { console.log(`${ok ? 'ok  ' : 'FAIL'} ${what}`); if
   await fetch(`${FAKE}/_fake/users`, { method: 'POST', body: JSON.stringify({ id: APPROVER, email: EMAIL, password: PASSWORD }) });
   const browser = await chromium.launch();
   const page = await browser.newPage({ viewport: { width: 1100, height: 800 } });
-  const signIn = async (email, password) => {
-    await page.goto(`${WEB}/sign-in`);
-    await page.fill('#email', email);
-    await page.fill('#password', password);
-    await page.getByRole('button', { name: 'Sign in' }).click();
-    await page.waitForLoadState('networkidle');
+  const signIn = async (email, password, on = page) => {
+    await on.goto(`${WEB}/sign-in`);
+    await on.fill('#email', email);
+    await on.fill('#password', password);
+    await on.getByRole('button', { name: 'Sign in' }).click();
+    await on.waitForLoadState('networkidle');
   };
+  const sessionCookies = async (on) => (await on.context().cookies()).filter((c) => c.name.startsWith('sb-') || c.name === 'dialback_signed_in_at');
   const notice = () => page.locator('p.result.error').innerText().catch(() => '');
   const who = () => page.locator('.who').innerText().catch(() => '');
 
@@ -51,8 +52,23 @@ const check = (ok, what) => { console.log(`${ok ? 'ok  ' : 'FAIL'} ${what}`); if
   await page.context().addCookies([{ name: 'dialback_signed_in_at', value: new Date(Date.now() - 13 * 3600_000).toISOString(),
     url: WEB, httpOnly: true, sameSite: 'Lax' }]);
   await page.goto(queue);
-  check(page.url().includes('/sign-in'), 'after 12 hours the dashboard asks to sign in again');
+  check(page.url().includes('/sign-in'), 'with the sign-in marker 13 hours old, the dashboard asks to sign in again');
   await signIn(EMAIL, PASSWORD);
+
+  // The judges share accounts: signing out in one browser leaves the other signed in.
+  const other = await (await browser.newContext()).newPage();
+  await signIn(EMAIL, PASSWORD, other);
+  await other.getByRole('button', { name: 'Sign out' }).click();
+  await other.waitForLoadState('networkidle');
+  await page.goto(queue);
+  check(/ · approver/.test(await who()), 'signing out in another browser leaves this one signed in');
+
+  // The cap comes from the signed token, not only our cookie: a sign-in made 13 hours ago ends.
+  await fetch(`${FAKE}/_fake/backdate`, { method: 'POST', body: JSON.stringify({ email: EMAIL, hours: 13 }) });
+  const stale = await (await browser.newContext()).newPage();
+  await signIn(EMAIL, PASSWORD, stale);
+  check(stale.url().includes('/sign-in') && (await sessionCookies(stale)).length === 0,
+    `a sign-in older than 12 hours by its token is signed out, its cookies gone (${stale.url()})`);
 
   console.log('waiting 125 s for the 120 s access token to expire...');
   await new Promise((r) => setTimeout(r, 125_000));
@@ -63,7 +79,7 @@ const check = (ok, what) => { console.log(`${ok ? 'ok  ' : 'FAIL'} ${what}`); if
   await page.getByRole('button', { name: 'Sign out' }).click();
   await page.waitForLoadState('networkidle');
   check(page.url().includes('/sign-in'), 'sign-out lands on sign-in');
-  const left = (await page.context().cookies()).filter((c) => c.name.startsWith('sb-') || c.name === 'dialback_signed_in_at');
+  const left = await sessionCookies(page);
   check(left.length === 0, `sign-out deleted the session cookies (${left.map((c) => c.name).join(', ') || 'none left'})`);
   await page.goto(`${WEB}/`);
   check(page.url().includes('/sign-in'), 'after sign-out the dashboard asks to sign in again');
