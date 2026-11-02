@@ -54,19 +54,19 @@ Until each lands, the fact it carries is `None`.
 - [x] A report without `contact_point_id`, or with one that isn't the current version's pick, gives `dialed_eligible_number = False`.
 - [x] A dropped call that said "no", followed by a redial that says "yes", reaches `decide()` with the "no" in `earlier_calls`.
 - [x] `consent_first`, `answers_in_order` and `same_person_yes_and_digits` follow decisions 3 and 4. Each branch has a unit test.
-- [x] Every new fact is `None` when its source is missing: no ledger, an older voice report, or no names recorded.
+- [x] Every new fact is `None` when its source is missing: no ledger, an older voice report, no names recorded, or a name or company that can't be read. The ledger port counts only booleans, and if it fails, the case goes to a person.
 - [x] A slot answered twice keeps both values in order. `company_matches` is `False` if any recorded company value doesn't match.
-- [x] Core tests and the smoke run still pass. The doubles supply the new facts, and the skeleton engine is unchanged.
+- [x] Core tests and the smoke run still pass. The doubles supply the new facts. The skeleton engine's rules are unchanged, except that an earlier call's "no" or wrong digits now decide Not verified, which closes the dropped-call gap.
 
 ## Tests (written first)
 
 | Acceptance item | Test |
 |---|---|
 | contact point | `apps/core/tests/test_worker.py::test_a_report_without_the_picked_contact_point_is_not_eligible` |
-| earlier calls | `apps/core/tests/test_worker.py::test_a_dropped_call_that_said_no_still_counts` |
+| earlier calls | `apps/core/tests/test_worker.py::test_a_dropped_call_that_said_no_still_counts`, `::test_only_this_generations_pick_and_calls_count` |
 | order and same person | `packages/decision/tests/test_facts.py` (one test per branch) |
-| unknown is None | `packages/decision/tests/test_facts.py::test_missing_sources_are_none` |
-| company | `apps/core/tests/test_worker.py::test_every_company_answer_must_match` |
+| unknown is None | `packages/decision/tests/test_facts.py::test_missing_sources_are_none`, `test_worker.py::test_the_ledgers_change_context_counts_only_booleans`, `::test_a_change_context_failure_goes_to_a_person` |
+| company | `apps/core/tests/test_worker.py::test_every_company_answer_must_match`, `::test_every_company_answer_must_match_and_an_unreadable_one_is_unknown` |
 | nothing breaks | `cd apps/core && uv run pytest`, `uv run python scripts/dev/stack.py --smoke` |
 
 ## Out of scope

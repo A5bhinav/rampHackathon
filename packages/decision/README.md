@@ -65,7 +65,7 @@ inside this package; the caller passes everything in.
 - `CaseFacts` per spec 0005 (`facts.py`):
   - A repeated answer keeps every value, in order.
   - The call order (`consent_first`, `answers_in_order`) and the single declared speaker (`same_person_yes_and_digits`) are computed from the answers' turns.
-  - Earlier calls of the same generation are summarized as `EarlierCall`; they can count against a change, never for one.
+  - Earlier calls of the same generation are summarized as `EarlierCall`; they can count against a change, never for one. The skeleton's NV01–NV03 already act on them, so a dropped call's "no" still blocks the case.
   - Telephony and change-context facts are `None` until their slices supply them.
   - The skeleton engine reads a repeated answer as before: its value if every recording agrees, else unknown.
 - Still unknown, and recorded as "not checked by this engine version": `U01` (the speaker first appeared in the change thread) and `U03` (an offered number came from the request), until the ledger's `change_context` exists. `U02` (one person) is now computed. The Nov 4 engine (spec 0006) fails closed on all of them.

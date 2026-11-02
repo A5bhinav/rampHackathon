@@ -267,6 +267,47 @@ async def test_a_dropped_call_that_said_no_still_counts(world, monkeypatch):
     assert [(c.result, c.change_requested) for c in facts.earlier_calls] == [("failed", ("no",))]
     assert facts.dialed_eligible_number and facts.same_person_yes_and_digits and facts.consent_first
     assert world.change_context.calls[-1]["speaker_names"] == ("Jordan Lee",)
+    case = await case_of(world)
+    assert (case["state"], case["outcome"]) == ("blocked", "not_verified"), "the dropped call's no still decides"
+
+
+async def test_only_this_generations_pick_and_calls_count(world, monkeypatch):
+    import dialback_core.worker as worker_module
+    seen, real = [], worker_module.decide
+    monkeypatch.setattr(worker_module, "decide", lambda facts: seen.append(facts) or real(facts))
+    await import_all(world.pool, world.ramp, world.keys, world.dataset.id)
+    await change_and_detect(world)
+    case = await case_of(world)
+    first = world.voice.placed[0]["call_id"]
+    dropped = await report(world, case["id"], first, result="failed", answers=transit(first, change="no"),
+                           retry_at="2030-01-01T00:00:00Z")
+    assert dropped.status_code == 204
+
+    world.resolver.point = uuid.UUID("0f0f0f0f-1111-4000-8000-000000000002")  # the ledger picks anew for v2
+    await change_and_detect(world, account_number="000077778888")
+    case = await case_of(world)
+    assert (case["version"], case["state"]) == (2, "calling")
+    second = world.voice.placed[-1]["call_id"]
+    v2 = await report(world, case["id"], second, attempt=case["call_attempts"], answers=transit(second, digits="8888"),
+                      contact_point=world.resolver.point)
+    assert v2.status_code == 204
+    await world.worker.drain(world.dataset.id)
+    [facts] = seen
+    assert facts.dialed_eligible_number, "v2's own pick"
+    assert facts.earlier_calls == (), "version 1's call (and its no) belongs to another change"
+
+
+async def test_a_change_context_failure_goes_to_a_person(world):
+    world.change_context.facts = RuntimeError("ledger down")
+    await import_all(world.pool, world.ramp, world.keys, world.dataset.id)
+    await change_and_detect(world)
+    case = await case_of(world)
+    assert (await report(world, case["id"], world.voice.placed[0]["call_id"])).status_code == 204
+    await world.worker.drain(world.dataset.id)
+    case = await case_of(world)
+    assert case["state"] == "needs_review" and case["outcome"] is None
+    alert = await one(world.pool, "select kind, message from app.alerts where case_id = %s", case["id"])
+    assert alert["kind"] == "command_stuck" and "decide" in alert["message"]
 
 
 async def test_every_company_answer_must_match(world):
@@ -287,3 +328,22 @@ async def test_without_the_ledgers_change_context_every_answer_is_unknown(world)
                                               cutoff=dt.datetime(2026, 11, 3, tzinfo=dt.UTC), speaker_names=("Jordan Lee",),
                                               offered_numbers=())
     assert facts == ChangeFacts()
+
+
+async def test_the_ledgers_change_context_counts_only_booleans(world, monkeypatch):
+    import dialback_ledger
+    monkeypatch.setattr(dialback_ledger, "change_context", raising=False, value=lambda **_: {
+        "speaker_in_change_thread": "no", "offered_number_from_request": True, "speaker_known_before_request": None,
+        "something_else": True})
+    facts = await LedgerChangeContext().check(case_id=uuid.uuid4(), dataset_id=world.dataset.id, vendor_id=uuid.uuid4(),
+                                              cutoff=dt.datetime(2026, 11, 3, tzinfo=dt.UTC), speaker_names=(),
+                                              offered_numbers=("415 555 0177",))
+    assert facts == ChangeFacts(offered_number_from_request=True), "a string 'no' is not False"
+
+
+def test_every_company_answer_must_match_and_an_unreadable_one_is_unknown():
+    from dialback_core.company import every_name_matches
+    assert every_name_matches(["Acme Fasteners"], "Acme Fasteners LLC") is True
+    assert every_name_matches(["Acme Fasteners", "Globex"], "Acme Fasteners LLC") is False
+    assert every_name_matches(["Acme Fasteners", "LLC"], "Acme Fasteners LLC") is None, "'LLC' alone names nobody"
+    assert every_name_matches([], "Acme Fasteners LLC") is None

@@ -44,13 +44,13 @@ class StandInResolver:
     """TEST DOUBLE for Inesh's select_number (spec 0002, D10): picks one fixed number, or none."""
 
     def __init__(self, pick: bool = True) -> None:
-        self.pick, self.calls = pick, []
+        self.pick, self.calls, self.point = pick, [], CONTACT_POINT
 
     async def select_number(self, *, case_id, dataset_id, vendor_id, cutoff) -> Selection:
         self.calls.append(case_id)
         if not self.pick:
             return Selection(uuid.uuid4(), "test-double", None, reason="No number met the rule.")
-        return Selection(uuid.uuid4(), "test-double", CONTACT_POINT, source_types=("contract", "listing"))
+        return Selection(uuid.uuid4(), "test-double", self.point, source_types=("contract", "listing"))
 
 
 class StandInChangeContext:
@@ -64,6 +64,8 @@ class StandInChangeContext:
 
     async def check(self, **asked) -> ChangeFacts:
         self.calls.append(asked)
+        if isinstance(self.facts, Exception):
+            raise self.facts
         return self.facts
 
 

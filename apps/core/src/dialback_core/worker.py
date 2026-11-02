@@ -30,7 +30,7 @@ from psycopg.types.json import Jsonb
 from psycopg_pool import AsyncConnectionPool
 
 from .calling_window import CallingWindow
-from .company import company_matches
+from .company import every_name_matches
 from .db import dataset_now, system_tx
 from .detection import Keys, process_inbound_webhooks
 from .events import TransitionRefused, apply_event
@@ -362,7 +362,6 @@ class Worker:
         # Earlier calls can count against the change, never for it (D2).
         earlier = tuple(earlier_call(e["body"]) for e in generation
                         if e["type"] == "call_ended" and e["body"].get("call_id") != body.get("call_id"))
-        companies = [company_matches(n, case["legal_name"], case["trade_names"] or ()) for n in values(answers, "company_named")]
         context = await self.change_context.check(
             case_id=case["id"], dataset_id=case["dataset_id"], vendor_id=case["vendor_id"],
             cutoff=case["ramp_changed_at"] or case["detected_at"],
@@ -373,7 +372,7 @@ class Worker:
             call_result=body["result"],
             dialed_eligible_number=dialed_eligible,
             last_four_result=body.get("last_four_result"),
-            company_matches=all(companies) if companies else None,  # every company value must match (D7)
+            company_matches=every_name_matches(values(answers, "company_named"), case["legal_name"], case["trade_names"] or ()),
             checks=CallChecks(**checks) if checks else None,
             earlier_calls=earlier,
             speaker_in_change_thread=context.speaker_in_change_thread,

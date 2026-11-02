@@ -2,7 +2,7 @@ from dataclasses import replace
 
 from dialback_decision import CallChecks, CaseFacts, decide
 from dialback_decision.engine import ENGINE_VERSION, TEMPLATES
-from dialback_decision.facts import facts_from_answers
+from dialback_decision.facts import EarlierCall, facts_from_answers
 from hypothesis import given
 from hypothesis import strategies as st
 
@@ -87,3 +87,14 @@ def test_decide_is_total_and_never_verifies_without_matching_digits(facts):
     assert d.outcome in ("verified", "not_verified", "needs_review")
     if d.outcome == "verified":
         assert facts.last_four_result == "match" and set(facts.change_requested) == {"yes"}
+
+
+def test_an_earlier_call_counts_against_the_change_never_for_it():
+    said_no = replace(GOOD, earlier_calls=(EarlierCall(result="failed", change_requested=("yes", "no")),))
+    assert decide(said_no).rules_fired == ("NV01_vendor_denied_change",)
+    wrong = replace(GOOD, earlier_calls=(EarlierCall(result="failed", last_four_result="mismatch"),))
+    assert decide(wrong).rules_fired == ("NV02_digits_mismatch",)
+    old = replace(GOOD, earlier_calls=(EarlierCall(result="failed", last_four_result="matches_old_account"),))
+    assert decide(old).rules_fired == ("NV03_digits_match_old_account",)
+    clean = replace(GOOD, earlier_calls=(EarlierCall(result="failed", recording_consent=("yes",)),))
+    assert decide(clean).outcome == "verified", "a clean dropped call neither helps nor hurts"

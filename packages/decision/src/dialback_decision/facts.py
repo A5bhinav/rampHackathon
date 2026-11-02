@@ -125,9 +125,12 @@ def same_person(answers: list[dict[str, Any]]) -> bool | None:
     """One declared speaker: exactly one distinct name, given no later than the change answer.
     Two names (even "Jordan" and "Jordan Lee") are two people. This checks the declared identity
     stays the same; it doesn't prove who is speaking (spec 0006, limits)."""
-    names = [(a["turn_id"], _name(a["value"])) for a in answers if a["slot"] == "speaker_name" and _name(a["value"])]
+    recorded = [(a["turn_id"], _name(a["value"])) for a in answers if a["slot"] == "speaker_name"]
+    names = [(t, n) for t, n in recorded if n]
     if len({n for _, n in names}) > 1:
         return False
+    if len(names) < len(recorded):
+        return None  # a name we can't read could be anyone
     change = _turns(answers, "change_requested")
     if names and change and min(t for t, _ in names) <= min(change):
         return True

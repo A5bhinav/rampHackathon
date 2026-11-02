@@ -90,3 +90,21 @@ def test_the_hash_covers_earlier_calls_and_answer_order_but_not_flag_order():
     assert inputs_hash(CaseFacts(**{**base.__dict__, "change_requested": ("yes", "no")})) != inputs_hash(flipped)
     ab = CaseFacts(**{**base.__dict__, "flags": ("a", "b")})
     assert inputs_hash(ab) == inputs_hash(CaseFacts(**{**base.__dict__, "flags": ("b", "a")}))
+
+
+def test_a_name_we_cant_read_could_be_anyone():
+    assert same_person([*CALL, a("speaker_name", "?", 8)]) is None
+    assert same_person([*CALL, a("speaker_name", "?", 8), a("speaker_name", "Sam Ortiz", 9)]) is False, "two readable names"
+
+
+def test_answers_are_judged_by_turn_not_by_list_order():
+    shuffled = list(reversed(CALL))
+    assert (consent_first(shuffled), answers_in_order(shuffled), same_person(shuffled)) == (True, True, True)
+    asked_again = [*CALL, a("recording_consent", "yes", 11)]  # consent repeated later is still first
+    assert consent_first(asked_again) is True
+
+
+def test_order_facts_are_unknown_if_any_answer_has_no_turn():
+    partial = [*CALL[:-1], {"slot": "account_last4", "value": "6666"}]
+    f = facts_from_answers(partial, call_result="answers_recorded", dialed_eligible_number=True)
+    assert (f.consent_first, f.answers_in_order, f.same_person_yes_and_digits) == (None, None, None)

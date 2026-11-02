@@ -19,7 +19,7 @@ import rfc8785
 
 from .facts import CaseFacts
 
-ENGINE_VERSION = "decision-0.1.1-skeleton"  # 0.1.1: the spec 0005 facts; same rules
+ENGINE_VERSION = "decision-0.1.1-skeleton"  # 0.1.1: the spec 0005 facts; earlier calls count against (NV01-NV03)
 
 
 @dataclass(frozen=True)
@@ -33,6 +33,11 @@ def _checks(f: CaseFacts, predicate: Callable) -> bool:
     return f.checks is not None and predicate(f.checks)
 
 
+def _earlier(f: CaseFacts, predicate: Callable) -> bool:
+    """An earlier call of this generation counts against the change, never for it (spec 0005, D2)."""
+    return any(predicate(call) for call in f.earlier_calls)
+
+
 def _one(values: tuple[str, ...]) -> str | None:
     """The skeleton's reading of a repeated answer: its value if every recording agrees, else
     unknown. The Nov 4 engine reads every value instead (spec 0006)."""
@@ -41,11 +46,12 @@ def _one(values: tuple[str, ...]) -> str | None:
 
 NOT_VERIFIED: tuple[Rule, ...] = (
     Rule("NV01_vendor_denied_change", "The person said the vendor did not ask to change its bank details.",
-         lambda f: _one(f.change_requested) == "no"),
+         lambda f: _one(f.change_requested) == "no" or _earlier(f, lambda c: "no" in c.change_requested)),
     Rule("NV02_digits_mismatch", "The digits the person gave do not match the new account.",
-         lambda f: f.last_four_result == "mismatch"),
+         lambda f: f.last_four_result == "mismatch" or _earlier(f, lambda c: c.last_four_result == "mismatch")),
     Rule("NV03_digits_match_old_account", "The digits the person gave match the old account, not the new one.",
-         lambda f: f.last_four_result == "matches_old_account"),
+         lambda f: f.last_four_result == "matches_old_account"
+         or _earlier(f, lambda c: c.last_four_result == "matches_old_account")),
     Rule("NV04_offered_number_from_request", "The person offered a phone number that first appeared in the change request.",
          lambda f: f.offered_number_from_request is True),
 )
