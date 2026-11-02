@@ -279,7 +279,9 @@ async def scope(request: Request) -> AsyncIterator[Scope]:
         yield Scope(conn, row["id"], dataset_id)
 
 
-ScopeDep = Annotated[Scope, Depends(scope)]
+# scope="function": the transaction commits before the response goes out, so an answer the
+# chaos mode drops after the work (a lost response) never races the commit.
+ScopeDep = Annotated[Scope, Depends(scope, scope="function")]
 
 
 async def owned_vendor(s: Scope, vendor_id: UUID, lock: bool = False) -> dict:
@@ -372,7 +374,9 @@ def create_app(settings: Settings, pool: AsyncConnectionPool | None = None,
         if fault.status is None:
             return await call_next(request)
         if fault.after_work:
-            await call_next(request)  # the work is done and committed; the answer is lost
+            done = await call_next(request)  # the work is done and committed; the answer is lost
+            async for _ in done.body_iterator:  # let the route finish before answering
+                pass
         return error(fault.status, "chaos", "Simulated Ramp failure (chaos mode).")
 
     @app.exception_handler(MockError)

@@ -1,8 +1,9 @@
 """Chaos mode (spec 0008): Ramp's API, made unreliable on purpose and repeatably.
 
 While a business's `chaos_seed` is set, each request to Ramp's API (never the mock's own
-`/_mock` routes) draws from a stream seeded by the seed, the business and when its settings
-last changed, so patching the settings restarts the same sequence:
+`/_mock` routes) draws from a stream seeded by the seed and the request's number since the
+settings last changed. No database id goes in, so the same seed and the same requests give the
+same faults in every run, and patching the settings restarts the sequence:
 
 - it may wait up to `chaos_max_latency_ms` first;
 - with probability `chaos_error_permille`/1000 it answers 500, 502 or 503, and half the time it
@@ -39,7 +40,7 @@ class Chaos:
         key = (row["business_id"], row["chaos_seed"], row["updated_at"])
         n = self._counters.get(key, 0)
         self._counters[key] = n + 1
-        rng = random.Random(f"{row['chaos_seed']}:{row['business_id']}:{n}")  # changing settings restarts at n = 0
+        rng = random.Random(f"{row['chaos_seed']}:{n}")  # changing settings restarts at n = 0
         latency = rng.randint(0, row["chaos_max_latency_ms"]) if row["chaos_max_latency_ms"] else 0
         if rng.randrange(1000) >= row["chaos_error_permille"]:
             return Fault(latency_ms=latency)
@@ -47,8 +48,9 @@ class Chaos:
         return Fault(latency_ms=latency, status=rng.choice((500, 502, 503)), after_work=rng.random() < 0.5)
 
 
-def drops_delivery(seed: int | None, permille: int, delivery_id: int, attempt: int) -> bool:
+def drops_delivery(seed: int | None, permille: int, ordinal: int, attempt: int) -> bool:
+    """`ordinal` is the delivery's number within its subscription, not its row id, so a run repeats."""
     if seed is None or permille <= 0:
         return False
-    return random.Random(f"{seed}:delivery:{delivery_id}:{attempt}").randrange(1000) < permille
+    return random.Random(f"{seed}:delivery:{ordinal}:{attempt}").randrange(1000) < permille
 

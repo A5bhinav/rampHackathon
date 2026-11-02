@@ -8,7 +8,9 @@ the sealed set, and prints the SHA-256 that is committed instead of the file.
         [--schema packages/contracts/schemas/scenario.schema.json]
 
 Rules: one dialback.scenario/v1 family per line; held_out true; no `expected` block (the
-oracle writes it); fictional numbers only (+1 NPA 555-0100 to 555-0199); unique family ids.
+oracle writes it); fictional numbers only (+1 NPA 555-0100 to 555-0199); unique family ids and,
+within a family, unique variant ids; each variant's facts, with its overrides applied as a JSON
+Merge Patch, still match the format; and every variant but `base` changes something.
 """
 from __future__ import annotations
 
@@ -41,6 +43,24 @@ def local_schemas(schema_path: Path) -> Registry:
     return Registry(retrieve=refuse).with_resources(resources)
 
 
+def merge_patch(target: object, patch: object) -> object:
+    """RFC 7396, which is how a variant's `overrides` apply to the family's facts."""
+    if not isinstance(patch, dict):
+        return patch
+    result = dict(target) if isinstance(target, dict) else {}
+    for key, value in patch.items():
+        if value is None:
+            result.pop(key, None)
+        else:
+            result[key] = merge_patch(result.get(key), value)
+    return result
+
+
+def _numbers(facts: object) -> list[str]:
+    phones = facts.get("phone_numbers") if isinstance(facts, dict) else None
+    return [str(p.get("e164", "")) if isinstance(p, dict) else repr(p) for p in phones or []]
+
+
 def problems(families: list[dict], schema: dict, registry: Registry | None = None) -> list[str]:
     validator = Draft202012Validator(schema, registry=registry or Registry())
     found, seen = [], set()
@@ -52,12 +72,27 @@ def problems(families: list[dict], schema: dict, registry: Registry | None = Non
         if fam.get("family_id") in seen:
             found.append(f"{where}: duplicate family_id")
         seen.add(fam.get("family_id"))
-        for v in fam.get("variants", []):
+        facts = fam.get("facts")
+        numbers = _numbers(facts)
+        variant_ids: set = set()
+        for v in fam.get("variants") or []:
+            if not isinstance(v, dict):
+                continue  # the schema check above already reported it
+            vid = v.get("variant_id")
+            if vid in variant_ids:
+                found.append(f"{where}: duplicate variant_id {vid}")
+            variant_ids.add(vid)
             if "expected" in v:
-                found.append(f"{where}: variant {v.get('variant_id')} has an expected block; the oracle writes it")
-        numbers = [p.get("e164", "") for p in fam.get("facts", {}).get("phone_numbers", [])]
-        numbers += [p.get("e164", "") for v in fam.get("variants", []) for p in (v.get("overrides") or {}).get("phone_numbers", [])]
-        found += [f"{where}: {e} is not a fictional 555-01xx number" for e in numbers if not FICTIONAL.match(e)]
+                found.append(f"{where}: variant {vid} has an expected block; the oracle writes it")
+            patched = merge_patch(facts, v.get("overrides") or {})
+            if vid != "base" and patched == facts:
+                found.append(f"{where}: variant {vid} changes nothing, so it runs the same as base")
+            if v.get("overrides"):
+                # The patched facts must still be valid facts: check the family as that variant sees it.
+                as_run = dict(fam, facts=patched, variants=[{k: x for k, x in v.items() if k != "overrides"}])
+                found += [f"{where}: variant {vid} after overrides: {e.message}" for e in validator.iter_errors(as_run)]
+                numbers += _numbers(patched)
+        found += [f"{where}: {e} is not a fictional 555-01xx number" for e in dict.fromkeys(numbers) if not FICTIONAL.match(e)]
     return found
 
 

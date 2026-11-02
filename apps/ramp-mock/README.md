@@ -64,8 +64,10 @@ with 500, so a switch is spent even though the request failed.
   come *after* the work was done (a lost response);
 - a webhook delivery is dropped with probability `chaos_drop_permille`/1000.
 
-The same seed gives the same faults for the same sequence of requests. Patching the settings
-restarts the sequence.
+The same seed gives the same faults for the same sequence of requests, in every run: the draw
+uses only the seed and the request's (or delivery's) number, never a database id. Patching the
+settings restarts the sequence. Each request's transaction commits before its answer goes out,
+so a lost response always leaves the work done.
 
 **Webhook subscriptions point at the core per dataset:** `{core}/webhooks/ramp/{dataset_id}`
 (spec 0002, D3), with the secret the core verifies.
