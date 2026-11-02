@@ -1,17 +1,16 @@
-"""A stand-in for Supabase Auth, for local end-to-end checks of the magic-link sign-in (spec 0010).
+"""A stand-in for Supabase Auth, for local end-to-end checks of the password sign-in (spec 0010).
 
-It answers the few endpoints the dashboard and the core use: /otp (send a link), /verify (spend
-it), /token (refresh), /user, /logout and the JWKS. It signs ES256 tokens with a key made fresh
-each run, the way a project on asymmetric signing keys does. Nothing is emailed: each link is
-printed, and kept at GET /_fake/last-link?email=..., so a test can follow it. Local tests only.
+It answers the few endpoints the dashboard and the core use: /token (password sign-in and
+refresh), /user, /logout and the JWKS. It signs ES256 tokens with a key made fresh each run,
+the way a project on asymmetric signing keys does. Local tests only.
 
-    uv run python scripts/dev/fake_supabase_auth.py --site http://127.0.0.1:3000 --user <uuid>:riley@example.test
+    uv run python scripts/dev/fake_supabase_auth.py --user '<uuid>:riley@example.test:a-long-password'
     uv run python scripts/dev/stack.py --changes --supabase-url http://127.0.0.1:54321
 """
 from __future__ import annotations
 
 import argparse
-import hashlib
+import hmac
 import json
 import secrets
 import time
@@ -28,11 +27,10 @@ KEY = ec.generate_private_key(ec.SECP256R1())
 
 
 class Auth:
-    def __init__(self, base: str, site: str, expires: int) -> None:
-        self.base, self.site, self.expires = base, site, expires
+    def __init__(self, base: str, expires: int) -> None:
+        self.base, self.expires = base, expires
         self.users: dict[str, str] = {}         # email -> user id
-        self.links: dict[str, str] = {}         # token hash -> email, spent on use
-        self.last_link: dict[str, str] = {}     # email -> the newest link
+        self.passwords: dict[str, str] = {}     # email -> password
         self.refresh: dict[str, str] = {}       # refresh token -> email, rotated on use
 
     def user(self, email: str) -> dict:
@@ -45,7 +43,7 @@ class Auth:
         now = int(time.time())
         claims = {"iss": f"{self.base}/auth/v1", "sub": self.users[email], "aud": "authenticated", "role": "authenticated",
                   "email": email, "iat": now, "exp": now + self.expires, "session_id": str(uuid.uuid4()),
-                  "is_anonymous": False, "aal": "aal1", "amr": [{"method": "otp", "timestamp": now}]}
+                  "is_anonymous": False, "aal": "aal1", "amr": [{"method": "password", "timestamp": now}]}
         refresh = secrets.token_urlsafe(24)
         self.refresh[refresh] = email
         return {"access_token": jwt.encode(claims, KEY, algorithm="ES256", headers={"kid": KID}), "token_type": "bearer",
@@ -78,31 +76,23 @@ def handler(auth: Auth) -> type[BaseHTTPRequestHandler]:
                 except jwt.PyJWTError:
                     return self._send(401, {"code": "bad_jwt", "msg": "invalid JWT"})
                 return self._send(200, auth.user(claims["email"]))
-            if url.path == "/_fake/last-link":
-                email = parse_qs(url.query).get("email", [""])[0].lower()
-                return self._send(200, {"link": auth.last_link.get(email)})
             return self._send(404, {"code": "not_found", "msg": url.path})
 
         def do_POST(self) -> None:
             url, body = urlparse(self.path), self._body()
             if url.path == "/_fake/users":
                 auth.users[body["email"].lower()] = body["id"]
+                auth.passwords[body["email"].lower()] = body["password"]
                 return self._send(200, {})
-            if url.path == "/auth/v1/otp":
+            grant = parse_qs(url.query).get("grant_type", [""])[0]
+            if url.path == "/auth/v1/token" and grant == "password":
                 email = str(body.get("email", "")).lower()
-                if email not in auth.users:  # create_user is false: Supabase refuses without saying more
-                    return self._send(422, {"code": "otp_disabled", "msg": "Signups not allowed for otp"})
-                token_hash = hashlib.sha224(secrets.token_bytes(32)).hexdigest()
-                auth.links[token_hash] = email
-                auth.last_link[email] = f"{auth.site}/auth/confirm?token_hash={token_hash}&type=email"
-                print(f"magic link for {email}: {auth.last_link[email]}", flush=True)
-                return self._send(200, {})
-            if url.path == "/auth/v1/verify":
-                email = auth.links.pop(str(body.get("token_hash", "")), None)  # each link works once
-                if email is None or body.get("type") not in ("email", "invite"):
-                    return self._send(403, {"code": "otp_expired", "msg": "Token has expired or is invalid"})
+                known = auth.passwords.get(email)
+                # Same answer for an unknown email and a wrong password, as Supabase gives.
+                if known is None or not hmac.compare_digest(known, str(body.get("password", ""))):
+                    return self._send(400, {"code": "invalid_credentials", "msg": "Invalid login credentials"})
                 return self._send(200, auth.session(email))
-            if url.path == "/auth/v1/token" and parse_qs(url.query).get("grant_type") == ["refresh_token"]:
+            if url.path == "/auth/v1/token" and grant == "refresh_token":
                 email = auth.refresh.pop(str(body.get("refresh_token", "")), None)
                 if email is None:
                     return self._send(400, {"code": "refresh_token_not_found", "msg": "Invalid Refresh Token"})
@@ -127,14 +117,14 @@ def handler(auth: Auth) -> type[BaseHTTPRequestHandler]:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--port", type=int, default=54321)
-    parser.add_argument("--site", default="http://127.0.0.1:3000", help="the dashboard's URL, where links point")
-    parser.add_argument("--user", action="append", default=[], help="<uuid>:<email>, repeatable")
+    parser.add_argument("--user", action="append", default=[], help="<uuid>:<email>:<password>, repeatable")
     parser.add_argument("--expires", type=int, default=3600, help="access-token lifetime in seconds")
     args = parser.parse_args()
-    auth = Auth(f"http://127.0.0.1:{args.port}", args.site.rstrip("/"), args.expires)
+    auth = Auth(f"http://127.0.0.1:{args.port}", args.expires)
     for entry in args.user:
-        user_id, _, email = entry.partition(":")
+        user_id, email, password = entry.split(":", 2)
         auth.users[email.lower()] = str(uuid.UUID(user_id))
+        auth.passwords[email.lower()] = password
     print(f"fake Supabase Auth on http://127.0.0.1:{args.port} (key {KID})", flush=True)
     ThreadingHTTPServer(("127.0.0.1", args.port), handler(auth)).serve_forever()
 

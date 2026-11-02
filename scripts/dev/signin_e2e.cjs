@@ -1,4 +1,4 @@
-// The magic-link sign-in end to end (spec 0010): the dashboard, the core and a stand-in for
+// The password sign-in end to end (spec 0010): the dashboard, the core and a stand-in for
 // Supabase Auth, in a real browser. Runs by hand; CI has no browser job.
 //
 //   uv run python scripts/dev/fake_supabase_auth.py --expires 120
@@ -10,60 +10,61 @@
 // Needs Playwright with Chromium (npx playwright install chromium). The refresh check waits for
 // the stand-in's access token to expire, so start it with --expires 120.
 const { chromium } = require('playwright');
-const [RILEY] = process.argv.slice(2);
-if (!RILEY) { console.error('usage: node scripts/dev/signin_e2e.cjs <approver user id>'); process.exit(2); }
+const { randomUUID } = require('crypto');
+
+const [APPROVER] = process.argv.slice(2);
+if (!APPROVER) { console.error('usage: node scripts/dev/signin_e2e.cjs <approver user id>'); process.exit(2); }
 const WEB = process.env.WEB ?? 'http://127.0.0.1:3000', FAKE = process.env.FAKE ?? 'http://127.0.0.1:54321';
+const EMAIL = 'riley@example.test', PASSWORD = `e2e-${randomUUID()}`;
 const check = (ok, what) => { console.log(`${ok ? 'ok  ' : 'FAIL'} ${what}`); if (!ok) process.exitCode = 1; };
+
 (async () => {
-  await fetch(`${FAKE}/_fake/users`, { method: 'POST', body: JSON.stringify({ id: RILEY, email: 'riley@example.test' }) });
+  await fetch(`${FAKE}/_fake/users`, { method: 'POST', body: JSON.stringify({ id: APPROVER, email: EMAIL, password: PASSWORD }) });
   const browser = await chromium.launch();
   const page = await browser.newPage({ viewport: { width: 1100, height: 800 } });
-  const ask = async (email) => {
+  const signIn = async (email, password) => {
     await page.goto(`${WEB}/sign-in`);
     await page.fill('#email', email);
-    await page.getByRole('button', { name: 'Email me a sign-in link' }).click();
+    await page.fill('#password', password);
+    await page.getByRole('button', { name: 'Sign in' }).click();
     await page.waitForLoadState('networkidle');
-    return page.getByRole('status').innerText();
   };
-  const lastLink = async (email) => (await (await fetch(`${FAKE}/_fake/last-link?email=${email}`)).json()).link;
+  const notice = () => page.locator('p.result.error').innerText().catch(() => '');
+  const who = () => page.locator('.who').innerText().catch(() => '');
 
-  const strangerNotice = await ask('stranger@example.test');
-  const rileyNotice = await ask('Riley@Example.test');
-  check(strangerNotice === rileyNotice && strangerNotice.includes('If this address belongs'), 'the same answer for an unknown and a known email');
-  check(await lastLink('stranger@example.test') === null, 'no link for an email without an account');
-  const link = await lastLink('riley@example.test');
-  check(Boolean(link), 'a link for the approver');
+  await signIn('stranger@example.test', PASSWORD);
+  const unknown = await notice();
+  await signIn(EMAIL, 'not-the-password');
+  const wrong = await notice();
+  check(unknown.includes("don't match") && unknown === wrong, 'an unknown email and a wrong password get the same answer');
+  check(!(await page.context().cookies()).some((c) => c.name.startsWith('sb-')), 'a refused sign-in starts no session');
 
-  await page.goto(link);
-  await page.goto(link);  // opening it twice (an email scanner, then the person) spends nothing
-  await page.getByRole('button', { name: 'Sign in' }).click();
-  await page.waitForLoadState('networkidle');
-  const who = await page.locator('.who').innerText().catch(() => '');
-  check(/ · approver/.test(who), `signed in, and the core ran as that person (${who.replace(/\n/g, ' | ')})`);
+  await signIn(EMAIL, PASSWORD);
+  check(/ · approver/.test(await who()), `signed in, and the core ran as that person (${(await who()).replace(/\n/g, ' | ')})`);
   check(page.url().includes('/cases'), `landed on the queue (${page.url()})`);
   const cookies = await page.context().cookies();
-  const sb = cookies.filter((c) => c.name.startsWith('sb-'));
-  check(sb.length > 0 && sb.every((c) => c.httpOnly), `Supabase's session cookies are httpOnly (${sb.map((c) => c.name).join(', ')})`);
+  const ours = cookies.filter((c) => c.name.startsWith('sb-') || c.name === 'dialback_signed_in_at');
+  check(ours.length >= 2 && ours.every((c) => c.httpOnly), `the session cookies are httpOnly (${ours.map((c) => c.name).join(', ')})`);
 
-  const again = await browser.newPage();
-  await again.goto(link);
-  await again.getByRole('button', { name: 'Sign in' }).click();
-  await again.waitForLoadState('networkidle');
-  check(again.url().includes('/sign-in?failed=1'), 'a spent link starts no session');
-  await again.goto(`${WEB}/auth/confirm?token_hash=abc&type=recovery`);
-  check((await again.locator('p.result.error').innerText()).includes('not valid'), 'a recovery-type or malformed link is refused on sight');
+  // A sign-in lasts 12 hours: pretend this one happened 13 hours ago.
+  const queue = page.url();
+  await page.context().addCookies([{ name: 'dialback_signed_in_at', value: new Date(Date.now() - 13 * 3600_000).toISOString(),
+    url: WEB, httpOnly: true, sameSite: 'Lax' }]);
+  await page.goto(queue);
+  check(page.url().includes('/sign-in'), 'after 12 hours the dashboard asks to sign in again');
+  await signIn(EMAIL, PASSWORD);
 
   console.log('waiting 125 s for the 120 s access token to expire...');
   await new Promise((r) => setTimeout(r, 125_000));
   await page.reload();
   await page.waitForLoadState('networkidle');
-  check(/ · approver/.test(await page.locator('.who').innerText().catch(() => '')), 'still signed in after the access token expired (refreshed)');
+  check(/ · approver/.test(await who()), 'still signed in after the access token expired (refreshed)');
 
   await page.getByRole('button', { name: 'Sign out' }).click();
   await page.waitForLoadState('networkidle');
   check(page.url().includes('/sign-in'), 'sign-out lands on sign-in');
-  const left = (await page.context().cookies()).filter((c) => c.name.startsWith('sb-')).map((c) => c.name);
-  check(left.length === 0, `sign-out deleted Supabase's cookies (${left.join(', ') || 'none left'})`);
+  const left = (await page.context().cookies()).filter((c) => c.name.startsWith('sb-') || c.name === 'dialback_signed_in_at');
+  check(left.length === 0, `sign-out deleted the session cookies (${left.map((c) => c.name).join(', ') || 'none left'})`);
   await page.goto(`${WEB}/`);
   check(page.url().includes('/sign-in'), 'after sign-out the dashboard asks to sign in again');
   await browser.close();

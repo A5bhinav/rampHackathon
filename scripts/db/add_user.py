@@ -1,7 +1,8 @@
-"""Give an invited Supabase user a Dialback profile and roles, or take roles away (spec 0010, D6).
+"""Give a Supabase user a Dialback profile and roles, or take roles away (spec 0010, D6).
 
-Invite the person from the Supabase dashboard first (Authentication, Users), so they exist in
-auth.users. Then, with the database's connection string:
+Create the person in the Supabase dashboard first (Authentication, Users, "Create new user",
+with a generated password, already confirmed), so they exist in auth.users. Then, with the
+database's connection string:
 
     DATABASE_URL=... uv run python scripts/db/add_user.py --email riley@example.com --name "Riley Approver" --role approver
     DATABASE_URL=... uv run python scripts/db/add_user.py --email riley@example.com --remove-role approver
@@ -33,7 +34,7 @@ def apply(conn: psycopg.Connection, email: str, name: str | None = None, add: tu
         raise UserError("this database has no auth.users: it isn't a Supabase project (local dev uses seeded users)")
     rows = conn.execute("select id from auth.users where lower(email) = lower(%s)", (email,)).fetchall()
     if not rows:
-        raise UserError(f"no Supabase user with the email {email}: invite them from the Supabase dashboard first")
+        raise UserError(f"no Supabase user with the email {email}: create them in the Supabase dashboard first")
     if len(rows) > 1:  # e.g. an SSO account sharing the address: never guess who gets a role
         raise UserError(f"{len(rows)} Supabase users share the email {email}; grant by hand to the right id")
     user_id = rows[0][0]
