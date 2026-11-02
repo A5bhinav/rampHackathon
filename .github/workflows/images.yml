@@ -1,0 +1,70 @@
+name: images
+
+# The Railway images (docs/deploy.md): build both, migrate a database with the core image the
+# way Railway's pre-deploy step does, then start each service and wait for /healthz.
+on:
+  pull_request:
+    paths:
+      - "apps/core/**"
+      - "apps/ramp-mock/**"
+      - "packages/decision/**"
+      - "packages/ledger/**"
+      - "supabase/migrations/**"
+      - "scripts/db/**"
+      - "pyproject.toml"
+      - "uv.lock"
+      - ".dockerignore"
+      - ".github/workflows/images.yml"
+  push:
+    branches: [main]
+
+jobs:
+  images:
+    name: deploy images build and start
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Install psql
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+      - name: Migration runner tests
+        run: uv run --no-project --with pytest --with "psycopg[binary]" pytest -q scripts/db/test_migrate.py
+      - name: Build the core and Ramp mock images
+        run: |
+          docker build -f apps/core/Dockerfile -t dialback-core .
+          docker build -f apps/ramp-mock/Dockerfile -t dialback-ramp-mock .
+      - name: Migrate with the core image, twice (the second run must change nothing)
+        run: |
+          psql -X -q -v ON_ERROR_STOP=1 "$DATABASE_URL" -f supabase/tests/_local_auth_stub.sql  # Supabase has auth.uid()
+          docker run --rm --network host -e DATABASE_URL dialback-core python scripts/db/migrate.py
+          docker run --rm --network host -e DATABASE_URL dialback-core python scripts/db/migrate.py | tee second.txt
+          grep -q "0 applied now" second.txt
+      - name: Start both services and wait for /healthz
+        run: |
+          docker run -d --name mock --network host -e DATABASE_URL -e MOCK_RAMP_SECRET=ci-mock-secret-0123456789 \
+            -e PORT=8003 dialback-ramp-mock
+          docker run -d --name core --network host -e DATABASE_URL -e PORT=8001 \
+            -e RAMP_BASE_URL=http://localhost:8003 -e MOCK_RAMP_SECRET=ci-mock-secret-0123456789 \
+            -e RAMP_WEBHOOK_SECRET=ci-webhook-secret-0123 -e FINGERPRINT_KEY=ci-fingerprint-key-0123456789abcdef \
+            -e DIGITS_KEY=ci-digits-key-0123456789abcdef0123 -e INTERNAL_API_TOKEN=ci-internal-token-0123456789 \
+            -e DIALBACK_JWT_SECRET=ci-jwt-secret-0123456789abcdef0123456 dialback-core
+          for svc in 8003 8001; do
+            for i in $(seq 1 30); do curl -fsS "http://localhost:$svc/healthz" && break; sleep 1; done
+            curl -fsS "http://localhost:$svc/healthz" > /dev/null
+          done
+      - name: Service logs
+        if: always()
+        run: docker logs mock; docker logs core
