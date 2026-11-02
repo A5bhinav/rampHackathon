@@ -35,12 +35,12 @@ page lands.
   the core's templated reason inline.
 - **Sign-in (spec 0010):**
   - **Supabase:** with `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` set, people sign in with
-    an email magic link.
-    - `signInWithOtp` never creates accounts, and the page answers the same for any email.
-    - The link lands on `/auth/confirm`, which signs in only when the person presses the button,
-      because email scanners open links and each link works once.
+    an email and password, on accounts the team creates.
+    - No email is ever sent, so there's no email provider to set up, and anyone we give an
+      account to can sign in, Ramp's judges included.
+    - A wrong password and an unknown email get the same answer.
     - `@supabase/ssr` keeps the session in httpOnly cookies, and `src/proxy.ts` refreshes it on
-      every request.
+      every request. A sign-in lasts 12 hours; then the person signs in again.
     - The server forwards the access token to the core, which verifies it against the project's
       signing keys. The dashboard never decides who someone is.
   - **Dev:** `DIALBACK_AUTH_MODE=dev`, local only and refused when `VERCEL_ENV=production`,
@@ -75,23 +75,29 @@ cd apps/web && CORE_URL=http://127.0.0.1:8001 DIALBACK_AUTH_MODE=dev DIALBACK_JW
 1. **JWT signing keys:** the project must sign with asymmetric keys. If it still uses the
    legacy secret, use "Migrate JWT secret", then "Rotate keys". The core gets only
    `SUPABASE_URL` (spec 0010, D4).
-2. **URL configuration:** Site URL is the dashboard's production URL. Magic links go there, so
-   preview deployments can't finish a sign-in.
-3. **Email templates:**
-   - **Magic link:** link to `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email`.
-   - **Invite user:** the same with `type=invite`.
-4. **Link lifetime:** set the email OTP expiry to 15 minutes. An unspent link's token is in the
-   confirm page's URL, so it can reach request logs (spec 0010, stated limits).
-5. **Invite-only:** turn off new-user sign-ups. Invite each person from the Users page, then
-   give them a profile and a role in `app.user_profiles` and `app.user_roles` (spec 0010, D6).
-6. **Email delivery:** the built-in email reaches only members of the project's Supabase
-   organization. Anyone else needs custom SMTP (spec 0010, Q32).
+2. **Access-token expiry:** 15 minutes (900 seconds), in the project settings under JWT Keys.
+   Signing out or deleting someone ends their access within that time (spec 0010, D8).
+   Supabase advises against anything under 5 minutes.
+3. **No sign-ups and no emails:** on the Auth Providers page, open the Email provider. Turn off
+   "Confirm email", so accounts work without any email, and set the minimum password length to
+   16. Then turn off new-user sign-ups, so nobody can create an account from the dashboard.
+4. **Accounts:** for each person, add a user on the Authentication → Users page with their
+   email and a generated password. Then give them a profile and a role with
+   `scripts/db/add_user.py` (spec 0010, D6). Generate passwords; never pick them by hand:
+
+   ```bash
+   python3 -c "import secrets; print(secrets.token_urlsafe(18))"
+   ```
+
+5. **Judges:** one approver account and one clerk account for Ramp's judges, so they can see the
+   person who entered a change being refused the release. Send the passwords privately, never
+   in the repo or the video, and delete the accounts after Nov 19.
 
 To try the whole flow locally without a project, run the stand-in for Supabase Auth with the
 stack:
 
 ```bash
-uv run python scripts/dev/fake_supabase_auth.py --user <uuid>:riley@example.test
+uv run python scripts/dev/fake_supabase_auth.py --user '<uuid>:riley@example.test:a-long-password'
 ```
 
 ```bash
@@ -102,9 +108,8 @@ uv run python scripts/dev/stack.py --changes --supabase-url http://127.0.0.1:543
 cd apps/web && CORE_URL=http://127.0.0.1:8001 SUPABASE_URL=http://127.0.0.1:54321 SUPABASE_PUBLISHABLE_KEY=sb_publishable_local pnpm dev
 ```
 
-Magic links are printed by the stand-in instead of emailed. To check the whole flow in a
-browser, run `pnpm build && pnpm start` instead of `pnpm dev` and use `scripts/dev/signin_e2e.cjs`.
-Its header lists the steps.
+To check the whole flow in a browser, run `pnpm build && pnpm start` instead of `pnpm dev`
+and use `scripts/dev/signin_e2e.cjs`. Its header lists the steps.
 
 ## Checks
 

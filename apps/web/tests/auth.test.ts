@@ -1,7 +1,7 @@
 // Sign-in rules that don't need a browser or a Supabase project (spec 0010). `pnpm test`.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { authMode, cleanEmail, linkParams } from "../src/lib/auth-mode.ts";
+import { SESSION_HOURS, authMode, cleanEmail, cleanPassword, sessionFresh } from "../src/lib/auth-mode.ts";
 
 const SUPABASE = { SUPABASE_URL: "https://abcdefghijklmnop.supabase.co", SUPABASE_PUBLISHABLE_KEY: "sb_publishable_x" };
 
@@ -15,16 +15,21 @@ test("the sign-in mode: dev only off production, Supabase when configured, else 
   assert.equal(authMode({}), "none");
 });
 
-test("a sign-in link is accepted only as a magic link or an invite, with a plausible token hash", () => {
-  const hash = "a".repeat(56);
-  assert.deepEqual(linkParams({ token_hash: hash, type: "email" }), { tokenHash: hash, type: "email" });
-  assert.deepEqual(linkParams({ token_hash: hash, type: "invite" }), { tokenHash: hash, type: "invite" });
-  for (const type of ["recovery", "signup", "email_change", "magiclink", "", undefined]) {
-    assert.equal(linkParams({ token_hash: hash, type }), null, `type ${type}`);
+test("a password is passed through as typed, and only a plausible one is sent", () => {
+  assert.equal(cleanPassword("  correct horse battery staple "), "  correct horse battery staple ", "never trimmed or changed");
+  for (const bad of ["", "x".repeat(300), null, undefined, 42, ["a"]]) {
+    assert.equal(cleanPassword(bad), null, String(bad));
   }
-  for (const tokenHash of ["", "short", "has spaces in it ok?", "x".repeat(600), undefined, ["a", "b"]]) {
-    assert.equal(linkParams({ token_hash: tokenHash, type: "email" }), null, `hash ${String(tokenHash)}`);
-  }
+});
+
+test(`a sign-in lasts ${SESSION_HOURS} hours, measured from when the person signed in`, () => {
+  const now = new Date("2026-11-19T18:00:00Z");
+  assert.equal(SESSION_HOURS, 12);
+  assert.equal(sessionFresh("2026-11-19T09:00:00.000Z", now), true);
+  assert.equal(sessionFresh("2026-11-19T06:00:01.000Z", now), true);
+  assert.equal(sessionFresh("2026-11-19T05:59:59.000Z", now), false, "past 12 hours: sign in again");
+  assert.equal(sessionFresh("2026-11-19T18:05:00.000Z", now), false, "a time in the future is not trusted");
+  for (const bad of [undefined, "", "not a date", "1700000000"]) assert.equal(sessionFresh(bad, now), false, String(bad));
 });
 
 test("an email is trimmed and lowercased, and anything that isn't one is refused", () => {

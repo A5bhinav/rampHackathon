@@ -1,23 +1,14 @@
 import "server-only";
 import { createServerClient } from "@supabase/ssr";
-import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { SUPABASE_COOKIE_OPTIONS } from "./auth-mode";
 
-// Supabase Auth on the dashboard's server (spec 0010): magic links, the session cookies, sign-out.
+// Supabase Auth on the dashboard's server (spec 0010): password sign-in, the session cookies, sign-out.
 // The browser never talks to Supabase, and the dashboard never decides who someone is: it hands
 // the session's access token to the core, which verifies it against the project's keys.
 
 export function supabaseConfig(): { url: string; key: string } {
   return { url: process.env.SUPABASE_URL ?? "", key: process.env.SUPABASE_PUBLISHABLE_KEY ?? "" };
-}
-
-/** For sending a magic link: no session and no cookies, so it can run after the response. */
-export function supabaseStateless() {
-  const { url, key } = supabaseConfig();
-  return createClient(url, key, {
-    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, flowType: "implicit" },
-  });
 }
 
 export async function supabaseServer() {

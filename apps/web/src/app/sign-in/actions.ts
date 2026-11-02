@@ -1,11 +1,10 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { after } from "next/server";
-import { authMode, cleanEmail } from "@/lib/auth-mode";
+import { authMode, cleanEmail, cleanPassword } from "@/lib/auth-mode";
 import { DEV_TOKEN_SECONDS, devAuthEnabled, mintDevToken } from "@/lib/dev-auth";
-import { setSession } from "@/lib/session";
-import { supabaseStateless } from "@/lib/supabase";
+import { markSignedIn, setSession } from "@/lib/session";
+import { supabaseServer } from "@/lib/supabase";
 
 export async function signInAsDevUser(formData: FormData): Promise<void> {
   if (!devAuthEnabled()) redirect("/sign-in");
@@ -14,16 +13,18 @@ export async function signInAsDevUser(formData: FormData): Promise<void> {
   redirect("/");
 }
 
-/** Emails a magic link to an existing user (spec 0010). The answer, and how long it takes, are
- *  the same whether or not the address has an account: the link is requested after the page has
- *  answered, so the page can't be used to find out who has one. */
-export async function sendMagicLink(formData: FormData): Promise<void> {
+/** Email and password, for accounts the team created (spec 0010). A wrong password and an
+ *  unknown email get the same answer, so the page can't be used to find out who has an account. */
+export async function signIn(formData: FormData): Promise<void> {
   if (authMode(process.env) !== "supabase") redirect("/sign-in");
   const email = cleanEmail(formData.get("email"));
-  if (!email) redirect("/sign-in?invalid=1");
-  after(async () => {
-    const { error } = await supabaseStateless().auth.signInWithOtp({ email, options: { shouldCreateUser: false } });
-    if (error) console.warn(`magic link not sent: ${error.status ?? "?"} ${error.code ?? error.name}`);  // never the address
-  });
-  redirect("/sign-in?sent=1");
+  const password = cleanPassword(formData.get("password"));
+  if (!email || !password) redirect("/sign-in?failed=1");
+  const { error } = await (await supabaseServer()).auth.signInWithPassword({ email, password });
+  if (error) {
+    console.warn(`sign-in refused: ${error.status ?? "?"} ${error.code ?? error.name}`);  // never the address
+    redirect(error.status === 429 ? "/sign-in?slow=1" : "/sign-in?failed=1");
+  }
+  await markSignedIn();
+  redirect("/");
 }
