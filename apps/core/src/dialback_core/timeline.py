@@ -16,7 +16,6 @@ LAST_FOUR = {
     "matches_old_account": "matched the old account, not the new one",
     "near_miss": "were one digit off the new account",
     "mismatch": "did not match the new account",
-    "not_provided": "were not given",
     "ambiguous": "could not prove anything (the old and new accounts end the same)",
     "inconsistent": "were given two different ways",
 }
@@ -70,6 +69,8 @@ def summary(event_type: str, body: dict[str, Any], actor_name: str) -> str:
         case "call_ended":
             attempt = b.get("attempt", "?")
             if b.get("result") == "answers_recorded":
+                if b.get("last_four_result") == "not_provided":
+                    return f"Call attempt {attempt} ended with answers recorded; the person did not give four digits."
                 digits = LAST_FOUR.get(b.get("last_four_result", ""), "were not compared")
                 return f"Call attempt {attempt} ended with answers recorded; the digits given {digits}."
             if b.get("result") == "callback_requested":

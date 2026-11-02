@@ -163,3 +163,9 @@ async def test_not_found_and_invalid_requests(world):
     bad = await post(world, f"/api/cases/{missing}/release", "approver1", "/api/cases/{case_id}/release",
                      {"expected_version": 1, "action": "approve", "reason": "   "}, status=422)
     assert bad["code"] == "invalid_request"
+
+
+def test_the_timeline_says_plainly_when_no_digits_were_given():
+    from dialback_core.timeline import summary
+    body = {"attempt": 1, "result": "answers_recorded", "last_four_result": "not_provided"}
+    assert summary("call_ended", body, "Dialback") == "Call attempt 1 ended with answers recorded; the person did not give four digits."
