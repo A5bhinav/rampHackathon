@@ -162,12 +162,15 @@ async def bank_change(settings: Settings, dataset_id, vendor_id: str, account: s
         (await mock.post(f"/_mock/vendors/{vendor_id}/bank-change", json=body)).raise_for_status()
 
 
-def core_settings(url: str, backoff: float = 1.0, jobs_every: int = 30) -> Settings:
+def core_settings(url: str, backoff: float = 1.0, jobs_every: int = 30, supabase_url: str | None = None) -> Settings:
     s = SECRETS
-    return Settings(database_url=url, ramp_mode=RampMode.MOCK, ramp_base_url=MOCK_URL,
+    # With a Supabase project (or scripts/dev/fake_supabase_auth.py), the core trusts only its
+    # signing keys; otherwise the dashboard's dev sign-in secret (spec 0010).
+    return Settings(database_url=url, ramp_mode=RampMode.MOCK, ramp_base_url=MOCK_URL, supabase_url=supabase_url,
                     ramp_webhook_secret=s["RAMP_WEBHOOK_SECRET"].encode(), fingerprint_key=s["FINGERPRINT_KEY"].encode(),
                     mock_ramp_secret=s["MOCK_RAMP_SECRET"].encode(), digits_key=s["DIGITS_KEY"].encode(),
-                    internal_api_token=s["INTERNAL_API_TOKEN"].encode(), jwt_secret=s["DIALBACK_JWT_SECRET"].encode(),
+                    internal_api_token=s["INTERNAL_API_TOKEN"].encode(),
+                    jwt_secret=b"" if supabase_url else s["DIALBACK_JWT_SECRET"].encode(),
                     calling_window="00:00-23:59", calling_days="all",  # the evening demo (spec 0002, Q7)
                     command_backoff_seconds=backoff, worker_poll_seconds=0.3, run_worker=True,
                     # The poller and reconciliation (spec 0003), much more often than in production.
@@ -191,7 +194,8 @@ async def run(url: str, args: argparse.Namespace) -> int:
     mock = await asyncio.create_subprocess_exec(sys.executable, "-m", "dialback_ramp_mock.main", env=env)
     try:
         await wait_for(f"{MOCK_URL}/healthz")
-        settings = core_settings(url, backoff=0.2 if args.smoke else 1.0, jobs_every=2 if args.smoke else 30)
+        settings = core_settings(url, backoff=0.2 if args.smoke else 1.0, jobs_every=2 if args.smoke else 30,
+                                 supabase_url=args.supabase_url)
         pool = await open_pool(url, max_size=10)
         voice = ScriptedVoice(pool, refuse={"Brightline Office Supply Inc"}, deny={"Cobalt Freight LLC"})
         app = create_app(settings, pool=pool, resolver=ScriptedLedger(), caller=voice)
@@ -204,8 +208,13 @@ async def run(url: str, args: argparse.Namespace) -> int:
         print("\nThe walking skeleton is running.\n")
         print(f"  core      {CORE_URL}\n  ramp mock {MOCK_URL}\n  dataset   {dataset_id}\n")
         print("Start the dashboard in another terminal:\n")
-        print(f"  cd apps/web && CORE_URL={CORE_URL} DIALBACK_AUTH_MODE=dev DIALBACK_JWT_SECRET={SECRETS['DIALBACK_JWT_SECRET']} \\")
-        print(f"    DIALBACK_DEV_USERS='{dev_users}' pnpm dev\n")
+        if args.supabase_url:
+            print(f"  cd apps/web && CORE_URL={CORE_URL} SUPABASE_URL={args.supabase_url} \\")
+            print("    SUPABASE_PUBLISHABLE_KEY=sb_publishable_local pnpm dev\n")
+            print(f"  Seeded users (id:name), for the Supabase project or the stand-in: {dev_users}\n")
+        else:
+            print(f"  cd apps/web && CORE_URL={CORE_URL} DIALBACK_AUTH_MODE=dev DIALBACK_JWT_SECRET={SECRETS['DIALBACK_JWT_SECRET']} \\")
+            print(f"    DIALBACK_DEV_USERS='{dev_users}' pnpm dev\n")
 
         if args.changes or args.smoke:
             # Three bank changes: Acme confirms (verified), Brightline's call is refused before
@@ -238,6 +247,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--changes", action="store_true", help="make three bank changes after seeding")
     parser.add_argument("--smoke", action="store_true", help="run one case end to end, check it, and exit")
+    parser.add_argument("--supabase-url", help="trust this Supabase project's signing keys instead of the dev sign-in "
+                        "(e.g. http://127.0.0.1:54321 for scripts/dev/fake_supabase_auth.py)")
     args = parser.parse_args()
     sys.path.insert(0, str(Path(__file__).parent))
     # A fresh, migrated database: on DATABASE_URL's server if set (CI), else a throwaway Postgres.
