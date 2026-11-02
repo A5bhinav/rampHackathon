@@ -155,7 +155,8 @@ If this slice is behind at the Nov 4 checkpoint, `packages/decision` moves to In
 | `POST /internal/calls/{call_id}/ended` per Sami's `internal.yaml`: digits compared then hashed, only the current call counts | `calls.py`, `answers.py` | `abhi/core-worker` |
 | Ports to Inesh's `select_number` and Sami's `POST /calls`, both failing closed when the other side is missing | `ports.py` | `abhi/core-worker` |
 | Company-name match, calling window | `company.py`, `calling_window.py` | `abhi/core-worker` |
-| CLI: `serve`, `new-dataset`, `import-vendors`, `retire-dataset` | `main.py` | `abhi/core-worker` |
+| CLI: `serve`, `new-dataset`, `import-vendors`, `retire-dataset`, `run-job` | `main.py` | `abhi/core-worker`, `abhi/poller-reconcile` |
+| Scheduled jobs on the dataset clock: the poller (incremental, with a nightly full sweep) and reconciliation (a missing hold goes back on, with a critical alert) | `jobs.py` | `abhi/poller-reconcile` |
 | The dashboard API per `dialback.yaml`: me, datasets, chain status, alerts, queue, case detail (timeline, decision, permissions), release and review, each run in Postgres as the signed-in person | `api.py`, `auth.py`, `timeline.py` | `abhi/core-api` |
 
 ### Configuration
@@ -174,6 +175,8 @@ If this slice is behind at the Nov 4 checkpoint, `packages/decision` moves to In
 | `DIALBACK_RESOLVER` | no | `stub` (default) calls the ledger's `select_number_stub`; `ledger` its `select_number` |
 | `DIALBACK_CALLING_TZ`, `DIALBACK_CALLING_WINDOW`, `DIALBACK_CALLING_DAYS` | no | Default `America/Los_Angeles`, `09:00-16:30`, `mon-fri` |
 | `DIALBACK_RUN_WORKER` | no | `0` runs the API without the worker |
+| `DIALBACK_RUN_JOBS` | no | `0` turns off the poller and reconciliation (spec 0003) |
+| `DIALBACK_POLL_SECONDS`, `DIALBACK_RECONCILE_SECONDS`, `DIALBACK_FULL_SWEEP_SECONDS` | no | Job intervals on the dataset clock; default 60, 300 and 86400 |
 | `DIALBACK_JWT_SECRET` | yes | Verifies the dashboard's JWTs (Supabase's signing secret; a dev secret locally). 32+ characters |
 
 Secrets live in Railway variables and Supabase Vault; never in the repo or in logs.

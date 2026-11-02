@@ -36,7 +36,7 @@ it is proven.
 ## Follow-ups found while building
 
 - Alerts are never resolved, so banners stay up after the cause is handled. Resolve an alert when its case moves on (or a person dismisses it, logged).
-- The poller (Nov 2) and the five-minute reconciliation that re-checks every unfinished case is still held in Ramp are not built yet; `import_all` is the sweep they will call.
+- ~~The poller and the five-minute reconciliation~~: built in `specs/0003-poller-and-reconciliation.md`.
 - Supabase sign-in waits for the project (spec 0002, Q5); dev sign-in is local only.
 - The demo's evening calls fall outside the 9:00 to 16:30 window (spec 0002, Q7); the local stack opens the window all day.
 
