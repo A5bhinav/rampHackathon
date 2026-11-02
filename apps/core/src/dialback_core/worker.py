@@ -456,7 +456,9 @@ class Worker:
                 await apply_event(conn, case["id"], "deadline_reached", f"{case['id']}:deadline",
                                   {"timer_id": timer["id"], "deadline_at": timer["fire_at"].isoformat()})
             elif timer["kind"] == "callback":
-                log.info("callback timers are not built yet; timer %s fired with no action", timer["id"])
+                # A vendor's callback (spec 0007) is a retry_call timer at the time they asked for; this
+                # kind is never scheduled. One firing anyway does nothing rather than call.
+                log.warning("unexpected callback timer %s fired with no action", timer["id"])
         except TransitionRefused as exc:
             log.warning("timer %s (%s) refused for case %s: %s", timer["id"], timer["kind"], case["id"], exc)
         await conn.execute("update app.timers set status = 'fired', fired_at = %s where id = %s", (now, timer["id"]))

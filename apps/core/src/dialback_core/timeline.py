@@ -72,6 +72,8 @@ def summary(event_type: str, body: dict[str, Any], actor_name: str) -> str:
             if b.get("result") == "answers_recorded":
                 digits = LAST_FOUR.get(b.get("last_four_result", ""), "were not compared")
                 return f"Call attempt {attempt} ended with answers recorded; the digits given {digits}."
+            if b.get("result") == "callback_requested":
+                return f"Call attempt {attempt} ended: the person asked to be called back at {b.get('retry_at', 'a later time')}."
             return f"Call attempt {attempt} ended: {CALL_RESULT.get(b.get('result', ''), 'no answers were recorded')}."
         case "call_timeout":
             return "The call never reported back, so a person must review this change."

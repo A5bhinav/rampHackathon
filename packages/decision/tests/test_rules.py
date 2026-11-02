@@ -159,3 +159,10 @@ def test_a_checks_object_that_overrides_the_script_check_is_invalid():
 def test_validation_never_raises_on_unhashable_input():
     d = decide(GOOD, source=["call"])
     assert d.rules_fired == ("NR97_facts_invalid",) and "source" not in d.body()
+
+
+def test_an_earlier_callback_call_is_valid_and_counts_against():
+    asked_back = EarlierCall(result="callback_requested", recording_consent=CONSENTED)
+    assert decide(replace(GOOD, earlier_calls=(asked_back,))).outcome == "verified", "a callback alone is no concern"
+    said_no = EarlierCall(result="callback_requested", recording_consent=CONSENTED, change_requested=("no",))
+    assert decide(replace(GOOD, earlier_calls=(said_no,))).rules_fired == ("NV01_vendor_denied_change",)

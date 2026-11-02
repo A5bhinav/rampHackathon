@@ -18,7 +18,7 @@ from dialback_decision import compare_last_four
 from dialback_decision.rules import CHANGE, CONSENT, FLAGS
 from fastapi import APIRouter, Header, Request
 from fastapi.responses import JSONResponse, Response
-from pydantic import BaseModel, ConfigDict, Field, StrictBool, field_validator
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, field_validator, model_validator
 
 from .answers import NO_DIGITS, protect, spoken_last_four
 from .db import system_tx
@@ -76,7 +76,8 @@ class Checks(Strict):
 class CallEndedRequest(Strict):
     call_id: UUID
     case_id: UUID
-    result: Literal["answers_recorded", "no_answer", "voicemail", "busy", "failed", "machine", "declined"]
+    result: Literal["answers_recorded", "no_answer", "voicemail", "busy", "failed", "machine", "declined",
+                    "callback_requested"]
     attempt: int = Field(ge=1)
     retry_at: str | None = None
     recording_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
@@ -89,6 +90,12 @@ class CallEndedRequest(Strict):
     direction: Literal["outbound", "inbound"] | None = None
     dialed_number_is_pick: StrictBool | None = None  # a real boolean only: never "yes" or 1
     answered_by: Literal["human", "machine"] | None = None
+
+    @model_validator(mode="after")
+    def _callback_has_a_time(self) -> CallEndedRequest:
+        if self.result == "callback_requested" and not self.retry_at:
+            raise ValueError("retry_at is required with callback_requested: the time the vendor asked to be called")
+        return self
 
 
 def _error(status: int, code: str, message: str) -> JSONResponse:
