@@ -49,6 +49,7 @@ class Settings:
     poll_interval_seconds: int = 60
     full_sweep_interval_seconds: int = 86_400
     reconcile_interval_seconds: int = 300
+    verify_interval_seconds: int = 300
     job_lease_seconds: int = 600
     # The dashboard's JWTs (Supabase's signing secret; a dev secret locally). HS256 for now (spec 0002, Q5).
     jwt_secret: bytes = b""
@@ -86,5 +87,6 @@ class Settings:
             poll_interval_seconds=int(env.get("DIALBACK_POLL_SECONDS", "60")),
             full_sweep_interval_seconds=int(env.get("DIALBACK_FULL_SWEEP_SECONDS", "86400")),
             reconcile_interval_seconds=int(env.get("DIALBACK_RECONCILE_SECONDS", "300")),
+            verify_interval_seconds=int(env.get("DIALBACK_VERIFY_SECONDS", "300")),
             jwt_secret=_secret(env, "DIALBACK_JWT_SECRET", 32),
         )

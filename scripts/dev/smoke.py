@@ -14,6 +14,8 @@ What it proves, in order:
   6. A hold lifted by hand in Ramp is put back by reconciliation, with a critical alert (I2).
   7. A bank change Ramp never announces is found by the poller (spec 0003).
   8. The evidence chain is intact.
+  9. One evidence row edited by hand is caught by the scheduled chain check, which points
+     straight at it (spec 0004; the demo's sixth beat).
 """
 from __future__ import annotations
 
@@ -30,8 +32,8 @@ CORE, MOCK = "http://127.0.0.1:8001", "http://127.0.0.1:8003"
 
 
 class Smoke:
-    def __init__(self, settings, dataset_id, refs: dict[str, str], users: dict[str, tuple]) -> None:
-        self.settings, self.dataset_id, self.refs, self.users = settings, str(dataset_id), refs, users
+    def __init__(self, pool, settings, dataset_id, refs: dict[str, str], users: dict[str, tuple]) -> None:
+        self.pool, self.settings, self.dataset_id, self.refs, self.users = pool, settings, str(dataset_id), refs, users
         self.results: list[tuple[bool, str]] = []
 
     def check(self, ok: bool, what: str) -> bool:
@@ -153,10 +155,33 @@ class Smoke:
             chain = (await approver.get(f"/api/datasets/{self.dataset_id}/chain")).json()
             self.check(chain["ok"], f"the evidence chain is intact ({chain['checked']} events)")
 
+        # The demo's sixth beat: someone with owner rights edits one evidence row by hand.
+        async with self.pool.connection() as owner:
+            await owner.execute("alter table audit.evidence_events disable trigger evidence_events_no_update")
+            try:
+                # Every envelope carries "v":1 (followed by "version", keys being sorted), so this edit
+                # always lands, whichever door found the change.
+                edited = await (await owner.execute(
+                    "update audit.evidence_events set body_jcs = replace(body_jcs, '\"v\":1,', '\"v\":9,') "
+                    "where chain_id = %s and seq = 1 and body_jcs like '%%\"v\":1,%%' returning seq", (chain["chain_id"],))).fetchone()
+            finally:
+                await owner.execute("alter table audit.evidence_events enable trigger evidence_events_no_update")
+        self.check(edited is not None, "one evidence row is edited by hand, as the demo shows")
+
+        async def caught() -> bool:
+            async with self.core() as approver:
+                alerts = (await approver.get(f"/api/datasets/{self.dataset_id}/alerts")).json()["alerts"]
+            return any(a["kind"] == "chain_broken" for a in alerts)
+        await self.until("the scheduled chain check raises 'Evidence chain broken'", caught)
+        async with self.core() as approver:
+            chain = (await approver.get(f"/api/datasets/{self.dataset_id}/chain")).json()
+            self.check(not chain["ok"] and chain["first_bad_seq"] == edited["seq"],
+                       f"it points straight at the edited row (event #{chain['first_bad_seq']})")
+
         failed = [what for ok, what in self.results if not ok]
         print(f"\n{len(self.results) - len(failed)} of {len(self.results)} checks passed.")
         return 1 if failed else 0
 
 
 async def run_smoke(pool, settings, dataset_id, refs, users) -> int:
-    return await Smoke(settings, dataset_id, refs, users).run()
+    return await Smoke(pool, settings, dataset_id, refs, users).run()

@@ -6,6 +6,8 @@
 - `full_sweep`: every vendor, once a day, for a change Ramp didn't reflect in `updated_at`.
 - `reconcile`: every vendor with an unfinished case must be held in Ramp (invariant I2). A
   missing hold is put back at once and raised as a critical alert (R1, R7).
+- `verify_chain`: recompute the dataset's evidence chain; a broken row raises one critical
+  alert naming it (spec 0004).
 
 Jobs are rows in `app.job_runs`, due on the dataset's clock and claimed with a lease, so two
 workers never run the same job and the lab drives them by moving a scenario's clock.
@@ -28,7 +30,7 @@ from .settings import Settings
 
 log = logging.getLogger(__name__)
 
-JOBS = ("poll", "full_sweep", "reconcile")
+JOBS = ("poll", "full_sweep", "reconcile", "verify_chain")
 WATERMARK_OVERLAP = dt.timedelta(minutes=2)
 # Where the hold should be on. `open` (being placed) and `releasing` (being lifted on
 # purpose) are left alone.
@@ -51,6 +53,7 @@ class Jobs:
             "poll": dt.timedelta(seconds=settings.poll_interval_seconds),
             "full_sweep": dt.timedelta(seconds=settings.full_sweep_interval_seconds),
             "reconcile": dt.timedelta(seconds=settings.reconcile_interval_seconds),
+            "verify_chain": dt.timedelta(seconds=settings.verify_interval_seconds),
         }
         self.lease = dt.timedelta(seconds=settings.job_lease_seconds)
 
@@ -172,3 +175,29 @@ class Jobs:
                 (dataset_id, case_id, message, now, case_id))
         log.warning("reconcile: case %s vendor %s was not held in Ramp; put back: %s", case_id, vendor_id, back)
         return back
+
+
+    # The evidence-chain check (spec 0004) ---------------------------------------------------
+
+    async def verify_chain(self, dataset_id: UUID, claimed: dict[str, Any]) -> JobResult:
+        """Recompute the chain with the same SQL as the dashboard badge. A broken chain is a
+        finding, not a job failure: one critical alert per dataset, never resolved here."""
+        async with system_tx(self.pool) as conn:
+            chain_id = (await (await conn.execute("select chain_id from app.datasets where id = %s",
+                                                  (dataset_id,))).fetchone())["chain_id"]
+            v = await (await conn.execute(
+                "select v.ok, v.checked, v.first_bad_seq, v.detail, t.seq as tip_seq, t.hash as tip_hash "
+                "from audit.verify_chain(%s) v left join audit.chain_tip(%s) t on true", (chain_id, chain_id))).fetchone()
+            if not v["ok"]:
+                bad = await (await conn.execute("select case_id from audit.evidence_events where chain_id = %s and seq = %s",
+                                                (chain_id, v["first_bad_seq"]))).fetchone()
+                await conn.execute(
+                    """insert into app.alerts (dataset_id, case_id, kind, severity, message, raised_at)
+                       select %s, %s, 'chain_broken', 'critical', %s, app.now(%s)
+                        where not exists (select 1 from app.alerts a where a.dataset_id = %s and a.kind = 'chain_broken'
+                                            and a.resolved_at is null)""",
+                    (dataset_id, bad["case_id"] if bad else None,
+                     f"The evidence chain is broken at event #{v['first_bad_seq']}: {v['detail']}.", dataset_id, dataset_id))
+                log.error("evidence chain for dataset %s is broken at event %s: %s", dataset_id, v["first_bad_seq"], v["detail"])
+        return JobResult(result={"ok": v["ok"], "checked": v["checked"], "first_bad_seq": v["first_bad_seq"],
+                                 "detail": v["detail"], "tip_seq": v["tip_seq"], "tip_hash": v["tip_hash"]})

@@ -171,7 +171,8 @@ def core_settings(url: str, backoff: float = 1.0, jobs_every: int = 30) -> Setti
                     calling_window="00:00-23:59", calling_days="all",  # the evening demo (spec 0002, Q7)
                     command_backoff_seconds=backoff, worker_poll_seconds=0.3, run_worker=True,
                     # The poller and reconciliation (spec 0003), much more often than in production.
-                    poll_interval_seconds=jobs_every, reconcile_interval_seconds=jobs_every)
+                    poll_interval_seconds=jobs_every, reconcile_interval_seconds=jobs_every,
+                    verify_interval_seconds=jobs_every)
 
 
 async def wait_for(url: str, seconds: float = 20.0) -> None:

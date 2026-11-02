@@ -4,7 +4,7 @@
     dialback-core new-dataset --kind demo --label "Demo 3"  a new dataset and evidence chain
     dialback-core import-vendors --dataset <id>          initial import (baseline) or a full sweep
     dialback-core retire-dataset --dataset <id>          hide a dataset; nothing is deleted
-    dialback-core run-job --dataset <id> --job reconcile run poll, full_sweep or reconcile now
+    dialback-core run-job --dataset <id> --job reconcile run poll, full_sweep, reconcile or verify_chain now
 """
 from __future__ import annotations
 

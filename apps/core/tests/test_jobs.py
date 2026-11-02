@@ -164,14 +164,14 @@ async def test_jobs_are_due_on_the_lab_clock(pool):
             await world.worker.drain(world.dataset.id)
 
         await world.worker.drain(world.dataset.id)
-        assert {job: n for job, (n, _) in (await runs()).items()} == {"poll": 1, "full_sweep": 1, "reconcile": 1}
+        assert {job: n for job, (n, _) in (await runs()).items()} == {"poll": 1, "full_sweep": 1, "reconcile": 1, "verify_chain": 1}
         assert (await runs())["poll"][1] == start, "started on the simulated clock"
         await advance(start + dt.timedelta(seconds=59))
         assert (await runs())["poll"][0] == 1, "not due before the interval"
         await advance(start + dt.timedelta(seconds=60))
-        assert {job: n for job, (n, _) in (await runs()).items()} == {"poll": 2, "full_sweep": 1, "reconcile": 1}
+        assert {job: n for job, (n, _) in (await runs()).items()} == {"poll": 2, "full_sweep": 1, "reconcile": 1, "verify_chain": 1}
         await advance(start + dt.timedelta(seconds=300))
-        assert {job: n for job, (n, _) in (await runs()).items()} == {"poll": 3, "full_sweep": 1, "reconcile": 2}
+        assert {job: n for job, (n, _) in (await runs()).items()} == {"poll": 3, "full_sweep": 1, "reconcile": 2, "verify_chain": 2}
 
         # A silent change on the lab dataset is found by moving the clock, as a scenario would.
         await world.mock_settings(silent_changes=True)
@@ -216,3 +216,41 @@ async def test_a_release_waits_behind_a_reconciliation_lock(world):
     with pytest.raises(errors.InsufficientPrivilege):
         async with person_tx(world.pool, world.users["approver1"], {}) as person:
             await person.execute("select app.lock_case(%s)", (case["id"],))
+
+
+async def test_an_intact_chain_is_recorded_quietly(world):
+    await import_all(world.pool, world.ramp, world.keys, world.dataset.id)
+    await change_and_detect(world)
+    assert await world.worker.jobs.run(world.dataset.id, "verify_chain") == 0
+    result = (await job_row(world, "verify_chain"))["last_result"]
+    events = (await one(world.pool, "select count(*) as n from audit.evidence_events where chain_id = %s", world.dataset.chain_id))["n"]
+    assert result["ok"] is True and result["checked"] == events == result["tip_seq"] and result["first_bad_seq"] is None
+    assert len(result["tip_hash"]) == 64
+    assert await alerts(world, "chain_broken") == []
+
+
+async def test_a_hand_edited_row_raises_one_alert_at_that_row(world, database_url):
+    import psycopg
+
+    await import_all(world.pool, world.ramp, world.keys, world.dataset.id)
+    await change_and_detect(world)
+    case = await case_of(world)
+    target = await one(world.pool, "select seq from audit.evidence_events where case_id = %s and type = 'hold_confirmed'", case["id"])
+
+    async with await psycopg.AsyncConnection.connect(database_url, autocommit=True) as owner:
+        await owner.execute("alter table audit.evidence_events disable trigger evidence_events_no_update")
+        try:
+            await owner.execute("update audit.evidence_events set body_jcs = replace(body_jcs, '\"bills_held\":2', '\"bills_held\":0') "
+                                "where chain_id = %s and seq = %s", (world.dataset.chain_id, target["seq"]))
+        finally:
+            await owner.execute("alter table audit.evidence_events enable trigger evidence_events_no_update")
+
+    for _ in range(2):
+        await world.worker.jobs.run(world.dataset.id, "verify_chain", force=True)
+    [alert] = await alerts(world, "chain_broken")
+    assert alert["severity"] == "critical" and alert["case_id"] == case["id"]
+    assert alert["message"].startswith(f"The evidence chain is broken at event #{target['seq']}: content_hash does not match")
+    result = (await job_row(world, "verify_chain"))["last_result"]
+    assert (result["ok"], result["first_bad_seq"]) == (False, target["seq"])
+    assert (await job_row(world, "verify_chain"))["last_ok"] is True, "a broken chain is a finding, not a job failure"
+
