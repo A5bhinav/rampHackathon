@@ -12,8 +12,8 @@ Show each case's evidence, take the release decision, and show the scorecard.
 | Page | Route | Shows | Owner | Status |
 |---|---|---|---|---|
 | Shell and navigation | `src/app/d/[datasetId]/layout.tsx` | Who is signed in, the dataset, navigation, alert banners ("Hold not confirmed") | Abhi | built |
-| Case queue | `/d/[datasetId]/cases` | Unfinished cases by state and age, held bills and the next payment date | Abhi | built |
-| Case detail | `/d/[datasetId]/cases/[caseId]` | The change, the hold and saved dates, the decision with every rule that fired, the chain badge, the timeline from evidence | Abhi | built |
+| Case queue | `/d/[datasetId]/cases` | Cases waiting on a person first, then in progress, each by soonest saved payment date; due-soon and deadline labels on the dataset's clock (spec 0009) | Abhi | built |
+| Case detail | `/d/[datasetId]/cases/[caseId]` | The change, the hold and saved dates (due-soon flags), the decision grouped by rule (not verified, sent to a person, not shown, shown) with rule ids, the deadline, the second-approver state, the chain badge, the timeline from evidence (spec 0009) | Abhi | built |
 | Release console | on case detail | A required reason, then approve or reject (and clear or block from review), sent with the version the person saw | Abhi | built |
 | Number lineage | `/d/[datasetId]/cases/[caseId]/lineage` (suggested) | The chosen number with its sources, every rejected number with its reason | Inesh | to build |
 | Vendor risk list | `/d/[datasetId]/risk` (suggested) | Vendors whose number on file is provable, unproven, a near miss, or missing | Inesh | to build |

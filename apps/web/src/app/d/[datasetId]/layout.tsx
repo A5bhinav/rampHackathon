@@ -33,7 +33,7 @@ export default async function DatasetShell({ children, params }: { children: Rea
           <form action="/sign-out" method="post"><button type="submit">Sign out</button></form>
         </div>
       </header>
-      <AlertBanners alerts={alerts} />
+      <AlertBanners alerts={alerts} datasetId={datasetId} />
       {children}
     </div>
   );

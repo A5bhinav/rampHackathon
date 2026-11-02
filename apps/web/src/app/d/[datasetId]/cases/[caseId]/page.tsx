@@ -2,8 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChainBadge, OutcomeBadge, StateBadge } from "@/components/badges";
 import { DecisionConsole } from "@/components/console";
+import { DecisionDetail } from "@/components/decision";
 import { CoreError, core } from "@/lib/core";
-import { date, when, words } from "@/lib/format";
+import { datasetNow, date, dueLabel, relative, when, words } from "@/lib/format";
 import { releaseAction, reviewAction } from "./actions";
 
 // Case detail and the release console: the timeline from the evidence log, the chain badge,
@@ -20,12 +21,20 @@ export default async function CaseDetailPage({ params, searchParams }: {
   searchParams: Promise<{ done?: string; to?: string }>;
 }) {
   const [{ datasetId, caseId }, { done, to }] = await Promise.all([params, searchParams]);
-  const detail = await core.case(caseId).catch((e) => {
-    if (e instanceof CoreError && e.status === 404) notFound();
-    throw e;
-  });
+  const [detail, datasets] = await Promise.all([
+    core.case(caseId).catch((e) => {
+      if (e instanceof CoreError && e.status === 404) notFound();
+      throw e;
+    }),
+    core.datasets(),
+  ]);
   const { case: c, change, hold, decision, permissions: can } = detail;
   const path = `/d/${datasetId}/cases/${caseId}`;
+  const now = datasetNow(datasets.find((d) => d.id === datasetId)?.sim_now);
+  const deadlinePassed = c.deadline_at ? Date.parse(c.deadline_at) < now.getTime() : false;
+  // ADR-10: with no known changer, the first approval for this version waits for a second approver.
+  const firstApproval = c.unknown_changer && c.state === "awaiting_release"
+    ? detail.releases.find((r) => r.action === "approve" && r.case_version === c.version) : undefined;
 
   return (
     <main>
@@ -40,7 +49,18 @@ export default async function CaseDetailPage({ params, searchParams }: {
         <ChainBadge chain={detail.chain} />
         <span className="muted">Version {c.version}</span>
         {c.unknown_changer ? <span className="badge tone-warn">Unknown changer: two approvers</span> : null}
+        {c.deadline_at && !["released", "releasing"].includes(c.state) ? (
+          <span className={`badge ${deadlinePassed ? "tone-bad" : "tone-muted"}`} title={when(c.deadline_at)}>
+            Deadline {deadlinePassed ? "passed" : relative(c.deadline_at, now)}
+          </span>
+        ) : null}
       </p>
+      {firstApproval ? (
+        <p className="result ok" role="status">
+          {firstApproval.actor.display_name} approved this change {when(firstApproval.created_at)}. Nobody in Dialback made it, so a second,
+          different approver must release it.
+        </p>
+      ) : null}
 
       <div className="grid">
         <section className="card" aria-labelledby="change-h">
@@ -65,7 +85,17 @@ export default async function CaseDetailPage({ params, searchParams }: {
               {hold.schedule.length > 0 ? (
                 <>
                   <p className="muted" style={{ marginBottom: 4 }}>Saved payment dates, restored on release:</p>
-                  <ul className="plain">{hold.schedule.map((s) => <li key={s.bill_id}><span className="mono">{s.bill_id.slice(0, 8)}</span> · {date(s.payment_date)}</li>)}</ul>
+                  <ul className="plain">
+                    {hold.schedule.map((s) => {
+                      const due = hold.released_at ? null : dueLabel(s.payment_date, now);
+                      return (
+                        <li key={s.bill_id}>
+                          <span className="mono">{s.bill_id.slice(0, 8)}</span> · {date(s.payment_date)}
+                          {due ? <> <span className={`badge ${due.soon ? "tone-bad" : "tone-muted"}`}>{due.text}</span></> : null}
+                        </li>
+                      );
+                    })}
+                  </ul>
                 </>
               ) : null}
               {hold.last_error ? <p className="result error">{hold.last_error}</p> : null}
@@ -75,12 +105,13 @@ export default async function CaseDetailPage({ params, searchParams }: {
 
         <section className="card" aria-labelledby="decision-h">
           <h2 id="decision-h">The decision</h2>
-          {decision ? (
-            <>
-              <p><OutcomeBadge outcome={decision.outcome} /> <span className="muted">{when(decision.decided_at)} · {decision.engine_version}</span></p>
-              <ul className="plain">{decision.explanation.map((s) => <li key={s}>{s}</li>)}</ul>
-            </>
-          ) : <p className="muted">No decision yet for this version.</p>}
+          {decision ? <DecisionDetail decision={decision} /> : (
+            <p className="muted">
+              {["needs_review", "blocked"].includes(c.state)
+                ? "Code made no decision: this case went to a person before a call finished. The timeline says why."
+                : "No decision yet for this version."}
+            </p>
+          )}
         </section>
       </div>
 

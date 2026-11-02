@@ -1,43 +1,81 @@
 import Link from "next/link";
 import { OutcomeBadge, StateBadge } from "@/components/badges";
+import type { CaseState, CaseSummary } from "@/lib/api-types";
 import { core } from "@/lib/core";
-import { date, when } from "@/lib/format";
+import { datasetNow, date, dueLabel, relative, when } from "@/lib/format";
 
-// Case queue: unfinished cases by state and age, and held bills near their due date.
+// Case queue: unfinished cases by state and age, and held bills near their due date (design,
+// "Dashboard"). Cases waiting on a person come first, soonest saved payment date first, then
+// the ones code is still working on. Times are read against the dataset's own clock, so a lab
+// dataset's simulated time counts days the same way the deadline does.
+const NEEDS_A_PERSON: CaseState[] = ["needs_review", "awaiting_release", "blocked"];
+
+function bySoonestPayment(a: CaseSummary, b: CaseSummary): number {
+  const ka = a.next_payment_date ?? "9999-12-31";
+  const kb = b.next_payment_date ?? "9999-12-31";
+  return ka === kb ? a.opened_at.localeCompare(b.opened_at) : ka.localeCompare(kb);
+}
+
 export default async function CaseQueue({ params }: { params: Promise<{ datasetId: string }> }) {
   const { datasetId } = await params;
-  const cases = await core.cases(datasetId);
+  const [cases, datasets] = await Promise.all([core.cases(datasetId), core.datasets()]);
+  const now = datasetNow(datasets.find((d) => d.id === datasetId)?.sim_now);
+  const waiting = cases.filter((c) => NEEDS_A_PERSON.includes(c.state)).sort(bySoonestPayment);
+  const working = cases.filter((c) => !NEEDS_A_PERSON.includes(c.state)).sort(bySoonestPayment);
+  const dueSoon = cases.filter((c) => dueLabel(c.next_payment_date, now)?.soon).length;
+  const unconfirmed = cases.filter((c) => c.hold_status === "failed").length;
+
   return (
     <main>
       <h1>Case queue</h1>
       <p className="muted">Every vendor whose bank details changed. Payments stay on hold until a different person releases them.</p>
-      <div className="card table-wrap">
-        {cases.length === 0 ? (
-          <p className="muted">No open cases.</p>
-        ) : (
-          <table>
-            <thead>
-              <tr><th>Vendor</th><th>State</th><th>Decision</th><th>Opened</th><th>Held bills</th><th>Next payment date</th><th>Deadline</th></tr>
-            </thead>
-            <tbody>
-              {cases.map((c) => (
-                <tr key={c.id}>
-                  <td>
-                    <Link href={`/d/${datasetId}/cases/${c.id}`}>{c.vendor.legal_name}</Link>
-                    {c.unknown_changer ? <div><span className="badge tone-warn">two approvers</span></div> : null}
-                  </td>
-                  <td><StateBadge state={c.state} /></td>
-                  <td><OutcomeBadge outcome={c.outcome} /></td>
-                  <td>{when(c.opened_at)}</td>
-                  <td>{c.hold_status === "failed" ? <span className="badge tone-bad">hold not confirmed</span> : c.bills_held}</td>
-                  <td>{date(c.next_payment_date)}</td>
-                  <td>{when(c.deadline_at)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+      <div className="summary" aria-label="Summary">
+        <span className="badge tone-warn">{waiting.length} waiting on a person</span>
+        <span className="badge tone-info">{working.length} in progress</span>
+        {dueSoon > 0 ? <span className="badge tone-bad">{dueSoon} with a payment due within 3 days</span> : null}
+        {unconfirmed > 0 ? <span className="badge tone-bad">{unconfirmed} hold not confirmed</span> : null}
       </div>
+      {cases.length === 0 ? <div className="card"><p className="muted">No open cases.</p></div> : null}
+      {waiting.length > 0 ? <QueueTable title="Waiting on a person" cases={waiting} datasetId={datasetId} now={now} /> : null}
+      {working.length > 0 ? <QueueTable title="In progress" cases={working} datasetId={datasetId} now={now} /> : null}
     </main>
+  );
+}
+
+function QueueTable({ title, cases, datasetId, now }: { title: string; cases: CaseSummary[]; datasetId: string; now: Date }) {
+  return (
+    <section className="card table-wrap queue-group" aria-label={title}>
+      <h2>{title} <span className="muted sub">{cases.length}</span></h2>
+      <table>
+        <thead>
+          <tr><th>Vendor</th><th>State</th><th>Decision</th><th>Held bills</th><th>Next payment date</th><th>Opened</th><th>Deadline</th></tr>
+        </thead>
+        <tbody>
+          {cases.map((c) => {
+            const due = dueLabel(c.next_payment_date, now);
+            return (
+              <tr key={c.id}>
+                <td>
+                  <Link href={`/d/${datasetId}/cases/${c.id}`}>{c.vendor.legal_name}</Link>
+                  {c.unknown_changer ? <div><span className="badge tone-warn">two approvers</span></div> : null}
+                </td>
+                <td><StateBadge state={c.state} />{c.version > 1 ? <div className="muted sub">change {c.version}</div> : null}</td>
+                <td><OutcomeBadge outcome={c.outcome} /></td>
+                <td>{c.hold_status === "failed" ? <span className="badge tone-bad">hold not confirmed</span> : c.bills_held}</td>
+                <td>
+                  {date(c.next_payment_date)}
+                  {due ? <div><span className={`badge ${due.soon ? "tone-bad" : "tone-muted"}`}>{due.text}</span></div> : null}
+                </td>
+                <td>{when(c.opened_at)}<div className="muted sub">{relative(c.opened_at, now)}</div></td>
+                <td>
+                  {when(c.deadline_at)}
+                  {c.deadline_at ? <div className="muted sub">{Date.parse(c.deadline_at) < now.getTime() ? "passed" : relative(c.deadline_at, now)}</div> : null}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </section>
   );
 }
