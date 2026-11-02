@@ -405,13 +405,23 @@ class Worker:
             raise Retry("read-back still shows the hold")
 
         restored = []
-        for entry in await self._saved_schedule(case["id"]) or []:
-            if entry.get("payment_date"):
-                try:
-                    await ramp.set_bill_payment_date(entry["bill_id"], dt.date.fromisoformat(entry["payment_date"]))
-                    restored.append(entry)
-                except RampNotFound:
-                    log.info("bill %s is paid or gone; not rescheduled", entry["bill_id"])
+        try:
+            for entry in await self._saved_schedule(case["id"]) or []:
+                if entry.get("payment_date"):
+                    try:
+                        await ramp.set_bill_payment_date(entry["bill_id"], dt.date.fromisoformat(entry["payment_date"]))
+                        restored.append(entry)
+                    except RampNotFound:
+                        log.info("bill %s is paid or gone; not rescheduled", entry["bill_id"])
+        except RampError:
+            # The hold is off but the release can't finish: put it back before retrying, so the vendor
+            # is never unheld while the case isn't released (spec 0008, D3; R1, R7). The next try
+            # releases again. If putting it back fails too, reconciliation does it (invariant I2).
+            try:
+                await ramp.place_vendor_hold(vendor, HOLD_REASON)
+            except RampError:
+                log.error("release of case %s failed and the hold could not be put back; reconciliation will", case["id"])
+            raise
         try:
             await self._emit(case, "hold_release_confirmed", f"{cmd.key}:confirmed",
                              {"readback_ok": True, "restored_schedule": restored})

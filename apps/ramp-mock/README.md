@@ -51,12 +51,21 @@ The rules are SQL functions in `supabase/migrations/mock_ramp/`, tested in
 | `GET /developer/v1/audit-logs/events` (`target_id`, `event_type`, `from_occurred_at`) | Audit events with the actor |
 | `POST /_mock/seed` | Create the token's business if needed, then add users, vendors (accounts, contacts, bills), webhook subscriptions and settings. Every entity can carry a `ref`; the response maps refs to ids. For Inesh's demo seed and Sami's lab. |
 | `POST /_mock/vendors/{id}/bank-change` | A bank change (optionally by a seeded user): new active account, audit event, webhook unless silent |
-| `PATCH /_mock/settings` | Chaos switches: `duplicate_webhooks`, `reorder_webhooks`, `silent_changes`, `webhook_delay_ms`, `rate_limit_per_10s`, `fail_next_hold`, `fail_next_release`, `fail_holds` (stays on: the hold endpoint is down), `hold_readback_lag_ms` |
+| `PATCH /_mock/settings` | Chaos switches: `duplicate_webhooks`, `reorder_webhooks`, `silent_changes`, `webhook_delay_ms`, `rate_limit_per_10s`, `fail_next_hold`, `fail_next_release`, `fail_holds` (stays on: the hold endpoint is down), `hold_readback_lag_ms`. Spec 0008 adds the release side, each staying on until turned off: `fail_releases`, `ignore_releases` (200, but the hold stays) and `fail_bill_updates`. It also adds **chaos mode**: `chaos_seed` (null turns it off), `chaos_error_permille`, `chaos_max_latency_ms` and `chaos_drop_permille`. |
 | `POST /_mock/payment-run` (`as_of`) | Pay every approved, unpaid bill due by `as_of`, unless it or its vendor is held. This is how the demo shows R1. |
 | `POST /_mock/webhooks/deliver` | Send this dataset's queued webhooks now, in scheduled order |
 
 The one-shot failure switches are consumed in the request's own transaction and answered
 with 500, so a switch is spent even though the request failed.
+
+**Chaos mode (spec 0008)** makes Ramp's API (never `/_mock`) unreliable on purpose:
+- each request can wait up to `chaos_max_latency_ms`;
+- with probability `chaos_error_permille`/1000 it answers 500, 502 or 503, and half of those
+  come *after* the work was done (a lost response);
+- a webhook delivery is dropped with probability `chaos_drop_permille`/1000.
+
+The same seed gives the same faults for the same sequence of requests. Patching the settings
+restarts the sequence.
 
 **Webhook subscriptions point at the core per dataset:** `{core}/webhooks/ramp/{dataset_id}`
 (spec 0002, D3), with the secret the core verifies.

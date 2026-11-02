@@ -15,13 +15,16 @@ from uuid import UUID
 import httpx
 from psycopg_pool import AsyncConnectionPool
 
+from .chaos import drops_delivery
 from .db import transaction
 
 CLAIM = """
-select d.id, d.event_id, d.event_type, d.payload, d.attempt, s.url, s.secret
+select d.id, d.event_id, d.event_type, d.payload, d.attempt, s.url, s.secret,
+       st.chaos_seed, coalesce(st.chaos_drop_permille, 0) as chaos_drop_permille
   from mock_ramp.webhook_deliveries d
   join mock_ramp.webhook_subscriptions s on s.id = d.subscription_id
   join mock_ramp.businesses b on b.id = s.business_id
+  left join mock_ramp.settings st on st.business_id = b.id
  where d.status = 'scheduled' and (%(everything)s or d.scheduled_at <= now())
    and (%(dataset)s::uuid is null or b.dataset_id = %(dataset)s::uuid)
  order by d.scheduled_at, d.id
@@ -59,6 +62,12 @@ async def deliver_due(pool: AsyncConnectionPool, http: httpx.AsyncClient, max_at
             if row is None or row["id"] in attempted_ids:
                 break
             attempted_ids.add(row["id"])
+            if drops_delivery(row["chaos_seed"], row["chaos_drop_permille"], row["id"], row["attempt"]):
+                # Chaos mode (spec 0008): this delivery is lost and never retried.
+                await conn.execute("update mock_ramp.webhook_deliveries set status = 'dropped', last_error = 'chaos' "
+                                   "where id = %s", (row["id"],))
+                attempted += 1
+                continue
             body = raw_body(row["payload"])
             headers = {
                 "Content-Type": "application/json",
