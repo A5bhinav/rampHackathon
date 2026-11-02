@@ -28,13 +28,14 @@ WEBHOOK_SECRET = b"whsec-for-tests-only-0123"
 FINGERPRINT_KEY = b"fingerprint-key-for-tests-only-0123456789"
 DIGITS_KEY = b"digits-key-for-tests-only-0123456789abcd"
 INTERNAL_TOKEN = b"internal-token-for-tests-only-0123"
+JWT_SECRET = b"jwt-secret-for-tests-only-0123456789abcdef"
 
 
 def core_settings(**overrides) -> Settings:
     base = {"database_url": "unused-in-tests", "ramp_mode": RampMode.MOCK, "ramp_base_url": "http://ramp-mock",
             "ramp_webhook_secret": WEBHOOK_SECRET, "fingerprint_key": FINGERPRINT_KEY, "mock_ramp_secret": MOCK_SECRET,
             "digits_key": DIGITS_KEY, "internal_api_token": INTERNAL_TOKEN, "run_worker": False,
-            "command_backoff_seconds": 0.0, "calling_window": "00:00-23:59", "calling_days": "all"}
+            "command_backoff_seconds": 0.0, "calling_window": "00:00-23:59", "calling_days": "all", "jwt_secret": JWT_SECRET}
     return Settings(**(base | overrides))
 
 

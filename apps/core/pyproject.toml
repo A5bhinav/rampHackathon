@@ -10,6 +10,7 @@ dependencies = [
   "psycopg[binary]>=3.2",
   "psycopg-pool>=3.2",
   "pydantic>=2.9",
+  "pyjwt>=2.9",
   "dialback-decision",
   "dialback-ledger",
 ]
@@ -20,7 +21,7 @@ dialback-core = "dialback_core.main:run"
 [dependency-groups]
 # The Ramp mock is a test-only dependency: core tests drive the real HTTP adapter against it
 # in process. Nothing under src/ imports another app.
-dev = ["pytest>=8", "anyio>=4", "dialback-ramp-mock"]
+dev = ["pytest>=8", "anyio>=4", "dialback-ramp-mock", "jsonschema>=4.23", "pyyaml>=6"]
 
 [tool.uv.sources]
 dialback-ramp-mock = { workspace = true }

@@ -6,11 +6,12 @@ import asyncio
 import contextlib
 
 import httpx
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from psycopg_pool import AsyncConnectionPool
 
+from .api import router as api_router
 from .calls import router as calls_router
 from .db import open_pool
 from .detection import Keys
@@ -61,8 +62,17 @@ def create_app(settings: Settings, pool: AsyncConnectionPool | None = None, conn
         problems = "; ".join(f"{'.'.join(str(p) for p in e['loc'])}: {e['msg']}" for e in exc.errors())
         return JSONResponse({"code": "invalid_request", "message": problems}, status_code=422)
 
+    @app.exception_handler(HTTPException)
+    async def http_problem(_: Request, exc: HTTPException):
+        # The dashboard contract's Error shape: {code, message}.
+        if isinstance(exc.detail, dict) and {"code", "message"} <= exc.detail.keys():
+            return JSONResponse(exc.detail, status_code=exc.status_code, headers=exc.headers)
+        code = {401: "unauthenticated", 403: "forbidden", 404: "not_found", 409: "transition_refused"}.get(exc.status_code, "invalid_request")
+        return JSONResponse({"code": code, "message": str(exc.detail)}, status_code=exc.status_code, headers=exc.headers)
+
     app.include_router(webhooks_router)
     app.include_router(calls_router)
+    app.include_router(api_router)
 
     @app.get("/healthz")
     async def healthz():
