@@ -154,6 +154,7 @@ If this slice is behind at the Nov 4 checkpoint, `packages/decision` moves to In
 | The worker: commands with retries, deferral, stale drops and escalation; timers on the dataset clock | `worker.py` | `abhi/core-worker` |
 | `POST /internal/calls/{call_id}/ended` per Sami's `internal.yaml`: digits compared then hashed, only the current call counts | `calls.py`, `answers.py` | `abhi/core-worker` |
 | Ports to Inesh's `select_number` and Sami's `POST /calls`, both failing closed when the other side is missing | `ports.py` | `abhi/core-worker` |
+| What `decide()` reads (spec 0005): the report must name this version's ledger pick; earlier calls of the generation; every company answer must match; the ledger's `change_context` port (unknown until it exists) | `worker.py`, `ports.py` | `abhi/decision-facts` |
 | Company-name match, calling window | `company.py`, `calling_window.py` | `abhi/core-worker` |
 | CLI: `serve`, `new-dataset`, `import-vendors`, `retire-dataset`, `run-job` | `main.py` | `abhi/core-worker`, `abhi/poller-reconcile` |
 | Scheduled jobs on the dataset clock: the poller (incremental, with a nightly full sweep) and reconciliation (a missing hold goes back on, with a critical alert) | `jobs.py` | `abhi/poller-reconcile` |

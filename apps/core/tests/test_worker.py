@@ -11,9 +11,9 @@ from conftest import core_settings, make_world
 from dialback_core.db import system_tx
 from dialback_core.detection import import_all, sync_vendor
 from dialback_core.flags import ResolverMode
-from dialback_core.ports import LedgerResolver
+from dialback_core.ports import ChangeFacts, LedgerChangeContext, LedgerResolver
 from dialback_core.ramp import RampError
-from flows import _types, bills, case_of, change_and_detect, one, pay, release, report, transit
+from flows import _types, answer, bills, case_of, change_and_detect, one, pay, release, report, transit
 
 pytestmark = pytest.mark.anyio
 
@@ -35,7 +35,9 @@ async def test_a_bank_change_walks_all_the_way_to_release(world):
     case = await case_of(world)
     assert (case["state"], case["outcome"]) == ("awaiting_release", "verified")
     decision = await one(world.pool, "select * from app.decisions where case_id = %s", case["id"])
-    assert decision["last_four_result"] == "match" and "U01_speaker_thread_not_checked" in decision["rules_fired"]
+    assert decision["last_four_result"] == "match"
+    assert "U01_speaker_thread_not_checked" not in decision["rules_fired"], "the change context reached the engine (spec 0005)"
+    assert "U03_offered_number_source_not_checked" in decision["rules_fired"], "still unknown: the double doesn't say"
 
     ended = await one(world.pool, "select body_jcs from audit.evidence_events where case_id = %s and type = 'call_ended'", case["id"])
     assert '"value":"6666"' not in ended["body_jcs"] and '"digit_count":4' in ended["body_jcs"], "digits are never stored"
@@ -228,3 +230,60 @@ async def test_a_release_that_races_a_new_change_puts_the_hold_back(world):
     assert alert is not None
     case = await case_of(world)
     assert (case["state"], case["version"]) == ("held", 2)
+
+
+# What the decision engine reads (spec 0005) -------------------------------------------------------
+
+@pytest.mark.parametrize("dialed", [None, uuid.UUID("0f0f0f0f-0000-4000-8000-000000000000")], ids=["missing", "another"])
+async def test_a_report_without_the_picked_contact_point_is_not_eligible(world, dialed):
+    await import_all(world.pool, world.ramp, world.keys, world.dataset.id)
+    await change_and_detect(world)
+    case = await case_of(world)
+    assert (await report(world, case["id"], world.voice.placed[0]["call_id"], contact_point=dialed)).status_code == 204
+    await world.worker.drain(world.dataset.id)
+    decision = await one(world.pool, "select outcome, rules_fired from app.decisions where case_id = %s", case["id"])
+    assert (decision["outcome"], list(decision["rules_fired"])) == ("needs_review", ["NR99_nothing_decided"])
+
+
+async def test_a_dropped_call_that_said_no_still_counts(world, monkeypatch):
+    import dialback_core.worker as worker_module
+    seen, real = [], worker_module.decide
+    monkeypatch.setattr(worker_module, "decide", lambda facts: seen.append(facts) or real(facts))
+    await import_all(world.pool, world.ramp, world.keys, world.dataset.id)
+    await change_and_detect(world)
+    case = await case_of(world)
+
+    first = world.voice.placed[0]["call_id"]
+    dropped = await report(world, case["id"], first, result="failed", answers=transit(first, change="no"),
+                           retry_at="2026-01-01T00:00:00Z")
+    assert dropped.status_code == 204 and (await case_of(world))["state"] == "retry_wait"
+    await world.worker.drain(world.dataset.id)  # the retry is already due
+    assert [p["attempt"] for p in world.voice.placed] == [1, 2]
+    assert (await report(world, case["id"], world.voice.placed[1]["call_id"], attempt=2)).status_code == 204
+    await world.worker.drain(world.dataset.id)
+
+    [facts] = seen
+    assert facts.change_requested == ("yes",), "the redial's own answers are the ones being decided"
+    assert [(c.result, c.change_requested) for c in facts.earlier_calls] == [("failed", ("no",))]
+    assert facts.dialed_eligible_number and facts.same_person_yes_and_digits and facts.consent_first
+    assert world.change_context.calls[-1]["speaker_names"] == ("Jordan Lee",)
+
+
+async def test_every_company_answer_must_match(world):
+    await import_all(world.pool, world.ramp, world.keys, world.dataset.id)
+    await change_and_detect(world)
+    case = await case_of(world)
+    call_id = world.voice.placed[0]["call_id"]
+    answers = transit(call_id)
+    answers["answers"].append(answer("company_named", "Globex Corporation", 11))
+    assert (await report(world, case["id"], call_id, answers=answers)).status_code == 204
+    await world.worker.drain(world.dataset.id)
+    decision = await one(world.pool, "select outcome, rules_fired from app.decisions where case_id = %s", case["id"])
+    assert decision["outcome"] == "needs_review" and "NR03_wrong_company" in decision["rules_fired"]
+
+
+async def test_without_the_ledgers_change_context_every_answer_is_unknown(world):
+    facts = await LedgerChangeContext().check(case_id=uuid.uuid4(), dataset_id=world.dataset.id, vendor_id=uuid.uuid4(),
+                                              cutoff=dt.datetime(2026, 11, 3, tzinfo=dt.UTC), speaker_names=("Jordan Lee",),
+                                              offered_numbers=())
+    assert facts == ChangeFacts()

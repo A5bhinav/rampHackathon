@@ -51,12 +51,12 @@ Until each lands, the fact it carries is `None`.
 
 ## Acceptance
 
-- [ ] A report without `contact_point_id`, or with one that isn't the current version's pick, gives `dialed_eligible_number = False`.
-- [ ] A dropped call that said "no", followed by a redial that says "yes", reaches `decide()` with the "no" in `earlier_calls`.
-- [ ] `consent_first`, `answers_in_order` and `same_person_yes_and_digits` follow decisions 3 and 4. Each branch has a unit test.
-- [ ] Every new fact is `None` when its source is missing: no ledger, an older voice report, or no names recorded.
-- [ ] A slot answered twice keeps both values in order. `company_matches` is `False` if any recorded company value doesn't match.
-- [ ] Core tests and the smoke run still pass. The doubles supply the new facts, and the skeleton engine is unchanged.
+- [x] A report without `contact_point_id`, or with one that isn't the current version's pick, gives `dialed_eligible_number = False`.
+- [x] A dropped call that said "no", followed by a redial that says "yes", reaches `decide()` with the "no" in `earlier_calls`.
+- [x] `consent_first`, `answers_in_order` and `same_person_yes_and_digits` follow decisions 3 and 4. Each branch has a unit test.
+- [x] Every new fact is `None` when its source is missing: no ledger, an older voice report, or no names recorded.
+- [x] A slot answered twice keeps both values in order. `company_matches` is `False` if any recorded company value doesn't match.
+- [x] Core tests and the smoke run still pass. The doubles supply the new facts, and the skeleton engine is unchanged.
 
 ## Tests (written first)
 
