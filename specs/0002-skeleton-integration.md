@@ -118,7 +118,9 @@ arrives, the core:
 1. computes `last_four_result` with `packages/decision` (match, matches_old_account,
    near_miss, mismatch, not_provided, ambiguous, inconsistent) against the case's new and old
    account last fours;
-2. replaces the digits with the stored shape (`digits_hmac`, `digit_count`, `key_version`);
+2. replaces the digits with the stored shape (`digits_hmac`, `digit_count`, `key_version`), where
+   `digits_hmac` is HMAC-SHA256 with the server's digits key over `<call_id>:<digits>`, so the same
+   four digits on two calls never hash alike;
 3. appends `call_ended` with the stored answers, `last_four_result`, and Sami's `checks`.
 
 The later `decide` command is then a pure function of stored facts, with no digits in reach.
@@ -204,6 +206,8 @@ explains a decision comes from a template in the core, never from a model, and s
 | Q4 | Field names for a vendor's hold and a bill's hold flag, for read-back. The mock uses `hold` and `is_on_hold`. | Ramp OpenAPI spec |
 | Q5 | Supabase project keys: HS256 legacy secret or asymmetric JWKS. The verifier supports HS256 today. | Abhi, when the project exists |
 | Q6 | A `blocked` case keeps its hold forever unless another change arrives. What ends it: vendor offboarding, or a manual unblock with two people? | Team |
+| Q7 | The live final is in the evening, outside the 9:00 to 16:30 calling window, so a live demo call would wait until morning. Widen the window for the demo dataset only (`DIALBACK_CALLING_WINDOW`), or run the live call in the vendor's time zone? | Team, before Nov 19 |
+| Q8 | The skeleton's `decide()` records three facts it cannot check yet (`U01` to `U03`). Who supplies them for the Nov 4 engine: the ledger's change context (Inesh) and per-turn speaker identity (Sami)? | Inesh, Sami |
 
 ## Acceptance
 

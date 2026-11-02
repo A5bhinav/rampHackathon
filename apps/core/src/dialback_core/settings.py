@@ -29,6 +29,21 @@ class Settings:
     mock_ramp_secret: bytes | None = None
     resolver_mode: ResolverMode = ResolverMode.STUB
     ramp_requests_per_10s: int = 150          # stay under Ramp's 200 per 10 s with headroom
+    # Spoken digits are hashed with this key before anything is stored (spec 0002, D7).
+    digits_key: bytes = b""
+    digits_key_version: int = 1
+    # Service-to-service token for the voice service's call reports (internal.yaml).
+    internal_api_token: bytes = b""
+    voice_base_url: str | None = None
+    # When calls may be placed, in the vendor's time zone (design: Mon-Fri 9:00-16:30).
+    calling_tz: str = "America/Los_Angeles"
+    calling_window: str = "09:00-16:30"
+    calling_days: str = "mon-fri"
+    # Worker pacing.
+    command_backoff_seconds: float = 5.0
+    lease_seconds: int = 300
+    worker_poll_seconds: float = 1.0
+    run_worker: bool = True
     extra: dict[str, str] = field(default_factory=dict)
 
     @classmethod
@@ -50,4 +65,12 @@ class Settings:
             fingerprint_key_version=int(env.get("FINGERPRINT_KEY_VERSION", "1")),
             mock_ramp_secret=_secret(env, "MOCK_RAMP_SECRET") if ramp_mode is RampMode.MOCK else None,
             resolver_mode=read_flag("DIALBACK_RESOLVER", ResolverMode, ResolverMode.STUB, env),
+            digits_key=_secret(env, "DIGITS_KEY", 32),
+            digits_key_version=int(env.get("DIGITS_KEY_VERSION", "1")),
+            internal_api_token=_secret(env, "INTERNAL_API_TOKEN", 24),
+            voice_base_url=(env.get("VOICE_URL") or "").rstrip("/") or None,
+            calling_tz=env.get("DIALBACK_CALLING_TZ", "America/Los_Angeles"),
+            calling_window=env.get("DIALBACK_CALLING_WINDOW", "09:00-16:30"),
+            calling_days=env.get("DIALBACK_CALLING_DAYS", "mon-fri"),
+            run_worker=env.get("DIALBACK_RUN_WORKER", "1") != "0",
         )

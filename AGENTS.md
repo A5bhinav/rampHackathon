@@ -52,6 +52,10 @@ second owner (the partner) who reviews it.
 | Validate contract schemas, examples and OpenAPI files | `uv run --with jsonschema --with rfc8785 --with pyyaml --with openapi-spec-validator python packages/contracts/scripts/validate.py` |
 | Regenerate the shared hash vectors | `uv run --with rfc8785 python packages/contracts/scripts/make_vectors.py` |
 | Redraw the state-machine doc from the database | `DATABASE_URL=... python3 scripts/db/render_state_machine.py docs/state-machine.md` |
+| Install the Python workspace | `uv sync --all-packages` |
+| Core tests (core and the Ramp mock in process, on a throwaway Postgres) | `cd apps/core && uv run pytest` |
+| Ramp mock tests | `cd apps/ramp-mock && uv run pytest` |
+| Decision engine tests | `cd packages/decision && uv run pytest` |
 
 Each owner adds their own commands here as their part lands (`pnpm`, `uv run`, `lab run`).
 

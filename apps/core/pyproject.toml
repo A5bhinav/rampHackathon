@@ -10,6 +10,8 @@ dependencies = [
   "psycopg[binary]>=3.2",
   "psycopg-pool>=3.2",
   "pydantic>=2.9",
+  "dialback-decision",
+  "dialback-ledger",
 ]
 
 [project.scripts]
@@ -22,6 +24,8 @@ dev = ["pytest>=8", "anyio>=4", "dialback-ramp-mock"]
 
 [tool.uv.sources]
 dialback-ramp-mock = { workspace = true }
+dialback-decision = { workspace = true }
+dialback-ledger = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]

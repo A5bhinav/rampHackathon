@@ -151,6 +151,30 @@ If this slice is behind at the Nov 4 checkpoint, `packages/decision` moves to In
 | `POST /webhooks/ramp/{dataset_id}`: verify, store, dedupe, alert on bad signatures | `webhooks.py` | `abhi/core-foundation` |
 | Detection: initial import, sync a vendor, process stored webhooks; one case per change across every door | `detection.py` | `abhi/core-foundation` |
 | New datasets with their own evidence chain (demo reset, lab scenarios) | `datasets.py` | `abhi/core-foundation` |
+| The worker: commands with retries, deferral, stale drops and escalation; timers on the dataset clock | `worker.py` | `abhi/core-worker` |
+| `POST /internal/calls/{call_id}/ended` per Sami's `internal.yaml`: digits compared then hashed, only the current call counts | `calls.py`, `answers.py` | `abhi/core-worker` |
+| Ports to Inesh's `select_number` and Sami's `POST /calls`, both failing closed when the other side is missing | `ports.py` | `abhi/core-worker` |
+| Company-name match, calling window | `company.py`, `calling_window.py` | `abhi/core-worker` |
+| CLI: `serve`, `new-dataset`, `import-vendors`, `retire-dataset` | `main.py` | `abhi/core-worker` |
+
+### Configuration
+
+| Variable | Required | Meaning |
+|---|---|---|
+| `DATABASE_URL` | yes | Postgres (Supabase) |
+| `RAMP_BASE_URL` | yes | The Ramp mock's URL, or Ramp's API |
+| `DIALBACK_RAMP` | no | `mock` (default) or `sandbox` (not wired yet; fails at startup) |
+| `MOCK_RAMP_SECRET` | with `mock` | Shared with the mock; per-dataset tokens are derived from it |
+| `RAMP_WEBHOOK_SECRET` | yes | Verifies `X-Ramp-Signature` |
+| `FINGERPRINT_KEY`, `FINGERPRINT_KEY_VERSION` | yes | Keyed fingerprints of bank accounts (32+ characters) |
+| `DIGITS_KEY`, `DIGITS_KEY_VERSION` | yes | Keyed hash of spoken digits (32+ characters) |
+| `INTERNAL_API_TOKEN` | yes | The voice service's bearer token for call reports (24+ characters) |
+| `VOICE_URL` | no | Sami's voice service. Unset: every call is refused and the case goes to a person |
+| `DIALBACK_RESOLVER` | no | `stub` (default) calls the ledger's `select_number_stub`; `ledger` its `select_number` |
+| `DIALBACK_CALLING_TZ`, `DIALBACK_CALLING_WINDOW`, `DIALBACK_CALLING_DAYS` | no | Default `America/Los_Angeles`, `09:00-16:30`, `mon-fri` |
+| `DIALBACK_RUN_WORKER` | no | `0` runs the API without the worker |
+
+Secrets live in Railway variables and Supabase Vault; never in the repo or in logs.
 
 Run the tests (a throwaway Postgres starts automatically, or set `DATABASE_URL`):
 

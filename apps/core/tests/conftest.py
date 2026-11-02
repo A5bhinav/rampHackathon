@@ -14,16 +14,59 @@ from dialback_core.datasets import Dataset, create_dataset
 from dialback_core.db import open_pool, system_tx
 from dialback_core.detection import Keys
 from dialback_core.flags import RampMode
+from dialback_core.ports import PreDialRefused, Selection
 from dialback_core.ramp import RampConnector
 from dialback_core.ramp.connector import mock_token
 from dialback_core.ramp.http import TokenBucket
 from dialback_core.settings import Settings
+from dialback_core.worker import Worker
 from dialback_ramp_mock.app import create_app as create_mock_app
 from dialback_ramp_mock.settings import Settings as MockSettings
 
 MOCK_SECRET = b"mock-secret-for-tests-only"
 WEBHOOK_SECRET = b"whsec-for-tests-only-0123"
 FINGERPRINT_KEY = b"fingerprint-key-for-tests-only-0123456789"
+DIGITS_KEY = b"digits-key-for-tests-only-0123456789abcd"
+INTERNAL_TOKEN = b"internal-token-for-tests-only-0123"
+
+
+def core_settings(**overrides) -> Settings:
+    base = {"database_url": "unused-in-tests", "ramp_mode": RampMode.MOCK, "ramp_base_url": "http://ramp-mock",
+            "ramp_webhook_secret": WEBHOOK_SECRET, "fingerprint_key": FINGERPRINT_KEY, "mock_ramp_secret": MOCK_SECRET,
+            "digits_key": DIGITS_KEY, "internal_api_token": INTERNAL_TOKEN, "run_worker": False,
+            "command_backoff_seconds": 0.0, "calling_window": "00:00-23:59", "calling_days": "all"}
+    return Settings(**(base | overrides))
+
+
+class StandInResolver:
+    """TEST DOUBLE for Inesh's select_number (spec 0002, D10): picks one fixed number, or none."""
+
+    def __init__(self, pick: bool = True) -> None:
+        self.pick, self.calls = pick, []
+
+    async def select_number(self, *, case_id, dataset_id, vendor_id, cutoff) -> Selection:
+        self.calls.append(case_id)
+        if not self.pick:
+            return Selection(uuid.uuid4(), "test-double", None, reason="No number met the rule.")
+        return Selection(uuid.uuid4(), "test-double", CONTACT_POINT, source_types=("contract", "listing"))
+
+
+class StandInVoice:
+    """TEST DOUBLE for Sami's voice service (internal.yaml placeCall): accepts every call."""
+
+    def __init__(self) -> None:
+        self.placed: list[dict] = []
+        self.refuse: str | None = None
+
+    async def place_call(self, *, case_id, attempt, idempotency_key) -> uuid.UUID:
+        if self.refuse:
+            raise PreDialRefused(self.refuse)
+        call_id = uuid.uuid4()
+        self.placed.append({"case_id": case_id, "attempt": attempt, "key": idempotency_key, "call_id": call_id})
+        return call_id
+
+
+CONTACT_POINT = uuid.UUID("5d4c3b2a-1f0e-4d9c-8b7a-6f5e4d3c2b1a")
 
 
 @pytest.fixture
@@ -48,6 +91,9 @@ class World:
     dataset: Dataset
     refs: dict[str, str] = field(default_factory=dict)
     users: dict[str, uuid.UUID] = field(default_factory=dict)
+    worker: Worker | None = None
+    resolver: StandInResolver | None = None
+    voice: StandInVoice | None = None
 
     @property
     def auth(self) -> dict[str, str]:
@@ -87,10 +133,8 @@ def seed(dataset_id: uuid.UUID) -> dict:
     }
 
 
-@pytest.fixture
-async def world(pool):
-    settings = Settings(database_url="unused-in-tests", ramp_mode=RampMode.MOCK, ramp_base_url="http://ramp-mock",
-                        ramp_webhook_secret=WEBHOOK_SECRET, fingerprint_key=FINGERPRINT_KEY, mock_ramp_secret=MOCK_SECRET)
+async def make_world(pool, kind: str = "dev", sim_now=None, settings: Settings | None = None):
+    settings = settings or core_settings()
     mock_app = create_mock_app(MockSettings(database_url="unused", token_secret=MOCK_SECRET, deliver_webhooks=False), pool=pool)
     to_mock = httpx.AsyncClient(transport=httpx.ASGITransport(app=mock_app), base_url="http://ramp-mock")
     connector = RampConnector(settings, to_mock, limiter=TokenBucket(100_000))
@@ -98,7 +142,7 @@ async def world(pool):
     to_core = httpx.AsyncClient(transport=httpx.ASGITransport(app=core_app), base_url="http://core")
     mock_app.state.http = to_core  # the mock's webhooks land on the core's real endpoint
 
-    dataset = await create_dataset(pool, "dev", f"test-{uuid.uuid4().hex[:8]}")
+    dataset = await create_dataset(pool, kind, f"test-{uuid.uuid4().hex[:8]}", sim_now)
     w = World(pool, to_core, to_mock, connector, Keys(FINGERPRINT_KEY), dataset)
     r = await to_mock.post("/_mock/seed", json=seed(dataset.id), headers=w.auth)
     assert r.status_code == 200, r.text
@@ -112,6 +156,18 @@ async def world(pool):
                                (uid, name.title(), w.refs.get(ramp_ref) if ramp_ref else None))
             await conn.execute("insert into app.user_roles (user_id, role) values (%s, %s)", (uid, role))
             w.users[name] = uid
+    w.resolver, w.voice = StandInResolver(), StandInVoice()
+    w.worker = Worker(pool, settings, connector, w.resolver, w.voice, sleep=_no_sleep)
+    return w
+
+
+async def _no_sleep(_: float) -> None:
+    return None
+
+
+@pytest.fixture
+async def world(pool):
+    w = await make_world(pool)
     yield w
-    await to_core.aclose()
-    await to_mock.aclose()
+    await w.core.aclose()
+    await w.mock.aclose()

@@ -1,8 +1,9 @@
 [project]
 name = "dialback-decision"
-version = "0.0.0"
+version = "0.1.0"
+description = "decide(): Verified, Not verified or Needs review, the same way every time. Pure: no database, network or model."
 requires-python = ">=3.13"
-dependencies = []
+dependencies = ["rfc8785>=0.1.4"]
 
 [dependency-groups]
 dev = ["pytest>=8", "hypothesis>=6"]
@@ -13,3 +14,6 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/dialback_decision"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

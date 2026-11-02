@@ -1,35 +1,49 @@
-"""The core service's FastAPI app. Routes are added per branch of the walking skeleton:
-webhooks here; the call report and the dashboard API in later branches."""
+"""The core service's FastAPI app: Ramp webhooks, the voice service's call reports, and (in
+the next branch) the dashboard API. One always-on container also runs the worker."""
 from __future__ import annotations
 
+import asyncio
 import contextlib
 
 import httpx
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from psycopg_pool import AsyncConnectionPool
 
+from .calls import router as calls_router
 from .db import open_pool
 from .detection import Keys
+from .ports import CallPlacer, LedgerResolver, NoVoiceService, NumberResolver, VoiceServiceClient
 from .ramp import RampConnector
 from .settings import Settings
 from .webhooks import router as webhooks_router
+from .worker import Worker
 
 
-def create_app(settings: Settings, pool: AsyncConnectionPool | None = None,
-               connector: RampConnector | None = None) -> FastAPI:
+def create_app(settings: Settings, pool: AsyncConnectionPool | None = None, connector: RampConnector | None = None,
+               resolver: NumberResolver | None = None, caller: CallPlacer | None = None) -> FastAPI:
     @contextlib.asynccontextmanager
     async def lifespan(app: FastAPI):
-        owned_http: httpx.AsyncClient | None = None
+        http = httpx.AsyncClient(timeout=10.0)
         if pool is None:
             app.state.pool = await open_pool(settings.database_url)
         if connector is None:
-            owned_http = httpx.AsyncClient(timeout=10.0)
-            app.state.connector = RampConnector(settings, owned_http)
+            app.state.connector = RampConnector(settings, http)
+        stop, task = asyncio.Event(), None
+        if settings.run_worker:
+            worker = Worker(app.state.pool, settings, app.state.connector,
+                            resolver or LedgerResolver(settings.resolver_mode),
+                            caller or (VoiceServiceClient(settings.voice_base_url, settings.internal_api_token, http)
+                                       if settings.voice_base_url else NoVoiceService()))
+            task = asyncio.create_task(worker.run_forever(stop))
         try:
             yield
         finally:
-            if owned_http is not None:
-                await owned_http.aclose()
+            stop.set()
+            if task:
+                await task
+            await http.aclose()
             if pool is None:
                 await app.state.pool.close()
 
@@ -40,7 +54,15 @@ def create_app(settings: Settings, pool: AsyncConnectionPool | None = None,
         app.state.pool = pool
     if connector is not None:
         app.state.connector = connector
+
+    @app.exception_handler(RequestValidationError)
+    async def invalid_request(_: Request, exc: RequestValidationError):
+        # Never echo input values back: a call report carries spoken digits.
+        problems = "; ".join(f"{'.'.join(str(p) for p in e['loc'])}: {e['msg']}" for e in exc.errors())
+        return JSONResponse({"code": "invalid_request", "message": problems}, status_code=422)
+
     app.include_router(webhooks_router)
+    app.include_router(calls_router)
 
     @app.get("/healthz")
     async def healthz():
