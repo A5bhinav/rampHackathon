@@ -49,7 +49,7 @@ second owner (the partner) who reviews it.
 |------|---------|
 | Apply migrations and run the SQL tests on a throwaway Postgres | `scripts/db/test.sh` |
 | Apply migrations to a database | `DATABASE_URL=... scripts/db/apply.sh` |
-| Validate contract schemas and examples | `uv run --with jsonschema --with rfc8785 python packages/contracts/scripts/validate.py` |
+| Validate contract schemas, examples and OpenAPI files | `uv run --with jsonschema --with rfc8785 --with pyyaml --with openapi-spec-validator python packages/contracts/scripts/validate.py` |
 | Regenerate the shared hash vectors | `uv run --with rfc8785 python packages/contracts/scripts/make_vectors.py` |
 | Redraw the state-machine doc from the database | `DATABASE_URL=... python3 scripts/db/render_state_machine.py docs/state-machine.md` |
 
