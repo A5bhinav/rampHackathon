@@ -18,7 +18,7 @@ from dialback_decision import compare_last_four
 from dialback_decision.rules import CHANGE, CONSENT, FLAGS
 from fastapi import APIRouter, Header, Request
 from fastapi.responses import JSONResponse, Response
-from pydantic import BaseModel, ConfigDict, Field, StrictBool, field_validator, model_validator
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, StrictBool, field_validator, model_validator
 
 from .answers import NO_DIGITS, protect, spoken_last_four
 from .db import system_tx
@@ -79,7 +79,7 @@ class CallEndedRequest(Strict):
     result: Literal["answers_recorded", "no_answer", "voicemail", "busy", "failed", "machine", "declined",
                     "callback_requested"]
     attempt: int = Field(ge=1)
-    retry_at: str | None = None
+    retry_at: AwareDatetime | None = None  # a real moment with its offset: never 'infinity' or a local time
     recording_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     transcript_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     agent_version: str | None = None

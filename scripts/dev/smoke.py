@@ -88,7 +88,7 @@ class Smoke:
         async def settled() -> bool:
             c = await self.cases()
             return (c.get(acme, {}).get("state"), c.get(bright, {}).get("state"), c.get(cobalt, {}).get("state")) == \
-                ("awaiting_release", "needs_review", "blocked")
+                ("awaiting_release", "needs_review", "blocked") and c.get("Delta Paper Co", {}).get("hold_status") == "confirmed"
         await self.until("three changes settle: confirmed awaits release, refused call needs review, denial is blocked", settled)
         c = await self.cases()
         self.check(c[acme]["outcome"] == "verified" and c[cobalt]["outcome"] == "not_verified", "code decided verified and not verified")

@@ -105,6 +105,10 @@ select c.*, v.ramp_vendor_id, v.legal_name, v.trade_names, ce.detected_at, ce.ra
  where c.id = %s
 """
 
+# The deadline acts only while code owns the case; otherwise it re-checks (spec 0007, D4).
+DEADLINE_ACTIVE = ("held", "calling", "retry_wait", "deciding")
+DEADLINE_RECHECK = dt.timedelta(hours=1)
+
 # This generation's evidence the decision reads (spec 0005): the ledger's pick and every call report.
 GENERATION = """
 select type, body_jcs::jsonb -> 'body' as body
@@ -452,9 +456,15 @@ class Worker:
                 await apply_event(conn, case["id"], "retry_timer_fired",
                                   f"{case['id']}:retry:v{case['version']}:{payload.get('after_attempt')}",
                                   {"in_window": True, "timer_id": timer["id"]})
-            elif timer["kind"] == "deadline" and case["state"] in ("held", "calling", "retry_wait", "deciding"):
+            elif timer["kind"] == "deadline" and case["state"] in DEADLINE_ACTIVE:
                 await apply_event(conn, case["id"], "deadline_reached", f"{case['id']}:deadline",
                                   {"timer_id": timer["id"], "deadline_at": timer["fire_at"].isoformat()})
+            elif timer["kind"] == "deadline" and case["state"] != "released":
+                # A person owns the case (or it is releasing), so the deadline waits rather than being
+                # used up: if a new change hands it back to code, the next check sends it to a person
+                # (spec 0007, D4). The hold stays on throughout.
+                await conn.execute("update app.timers set fire_at = %s where id = %s", (now + DEADLINE_RECHECK, timer["id"]))
+                return
             elif timer["kind"] == "callback":
                 # A vendor's callback (spec 0007) is a retry_call timer at the time they asked for; this
                 # kind is never scheduled. One firing anyway does nothing rather than call.

@@ -21,6 +21,9 @@ begin
   perform app.apply_case_event(c, 'number_resolved', pg_temp.sys(), c || ':select:v1:resolved', jsonb_build_object('contact_point_id', gen_random_uuid()));
   call_1 := pg_temp.start_call(c);
 
+  -- A callback with no time is refused by the referee too, not only by the core's API.
+  perform pg_temp.expect_error(format($q$ select app.apply_case_event(%L, 'call_ended', pg_temp.sys(), 'no-time', '{"call_id": "%s", "result": "callback_requested", "attempt": 1}') $q$,
+                                      c, call_1), '23514', '%guard failed%');
   -- A callback from a call that isn't current is refused.
   perform pg_temp.expect_error(format($q$ select app.apply_case_event(%L, 'call_ended', pg_temp.sys(), 'stray', '{"call_id": "%s", "result": "callback_requested", "attempt": 1, "retry_at": "%s"}') $q$,
                                       c, gen_random_uuid(), v_at), '23514', '%guard failed%');

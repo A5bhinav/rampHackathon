@@ -441,6 +441,9 @@ async def test_a_callback_is_redialed_at_the_time_asked_and_inside_the_window(po
         asked = dt.datetime(2026, 11, 4, 1, 0, tzinfo=dt.UTC)
         r = await report(world, case["id"], first, result="callback_requested", answers=consent, retry_at=asked.isoformat())
         assert r.status_code == 204 and (await case_of(world))["state"] == "retry_wait"
+        timer = await one(pool, "select fire_at from app.timers where case_id = %s and kind = 'retry_call' and status = 'scheduled'",
+                          case["id"])
+        assert timer["fire_at"] == asked, "the time the vendor asked for, not the default two hours"
 
         await _advance(pool, world, asked - dt.timedelta(minutes=1))
         assert len(world.voice.placed) == 1, "not before the time asked"
@@ -475,7 +478,7 @@ async def test_the_deadline_survives_a_re_hold_and_overtakes_a_callback(pool):
                           case["id"])
         assert timer["fire_at"] == deadline
 
-        later = deadline + dt.timedelta(days=1)  # the vendor asks for a callback after the deadline
+        later = deadline + dt.timedelta(days=3)  # Monday 09:00 in Los Angeles: inside the window, after the deadline
         r = await report(world, case["id"], world.voice.placed[-1]["call_id"], attempt=case["call_attempts"],
                          result="callback_requested", retry_at=later.isoformat())
         assert r.status_code == 204
@@ -504,6 +507,39 @@ async def test_the_deadline_leaves_a_case_a_person_owns_alone(pool):
         await _advance(pool, world, case["deadline_at"] + dt.timedelta(minutes=1))
         assert (await case_of(world))["state"] == "awaiting_release", "an approver owns it now"
         assert await one(pool, "select 1 from app.alerts where case_id = %s and kind = 'deadline_reached'", case["id"]) is None
+
+        # A new change hands the case back to code after its deadline: the next check sends it to a person.
+        await change_and_detect(world, account_number="000077778888")
+        assert (await case_of(world))["state"] == "calling"
+        await _advance(pool, world, case["deadline_at"] + dt.timedelta(hours=1, minutes=1))
+        assert (await case_of(world))["state"] == "needs_review", "the deadline wasn't used up while a person owned the case"
     finally:
         await world.core.aclose()
         await world.mock.aclose()
+
+
+async def test_a_callback_inside_the_window_is_redialed_exactly_then(pool):
+    world = await lab_world(pool)
+    try:
+        await import_all(world.pool, world.ramp, world.keys, world.dataset.id)
+        await change_and_detect(world)
+        case = await case_of(world)
+        asked = LAB_START + dt.timedelta(hours=3)  # noon in Los Angeles
+        r = await report(world, case["id"], world.voice.placed[0]["call_id"], result="callback_requested", retry_at=asked.isoformat())
+        assert r.status_code == 204
+        await _advance(pool, world, asked - dt.timedelta(seconds=1))
+        assert len(world.voice.placed) == 1
+        await _advance(pool, world, asked)
+        assert [p["attempt"] for p in world.voice.placed] == [1, 2]
+    finally:
+        await world.core.aclose()
+        await world.mock.aclose()
+
+
+@pytest.mark.parametrize("when", ["infinity", "soon", "2026-11-03T10:00:00"], ids=["infinity", "words", "no-offset"])
+async def test_a_callback_time_that_isnt_a_moment_is_refused(world, when):
+    await import_all(world.pool, world.ramp, world.keys, world.dataset.id)
+    await change_and_detect(world)
+    case = await case_of(world)
+    r = await report(world, case["id"], world.voice.placed[0]["call_id"], result="callback_requested", retry_at=when)
+    assert r.status_code == 422 and (await case_of(world))["state"] == "calling"
