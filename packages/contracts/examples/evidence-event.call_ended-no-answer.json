@@ -18,6 +18,8 @@
     "retry_at": "2026-11-01T19:20:41Z",
     "agent_version": "agent-0.1.0",
     "contact_point_id": "5d4c3b2a-1f0e-4d9c-8b7a-6f5e4d3c2b1a",
+    "direction": "outbound",
+    "dialed_number_is_pick": true,
     "checks": {
       "disclosure_first": true,
       "answers_grounded": true,
