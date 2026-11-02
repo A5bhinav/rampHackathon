@@ -11,8 +11,11 @@ info:
     - Every request carries an `Idempotency-Key`; a replayed key returns the first result.
     - The call report mirrors `CallEndedBody` in `evidence-event.schema.json`, except that
       `answers` uses `CallAnswersInTransit`, which carries the spoken last four digits. The
-      core runs `decide()` on them in memory, replaces them with the keyed hash, and appends
-      the stored `CallEndedBody`. Neither service logs or stores the digits.
+      core compares them with the case's accounts in memory (`last_four_result`), replaces
+      them with the keyed hash, and appends the stored `CallEndedBody` (spec 0002, D7).
+      Neither service logs or stores the digits.
+    - Only the case's current call counts: the core pins it from `call_started` when this
+      service answers `placeCall`, and refuses a report for any other call (spec 0002, D6).
 
 servers:
   - url: http://localhost
@@ -53,6 +56,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PlaceCallAccepted'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '409':
           description: A pre-dial check failed and no call was placed. The core sends the case to needs_review.
           content:
@@ -123,8 +128,12 @@ paths:
                 properties:
                   status:
                     const: already_applied
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '409':
-          description: The case isn't in the calling state for this call.
+          description: |
+            No such case (`unknown_case`), or the case is not waiting on this call
+            (`not_current_call`), such as a late report from an earlier generation's call.
           content:
             application/json:
               schema:
@@ -148,11 +157,22 @@ components:
       name: Idempotency-Key
       in: header
       required: true
-      description: '`{case_id}:call:{attempt}` for placeCall; `{case_id}:call:{attempt}:ended` for reportCallEnded.'
+      description: |
+        `{case_id}:call:v{version}:{attempt}` for placeCall, where `version` is the case's
+        version, so a re-held case's first attempt never reuses the earlier call (spec 0002, D6).
+        `{case_id}:call:{call_id}:ended` for reportCallEnded.
       schema:
         type: string
         minLength: 1
         maxLength: 200
+
+  responses:
+    Unauthorized:
+      description: Missing or wrong service token (`unauthorized`). The body is never echoed.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
 
   schemas:
     PlaceCallRequest:
@@ -205,8 +225,8 @@ components:
     CallEndedRequest:
       description: |
         `CallEndedBody` plus `case_id`, with `answers` in the in-transit shape. Field types point
-        at `CallEndedBody` so the two can't drift. The optional fields after `answers` are
-        proposed additions to `CallEndedBody`, pending Abhi's review.
+        at `CallEndedBody` so the two can't drift. `last_four_result` is not sent: the core
+        computes it on arrival.
       type: object
       additionalProperties: false
       required: [call_id, case_id, result, attempt]
@@ -231,45 +251,9 @@ components:
           description: Present when result is answers_recorded.
           $ref: '../schemas/call-answers.schema.json#/$defs/CallAnswersInTransit'
         contact_point_id:
-          description: Proposed. The Trust Ledger contact point that was dialed.
-          $ref: '../schemas/evidence-event.schema.json#/$defs/Uuid'
+          $ref: '../schemas/evidence-event.schema.json#/$defs/CallEndedBody/properties/contact_point_id'
         checks:
-          $ref: '#/components/schemas/CallChecks'
-
-    CallChecks:
-      description: |
-        Proposed. Computed by code in the voice service after the call, never by the model. Checks
-        that need case or ledger data (company match against the vendor's names, whether the
-        speaker first appeared in the change thread) stay with the core.
-      type: object
-      additionalProperties: false
-      required:
-        - disclosure_first
-        - answers_grounded
-        - agent_spoke_account_digits
-        - new_number_accepted
-        - policy_violations
-        - speech_guard_trips
-      properties:
-        disclosure_first:
-          description: The fixed AI and recording disclosure played in full as the first turn.
-          type: boolean
-        answers_grounded:
-          description: Every recorded answer appears in the transcript turn it cites.
-          type: boolean
-        agent_spoke_account_digits:
-          description: Must be false. True is a script violation.
-          type: boolean
-        new_number_accepted:
-          description: Must be false. True is a script violation.
-          type: boolean
-        policy_violations:
-          description: Unknown tools or invalid tool arguments.
-          type: integer
-          minimum: 0
-        speech_guard_trips:
-          type: integer
-          minimum: 0
+          $ref: '../schemas/evidence-event.schema.json#/$defs/CallChecks'
 
     Error:
       type: object
