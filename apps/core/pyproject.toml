@@ -1,11 +1,32 @@
 [project]
 name = "dialback-core"
 version = "0.0.0"
+description = "Dialback's core service: Ramp adapter, change detection, case worker, dashboard API."
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+  "fastapi>=0.115",
+  "uvicorn>=0.32",
+  "httpx>=0.28",
+  "psycopg[binary]>=3.2",
+  "psycopg-pool>=3.2",
+  "pydantic>=2.9",
+  "pyjwt>=2.9",
+  "dialback-decision",
+  "dialback-ledger",
+]
+
+[project.scripts]
+dialback-core = "dialback_core.main:run"
 
 [dependency-groups]
-dev = ["pytest>=8", "hypothesis>=6"]
+# The Ramp mock is a test-only dependency: core tests drive the real HTTP adapter against it
+# in process. Nothing under src/ imports another app.
+dev = ["pytest>=8", "anyio>=4", "dialback-ramp-mock", "jsonschema>=4.23", "pyyaml>=6"]
+
+[tool.uv.sources]
+dialback-ramp-mock = { workspace = true }
+dialback-decision = { workspace = true }
+dialback-ledger = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]
@@ -13,3 +34,8 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/dialback_core"]
+
+[tool.pytest.ini_options]
+pythonpath = ["../../scripts/db"]
+testpaths = ["tests"]
+addopts = "-p pgtemp"

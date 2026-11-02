@@ -39,21 +39,28 @@ with coding agents from the first hour.
 
 ## What runs today
 
-```bash
-scripts/db/test.sh
-```
-
-Applies every migration to a throwaway Postgres, runs the SQL tests (the evidence chain, a
-full case from detection to release with retries and two approvers, the closed doors and
-grants, the Ramp mock, and the Python-versus-SQL hash vectors), redraws
-`docs/state-machine.md`, and validates the contracts.
+The walking skeleton runs end to end: a bank change in the Ramp mock becomes a case, the
+hold goes on, a call is placed and reported, code decides, a different person releases from
+the dashboard, and the bills get their dates back. Inesh's `select_number` and Sami's voice
+service are stood in for by labeled test doubles until theirs land (spec 0002, D10).
 
 ```bash
-uv sync --all-packages
+uv run python scripts/dev/stack.py --changes
 ```
 
-Installs the Python workspace (three services, five packages, the lab). `pnpm install` sets
-up the TypeScript side once `apps/web` exists.
+Starts Postgres, the Ramp mock and the core with its worker, seeds a demo dataset with three
+bank changes (one confirmed, one refused before dialing, one denied), and prints the
+command to start the dashboard. `--smoke` instead runs the end-to-end checks and exits.
+
+| Check | Command |
+|---|---|
+| Database: migrations, SQL tests, contracts, hash vectors | `scripts/db/test.sh` |
+| Core, Ramp mock, decision engine | `cd apps/core && uv run pytest` (likewise `apps/ramp-mock`, `packages/decision`) |
+| Dashboard | `cd apps/web && pnpm check:api && pnpm typecheck && pnpm build` |
+| End to end | `uv run python scripts/dev/stack.py --smoke` |
+
+`uv sync --all-packages` installs the Python workspace; `pnpm install` the dashboard. CI
+runs all of these on every pull request (`.github/workflows/`).
 
 ## Dates
 

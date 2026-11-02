@@ -103,3 +103,19 @@ $$;
 
 create function pg_temp.state_of(p_case uuid) returns text
 language sql as $$ select state::text from app.cases where id = p_case $$;
+
+-- Start the case's current call attempt the way the core does after the voice service
+-- answers 202 (spec 0002, D6), and return the call id to report on.
+create function pg_temp.start_call(p_case uuid) returns uuid
+language plpgsql as $$
+declare
+  c      app.cases%rowtype;
+  v_call uuid := gen_random_uuid();
+begin
+  select * into c from app.cases where id = p_case;
+  perform app.apply_case_event(p_case, 'call_started', pg_temp.sys(),
+            format('%s:call:v%s:%s:started', p_case, c.version, c.call_attempts),
+            jsonb_build_object('call_id', v_call, 'attempt', c.call_attempts));
+  return v_call;
+end
+$$;

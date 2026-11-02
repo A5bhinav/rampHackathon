@@ -1,1 +1,1 @@
-"""dialback-core. See the README in this folder."""
+"""Dialback's core service. See the README in apps/core."""

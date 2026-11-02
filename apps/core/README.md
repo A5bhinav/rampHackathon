@@ -23,7 +23,7 @@ and record all of it in the evidence chain.
 | In, from Ramp | `POST /webhooks/ramp`: verify `X-Ramp-Signature` (HMAC-SHA256 of the raw body, constant-time compare) before parsing; store the raw delivery in `app.inbound_webhooks` (unique on Ramp's event id); answer 2xx within Ramp's 10-second limit, for duplicates too | Ramp's webhook docs |
 | In, from the voice service | `call_ended` with the recorded answers; also Twilio status callbacks for calls that never connected | `packages/contracts/openapi/internal.yaml` |
 | In, from the dashboard | REST with the signed-in user's token, passed through to Postgres so `auth.uid()` is the person | `packages/contracts/openapi/dialback.yaml`, served by Prism until each endpoint lands |
-| Out, to Ramp | `RampPort`, one Python protocol with two implementations: `RampHttpAdapter` and `RampMock`. `DIALBACK_RAMP=mock|sandbox` picks one at startup; no other code knows which | Ramp Developer API |
+| Out, to Ramp | `RampPort`, implemented by one `RampHttpAdapter` that talks to the Ramp-shaped mock or to Ramp's sandbox (spec 0002, D1). `DIALBACK_RAMP=mock|sandbox` picks the base URL and credentials; no other code knows which. `RampConnector.for_dataset()` hands out a dataset's adapter (per-dataset mock tokens) | Ramp Developer API |
 | Out, to the voice service | `POST /calls {case_id, attempt}`; the voice service reads the chosen number from the database itself | `internal.yaml` |
 | Out, to the Trust Ledger | `select_number(case)` and `lineage(vendor_id)` as Python calls | `packages/contracts/schemas/selection.schema.json` (Inesh) |
 | Out, to Postgres | `app.apply_case_event()` for every state change; `audit.verify_chain()` for the badge and the verify job | `supabase/migrations/app/0002_app_functions.sql` |
@@ -139,6 +139,53 @@ If this slice is behind at the Nov 4 checkpoint, `packages/decision` moves to In
 - Contract tests: the API matches `dialback.yaml` and `internal.yaml`; examples validate in both languages.
 - End-to-end smoke from Nov 2: seed the demo data and run one case from webhook to release in text mode (`demo-smoke` CI job).
 - Database tests already exist in `supabase/tests/`; extend them when you add a transition.
+
+## What exists so far
+
+| Piece | Where | Branch |
+|---|---|---|
+| Flags with safe defaults, settings that fail closed on missing secrets | `flags.py`, `settings.py` | `abhi/core-foundation` |
+| Database access as the service role or as the signed-in person | `db.py` | `abhi/core-foundation` |
+| The typed wrapper around `apply_case_event` (refusals become `TransitionRefused`, `NotAllowed`, `VersionConflict`) | `events.py` | `abhi/core-foundation` |
+| `RampPort`, the HTTP adapter (token bucket, retries, safe pagination), the per-dataset connector | `ramp/` | `abhi/core-foundation` |
+| `POST /webhooks/ramp/{dataset_id}`: verify, store, dedupe, alert on bad signatures | `webhooks.py` | `abhi/core-foundation` |
+| Detection: initial import, sync a vendor, process stored webhooks; one case per change across every door | `detection.py` | `abhi/core-foundation` |
+| New datasets with their own evidence chain (demo reset, lab scenarios) | `datasets.py` | `abhi/core-foundation` |
+| The worker: commands with retries, deferral, stale drops and escalation; timers on the dataset clock | `worker.py` | `abhi/core-worker` |
+| `POST /internal/calls/{call_id}/ended` per Sami's `internal.yaml`: digits compared then hashed, only the current call counts | `calls.py`, `answers.py` | `abhi/core-worker` |
+| Ports to Inesh's `select_number` and Sami's `POST /calls`, both failing closed when the other side is missing | `ports.py` | `abhi/core-worker` |
+| Company-name match, calling window | `company.py`, `calling_window.py` | `abhi/core-worker` |
+| CLI: `serve`, `new-dataset`, `import-vendors`, `retire-dataset` | `main.py` | `abhi/core-worker` |
+| The dashboard API per `dialback.yaml`: me, datasets, chain status, alerts, queue, case detail (timeline, decision, permissions), release and review, each run in Postgres as the signed-in person | `api.py`, `auth.py`, `timeline.py` | `abhi/core-api` |
+
+### Configuration
+
+| Variable | Required | Meaning |
+|---|---|---|
+| `DATABASE_URL` | yes | Postgres (Supabase) |
+| `RAMP_BASE_URL` | yes | The Ramp mock's URL, or Ramp's API |
+| `DIALBACK_RAMP` | no | `mock` (default) or `sandbox` (not wired yet; fails at startup) |
+| `MOCK_RAMP_SECRET` | with `mock` | Shared with the mock; per-dataset tokens are derived from it |
+| `RAMP_WEBHOOK_SECRET` | yes | Verifies `X-Ramp-Signature` |
+| `FINGERPRINT_KEY`, `FINGERPRINT_KEY_VERSION` | yes | Keyed fingerprints of bank accounts (32+ characters) |
+| `DIGITS_KEY`, `DIGITS_KEY_VERSION` | yes | Keyed hash of spoken digits (32+ characters) |
+| `INTERNAL_API_TOKEN` | yes | The voice service's bearer token for call reports (24+ characters) |
+| `VOICE_URL` | no | Sami's voice service. Unset: every call is refused and the case goes to a person |
+| `DIALBACK_RESOLVER` | no | `stub` (default) calls the ledger's `select_number_stub`; `ledger` its `select_number` |
+| `DIALBACK_CALLING_TZ`, `DIALBACK_CALLING_WINDOW`, `DIALBACK_CALLING_DAYS` | no | Default `America/Los_Angeles`, `09:00-16:30`, `mon-fri` |
+| `DIALBACK_RUN_WORKER` | no | `0` runs the API without the worker |
+| `DIALBACK_JWT_SECRET` | yes | Verifies the dashboard's JWTs (Supabase's signing secret; a dev secret locally). 32+ characters |
+
+Secrets live in Railway variables and Supabase Vault; never in the repo or in logs.
+
+Run the tests (a throwaway Postgres starts automatically, or set `DATABASE_URL`):
+
+```bash
+cd apps/core && uv run pytest
+```
+
+The tests run the core and the Ramp mock in process, wired to each other: the real adapter
+talks to the mock, and the mock's signed webhooks arrive at the real endpoint.
 
 ## Start here
 

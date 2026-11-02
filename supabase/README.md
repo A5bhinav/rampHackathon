@@ -42,6 +42,11 @@ Starts a throwaway Postgres 16 (or uses `DATABASE_URL`), installs a local stand-
 rolled-back transaction, redraws `docs/state-machine.md`, and checks the contract schemas
 and the shared hash vectors. The `db` GitHub Actions job runs the same script.
 
+**Python tests that need the database** (apps/core, apps/ramp-mock) use the same setup
+through `scripts/db/pgtemp.py`: a pytest plugin with a session fixture, `database_url`, that
+migrates a fresh database the same way. Put `scripts/db` on pytest's `pythonpath` and add
+`-p pgtemp` to `addopts`. Tests isolate themselves by creating their own dataset, as the lab does.
+
 ## What is in each schema
 
 ### `audit` (Abhi)
@@ -68,6 +73,8 @@ Plumbing: `case_transitions` (the state machine as rows), `case_event_receipts`
 | `app.apply_case_event(case_id, event_type, actor, idempotency_key, body)` | The one door. Checks the caller (a person must be `auth.uid()`; the system has no user), looks up the move in `case_transitions`, checks the actor kind and the guard (`app.eval_guard`), runs the side effects, queues follow-up commands and timers, moves the case, appends evidence, records the receipt. A repeated key returns `already_applied`. |
 | `app.release_case(case_id, expected_version, action, reason)` | Four-eyes with the user's own token: approver role, not a changer, not the reviewer, version matches, written reason. When the changer is unknown, the first call co-approves and the second approver releases (ADR-10). |
 | `app.eval_guard(guard_key, case, actor_id, body)` | The named guards in the transition table, in one place. |
+| `app.now(dataset_id)` | The one clock. A lab dataset's simulated time (`app.datasets.sim_now`), otherwise the real clock. Every time the functions write comes from it. |
+| `app.advance_clock(dataset_id, to)` | Lab datasets only, forward only. The attack lab sets a scenario's clock to `clock.start`, then moves it; due timers fire on the worker's next tick. Service role. |
 
 Access: everyone signed in can read; the service role writes mirrors and plumbing;
 `cases`, `decisions`, `releases` and `case_event_receipts` are written only by the functions,
@@ -106,6 +113,8 @@ These extend the design doc; none contradict it. Shout if any is wrong.
 6. **Guards are evaluated in SQL** from the event body (`readback_ok`, `result`, `outcome`, `in_window`, `reason`, `contact_point_id`), so the worker cannot skip a step by naming a target state.
 7. **Deadline** is three business days (weekends skipped, no holiday calendar).
 8. **`mock_ramp` field names** marked "confirm" in the migration are to be checked against Ramp's OpenAPI spec.
+9. **Migration `app/0004`** (spec `specs/0002-skeleton-integration.md`) adds the dataset clock (D2), the `call_started` event that pins `cases.current_call_id` so only the current call's report counts (D6), version-qualified call keys, `hold_confirmed` from `held` for re-holds, and a `decide` command that carries the stored call body (D8). Tests `006` and `007` fail without it.
+10. **Migration `app/0005`**: a repeated release request (a double click) returns its first result instead of a refusal, and only for the same person's own request. Test `008`.
 
 ## Hosted project setup (once, by Abhi)
 
