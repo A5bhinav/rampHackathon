@@ -1,0 +1,51 @@
+{
+ "call": "A flag 'approve_now' (not an allowed value) and a 'no'. Invalid input beats Not verified.",
+ "answers": [
+  [
+   "recording_consent",
+   "yes",
+   1
+  ],
+  [
+   "company_named",
+   "Acme Fasteners",
+   3
+  ],
+  [
+   "speaker_name",
+   "Jordan Lee",
+   5
+  ],
+  [
+   "speaker_role",
+   "AR manager",
+   5
+  ],
+  [
+   "change_requested",
+   "yes",
+   7
+  ],
+  [
+   "account_last4",
+   "6666",
+   9
+  ],
+  [
+   "flag",
+   "approve_now",
+   10
+  ],
+  [
+   "change_requested",
+   "no",
+   11
+  ]
+ ],
+ "expect": {
+  "outcome": "needs_review",
+  "rules_fired": [
+   "NR97_facts_invalid"
+  ]
+ }
+}

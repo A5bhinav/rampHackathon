@@ -1,0 +1,36 @@
+{
+ "call": "An insider entered the change. The real vendor answers on the ledger's number: 'We changed nothing.'",
+ "answers": [
+  [
+   "recording_consent",
+   "yes",
+   1
+  ],
+  [
+   "company_named",
+   "Acme Fasteners",
+   3
+  ],
+  [
+   "speaker_name",
+   "Jordan Lee",
+   5
+  ],
+  [
+   "speaker_role",
+   "AR manager",
+   5
+  ],
+  [
+   "change_requested",
+   "no",
+   7
+  ]
+ ],
+ "expect": {
+  "outcome": "not_verified",
+  "rules_fired": [
+   "NV01_vendor_denied_change"
+  ]
+ }
+}

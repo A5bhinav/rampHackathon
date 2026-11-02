@@ -1,0 +1,21 @@
+{
+ "call": "Consent 'no', then 'we made no change'. Answers after a refused consent aren't evidence.",
+ "answers": [
+  [
+   "recording_consent",
+   "no",
+   1
+  ],
+  [
+   "change_requested",
+   "no",
+   3
+  ]
+ ],
+ "expect": {
+  "outcome": "needs_review",
+  "rules_fired": [
+   "NR02_no_recording_consent"
+  ]
+ }
+}

@@ -1,0 +1,47 @@
+{
+ "call": "'Yes... actually, I'm not sure.'",
+ "answers": [
+  [
+   "recording_consent",
+   "yes",
+   1
+  ],
+  [
+   "company_named",
+   "Acme Fasteners",
+   3
+  ],
+  [
+   "speaker_name",
+   "Jordan Lee",
+   5
+  ],
+  [
+   "speaker_role",
+   "AR manager",
+   5
+  ],
+  [
+   "change_requested",
+   "yes",
+   7
+  ],
+  [
+   "change_requested",
+   "unsure",
+   8
+  ],
+  [
+   "account_last4",
+   "6666",
+   9
+  ]
+ ],
+ "expect": {
+  "outcome": "needs_review",
+  "rules_fired": [
+   "NR09_change_unsure",
+   "NR18_contradictory_answers"
+  ]
+ }
+}

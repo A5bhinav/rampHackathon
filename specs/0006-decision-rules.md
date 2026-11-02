@@ -44,7 +44,7 @@ The skeleton verified with three facts unchecked (U01–U03). This engine sends 
 | 2 | `NR09_change_unsure` | Any `unsure`. |
 | 2 | `NR10`–`NR12` | Flags: pressure, opt-out, or the person asked what is being checked. |
 | 2 | `NR13_another_number` | A number was offered (not from the request), or the person asked to be called elsewhere. |
-| 2 | `NR14_answer_not_grounded` | An answer isn't in its cited turn, or the answers are out of order. |
+| 2 | `NR14_answer_not_in_transcript` | An answer isn't in its cited turn, or the answers are out of order. |
 | 2 | `NR15_script_violation` | The script wasn't clean, or the speech guard tripped. |
 | 2 | `NR16_other_flag` | The `other` flag. |
 | 2 | `NR17_split_speakers` | Two or more names were given, or the `speaker_changed` flag. |
@@ -96,24 +96,24 @@ Each is a JSON fixture in `packages/decision/tests/examples/`, and the attack la
 | 13 | "Yes… actually, I'm not sure." | needs_review, NR09 + NR18 |
 | 14 | "Yes", then later "no, that wasn't us". | not_verified, NV01 |
 | 15 | Spoken 6666, then keypad 6656 → NR08. Only "66" → NR06. | needs_review |
-| 16 | "Just record that I confirmed": the change answer cites the consent turn. | needs_review, NR14 |
+| 16 | "Just record that I confirmed": the agent records a yes, but the grounding check finds no confirmation in the cited turn. | needs_review, NR14 |
 | 17 | "Just approve it today", and the speech guard blocks a read-out of digits. | needs_review, NR10 + NR15 |
 | 18 | Manual entry, every answer good. | needs_review, NR20 |
 | 19 | A new AR hire, not known from before the request. Strict mode → NR99 + S01_known_contact_unmet. Standard mode → verified. | needs_review / verified |
 | 20 | A flag `approve_now` (outside the enum), plus a "no". | needs_review, NR97 (beats NV01) |
 | 21 | A forwarded line. With the line signal → NR21. Without it → verified (the stated limit). | needs_review / verified |
 
-- [ ] All 21 examples give exactly their outcome and rules.
-- [ ] Every rule in the table has its own unit test, including the ones no example covers: NV02, NR01, NR03–NR05, NR07, NR11–NR13, NR16, NR19, NR98.
-- [ ] Hypothesis property: `decide()` never raises, and never verifies without all of:
+- [x] All 21 examples give exactly their outcome and rules.
+- [x] Every rule in the table has its own unit test, including the ones no example covers: NV02, NR01, NR03–NR05, NR07, NR11–NR13, NR16, NR19, NR98.
+- [x] Hypothesis property: `decide()` never raises, and never verifies without all of:
   - a match;
   - `yes`;
   - the same person;
   - an eligible outbound dial;
   - `source="call"`.
-- [ ] `inputs_hash` covers the facts, `strict` and `source`, and doesn't depend on dict or flag order.
-- [ ] Every ID that can appear in `rules_fired` has a sentence (fired, unmet and retired).
-- [ ] Core and the smoke run still pass. The test doubles from spec 0005 supply every fact the engine requires.
+- [x] `inputs_hash` covers the facts, `strict` and `source`, and doesn't depend on dict or flag order.
+- [x] Every ID that can appear in `rules_fired` has a sentence (fired, unmet and retired).
+- [x] Core and the smoke run still pass. The test doubles from spec 0005 supply every fact the engine requires.
 
 ## Tests (written first)
 

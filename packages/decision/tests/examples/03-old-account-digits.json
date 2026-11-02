@@ -1,0 +1,41 @@
+{
+ "call": "The callee confirms the change but reads out the old account's last four.",
+ "answers": [
+  [
+   "recording_consent",
+   "yes",
+   1
+  ],
+  [
+   "company_named",
+   "Acme Fasteners",
+   3
+  ],
+  [
+   "speaker_name",
+   "Jordan Lee",
+   5
+  ],
+  [
+   "speaker_role",
+   "AR manager",
+   5
+  ],
+  [
+   "change_requested",
+   "yes",
+   7
+  ],
+  [
+   "account_last4",
+   "4444",
+   9
+  ]
+ ],
+ "expect": {
+  "outcome": "not_verified",
+  "rules_fired": [
+   "NV03_digits_match_old_account"
+  ]
+ }
+}

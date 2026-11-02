@@ -14,6 +14,7 @@ from dialback_core.detection import import_all, sync_vendor
 from dialback_core.flags import ResolverMode
 from dialback_core.ports import ChangeFacts, LedgerChangeContext, LedgerResolver
 from dialback_core.ramp import RampError
+from dialback_decision import rules
 from flows import _types, answer, bills, case_of, change_and_detect, one, pay, release, report, transit
 
 pytestmark = pytest.mark.anyio
@@ -37,8 +38,7 @@ async def test_a_bank_change_walks_all_the_way_to_release(world):
     assert (case["state"], case["outcome"]) == ("awaiting_release", "verified")
     decision = await one(world.pool, "select * from app.decisions where case_id = %s", case["id"])
     assert decision["last_four_result"] == "match"
-    assert "U01_speaker_thread_not_checked" not in decision["rules_fired"], "the change context reached the engine (spec 0005)"
-    assert "U03_offered_number_source_not_checked" in decision["rules_fired"], "still unknown: the double doesn't say"
+    assert list(decision["rules_fired"]) == [r.id for r in rules.VERIFIED], "every condition checked (spec 0006)"
 
     ended = await one(world.pool, "select body_jcs from audit.evidence_events where case_id = %s and type = 'call_ended'", case["id"])
     assert '"value":"6666"' not in ended["body_jcs"] and '"digit_count":4' in ended["body_jcs"], "digits are never stored"
@@ -243,7 +243,8 @@ async def test_a_report_without_the_picked_contact_point_is_not_eligible(world, 
     assert (await report(world, case["id"], world.voice.placed[0]["call_id"], contact_point=dialed)).status_code == 204
     await world.worker.drain(world.dataset.id)
     decision = await one(world.pool, "select outcome, rules_fired from app.decisions where case_id = %s", case["id"])
-    assert (decision["outcome"], list(decision["rules_fired"])) == ("needs_review", ["NR99_nothing_decided"])
+    assert (decision["outcome"], list(decision["rules_fired"])) == \
+        ("needs_review", ["NR99_conditions_not_met", "V01_number_eligible_unmet"])
 
 
 async def test_a_dropped_call_that_said_no_still_counts(world, monkeypatch):

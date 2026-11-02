@@ -1,0 +1,44 @@
+{
+ "call": "A fraudster forwarded the vendor's line and answers truthfully; a line-risk signal is present.",
+ "answers": [
+  [
+   "recording_consent",
+   "yes",
+   1
+  ],
+  [
+   "company_named",
+   "Acme Fasteners",
+   3
+  ],
+  [
+   "speaker_name",
+   "Jordan Lee",
+   5
+  ],
+  [
+   "speaker_role",
+   "AR manager",
+   5
+  ],
+  [
+   "change_requested",
+   "yes",
+   7
+  ],
+  [
+   "account_last4",
+   "6666",
+   9
+  ]
+ ],
+ "known": {
+  "line_risk": true
+ },
+ "expect": {
+  "outcome": "needs_review",
+  "rules_fired": [
+   "NR21_line_risk"
+  ]
+ }
+}
