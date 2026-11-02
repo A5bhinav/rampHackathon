@@ -64,7 +64,7 @@ The skeleton verified with three facts unchecked (U01–U03). This engine sends 
 | 3 | `V10_answers_grounded` | Every answer is in the turn it cites, in order. |
 | 3 | `V11_script_clean` | The disclosure came first, no digits were spoken, no new number was accepted, and nothing was violated or tripped. |
 | 3 | `V12_no_flags` | No flags, and no offered number. |
-| 3, strict | `S01_known_contact` | The speaker is a person known from before the request, and line risk is `False`. |
+| 3, strict | `S01_known_contact` | The speaker is a person known from before the request, and no line-risk signal is `True` (an unknown signal doesn't block it, or strict mode could never verify). |
 
 That is 21 Needs review rules, not the design's 16. The four new ones (NR18–NR21) are reasons the design names but doesn't count. `packages/decision/README.md` is updated to match.
 
