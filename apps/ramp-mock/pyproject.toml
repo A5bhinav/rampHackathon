@@ -1,11 +1,22 @@
 [project]
 name = "dialback-ramp-mock"
 version = "0.0.0"
+description = "A Ramp-shaped mock of the Developer API for Dialback's tests, lab and demo."
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+  "fastapi>=0.115",
+  "uvicorn>=0.32",
+  "httpx>=0.28",
+  "psycopg[binary]>=3.2",
+  "psycopg-pool>=3.2",
+  "pydantic>=2.9",
+]
+
+[project.scripts]
+dialback-ramp-mock = "dialback_ramp_mock.main:run"
 
 [dependency-groups]
-dev = ["pytest>=8", "hypothesis>=6"]
+dev = ["pytest>=8", "anyio>=4"]
 
 [build-system]
 requires = ["hatchling"]
@@ -13,3 +24,8 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/dialback_ramp_mock"]
+
+[tool.pytest.ini_options]
+pythonpath = ["../../scripts/db"]
+testpaths = ["tests"]
+addopts = "-p pgtemp"

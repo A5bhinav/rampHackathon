@@ -10,10 +10,13 @@ Same rules as scripts/db/test.sh, so Python and SQL tests run against the same d
 Tests isolate themselves by creating their own dataset (and evidence chain, and mock business),
 exactly as the attack lab does, so nothing is ever truncated or deleted between tests.
 
-Use it from a package's tests by putting this directory on pytest's pythonpath
-(`[tool.pytest.ini_options] pythonpath = ["../../scripts/db"]`) and, in tests/conftest.py:
+Use it from a package's tests by loading it as a pytest plugin:
 
-    from pgtemp import database_url  # noqa: F401  (the session fixture)
+    [tool.pytest.ini_options]
+    pythonpath = ["../../scripts/db"]
+    addopts = "-p pgtemp"
+
+Then any test or fixture can take `database_url`.
 """
 from __future__ import annotations
 
@@ -70,7 +73,7 @@ def temp_postgres(port: int = 54340) -> Iterator[str]:
     try:
         yield f"postgresql://postgres@/postgres?host={tmp}&port={port}"
     finally:
-        subprocess.run([*run_as, str(pg_bin / "pg_ctl"), "-D", str(data), "-m", "fast", "stop"], capture_output=True)
+        subprocess.run([*run_as, str(pg_bin / "pg_ctl"), "-D", str(data), "-m", "fast", "stop"], check=False, capture_output=True)
         shutil.rmtree(tmp, ignore_errors=True)
 
 
@@ -82,7 +85,8 @@ def create_database(admin_url: str) -> str:
 
 def drop_database(admin_url: str, url: str) -> None:
     name = urlsplit(url).path.lstrip("/")
-    subprocess.run(["psql", "-X", "-q", admin_url, "-c", f'drop database if exists "{name}" with (force)'], capture_output=True)
+    subprocess.run(["psql", "-X", "-q", admin_url, "-c", f'drop database if exists "{name}" with (force)'],
+                   check=False, capture_output=True)
 
 
 def migrate(url: str) -> None:

@@ -43,9 +43,9 @@ rolled-back transaction, redraws `docs/state-machine.md`, and checks the contrac
 and the shared hash vectors. The `db` GitHub Actions job runs the same script.
 
 **Python tests that need the database** (apps/core, apps/ramp-mock) use the same setup
-through `scripts/db/pgtemp.py`: a session fixture, `database_url`, that migrates a fresh
-database the same way. Put `scripts/db` on pytest's `pythonpath` and import the fixture in
-`tests/conftest.py`. Tests isolate themselves by creating their own dataset, as the lab does.
+through `scripts/db/pgtemp.py`: a pytest plugin with a session fixture, `database_url`, that
+migrates a fresh database the same way. Put `scripts/db` on pytest's `pythonpath` and add
+`-p pgtemp` to `addopts`. Tests isolate themselves by creating their own dataset, as the lab does.
 
 ## What is in each schema
 
