@@ -35,7 +35,8 @@ def core_settings(**overrides) -> Settings:
     base = {"database_url": "unused-in-tests", "ramp_mode": RampMode.MOCK, "ramp_base_url": "http://ramp-mock",
             "ramp_webhook_secret": WEBHOOK_SECRET, "fingerprint_key": FINGERPRINT_KEY, "mock_ramp_secret": MOCK_SECRET,
             "digits_key": DIGITS_KEY, "internal_api_token": INTERNAL_TOKEN, "run_worker": False,
-            "command_backoff_seconds": 0.0, "calling_window": "00:00-23:59", "calling_days": "all", "jwt_secret": JWT_SECRET}
+            "command_backoff_seconds": 0.0, "calling_window": "00:00-23:59", "calling_days": "all", "jwt_secret": JWT_SECRET,
+            "run_jobs": False}  # scheduled jobs are tested on purpose in test_jobs.py
     return Settings(**(base | overrides))
 
 
@@ -138,7 +139,7 @@ async def make_world(pool, kind: str = "dev", sim_now=None, settings: Settings |
     settings = settings or core_settings()
     mock_app = create_mock_app(MockSettings(database_url="unused", token_secret=MOCK_SECRET, deliver_webhooks=False), pool=pool)
     to_mock = httpx.AsyncClient(transport=httpx.ASGITransport(app=mock_app), base_url="http://ramp-mock")
-    connector = RampConnector(settings, to_mock, limiter=TokenBucket(100_000))
+    connector = RampConnector(settings, to_mock, limiter=TokenBucket(100_000), sleep=_no_sleep)  # no real backoff waits
     core_app = create_app(settings, pool=pool, connector=connector)
     to_core = httpx.AsyncClient(transport=httpx.ASGITransport(app=core_app), base_url="http://core")
     mock_app.state.http = to_core  # the mock's webhooks land on the core's real endpoint

@@ -162,14 +162,16 @@ async def bank_change(settings: Settings, dataset_id, vendor_id: str, account: s
         (await mock.post(f"/_mock/vendors/{vendor_id}/bank-change", json=body)).raise_for_status()
 
 
-def core_settings(url: str, backoff: float = 1.0) -> Settings:
+def core_settings(url: str, backoff: float = 1.0, jobs_every: int = 30) -> Settings:
     s = SECRETS
     return Settings(database_url=url, ramp_mode=RampMode.MOCK, ramp_base_url=MOCK_URL,
                     ramp_webhook_secret=s["RAMP_WEBHOOK_SECRET"].encode(), fingerprint_key=s["FINGERPRINT_KEY"].encode(),
                     mock_ramp_secret=s["MOCK_RAMP_SECRET"].encode(), digits_key=s["DIGITS_KEY"].encode(),
                     internal_api_token=s["INTERNAL_API_TOKEN"].encode(), jwt_secret=s["DIALBACK_JWT_SECRET"].encode(),
                     calling_window="00:00-23:59", calling_days="all",  # the evening demo (spec 0002, Q7)
-                    command_backoff_seconds=backoff, worker_poll_seconds=0.3, run_worker=True)
+                    command_backoff_seconds=backoff, worker_poll_seconds=0.3, run_worker=True,
+                    # The poller and reconciliation (spec 0003), much more often than in production.
+                    poll_interval_seconds=jobs_every, reconcile_interval_seconds=jobs_every)
 
 
 async def wait_for(url: str, seconds: float = 20.0) -> None:
@@ -188,7 +190,7 @@ async def run(url: str, args: argparse.Namespace) -> int:
     mock = await asyncio.create_subprocess_exec(sys.executable, "-m", "dialback_ramp_mock.main", env=env)
     try:
         await wait_for(f"{MOCK_URL}/healthz")
-        settings = core_settings(url, backoff=0.2 if args.smoke else 1.0)
+        settings = core_settings(url, backoff=0.2 if args.smoke else 1.0, jobs_every=2 if args.smoke else 30)
         pool = await open_pool(url, max_size=10)
         voice = ScriptedVoice(pool, refuse={"Brightline Office Supply Inc"}, deny={"Cobalt Freight LLC"})
         app = create_app(settings, pool=pool, resolver=ScriptedLedger(), caller=voice)

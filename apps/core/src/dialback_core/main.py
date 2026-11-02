@@ -4,6 +4,7 @@
     dialback-core new-dataset --kind demo --label "Demo 3"  a new dataset and evidence chain
     dialback-core import-vendors --dataset <id>          initial import (baseline) or a full sweep
     dialback-core retire-dataset --dataset <id>          hide a dataset; nothing is deleted
+    dialback-core run-job --dataset <id> --job reconcile run poll, full_sweep or reconcile now
 """
 from __future__ import annotations
 
@@ -19,8 +20,9 @@ import uvicorn
 
 from .app import create_app
 from .datasets import create_dataset, retire_dataset
-from .db import open_pool
+from .db import open_pool, system_tx
 from .detection import Keys, import_all
+from .jobs import JOBS, Jobs
 from .ramp import RampConnector
 from .settings import Settings
 
@@ -45,6 +47,21 @@ async def _import(settings: Settings, dataset_id: UUID) -> None:
             await pool.close()
 
 
+async def _run_job(settings: Settings, dataset_id: UUID, job: str) -> None:
+    pool = await open_pool(settings.database_url, max_size=3)
+    async with httpx.AsyncClient(timeout=10.0) as http:
+        try:
+            jobs = Jobs(pool, settings, RampConnector(settings, http),
+                        Keys(settings.fingerprint_key, settings.fingerprint_key_version), "cli")
+            effects = await jobs.run(dataset_id, job, force=True)
+            async with system_tx(pool) as conn:
+                row = await (await conn.execute("select last_ok, last_error, last_result from app.job_runs "
+                                                "where dataset_id = %s and job = %s", (dataset_id, job))).fetchone()
+            print(f"{job}: ok={row['last_ok']} effects={effects} result={row['last_result']} error={row['last_error']}")
+        finally:
+            await pool.close()
+
+
 async def _retire(settings: Settings, dataset_id: UUID) -> None:
     pool = await open_pool(settings.database_url, max_size=2)
     try:
@@ -64,6 +81,9 @@ def run() -> None:
     nd.add_argument("--sim-now", help="lab only: start the dataset's simulated clock (ISO 8601)")
     for name in ("import-vendors", "retire-dataset"):
         sub.add_parser(name).add_argument("--dataset", type=UUID, required=True)
+    rj = sub.add_parser("run-job")
+    rj.add_argument("--dataset", type=UUID, required=True)
+    rj.add_argument("--job", choices=JOBS, required=True)
     args = parser.parse_args()
 
     settings = Settings.from_env()
@@ -75,6 +95,8 @@ def run() -> None:
         asyncio.run(_import(settings, args.dataset))
     elif args.cmd == "retire-dataset":
         asyncio.run(_retire(settings, args.dataset))
+    elif args.cmd == "run-job":
+        asyncio.run(_run_job(settings, args.dataset, args.job))
 
 
 if __name__ == "__main__":

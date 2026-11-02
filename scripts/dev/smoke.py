@@ -10,8 +10,10 @@ What it proves, in order:
      Ramp, the saved payment dates come back, and only then does the bill get paid.
   4. The changer cannot release (R5), and a stale version is refused.
   5. When Ramp's hold endpoint is down, a new change ends in needs_review with a
-     "Hold not confirmed" alert (R7).
-  6. The evidence chain is intact.
+     "Hold not confirmed" alert (R7); when Ramp recovers, reconciliation puts the hold on.
+  6. A hold lifted by hand in Ramp is put back by reconciliation, with a critical alert (I2).
+  7. A bank change Ramp never announces is found by the poller (spec 0003).
+  8. The evidence chain is intact.
 """
 from __future__ import annotations
 
@@ -120,10 +122,36 @@ class Smoke:
             alerts = (await approver.get(f"/api/datasets/{self.dataset_id}/alerts")).json()["alerts"]
             self.check(any(a["kind"] == "hold_not_confirmed" and a["severity"] == "critical" for a in alerts),
                        "R7: a critical 'Hold not confirmed' alert is raised")
-            chain = (await approver.get(f"/api/datasets/{self.dataset_id}/chain")).json()
-            self.check(chain["ok"], f"the evidence chain is intact ({chain['checked']} events)")
         async with self.mock() as m:
             await m.patch("/_mock/settings", json={"fail_holds": False})
+
+        async def held(ref: str) -> bool:
+            async with self.mock() as m:
+                return (await m.get(f"/developer/v1/vendors/{self.refs[ref]}")).json()["hold"] is not None
+        await self.until("when Ramp recovers, reconciliation puts the missing hold on", lambda: held("acme"))
+
+        async with self.mock() as m:
+            await m.post(f"/developer/v1/vendors/{self.refs['brightline']}/release")
+        await self.until("a hold lifted by hand in Ramp is put back by reconciliation", lambda: held("brightline"))
+        async with self.core() as approver:
+            alerts = (await approver.get(f"/api/datasets/{self.dataset_id}/alerts")).json()["alerts"]
+            self.check(any(a["kind"] == "vendor_not_held" and a["case_id"] == c[bright]["id"] for a in alerts),
+                       "I2: the missing hold raised a critical 'vendor not held' alert")
+
+        async with self.mock() as m:
+            await m.patch("/_mock/settings", json={"silent_changes": True})
+            await m.post(f"/_mock/vendors/{self.refs['cobalt']}/bank-change",
+                         json={"routing_number": "026009593", "account_number": "000012340011"})
+
+        async def found_by_poller() -> bool:
+            return (await self.cases()).get(cobalt, {}).get("version") == 2
+        await self.until("a bank change Ramp never announced is found by the poller", found_by_poller)
+        async with self.mock() as m:
+            await m.patch("/_mock/settings", json={"silent_changes": False})
+
+        async with self.core() as approver:
+            chain = (await approver.get(f"/api/datasets/{self.dataset_id}/chain")).json()
+            self.check(chain["ok"], f"the evidence chain is intact ({chain['checked']} events)")
 
         failed = [what for ok, what in self.results if not ok]
         print(f"\n{len(self.results) - len(failed)} of {len(self.results)} checks passed.")
