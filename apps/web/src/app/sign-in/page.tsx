@@ -2,12 +2,13 @@ import { authMode } from "@/lib/auth-mode";
 import { devUsers } from "@/lib/dev-auth";
 import { signIn, signInAsDevUser } from "./actions";
 
-type Notice = { expired?: string; failed?: string; slow?: string };
+type Notice = { expired?: string; failed?: string; slow?: string; unavailable?: string };
 
 const NOTICES: [keyof Notice, string][] = [
   ["expired", "Your session ended. Sign in again."],
   ["failed", "That email and password don't match a Dialback account."],
   ["slow", "Too many sign-in attempts. Wait a few minutes, then try again."],
+  ["unavailable", "Sign-in isn't available right now. Try again in a minute."],
 ];
 
 export default async function SignIn({ searchParams }: { searchParams: Promise<Notice> }) {

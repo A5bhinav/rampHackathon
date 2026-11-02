@@ -40,7 +40,11 @@ page lands.
       account to can sign in, Ramp's judges included.
     - A wrong password and an unknown email get the same answer.
     - `@supabase/ssr` keeps the session in httpOnly cookies, and `src/proxy.ts` refreshes it on
-      every request. A sign-in lasts 12 hours; then the person signs in again.
+      every request. A sign-in lasts 12 hours, timed from the signed token's own sign-in time;
+      after that `src/proxy.ts` ends the session and the person signs in again.
+    - Sign-out ends only this browser's session, since the judges share accounts.
+    - Each client gets 10 sign-in tries per 5 minutes. Every sign-in reaches Supabase from our
+      server, so this keeps one client from using up the rate limit everyone shares.
     - The server forwards the access token to the core, which verifies it against the project's
       signing keys. The dashboard never decides who someone is.
   - **Dev:** `DIALBACK_AUTH_MODE=dev`, local only and refused when `VERCEL_ENV=production`,
@@ -90,8 +94,15 @@ cd apps/web && CORE_URL=http://127.0.0.1:8001 DIALBACK_AUTH_MODE=dev DIALBACK_JW
    ```
 
 5. **Judges:** one approver account and one clerk account for Ramp's judges, so they can see the
-   person who entered a change being refused the release. Send the passwords privately, never
-   in the repo or the video, and delete the accounts after Nov 19.
+   person who entered a change being refused the release.
+   - Give the clerk account `--ramp-user-id` set to the Ramp user who makes the demo's bank
+     changes. Without it, every change has an unknown author and needs two approvers (ADR-10),
+     which one shared approver account can't provide.
+   - Send the passwords privately, never in the repo or the video, and delete the accounts
+     after Nov 19.
+6. **Vercel firewall:** add a rate-limit rule for POST requests to `/sign-in`, for example 20 a
+   minute per IP. Our in-app throttle counts per server instance, and this rule covers them
+   all.
 
 To try the whole flow locally without a project, run the stand-in for Supabase Auth with the
 stack:

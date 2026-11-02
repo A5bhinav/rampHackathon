@@ -41,13 +41,14 @@ export async function setSession(token: string, maxAgeSeconds: number): Promise<
   });
 }
 
-/** Ends whichever session exists: Supabase's (revoking its refresh tokens) and the dev cookie.
- *  The browser's session ends even if Supabase can't be reached: its cookies are always deleted. */
+/** Ends whichever session exists: this browser's Supabase session (only this one: the judges
+ *  share accounts) and the dev cookie. The browser's session ends even if Supabase can't be
+ *  reached: its cookies are always deleted. */
 export async function clearSession(): Promise<void> {
   const store = await cookies();
   if (authMode(process.env) === "supabase") {
     try {
-      const { error } = await (await supabaseServer()).auth.signOut();
+      const { error } = await (await supabaseServer()).auth.signOut({ scope: "local" });
       if (error) console.warn(`sign-out did not reach Supabase: ${error.status ?? "?"} ${error.code ?? error.name}`);
     } catch (e) {
       console.warn(`sign-out did not reach Supabase: ${(e as Error).name}`);
