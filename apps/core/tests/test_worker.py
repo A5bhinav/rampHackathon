@@ -354,8 +354,10 @@ def test_every_company_answer_must_match_and_an_unreadable_one_is_unknown():
 @pytest.mark.parametrize("telephony, expected", [
     ({"direction": "outbound", "dialed_number_is_pick": True, "answered_by": "human"}, (True, True, "human")),
     ({"direction": "inbound", "dialed_number_is_pick": False, "answered_by": "machine"}, (False, False, "machine")),
+    ({"direction": "outbound", "dialed_number_is_pick": False}, (True, False, None)),
+    ({"direction": "inbound", "dialed_number_is_pick": True, "answered_by": "human"}, (False, True, "human")),
     ({}, (None, None, None)),
-], ids=["placed", "suspect", "older-report"])
+], ids=["placed", "suspect", "wrong-number", "inbound", "older-report"])
 async def test_the_voice_reports_telephony_facts(world, monkeypatch, telephony, expected):
     """Spec 0005, D6: the call's direction, the adapter's dialed-number check and who answered
     come from the voice report (contract: A5bhinav/rampHackathon#13). Missing means unknown."""
@@ -378,3 +380,15 @@ async def test_the_voice_reports_telephony_facts(world, monkeypatch, telephony, 
     schema = json.loads((CONTRACTS / "schemas" / "evidence-event.schema.json").read_text())
     body = {k: v for k, v in stored["body"].items() if k != "answers"}  # answers are Sami's schema, not on main yet
     assert not list(Draft202012Validator({"$defs": schema["$defs"], **schema["$defs"]["CallEndedBody"]}).iter_errors(body))
+
+
+@pytest.mark.parametrize("telephony", [{"dialed_number_is_pick": "yes"}, {"dialed_number_is_pick": 1},
+                                       {"direction": "sideways"}, {"answered_by": "fax"}],
+                         ids=["pick-yes", "pick-1", "direction", "answered-by"])
+async def test_a_telephony_fact_that_isnt_in_the_contract_is_refused(world, telephony):
+    await import_all(world.pool, world.ramp, world.keys, world.dataset.id)
+    await change_and_detect(world)
+    case = await case_of(world)
+    r = await report(world, case["id"], world.voice.placed[0]["call_id"], telephony=telephony)
+    assert r.status_code == 422 and "6666" not in r.text, "refused, and the body is never echoed"
+    assert (await case_of(world))["state"] == "calling", "nothing was recorded"
