@@ -104,6 +104,14 @@ async def test_fail_next_hold_fires_once_and_stays_spent(api):
     assert (await api.post(f"{API}/vendors/{refs['acme']}/hold", headers=auth(ds))).status_code == 200
 
 
+async def test_fail_holds_stays_on_until_turned_off(api):
+    ds, refs = await seeded(api, settings={"fail_holds": True})
+    url = f"{API}/vendors/{refs['acme']}/hold"
+    assert [(await api.post(url, headers=auth(ds))).status_code for _ in range(3)] == [500, 500, 500]
+    await api.patch("/_mock/settings", headers=auth(ds), json={"fail_holds": False})
+    assert (await api.post(url, headers=auth(ds))).status_code == 200
+
+
 async def test_rate_limit_answers_429_with_retry_after(api):
     ds, _ = await seeded(api, settings={"rate_limit_per_10s": 3})
     codes = [(await api.get(f"{API}/vendors", headers=auth(ds))).status_code for _ in range(4)]
