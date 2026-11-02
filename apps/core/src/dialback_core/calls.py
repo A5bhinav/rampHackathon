@@ -80,6 +80,10 @@ class CallEndedRequest(Strict):
     answers: TransitAnswers | None = None
     contact_point_id: UUID | None = None
     checks: Checks | None = None
+    # Twilio's facts about the call (CallEndedBody; spec 0005, D6). Absent means unknown.
+    direction: Literal["outbound", "inbound"] | None = None
+    dialed_number_is_pick: bool | None = None
+    answered_by: Literal["human", "machine"] | None = None
 
 
 def _error(status: int, code: str, message: str) -> JSONResponse:

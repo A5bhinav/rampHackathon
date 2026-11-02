@@ -36,9 +36,15 @@ def transit(call_id, digits="6666", company="Acme Fasteners", change="yes"):
 
 
 async def report(world, case_id, call_id, attempt=1, result="answers_recorded", answers=None, token=INTERNAL_TOKEN, key=True,
-                 contact_point=CONTACT_POINT, retry_at=None):
+                 contact_point=CONTACT_POINT, retry_at=None, telephony=None):
+    """`telephony` overrides the voice service's Twilio facts; {} sends none (an older report)."""
     body = {"call_id": str(call_id), "case_id": str(case_id), "result": result, "attempt": attempt,
             "agent_version": "agent-test", "checks": CLEAN_CHECKS}
+    if telephony is None:
+        telephony = {"direction": "outbound", "dialed_number_is_pick": True}
+        if result == "answers_recorded":
+            telephony["answered_by"] = "human"
+    body |= telephony
     if result == "answers_recorded" or answers is not None:
         body["answers"] = answers or transit(call_id)
     if contact_point is not None:

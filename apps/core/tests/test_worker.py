@@ -8,6 +8,7 @@ import uuid
 
 import pytest
 from conftest import core_settings, make_world
+from contract import CONTRACTS
 from dialback_core.db import system_tx
 from dialback_core.detection import import_all, sync_vendor
 from dialback_core.flags import ResolverMode
@@ -347,3 +348,32 @@ def test_every_company_answer_must_match_and_an_unreadable_one_is_unknown():
     assert every_name_matches(["Acme Fasteners", "Globex"], "Acme Fasteners LLC") is False
     assert every_name_matches(["Acme Fasteners", "LLC"], "Acme Fasteners LLC") is None, "'LLC' alone names nobody"
     assert every_name_matches([], "Acme Fasteners LLC") is None
+
+
+@pytest.mark.parametrize("telephony, expected", [
+    ({"direction": "outbound", "dialed_number_is_pick": True, "answered_by": "human"}, (True, True, "human")),
+    ({"direction": "inbound", "dialed_number_is_pick": False, "answered_by": "machine"}, (False, False, "machine")),
+    ({}, (None, None, None)),
+], ids=["placed", "suspect", "older-report"])
+async def test_the_voice_reports_telephony_facts(world, monkeypatch, telephony, expected):
+    """Spec 0005, D6: the call's direction, the adapter's dialed-number check and who answered
+    come from the voice report (contract: A5bhinav/rampHackathon#13). Missing means unknown."""
+    import json
+
+    import dialback_core.worker as worker_module
+    from jsonschema import Draft202012Validator
+    seen, real = [], worker_module.decide
+    monkeypatch.setattr(worker_module, "decide", lambda facts: seen.append(facts) or real(facts))
+    await import_all(world.pool, world.ramp, world.keys, world.dataset.id)
+    await change_and_detect(world)
+    case = await case_of(world)
+    assert (await report(world, case["id"], world.voice.placed[0]["call_id"], telephony=telephony)).status_code == 204
+    await world.worker.drain(world.dataset.id)
+    [facts] = seen
+    assert (facts.dialed_out, facts.dialed_number_is_pick, facts.answered_by) == expected
+
+    stored = await one(world.pool, "select body_jcs::jsonb -> 'body' as body from audit.evidence_events "
+                                   "where case_id = %s and type = 'call_ended'", case["id"])
+    schema = json.loads((CONTRACTS / "schemas" / "evidence-event.schema.json").read_text())
+    body = {k: v for k, v in stored["body"].items() if k != "answers"}  # answers are Sami's schema, not on main yet
+    assert not list(Draft202012Validator({"$defs": schema["$defs"], **schema["$defs"]["CallEndedBody"]}).iter_errors(body))
