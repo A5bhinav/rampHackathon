@@ -60,9 +60,10 @@ class Decision:
     def body(self) -> dict:
         """The decision_made event body (evidence-event.schema.json, DecisionMadeBody)."""
         body = {"outcome": self.outcome, "rules_fired": list(self.rules_fired), "engine_version": self.engine_version,
-                "inputs_hash": self.inputs_hash, "strict_mode": self.strict is True,
-                "source": self.source if self.source in rules.SOURCES else "call"}
-        if self.last_four_result in LAST_FOUR_RESULTS:
+                "inputs_hash": self.inputs_hash, "strict_mode": self.strict is True}
+        if isinstance(self.source, str) and self.source in rules.SOURCES:
+            body["source"] = self.source              # an invalid source is left out, never guessed
+        if isinstance(self.last_four_result, str) and self.last_four_result in LAST_FOUR_RESULTS:
             body["last_four_result"] = self.last_four_result
         return body
 
@@ -72,9 +73,21 @@ def inputs_hash(facts: CaseFacts, strict: bool = False, source: str = "call") ->
     return hashlib.sha256(rfc8785.dumps({"facts": facts.to_json(), "strict": strict, "source": source})).hexdigest()
 
 
+def _hash_or_zeros(facts: object, strict: object, source: object) -> str:
+    try:
+        return inputs_hash(facts, strict, source)  # type: ignore[arg-type]
+    except Exception:  # noqa: BLE001  (invalid input may not even hash)
+        return "0" * 64
+
+
 def _decide(f: CaseFacts, mode: rules.Mode) -> tuple[str, tuple[str, ...]]:
-    if not rules.valid(f, mode):
-        return "needs_review", (rules.INVALID,)
+    """Run the table on facts that already passed validation."""
+    # An earlier call that had consent and said "no" (or gave wrong digits) decides first: this
+    # call's own problems (a machine, a refused consent) can't hide it (spec 0005, D2).
+    denied = tuple(r.id for r in rules.NOT_VERIFIED
+                   if r.earlier and any(r.earlier(c) for c in f.earlier_calls if rules.consented(c)))
+    if denied:
+        return "not_verified", denied
     for outcome, block in (("needs_review", rules.BLOCK0), ("not_verified", rules.NOT_VERIFIED),
                            ("needs_review", rules.NEEDS_REVIEW)):
         fired = tuple(r.id for r in block if r.test(f, mode))
@@ -88,15 +101,18 @@ def _decide(f: CaseFacts, mode: rules.Mode) -> tuple[str, tuple[str, ...]]:
 
 
 def decide(facts: CaseFacts, *, strict: bool = False, source: str = "call") -> Decision:
-    """Pure and total: invalid facts are NR97 and any engine error is NR98 (R7)."""
+    """Pure and total: invalid facts are NR97, and any error (hashing included) is NR98 (R6, R7)."""
+    digest, outcome, fired = "0" * 64, "needs_review", (rules.ENGINE_ERROR,)
     try:
-        digest = inputs_hash(facts, strict, source)
-    except Exception:  # noqa: BLE001  (unhashable input must still produce a decision)
-        digest = "0" * 64
-    try:
-        outcome, fired = _decide(facts, rules.Mode(strict=strict, source=source))
+        mode = rules.Mode(strict=strict, source=source)
+        if not rules.valid(facts, mode):
+            fired = (rules.INVALID,)
+            digest = _hash_or_zeros(facts, strict, source)
+        else:
+            digest = inputs_hash(facts, strict, source)  # no decision without the hash of what it read
+            outcome, fired = _decide(facts, mode)
     except Exception:  # noqa: BLE001  (fail closed on any engine error)
         outcome, fired = "needs_review", (rules.ENGINE_ERROR,)
     last_four = getattr(facts, "last_four_result", None)
-    return Decision(outcome, fired, ENGINE_VERSION, digest, last_four if last_four in LAST_FOUR_RESULTS else None,
-                    strict, source)
+    return Decision(outcome, fired, ENGINE_VERSION, digest,
+                    last_four if isinstance(last_four, str) and last_four in LAST_FOUR_RESULTS else None, strict, source)

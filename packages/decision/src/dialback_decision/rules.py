@@ -1,6 +1,8 @@
 """The rule table (spec 0006). Blocks run in order and the first block with a match decides;
 every matching rule in that block is listed:
 
+  earlier denials         -> not_verified   (an earlier call that had consent said "no" or gave
+                                              wrong digits; this call's problems can't hide it)
   block 0, input problems  -> needs_review   (before Not verified: answers after a refused or
                                               missing consent aren't evidence)
   block 1, Not verified    -> not_verified   (the hold stays and the controller is alerted)
@@ -43,6 +45,7 @@ class Rule:
     template: str                                # the sentence when it fires (or, for a condition, holds)
     test: Callable[[CaseFacts, Mode], bool]
     unmet: str | None = None                     # a Verified condition's sentence when it doesn't hold
+    earlier: Callable[[EarlierCall], bool] | None = None  # Not verified: the same evidence on an earlier call
 
     @property
     def unmet_id(self) -> str:
@@ -50,6 +53,14 @@ class Rule:
 
 
 # Validation (NR97) ----------------------------------------------------------------------------
+
+def _member(value: object, allowed: frozenset[str] | tuple[str, ...]) -> bool:
+    return isinstance(value, str) and value in allowed
+
+
+def _optional(value: object, allowed: frozenset[str] | tuple[str, ...]) -> bool:
+    return value is None or _member(value, allowed)
+
 
 def _strings(values: object, allowed: frozenset[str] | None = None) -> bool:
     return isinstance(values, tuple) and all(isinstance(v, str) and (allowed is None or v in allowed) for v in values)
@@ -62,28 +73,29 @@ def _count(value: object) -> bool:
 def _checks_ok(c: object) -> bool:
     if c is None:
         return True
-    return isinstance(c, CallChecks) and all(isinstance(getattr(c, n), bool) for n in (
+    return type(c) is CallChecks and all(isinstance(getattr(c, n), bool) for n in (
         "disclosure_first", "answers_grounded", "agent_spoke_account_digits", "new_number_accepted")) \
         and _count(c.policy_violations) and _count(c.speech_guard_trips)
 
 
 def _earlier_ok(call: object) -> bool:
-    return isinstance(call, EarlierCall) and call.result in CALL_RESULTS and _strings(call.recording_consent, CONSENT) \
-        and _strings(call.change_requested, CHANGE) and call.last_four_result in (None, *LAST_FOUR_RESULTS) \
+    return type(call) is EarlierCall and _member(call.result, CALL_RESULTS) and _strings(call.recording_consent, CONSENT) \
+        and _strings(call.change_requested, CHANGE) and _optional(call.last_four_result, LAST_FOUR_RESULTS) \
         and _strings(call.flags, FLAGS)
 
 
 def valid(f: object, mode: Mode) -> bool:
-    """Every fact has its type and an allowed value. Anything else is NR97, never a guess."""
-    if not isinstance(f, CaseFacts) or not isinstance(mode.strict, bool) or mode.source not in SOURCES:
+    """Every fact has its exact type and an allowed value. Anything else is NR97, never a guess."""
+    if type(f) is not CaseFacts or not isinstance(mode.strict, bool) or not _member(mode.source, SOURCES):
         return False
-    return (f.call_result in CALL_RESULTS and isinstance(f.dialed_eligible_number, bool)
+    return (_member(f.call_result, CALL_RESULTS) and isinstance(f.dialed_eligible_number, bool)
             and _strings(f.recording_consent, CONSENT) and _strings(f.company_named)
             and _strings(f.change_requested, CHANGE) and isinstance(f.speaker_named, bool) and _strings(f.speaker_role)
             and _strings(f.flags, FLAGS) and isinstance(f.offered_number, bool)
-            and f.last_four_result in (None, *LAST_FOUR_RESULTS) and f.answered_by in (None, *ANSWERED_BY)
+            and _optional(f.last_four_result, LAST_FOUR_RESULTS) and _optional(f.answered_by, ANSWERED_BY)
             and all(getattr(f, n) is None or isinstance(getattr(f, n), bool) for n in TRI_STATE)
-            and _checks_ok(f.checks) and isinstance(f.earlier_calls, tuple) and all(map(_earlier_ok, f.earlier_calls)))
+            and _checks_ok(f.checks) and isinstance(f.earlier_calls, tuple) and all(map(_earlier_ok, f.earlier_calls))
+            and isinstance(f.extra, dict))
 
 
 # Helpers the rules read ------------------------------------------------------------------------
@@ -91,6 +103,15 @@ def valid(f: object, mode: Mode) -> bool:
 def _earlier(f: CaseFacts, predicate: Callable[[EarlierCall], bool]) -> bool:
     """An earlier call of this generation counts against the change, never for it."""
     return any(predicate(c) for c in f.earlier_calls)
+
+
+def consented(c: EarlierCall) -> bool:
+    """An earlier call's answers are evidence only if that call had consent."""
+    return "yes" in c.recording_consent and "no" not in c.recording_consent
+
+
+def _denied(c: EarlierCall) -> bool:
+    return "no" in c.change_requested or c.last_four_result in ("mismatch", "matches_old_account")
 
 
 def _only(values: tuple[str, ...], value: str) -> bool:
@@ -102,12 +123,16 @@ def _conflicting(values: tuple[str, ...]) -> bool:
 
 
 def _earlier_concern(c: EarlierCall) -> bool:
+    """Anything an earlier call raised short of a consented denial (which is Not verified)."""
     return bool(c.flags) or "unsure" in c.change_requested or _conflicting(c.change_requested) \
-        or c.last_four_result in ("near_miss", "ambiguous", "inconsistent") or "no" in c.recording_consent
+        or c.last_four_result in ("near_miss", "ambiguous", "inconsistent") or "no" in c.recording_consent \
+        or (_denied(c) and not consented(c))
 
 
 def _clean_script(c: CallChecks | None) -> bool:
-    return c is not None and c.script_clean and c.speech_guard_trips == 0
+    """Computed from the fields, so nothing can override it."""
+    return c is not None and c.disclosure_first is True and c.agent_spoke_account_digits is False \
+        and c.new_number_accepted is False and c.policy_violations == 0 and c.speech_guard_trips == 0
 
 
 # Block 0: input problems ------------------------------------------------------------------------
@@ -119,7 +144,7 @@ NOT_MET = "NR99_conditions_not_met"
 BLOCK0: tuple[Rule, ...] = (
     Rule("NR01_no_live_person", "No person answered the questions on this call.",
          lambda f, m: f.call_result != "answers_recorded" or f.answered_by == "machine"),
-    Rule("NR02_no_recording_consent", "Recording consent was refused, contradicted, or not asked for first.",
+    Rule("NR02_no_recording_consent", "Recording consent was refused, contradicted, or not the first thing the person answered.",
          lambda f, m: "no" in f.recording_consent or f.consent_first is False),
 )
 
@@ -127,12 +152,12 @@ BLOCK0: tuple[Rule, ...] = (
 
 NOT_VERIFIED: tuple[Rule, ...] = (
     Rule("NV01_vendor_denied_change", "The person said the vendor did not ask to change its bank details.",
-         lambda f, m: "no" in f.change_requested or _earlier(f, lambda c: "no" in c.change_requested)),
+         lambda f, m: "no" in f.change_requested, earlier=lambda c: "no" in c.change_requested),
     Rule("NV02_digits_mismatch", "The digits the person gave do not match the new account.",
-         lambda f, m: f.last_four_result == "mismatch" or _earlier(f, lambda c: c.last_four_result == "mismatch")),
+         lambda f, m: f.last_four_result == "mismatch", earlier=lambda c: c.last_four_result == "mismatch"),
     Rule("NV03_digits_match_old_account", "The digits the person gave match the old account, not the new one.",
-         lambda f, m: f.last_four_result == "matches_old_account"
-         or _earlier(f, lambda c: c.last_four_result == "matches_old_account")),
+         lambda f, m: f.last_four_result == "matches_old_account",
+         earlier=lambda c: c.last_four_result == "matches_old_account"),
     Rule("NV04_offered_number_from_request", "The person offered a phone number that first appeared in the change request.",
          lambda f, m: f.offered_number_from_request is True),
 )
@@ -158,16 +183,16 @@ NEEDS_REVIEW: tuple[Rule, ...] = (
     Rule("NR12_asked_what_is_checked", "The person asked what is being checked.",
          lambda f, m: "asked_what_is_checked" in f.flags),
     Rule("NR13_another_number", "The person asked us to call a different number.",
-         lambda f, m: f.offered_number or "asked_to_call_another_number" in f.flags),
+         lambda f, m: f.offered_number is True or "asked_to_call_another_number" in f.flags),
     Rule("NR14_answer_not_in_transcript", "An answer is not supported by the transcript turn it cites, or came out of order.",
-         lambda f, m: (f.checks is not None and not f.checks.answers_grounded) or f.answers_in_order is False),
+         lambda f, m: (f.checks is not None and f.checks.answers_grounded is False) or f.answers_in_order is False),
     Rule("NR15_script_violation", "The call broke the script, or the speech guard had to stop the agent.",
          lambda f, m: f.checks is not None and not _clean_script(f.checks)),
     Rule("NR16_other_flag", "The call was flagged for a person to look at.", lambda f, m: "other" in f.flags),
-    Rule("NR17_split_speakers", "More than one person spoke for the vendor on this call.",
+    Rule("NR17_split_speakers", "Two different names were given for the person speaking for the vendor.",
          lambda f, m: f.same_person_yes_and_digits is False or "speaker_changed" in f.flags),
-    Rule("NR18_contradictory_answers", "The person gave conflicting answers.",
-         lambda f, m: any(_conflicting(v) for v in (f.change_requested, f.company_named, f.speaker_role))),
+    Rule("NR18_contradictory_answers", "The person gave conflicting answers about the change or their role.",
+         lambda f, m: _conflicting(f.change_requested) or _conflicting(f.speaker_role)),  # companies: NR03
     Rule("NR19_earlier_call_concern", "An earlier call about this change raised a concern.",
          lambda f, m: _earlier(f, _earlier_concern)),
     Rule("NR20_manual_answers", "These answers were entered by hand, so a person must review them before release.",
@@ -184,7 +209,7 @@ VERIFIED: tuple[Rule, ...] = (
     Rule("V02_outbound_dial", "We placed the call, outbound, to the number we chose.",
          lambda f, m: f.dialed_out is True and f.dialed_number_is_pick is True,
          "We could not confirm the call was outbound to the number we chose."),
-    Rule("V03_live_person", "A person, not a machine, answered and answered the questions.",
+    Rule("V03_live_person", "A person, not a machine, answered and gave the answers.",
          lambda f, m: f.call_result == "answers_recorded" and f.answered_by == "human",
          "We could not confirm a person, not a machine, answered."),
     Rule("V04_recording_consent", "The person agreed to the recorded call before anything else.",
@@ -204,11 +229,11 @@ VERIFIED: tuple[Rule, ...] = (
          lambda f, m: f.same_person_yes_and_digits is True,
          "We could not confirm that one person gave both the confirmation and the digits."),
     Rule("V10_answers_grounded", "Every answer appears in the transcript turn it cites, in order.",
-         lambda f, m: f.checks is not None and f.checks.answers_grounded and f.answers_in_order is True,
+         lambda f, m: f.checks is not None and f.checks.answers_grounded is True and f.answers_in_order is True,
          "We could not confirm every answer is in the transcript, in order."),
     Rule("V11_script_clean", "The disclosure came first and the script was followed.", lambda f, m: _clean_script(f.checks),
          "We could not confirm the script was followed."),
-    Rule("V12_no_flags", "Nothing on the call was flagged.", lambda f, m: not f.flags and not f.offered_number,
+    Rule("V12_no_flags", "Nothing on the call was flagged.", lambda f, m: f.flags == () and f.offered_number is False,
          "Something on the call was flagged."),
 )
 

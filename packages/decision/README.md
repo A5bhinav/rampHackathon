@@ -31,6 +31,8 @@ and a salted hash, never the digits.
 
 ### Rules: blocks evaluated in order, first match decides (spec 0006)
 
+First, **an earlier call that had consent and said "no" or gave wrong digits** decides Not verified; this call's own problems can't hide it.
+
 0. **Input problems (Needs review):** facts that fail validation (NR97), no live person (NR01), or consent refused, contradicted or not first (NR02). These come before Not verified, because answers after a refused consent aren't evidence.
 1. **Not verified (4 rules):** the vendor says they asked for no change; the digits don't match; the digits match the old account (all three on this call or an earlier one); the callee offers a number from the request. The hold stays and the controller is alerted.
 2. **Needs review (21 rules, NR01–NR21, counting the two in block 0):** the skeleton's 17 (the design's 16 plus split speakers) and four reasons the design names without counting: contradictory answers, an earlier call's concern, manual answers and line risk (NR18–NR21). Examples: the wrong company; a speaker from the change thread; near-miss or missing digits; pressure; an opt-out; an answer the transcript doesn't support.
@@ -38,7 +40,7 @@ and a salted hash, never the digits.
 4. **Anything else is Needs review**, naming each unmet condition (`NR99_conditions_not_met` plus `<id>_unmet`); any error is `NR98_engine_error` (R7).
 
 The rules are a versioned table in code (`rules.py`; `engine_version` bumps with any
-change), and each one has a test, plus 21 worked examples (`tests/examples/`). **Strict mode**
+change), and each one has a test, plus 23 worked examples (`tests/examples/`). **Strict mode**
 adds `S01_known_contact` (a person known from before the request), so the scorecard can show
 what it costs in extra reviews.
 

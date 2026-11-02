@@ -392,3 +392,19 @@ async def test_a_telephony_fact_that_isnt_in_the_contract_is_refused(world, tele
     r = await report(world, case["id"], world.voice.placed[0]["call_id"], telephony=telephony)
     assert r.status_code == 422 and "6666" not in r.text, "refused, and the body is never echoed"
     assert (await case_of(world))["state"] == "calling", "nothing was recorded"
+
+
+@pytest.mark.parametrize("slot, value", [("recording_consent", "No"), ("change_requested", "maybe"), ("flag", "approve_now")],
+                         ids=["consent", "change", "flag"])
+async def test_an_answer_value_outside_the_contract_is_refused_on_arrival(world, slot, value):
+    """A value the engine would reject (NR97) is refused when the report arrives, so it can't sit in
+    the evidence and poison later decisions through earlier_calls."""
+    await import_all(world.pool, world.ramp, world.keys, world.dataset.id)
+    await change_and_detect(world)
+    case = await case_of(world)
+    call_id = world.voice.placed[0]["call_id"]
+    answers = transit(call_id)
+    answers["answers"].append(answer(slot, value, 11))
+    r = await report(world, case["id"], call_id, answers=answers)
+    assert r.status_code == 422 and "6666" not in r.text
+    assert (await case_of(world))["state"] == "calling"

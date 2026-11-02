@@ -11,7 +11,8 @@ The skeleton verified with three facts unchecked (U01–U03). This engine sends 
 ## Decisions
 
 1. **Blocks run in order, and the first block with a match decides.** Every matching rule in that block is listed.
-   - **Block 0, input problems (Needs review):** checked before Not verified, because answers given after a refused or missing consent aren't evidence.
+   - **First, earlier denials (Not verified):** an earlier call of this change that had consent said "no" or gave wrong digits. This call's own problems (a machine, a refused consent) can't hide it. An earlier call without consent isn't evidence; it is a concern (NR19).
+   - **Block 0, input problems (Needs review):** checked before this call's Not verified rules, because answers given after a refused or missing consent aren't evidence.
    - **Block 1:** Not verified.
    - **Block 2:** Needs review.
    - **Block 3:** Verified, where every condition is required.
@@ -34,9 +35,9 @@ The skeleton verified with three facts unchecked (U01–U03). This engine sends 
 | 0 | `NR97_facts_invalid` | A fact has the wrong type, or an enum value outside its set. |
 | 0 | `NR01_no_live_person` | The result isn't `answers_recorded`, or a machine answered. |
 | 0 | `NR02_no_recording_consent` | Consent is `no`, contradicted, or not the first answer. |
-| 1 | `NV01_vendor_denied_change` | Any `no` to "did you ask for this change", on this call or an earlier one. |
-| 1 | `NV02_digits_mismatch` | The digits are a `mismatch`, on this call or an earlier one. |
-| 1 | `NV03_digits_match_old_account` | The digits are `matches_old_account`, on this call or an earlier one. |
+| 1 | `NV01_vendor_denied_change` | Any `no` to "did you ask for this change", on this call or an earlier call that had consent. |
+| 1 | `NV02_digits_mismatch` | The digits are a `mismatch`, on this call or an earlier call that had consent. |
+| 1 | `NV03_digits_match_old_account` | The digits are `matches_old_account`, on this call or an earlier call that had consent. |
 | 1 | `NV04_offered_number_from_request` | The person offered a number first seen in the change request. |
 | 2 | `NR03_wrong_company` | Any recorded company doesn't match the vendor. |
 | 2 | `NR04_speaker_from_change_thread` | The speaker first appeared in the change thread. |
@@ -48,8 +49,8 @@ The skeleton verified with three facts unchecked (U01–U03). This engine sends 
 | 2 | `NR15_script_violation` | The script wasn't clean, or the speech guard tripped. |
 | 2 | `NR16_other_flag` | The `other` flag. |
 | 2 | `NR17_split_speakers` | Two or more names were given, or the `speaker_changed` flag. |
-| 2 | `NR18_contradictory_answers` | A slot other than consent or digits has conflicting values. |
-| 2 | `NR19_earlier_call_concern` | An earlier call raised a flag, an `unsure`, a near-miss, ambiguous or inconsistent digits, or a consent `no`. |
+| 2 | `NR18_contradictory_answers` | The change or role answers conflict. Conflicting company names are NR03, since every one must match. |
+| 2 | `NR19_earlier_call_concern` | An earlier call raised a flag, an `unsure`, a near-miss, ambiguous or inconsistent digits, or a consent `no`, or denied the change without having consent. |
 | 2 | `NR20_manual_answers` | `source="manual"`. |
 | 2 | `NR21_line_risk` | A line-risk signal (call forwarding, a SIM swap) is `True`. |
 | 3 | `V01_number_eligible` | We dialed the ledger's pick for this version. |
@@ -88,6 +89,7 @@ Each is a JSON fixture in `packages/decision/tests/examples/`, and the attack la
 | 5 | The report has no `contact_point_id`. | needs_review, NR99 + V01_number_eligible_unmet |
 | 6 | The reported contact point isn't the pick. | needs_review, NR99 + V01_number_eligible_unmet |
 | 7 | Call 1 says "no" and drops; call 2 says yes, 6666. | not_verified, NV01 |
+| 7b | Call 1 had consent, said "no" and dropped; the redial reaches a machine. | not_verified, NV01 (beats NR01) |
 | 8 | Call 1 gets consent and a name, then drops; call 2 is complete and clean. | verified (only call 2's answers count) |
 | 9 | Consent "no", then "we made no change". | needs_review, NR02 (beats NV01) |
 | 10 | A voicemail greeting supplies the name before consent. | needs_review, NR02 |
@@ -97,13 +99,14 @@ Each is a JSON fixture in `packages/decision/tests/examples/`, and the attack la
 | 14 | "Yes", then later "no, that wasn't us". | not_verified, NV01 |
 | 15 | Spoken 6666, then keypad 6656 → NR08. Only "66" → NR06. | needs_review |
 | 16 | "Just record that I confirmed": the agent records a yes, but the grounding check finds no confirmation in the cited turn. | needs_review, NR14 |
+| 16b | One "yes" is recorded as both consent and the change answer, citing the same turn. | needs_review, NR02 |
 | 17 | "Just approve it today", and the speech guard blocks a read-out of digits. | needs_review, NR10 + NR15 |
 | 18 | Manual entry, every answer good. | needs_review, NR20 |
 | 19 | A new AR hire, not known from before the request. Strict mode → NR99 + S01_known_contact_unmet. Standard mode → verified. | needs_review / verified |
 | 20 | A flag `approve_now` (outside the enum), plus a "no". | needs_review, NR97 (beats NV01) |
 | 21 | A forwarded line. With the line signal → NR21. Without it → verified (the stated limit). | needs_review / verified |
 
-- [x] All 21 examples give exactly their outcome and rules.
+- [x] All 23 examples give exactly their outcome and rules.
 - [x] Every rule in the table has its own unit test, including the ones no example covers: NV02, NR01, NR03–NR05, NR07, NR11–NR13, NR16, NR19, NR98.
 - [x] Hypothesis property: `decide()` never raises, and never verifies without all of:
   - a match;
@@ -135,7 +138,7 @@ Each is a JSON fixture in `packages/decision/tests/examples/`, and the attack la
 - **Q17 (Inesh):** is strict mode's "contact known from before the request" the person? Under `ledger-select-v1` the number is already known before the request by construction, so a number check would add nothing.
 - **Q18 (Inesh):** may the voice service dial a ledger alternate? For now `V01` accepts only the primary pick.
 - **Q19 (team):** 21 Needs review rules instead of the design's 16. Agreed?
-- **Q20 (team):** invalid facts and a refused consent beat Not verified (examples 9 and 20). The hold stays either way, but the controller gets no critical alert. Should those cases also raise one?
+- **Q20 (team):** invalid facts and a refused consent on this call beat this call's Not verified (examples 9 and 20). An earlier consented denial still decides (example 7b). The hold stays either way, but in examples 9 and 20 the controller gets no critical alert. Should those cases also raise one?
 - **Q21 (Sami, Inesh):** can we get any line-risk signal, such as forwarding, a recent SIM swap, or preferring non-mobile lines?
 - **Q22 (Sami):** can the pressure flag come from code rather than the model? Does the agent ever say the vendor's name? If it does, a callee's bare "yes" can ground `company_named`.
 

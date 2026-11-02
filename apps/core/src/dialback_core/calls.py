@@ -15,6 +15,7 @@ from typing import Annotated, Any, Literal
 from uuid import UUID
 
 from dialback_decision import compare_last_four
+from dialback_decision.rules import CHANGE, CONSENT, FLAGS
 from fastapi import APIRouter, Header, Request
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, field_validator
@@ -26,6 +27,7 @@ from .events import TransitionRefused, apply_event
 log = logging.getLogger(__name__)
 router = APIRouter()
 _DIGITS = re.compile(r"^[0-9]{1,4}$")
+ALLOWED = {"recording_consent": CONSENT, "change_requested": CHANGE, "flag": FLAGS}
 
 
 class Strict(BaseModel):
@@ -48,6 +50,9 @@ class TransitAnswer(Strict):
         if slot == "account_last4":
             if not isinstance(value, str) or not (value in NO_DIGITS or _DIGITS.match(value)):
                 raise ValueError("account_last4 must be 1 to 4 digits, dont_know or refused")
+        elif slot in ALLOWED:
+            if value not in ALLOWED[slot]:  # the decision engine reads only these values (spec 0006)
+                raise ValueError(f"{slot} must be one of {', '.join(sorted(ALLOWED[slot]))}")
         elif not isinstance(value, str) or not value or len(value) > 200:
             raise ValueError("must be a non-empty string of at most 200 characters")
         return value

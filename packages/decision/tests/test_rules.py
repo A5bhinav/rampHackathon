@@ -10,7 +10,9 @@ from conftest import CLEAN, GOOD
 from dialback_decision import decide, rules
 from dialback_decision.facts import EarlierCall
 
-# rule id -> (changes to the clean call, decide() keywords, expected outcome)
+CONSENTED = ("yes",)
+
+# rule id -> (changes to the clean call, decide() keywords, expected outcome). The rule fires alone.
 FIRES = {
     "NR97_facts_invalid": ({"flags": ("approve_now",)}, {}, "needs_review"),
     "NR01_no_live_person": ({"answered_by": "machine"}, {}, "needs_review"),
@@ -40,6 +42,7 @@ FIRES = {
     "NR21_line_risk": ({"line_risk": True}, {}, "needs_review"),
     "NR99_conditions_not_met": ({"dialed_out": None}, {}, "needs_review"),
 }
+ALONGSIDE = {"NR99_conditions_not_met": ("V02_outbound_dial_unmet",)}
 
 # More ways each rule fires, so every clause of a rule is exercised.
 ALSO = [
@@ -47,16 +50,32 @@ ALSO = [
     ("NR97_facts_invalid", {"earlier_calls": (EarlierCall(result="failed", change_requested=("maybe",)),)}),
     ("NR01_no_live_person", {"call_result": "voicemail"}),
     ("NR02_no_recording_consent", {"recording_consent": ("no",)}), ("NR02_no_recording_consent", {"consent_first": False}),
-    ("NV01_vendor_denied_change", {"earlier_calls": (EarlierCall(result="failed", change_requested=("no",)),)}),
-    ("NV02_digits_mismatch", {"earlier_calls": (EarlierCall(result="failed", last_four_result="mismatch"),)}),
+    ("NR97_facts_invalid", {"call_result": ["answers_recorded"]}), ("NR97_facts_invalid", {"speaker_named": "yes"}),
+    ("NR97_facts_invalid", {"offered_number": 1}), ("NR97_facts_invalid", {"answered_by": "fax"}),
+    ("NR97_facts_invalid", {"recording_consent": ("Yes",)}), ("NR97_facts_invalid", {"earlier_calls": []}),
+    ("NR97_facts_invalid", {"checks": replace(CLEAN, policy_violations=-1)}),
+    ("NR97_facts_invalid", {"checks": replace(CLEAN, speech_guard_trips=True)}),
+    ("NR97_facts_invalid", {"earlier_calls": (EarlierCall(result="failed", last_four_result="close"),)}),
+    ("NR97_facts_invalid", {"earlier_calls": (EarlierCall(result="failed", flags=("approve_now",)),)}),
+    ("NR97_facts_invalid", {"extra": ["not", "a", "dict"]}),
+    ("NV01_vendor_denied_change", {"earlier_calls": (EarlierCall(result="failed", recording_consent=CONSENTED,
+                                                                 change_requested=("no",)),)}),
+    ("NV02_digits_mismatch", {"earlier_calls": (EarlierCall(result="failed", recording_consent=CONSENTED,
+                                                            last_four_result="mismatch"),)}),
     ("NR13_another_number", {"flags": ("asked_to_call_another_number",)}),
     ("NR14_answer_not_in_transcript", {"checks": replace(CLEAN, answers_grounded=False)}),
     ("NR15_script_violation", {"checks": replace(CLEAN, policy_violations=1)}),
     ("NR15_script_violation", {"checks": replace(CLEAN, disclosure_first=False)}),
+    ("NR15_script_violation", {"checks": replace(CLEAN, agent_spoke_account_digits=True)}),
+    ("NR15_script_violation", {"checks": replace(CLEAN, new_number_accepted=True)}),
     ("NR17_split_speakers", {"same_person_yes_and_digits": False}),
-    ("NR18_contradictory_answers", {"company_named": ("Acme Fasteners", "Acme Supplies")}),
+    ("NR18_contradictory_answers", {"change_requested": ("yes", "unsure")}),
     ("NR19_earlier_call_concern", {"earlier_calls": (EarlierCall(result="failed", last_four_result="near_miss"),)}),
     ("NR19_earlier_call_concern", {"earlier_calls": (EarlierCall(result="failed", recording_consent=("no",)),)}),
+    ("NR19_earlier_call_concern", {"earlier_calls": (EarlierCall(result="failed", change_requested=("unsure",)),)}),
+    ("NR19_earlier_call_concern", {"earlier_calls": (EarlierCall(result="failed", last_four_result="ambiguous"),)}),
+    ("NR19_earlier_call_concern", {"earlier_calls": (EarlierCall(result="failed", last_four_result="inconsistent"),)}),
+    ("NR19_earlier_call_concern", {"earlier_calls": (EarlierCall(result="failed", change_requested=("no",)),)}),
 ]
 
 # Verified condition -> a change that fails it alone.
@@ -81,7 +100,7 @@ UNMET = {
 def test_each_rule_fires_in_its_block(rule_id):
     changes, kwargs, outcome = FIRES[rule_id]
     d = decide(replace(GOOD, **changes), **kwargs)
-    assert d.outcome == outcome and rule_id in d.rules_fired, d.rules_fired
+    assert (d.outcome, d.rules_fired) == (outcome, (rule_id, *ALONGSIDE.get(rule_id, ()))), d.rules_fired
 
 
 @pytest.mark.parametrize("rule_id, changes", ALSO, ids=[f"{r}-{i}" for i, (r, _) in enumerate(ALSO)])
@@ -115,3 +134,28 @@ def test_every_rule_in_the_table_has_a_case():
     assert {r.id for r in (*rules.VERIFIED, *rules.STRICT)} == set(UNMET)
     assert len(rules.NOT_VERIFIED) == 4 and len(rules.VERIFIED) == 12
     assert len(rules.NEEDS_REVIEW) + len(rules.BLOCK0) == 21, "NR01-NR21"
+
+
+def test_an_earlier_denial_with_consent_beats_this_calls_problems():
+    said_no = EarlierCall(result="failed", recording_consent=CONSENTED, change_requested=("no",))
+    for problem in ({"answered_by": "machine"}, {"recording_consent": ("no",)}, {"consent_first": False}):
+        assert decide(replace(GOOD, earlier_calls=(said_no,), **problem)).rules_fired == ("NV01_vendor_denied_change",)
+
+
+def test_an_earlier_denial_without_consent_is_a_concern_not_evidence():
+    unconsented = EarlierCall(result="failed", change_requested=("no",))
+    assert decide(replace(GOOD, earlier_calls=(unconsented,))).rules_fired == ("NR19_earlier_call_concern",)
+
+
+def test_a_checks_object_that_overrides_the_script_check_is_invalid():
+    class Lenient(type(CLEAN)):
+        @property
+        def script_clean(self) -> bool:
+            return True
+    sneaky = Lenient(**{**CLEAN.__dict__, "agent_spoke_account_digits": True})
+    assert decide(replace(GOOD, checks=sneaky)).rules_fired == ("NR97_facts_invalid",)
+
+
+def test_validation_never_raises_on_unhashable_input():
+    d = decide(GOOD, source=["call"])
+    assert d.rules_fired == ("NR97_facts_invalid",) and "source" not in d.body()

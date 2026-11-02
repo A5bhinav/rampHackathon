@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import replace
 
 from conftest import CLEAN, GOOD
-from dialback_decision import CaseFacts, decide, rules
+from dialback_decision import decide, rules
 from dialback_decision.engine import ENGINE_VERSION, RETIRED, TEMPLATES, Decision
 from dialback_decision.facts import EarlierCall, facts_from_answers
 from hypothesis import given
@@ -32,6 +32,11 @@ def test_unknown_facts_fail_closed():
     for unknown in ("speaker_in_change_thread", "same_person_yes_and_digits", "dialed_out", "answered_by", "consent_first",
                     "company_matches", "checks", "last_four_result"):
         assert decide(replace(GOOD, **{unknown: None})).outcome == "needs_review", unknown
+
+
+def test_a_hash_failure_is_an_engine_error_never_a_decision():
+    d = decide(replace(GOOD, extra={"unhashable": object()}))
+    assert (d.outcome, d.rules_fired, d.inputs_hash) == ("needs_review", ("NR98_engine_error",), "0" * 64)
 
 
 def test_an_engine_error_goes_to_a_person(monkeypatch):
@@ -66,7 +71,18 @@ def test_the_decision_body_follows_the_contract():
                     "strict_mode": True, "source": "call"}
     no_digits = decide(replace(GOOD, last_four_result=None)).body()
     assert "last_four_result" not in no_digits, "the contract's LastFourResult has no null"
-    assert decide(GOOD, source="email").body()["source"] == "call", "an invalid source is never written"
+    assert "source" not in decide(GOOD, source="email").body(), "an invalid source is left out, never guessed"
+
+
+# Every id decision-0.x could record (frozen from the skeleton engine), so its decisions still render.
+SKELETON_IDS = ["NR01_no_live_person", "NR02_no_recording_consent", "NR03_wrong_company", "NR04_speaker_from_change_thread", "NR05_digits_near_miss", "NR06_digits_not_provided", "NR07_digits_ambiguous", "NR08_digits_inconsistent", "NR09_change_unsure", "NR10_pressure", "NR11_opt_out", "NR12_asked_what_is_checked", "NR13_another_number", "NR14_answer_not_in_transcript", "NR15_script_violation", "NR16_other_flag", "NR17_split_speakers", "NR98_engine_error", "NR99_nothing_decided", "NV01_vendor_denied_change", "NV02_digits_mismatch", "NV03_digits_match_old_account", "NV04_offered_number_from_request", "U01_speaker_thread_not_checked", "U02_same_person_not_checked", "U03_offered_number_source_not_checked", "V01_eligible_number_dialed", "V02_live_person", "V03_recording_consent", "V04_company_matches", "V05_speaker_named", "V06_change_confirmed", "V07_digits_match", "V08_answers_grounded", "V09_script_clean", "V10_no_flags"]
+
+
+def test_every_skeleton_id_still_renders_and_no_retired_id_is_reused():
+    assert len(SKELETON_IDS) == 36 and set(SKELETON_IDS) <= set(TEMPLATES)
+    current = {r.id for r in (*rules.BLOCK0, *rules.NOT_VERIFIED, *rules.NEEDS_REVIEW, *rules.VERIFIED, *rules.STRICT)}
+    assert not set(RETIRED) & current, "a retired id never comes back with a new meaning"
+    assert not set(RETIRED) & set(rules.FIXED)
 
 
 def test_every_id_that_can_be_recorded_has_a_sentence():
@@ -93,34 +109,37 @@ def test_facts_from_stored_answers():
 
 
 def test_an_earlier_call_counts_against_the_change_never_for_it():
-    said_no = replace(GOOD, earlier_calls=(EarlierCall(result="failed", change_requested=("yes", "no")),))
+    said_no = replace(GOOD, earlier_calls=(EarlierCall(result="failed", recording_consent=("yes",),
+                                                       change_requested=("yes", "no")),))
     assert decide(said_no).rules_fired == ("NV01_vendor_denied_change",)
-    old = replace(GOOD, earlier_calls=(EarlierCall(result="failed", last_four_result="matches_old_account"),))
+    old = replace(GOOD, earlier_calls=(EarlierCall(result="failed", recording_consent=("yes",),
+                                                   last_four_result="matches_old_account"),))
     assert decide(old).rules_fired == ("NV03_digits_match_old_account",)
     clean = replace(GOOD, earlier_calls=(EarlierCall(result="failed", recording_consent=("yes",)),))
     assert decide(clean).outcome == "verified", "a clean dropped call neither helps nor hurts"
 
 
 TRI = st.sampled_from([None, True, False])
-FACTS = st.builds(
-    CaseFacts,
-    call_result=st.sampled_from(["answers_recorded", "no_answer", "voicemail", "failed"]),
-    dialed_eligible_number=st.booleans(),
-    recording_consent=st.lists(st.sampled_from(["yes", "no"]), max_size=2).map(tuple),
-    change_requested=st.lists(st.sampled_from(["yes", "no", "unsure"]), max_size=2).map(tuple),
-    speaker_named=st.booleans(),
-    speaker_role=st.lists(st.sampled_from(["AR manager", "AP clerk", ""]), max_size=2).map(tuple),
-    flags=st.lists(st.sampled_from(["opt_out", "other", "pressure_to_approve", "speaker_changed"]), max_size=2).map(tuple),
-    offered_number=st.booleans(),
-    last_four_result=st.sampled_from([None, "match", "mismatch", "near_miss", "not_provided", "ambiguous"]),
-    company_matches=TRI, checks=st.sampled_from([None, CLEAN, replace(CLEAN, answers_grounded=False)]),
-    consent_first=TRI, answers_in_order=TRI, same_person_yes_and_digits=TRI,
-    earlier_calls=st.lists(st.builds(EarlierCall, result=st.just("failed"),
-                                     change_requested=st.lists(st.sampled_from(["yes", "no"]), max_size=1).map(tuple)),
-                           max_size=1).map(tuple),
-    dialed_out=TRI, dialed_number_is_pick=TRI, answered_by=st.sampled_from([None, "human", "machine"]), line_risk=TRI,
-    speaker_in_change_thread=TRI, offered_number_from_request=TRI, speaker_known_before_request=TRI,
-)
+CHANGES = {
+    "call_result": st.sampled_from(["answers_recorded", "no_answer", "voicemail", "failed"]),
+    "dialed_eligible_number": st.booleans(),
+    "recording_consent": st.lists(st.sampled_from(["yes", "no"]), max_size=2).map(tuple),
+    "change_requested": st.lists(st.sampled_from(["yes", "no", "unsure"]), max_size=2).map(tuple),
+    "speaker_named": st.booleans(),
+    "speaker_role": st.lists(st.sampled_from(["AR manager", "AP clerk", ""]), max_size=2).map(tuple),
+    "flags": st.lists(st.sampled_from(["opt_out", "other", "pressure_to_approve", "speaker_changed"]), max_size=2).map(tuple),
+    "offered_number": st.booleans(),
+    "last_four_result": st.sampled_from([None, "match", "mismatch", "near_miss", "not_provided", "ambiguous"]),
+    "checks": st.sampled_from([None, CLEAN, replace(CLEAN, answers_grounded=False), replace(CLEAN, speech_guard_trips=1)]),
+    "earlier_calls": st.lists(st.builds(EarlierCall, result=st.just("failed"),
+                                        recording_consent=st.sampled_from([(), ("yes",), ("no",)]),
+                                        change_requested=st.lists(st.sampled_from(["yes", "no"]), max_size=1).map(tuple)),
+                              max_size=1).map(tuple),
+    "answered_by": st.sampled_from([None, "human", "machine"]),
+    **{name: TRI for name in rules.TRI_STATE},
+}
+FACTS = st.lists(st.sampled_from(sorted(CHANGES)), max_size=2, unique=True).flatmap(
+    lambda names: st.fixed_dictionaries({n: CHANGES[n] for n in names})).map(lambda changes: replace(GOOD, **changes))
 
 
 @given(FACTS, st.booleans(), st.sampled_from(["call", "manual"]))
@@ -128,7 +147,14 @@ def test_decide_is_total_and_never_verifies_on_what_it_didnt_check(facts, strict
     d = decide(facts, strict=strict, source=source)
     assert d.outcome in ("verified", "not_verified", "needs_review") and d.rules_fired
     if d.outcome == "verified":
-        assert facts.last_four_result == "match" and set(facts.change_requested) == {"yes"}
-        assert facts.same_person_yes_and_digits is True and facts.dialed_eligible_number is True
-        assert facts.dialed_out is True and facts.dialed_number_is_pick is True and source == "call"
-        assert not any("no" in c.change_requested for c in facts.earlier_calls)
+        mode = rules.Mode(strict=strict, source=source)
+        assert all(c.test(facts, mode) for c in (*rules.VERIFIED, *(rules.STRICT if strict else ())))
+        assert facts.last_four_result == "match" and set(facts.change_requested) == {"yes"} and source == "call"
+        assert facts.same_person_yes_and_digits is True and facts.dialed_out is True and facts.dialed_number_is_pick is True
+        assert not any("no" in c.change_requested for c in facts.earlier_calls if rules.consented(c))
+
+
+def test_the_property_reaches_verified():
+    """The property's Verified branch is live: one harmless change still verifies."""
+    assert decide(replace(GOOD, line_risk=False)).outcome == "verified"
+    assert decide(replace(GOOD, offered_number_from_request=False)).outcome == "verified"
