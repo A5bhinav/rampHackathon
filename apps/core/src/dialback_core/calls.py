@@ -17,7 +17,7 @@ from uuid import UUID
 from dialback_decision import compare_last_four
 from fastapi import APIRouter, Header, Request
 from fastapi.responses import JSONResponse, Response
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, field_validator
 
 from .answers import NO_DIGITS, protect, spoken_last_four
 from .db import system_tx
@@ -80,6 +80,10 @@ class CallEndedRequest(Strict):
     answers: TransitAnswers | None = None
     contact_point_id: UUID | None = None
     checks: Checks | None = None
+    # Twilio's facts about the call (CallEndedBody; spec 0005, D6). Absent means unknown.
+    direction: Literal["outbound", "inbound"] | None = None
+    dialed_number_is_pick: StrictBool | None = None  # a real boolean only: never "yes" or 1
+    answered_by: Literal["human", "machine"] | None = None
 
 
 def _error(status: int, code: str, message: str) -> JSONResponse:

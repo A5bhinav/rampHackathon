@@ -65,7 +65,7 @@ Until each lands, the fact it carries is `None`.
 | contact point | `apps/core/tests/test_worker.py::test_a_report_without_the_picked_contact_point_is_not_eligible` |
 | earlier calls | `apps/core/tests/test_worker.py::test_a_dropped_call_that_said_no_still_counts`, `::test_only_this_generations_pick_and_calls_count` |
 | order and same person | `packages/decision/tests/test_facts.py` (one test per branch) |
-| unknown is None | `packages/decision/tests/test_facts.py::test_missing_sources_are_none`, `test_worker.py::test_the_ledgers_change_context_counts_only_booleans`, `::test_a_change_context_failure_goes_to_a_person` |
+| unknown is None | `packages/decision/tests/test_facts.py::test_missing_sources_are_none`, `test_worker.py::test_the_ledgers_change_context_counts_only_booleans`, `::test_a_change_context_failure_goes_to_a_person`, `::test_the_voice_reports_telephony_facts`, `::test_a_telephony_fact_that_isnt_in_the_contract_is_refused` |
 | company | `apps/core/tests/test_worker.py::test_every_company_answer_must_match`, `::test_every_company_answer_must_match_and_an_unreadable_one_is_unknown` |
 | nothing breaks | `cd apps/core && uv run pytest`, `uv run python scripts/dev/stack.py --smoke` |
 

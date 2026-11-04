@@ -109,7 +109,8 @@ class ScriptedVoice:
         if not denies:
             answers.append(a("account_last4", last4, 9))
         body = {"call_id": str(call_id), "case_id": str(case_id), "result": "answers_recorded", "attempt": attempt,
-                "contact_point_id": str(CONTACT_POINT),
+                "contact_point_id": str(CONTACT_POINT), "direction": "outbound", "dialed_number_is_pick": True,
+                "answered_by": "human",
                 "agent_version": "scripted-double", "answers": {"schema_version": "call-answers/v0", "call_id": str(call_id), "answers": answers},
                 "checks": {"disclosure_first": True, "answers_grounded": True, "agent_spoke_account_digits": False,
                            "new_number_accepted": False, "policy_violations": 0, "speech_guard_trips": 0}}
