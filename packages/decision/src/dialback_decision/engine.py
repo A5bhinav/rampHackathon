@@ -19,7 +19,7 @@ import rfc8785
 
 from .facts import CaseFacts
 
-ENGINE_VERSION = "decision-0.1.0-skeleton"
+ENGINE_VERSION = "decision-0.1.1-skeleton"  # 0.1.1: the spec 0005 facts; earlier calls count against (NV01-NV03)
 
 
 @dataclass(frozen=True)
@@ -33,20 +33,32 @@ def _checks(f: CaseFacts, predicate: Callable) -> bool:
     return f.checks is not None and predicate(f.checks)
 
 
+def _earlier(f: CaseFacts, predicate: Callable) -> bool:
+    """An earlier call of this generation counts against the change, never for it (spec 0005, D2)."""
+    return any(predicate(call) for call in f.earlier_calls)
+
+
+def _one(values: tuple[str, ...]) -> str | None:
+    """The skeleton's reading of a repeated answer: its value if every recording agrees, else
+    unknown. The Nov 4 engine reads every value instead (spec 0006)."""
+    return values[0] if values and all(v == values[0] for v in values) else None
+
+
 NOT_VERIFIED: tuple[Rule, ...] = (
     Rule("NV01_vendor_denied_change", "The person said the vendor did not ask to change its bank details.",
-         lambda f: f.change_requested == "no"),
+         lambda f: _one(f.change_requested) == "no" or _earlier(f, lambda c: "no" in c.change_requested)),
     Rule("NV02_digits_mismatch", "The digits the person gave do not match the new account.",
-         lambda f: f.last_four_result == "mismatch"),
+         lambda f: f.last_four_result == "mismatch" or _earlier(f, lambda c: c.last_four_result == "mismatch")),
     Rule("NV03_digits_match_old_account", "The digits the person gave match the old account, not the new one.",
-         lambda f: f.last_four_result == "matches_old_account"),
+         lambda f: f.last_four_result == "matches_old_account"
+         or _earlier(f, lambda c: c.last_four_result == "matches_old_account")),
     Rule("NV04_offered_number_from_request", "The person offered a phone number that first appeared in the change request.",
          lambda f: f.offered_number_from_request is True),
 )
 
 NEEDS_REVIEW: tuple[Rule, ...] = (
     Rule("NR01_no_live_person", "No person confirmed anything on this call.", lambda f: f.call_result != "answers_recorded"),
-    Rule("NR02_no_recording_consent", "Recording consent was not given.", lambda f: f.recording_consent == "no"),
+    Rule("NR02_no_recording_consent", "Recording consent was not given.", lambda f: _one(f.recording_consent) == "no"),
     Rule("NR03_wrong_company", "The company the person named does not match this vendor.", lambda f: f.company_matches is False),
     Rule("NR04_speaker_from_change_thread", "The person first appeared in the change request thread.",
          lambda f: f.speaker_in_change_thread is True),
@@ -56,7 +68,7 @@ NEEDS_REVIEW: tuple[Rule, ...] = (
     Rule("NR07_digits_ambiguous", "The old and new accounts end in the same four digits, so the digits prove nothing.",
          lambda f: f.last_four_result == "ambiguous"),
     Rule("NR08_digits_inconsistent", "The person gave two different sets of digits.", lambda f: f.last_four_result == "inconsistent"),
-    Rule("NR09_change_unsure", "The person was not sure the vendor asked for the change.", lambda f: f.change_requested == "unsure"),
+    Rule("NR09_change_unsure", "The person was not sure the vendor asked for the change.", lambda f: _one(f.change_requested) == "unsure"),
     Rule("NR10_pressure", "The person pressed for approval.", lambda f: "pressure_to_approve" in f.flags),
     Rule("NR11_opt_out", "The person asked not to be called again.", lambda f: "opt_out" in f.flags),
     Rule("NR12_asked_what_is_checked", "The person asked what is being checked.", lambda f: "asked_what_is_checked" in f.flags),
@@ -75,11 +87,11 @@ VERIFIED: tuple[Rule, ...] = (
     Rule("V01_eligible_number_dialed", "We dialed a number the Trust Ledger could prove, and we placed the call.",
          lambda f: f.dialed_eligible_number),
     Rule("V02_live_person", "A person answered and answered the questions.", lambda f: f.call_result == "answers_recorded"),
-    Rule("V03_recording_consent", "The person agreed to the recorded call.", lambda f: f.recording_consent == "yes"),
+    Rule("V03_recording_consent", "The person agreed to the recorded call.", lambda f: _one(f.recording_consent) == "yes"),
     Rule("V04_company_matches", "The person named this vendor.", lambda f: f.company_matches is True),
     Rule("V05_speaker_named", "The person gave their name.", lambda f: f.speaker_named),
     Rule("V06_change_confirmed", "The person confirmed the vendor asked to change its bank details.",
-         lambda f: f.change_requested == "yes"),
+         lambda f: _one(f.change_requested) == "yes"),
     Rule("V07_digits_match", "The person gave the last four digits of the new account.", lambda f: f.last_four_result == "match"),
     Rule("V08_answers_grounded", "Every answer appears in the transcript turn it cites.",
          lambda f: _checks(f, lambda c: c.answers_grounded)),

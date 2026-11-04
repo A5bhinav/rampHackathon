@@ -24,18 +24,18 @@ from typing import Any
 from uuid import UUID
 
 from dialback_decision import CallChecks, decide
-from dialback_decision.facts import facts_from_answers
+from dialback_decision.facts import earlier_call, facts_from_answers, values
 from psycopg import AsyncConnection
 from psycopg.types.json import Jsonb
 from psycopg_pool import AsyncConnectionPool
 
 from .calling_window import CallingWindow
-from .company import company_matches
+from .company import every_name_matches
 from .db import dataset_now, system_tx
 from .detection import Keys, process_inbound_webhooks
 from .events import TransitionRefused, apply_event
 from .jobs import Jobs, unique_worker_name
-from .ports import CallerError, CallPlacer, NumberResolver, PreDialRefused
+from .ports import CallerError, CallPlacer, ChangeContext, LedgerChangeContext, NumberResolver, PreDialRefused
 from .ramp import RampConnector, RampError, RampNotFound, RampPort
 from .settings import Settings
 from .timeline import PRE_DIAL
@@ -105,12 +105,22 @@ select c.*, v.ramp_vendor_id, v.legal_name, v.trade_names, ce.detected_at, ce.ra
  where c.id = %s
 """
 
+# This generation's evidence the decision reads (spec 0005): the ledger's pick and every call report.
+GENERATION = """
+select type, body_jcs::jsonb -> 'body' as body
+  from audit.evidence_events
+ where case_id = %s and (body_jcs::jsonb ->> 'version')::int = %s and type in ('number_resolved', 'call_ended')
+ order by seq
+"""
+
 
 class Worker:
     def __init__(self, pool: AsyncConnectionPool, settings: Settings, connector: RampConnector, resolver: NumberResolver,
-                 caller: CallPlacer, name: str | None = None, sleep=asyncio.sleep) -> None:
+                 caller: CallPlacer, name: str | None = None, sleep=asyncio.sleep,
+                 change_context: ChangeContext | None = None) -> None:
         self.pool, self.settings, self.connector = pool, settings, connector
         self.resolver, self.caller, self.name, self._sleep = resolver, caller, name or unique_worker_name(), sleep
+        self.change_context = change_context or LedgerChangeContext()
         self.keys = Keys(settings.fingerprint_key, settings.fingerprint_key_version)
         self.window = CallingWindow.parse(settings.calling_tz, settings.calling_window, settings.calling_days)
         self.jobs = Jobs(pool, settings, connector, self.keys, self.name)
@@ -345,20 +355,29 @@ class Worker:
         body = cmd.payload
         answers = (body.get("answers") or {}).get("answers") or []
         async with system_tx(self.pool) as conn:
-            picked = await (await conn.execute(
-                "select (body_jcs::jsonb -> 'body' ->> 'contact_point_id') as contact_point_id from audit.evidence_events "
-                "where case_id = %s and type = 'number_resolved' order by seq desc limit 1", (case["id"],))).fetchone()
-        dialed = body.get("contact_point_id")
-        dialed_eligible = picked is not None and (dialed is None or dialed == picked["contact_point_id"])
-        named = next((a["value"] for a in answers if a["slot"] == "company_named"), None)
+            generation = await (await conn.execute(GENERATION, (case["id"], case["version"]))).fetchall()
+        picks = [e["body"].get("contact_point_id") for e in generation if e["type"] == "number_resolved"]
+        # Only this version's pick counts, and a report that doesn't name it isn't eligible (D1).
+        dialed_eligible = bool(picks) and body.get("contact_point_id") == picks[-1]
+        # Earlier calls can count against the change, never for it (D2).
+        earlier = tuple(earlier_call(e["body"]) for e in generation
+                        if e["type"] == "call_ended" and e["body"].get("call_id") != body.get("call_id"))
+        context = await self.change_context.check(
+            case_id=case["id"], dataset_id=case["dataset_id"], vendor_id=case["vendor_id"],
+            cutoff=case["ramp_changed_at"] or case["detected_at"],
+            speaker_names=values(answers, "speaker_name"), offered_numbers=values(answers, "offered_number"))
         checks = body.get("checks")
         facts = facts_from_answers(
             answers,
             call_result=body["result"],
             dialed_eligible_number=dialed_eligible,
             last_four_result=body.get("last_four_result"),
-            company_matches=company_matches(named, case["legal_name"], case["trade_names"] or ()),
+            company_matches=every_name_matches(values(answers, "company_named"), case["legal_name"], case["trade_names"] or ()),
             checks=CallChecks(**checks) if checks else None,
+            earlier_calls=earlier,
+            speaker_in_change_thread=context.speaker_in_change_thread,
+            offered_number_from_request=context.offered_number_from_request,
+            speaker_known_before_request=context.speaker_known_before_request,
         )
         decision = decide(facts)
         await self._emit(case, "decision_made", f"{cmd.key}:made", decision.body())

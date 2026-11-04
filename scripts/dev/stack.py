@@ -37,7 +37,7 @@ from dialback_core.datasets import create_dataset
 from dialback_core.db import open_pool, system_tx
 from dialback_core.detection import Keys, import_all
 from dialback_core.flags import RampMode
-from dialback_core.ports import PreDialRefused, Selection
+from dialback_core.ports import ChangeFacts, PreDialRefused, Selection
 from dialback_core.ramp import RampConnector
 from dialback_core.ramp.connector import mock_token
 from dialback_core.settings import Settings
@@ -62,6 +62,14 @@ class ScriptedLedger:
 
     async def select_number(self, *, case_id, dataset_id, vendor_id, cutoff) -> Selection:
         return Selection(uuid.uuid4(), "scripted-double", CONTACT_POINT, source_types=("contract", "listing"))
+
+
+class ScriptedChangeContext:
+    """TEST DOUBLE for Inesh's change context: the speaker isn't in the change thread and is
+    known from before the request; an offered number's source stays unknown."""
+
+    async def check(self, **_) -> ChangeFacts:
+        return ChangeFacts(speaker_in_change_thread=False, speaker_known_before_request=True)
 
 
 class ScriptedVoice:
@@ -93,13 +101,15 @@ class ScriptedVoice:
 
         def a(slot, value, turn):
             return {"slot": slot, "value": value, "turn_id": turn, "tool_call_id": f"tc_{turn}",
-                    "captured_at": "2026-11-01T17:02:11Z", "capture_method": "keypad" if slot == "account_last4" else "speech"}
+                    "captured_at": f"2026-11-01T17:02:{turn:02d}Z", "capture_method": "keypad" if slot == "account_last4" else "speech"}
 
         answers = [a("recording_consent", "yes", 1), a("company_named", vendor.removesuffix(" LLC").removesuffix(" Inc"), 3),
-                   a("speaker_name", "Jordan Lee", 5), a("change_requested", "no" if denies else "yes", 7)]
+                   a("speaker_name", "Jordan Lee", 5), a("speaker_role", "AR manager", 5),
+                   a("change_requested", "no" if denies else "yes", 7)]
         if not denies:
             answers.append(a("account_last4", last4, 9))
         body = {"call_id": str(call_id), "case_id": str(case_id), "result": "answers_recorded", "attempt": attempt,
+                "contact_point_id": str(CONTACT_POINT),
                 "agent_version": "scripted-double", "answers": {"schema_version": "call-answers/v0", "call_id": str(call_id), "answers": answers},
                 "checks": {"disclosure_first": True, "answers_grounded": True, "agent_spoke_account_digits": False,
                            "new_number_accepted": False, "policy_violations": 0, "speech_guard_trips": 0}}
@@ -194,7 +204,7 @@ async def run(url: str, args: argparse.Namespace) -> int:
         settings = core_settings(url, backoff=0.2 if args.smoke else 1.0, jobs_every=2 if args.smoke else 30)
         pool = await open_pool(url, max_size=10)
         voice = ScriptedVoice(pool, refuse={"Brightline Office Supply Inc"}, deny={"Cobalt Freight LLC"})
-        app = create_app(settings, pool=pool, resolver=ScriptedLedger(), caller=voice)
+        app = create_app(settings, pool=pool, resolver=ScriptedLedger(), caller=voice, change_context=ScriptedChangeContext())
         server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=CORE_PORT, log_level="warning"))
         serving = asyncio.create_task(server.serve())
         await wait_for(f"{CORE_URL}/healthz")

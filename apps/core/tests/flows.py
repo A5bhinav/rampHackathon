@@ -1,7 +1,7 @@
 """Shared steps for core tests: drive a case through the money path the way the services do."""
 from __future__ import annotations
 
-from conftest import INTERNAL_TOKEN
+from conftest import CONTACT_POINT, INTERNAL_TOKEN
 from dialback_core.db import person_tx, system_tx
 
 CLEAN_CHECKS = {"disclosure_first": True, "answers_grounded": True, "agent_spoke_account_digits": False,
@@ -23,20 +23,28 @@ async def change_and_detect(world, account_number="000055556666", actor="clerk")
     await world.worker.drain(world.dataset.id)
 
 
+def answer(slot, value, turn):
+    """One answer as the voice service reports it, captured in turn order."""
+    return {"slot": slot, "value": value, "turn_id": turn, "tool_call_id": f"tc_{turn}",
+            "captured_at": f"2026-11-03T17:02:{turn:02d}Z", "capture_method": "keypad" if slot == "account_last4" else "speech"}
+
+
 def transit(call_id, digits="6666", company="Acme Fasteners", change="yes"):
-    def a(slot, value, turn):
-        return {"slot": slot, "value": value, "turn_id": turn, "tool_call_id": f"tc_{turn}",
-                "captured_at": "2026-11-03T17:02:11Z", "capture_method": "keypad" if slot == "account_last4" else "speech"}
     return {"schema_version": "call-answers/v0", "call_id": str(call_id), "answers": [
-        a("recording_consent", "yes", 1), a("company_named", company, 3), a("speaker_name", "Jordan Lee", 5),
-        a("change_requested", change, 7), a("account_last4", digits, 9)]}
+        answer("recording_consent", "yes", 1), answer("company_named", company, 3), answer("speaker_name", "Jordan Lee", 5),
+        answer("speaker_role", "AR manager", 5), answer("change_requested", change, 7), answer("account_last4", digits, 9)]}
 
 
-async def report(world, case_id, call_id, attempt=1, result="answers_recorded", answers=None, token=INTERNAL_TOKEN, key=True):
+async def report(world, case_id, call_id, attempt=1, result="answers_recorded", answers=None, token=INTERNAL_TOKEN, key=True,
+                 contact_point=CONTACT_POINT, retry_at=None):
     body = {"call_id": str(call_id), "case_id": str(case_id), "result": result, "attempt": attempt,
             "agent_version": "agent-test", "checks": CLEAN_CHECKS}
-    if result == "answers_recorded":
+    if result == "answers_recorded" or answers is not None:
         body["answers"] = answers or transit(call_id)
+    if contact_point is not None:
+        body["contact_point_id"] = str(contact_point)
+    if retry_at is not None:
+        body["retry_at"] = retry_at
     headers = {"Authorization": f"Bearer {token.decode()}"}
     if key:
         headers["Idempotency-Key"] = f"{case_id}:call:{attempt}:ended"

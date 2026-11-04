@@ -14,7 +14,7 @@ from dialback_core.datasets import Dataset, create_dataset
 from dialback_core.db import open_pool, system_tx
 from dialback_core.detection import Keys
 from dialback_core.flags import RampMode
-from dialback_core.ports import PreDialRefused, Selection
+from dialback_core.ports import ChangeFacts, PreDialRefused, Selection
 from dialback_core.ramp import RampConnector
 from dialback_core.ramp.connector import mock_token
 from dialback_core.ramp.http import TokenBucket
@@ -44,13 +44,29 @@ class StandInResolver:
     """TEST DOUBLE for Inesh's select_number (spec 0002, D10): picks one fixed number, or none."""
 
     def __init__(self, pick: bool = True) -> None:
-        self.pick, self.calls = pick, []
+        self.pick, self.calls, self.point = pick, [], CONTACT_POINT
 
     async def select_number(self, *, case_id, dataset_id, vendor_id, cutoff) -> Selection:
         self.calls.append(case_id)
         if not self.pick:
             return Selection(uuid.uuid4(), "test-double", None, reason="No number met the rule.")
-        return Selection(uuid.uuid4(), "test-double", CONTACT_POINT, source_types=("contract", "listing"))
+        return Selection(uuid.uuid4(), "test-double", self.point, source_types=("contract", "listing"))
+
+
+class StandInChangeContext:
+    """TEST DOUBLE for Inesh's change context (spec 0005, D5): the speaker is not in the change
+    thread and is known from before the request; whether an offered number came from the
+    request stays unknown."""
+
+    def __init__(self, facts: ChangeFacts | None = None) -> None:
+        self.facts = facts or ChangeFacts(speaker_in_change_thread=False, speaker_known_before_request=True)
+        self.calls: list[dict] = []
+
+    async def check(self, **asked) -> ChangeFacts:
+        self.calls.append(asked)
+        if isinstance(self.facts, Exception):
+            raise self.facts
+        return self.facts
 
 
 class StandInVoice:
@@ -96,6 +112,7 @@ class World:
     worker: Worker | None = None
     resolver: StandInResolver | None = None
     voice: StandInVoice | None = None
+    change_context: StandInChangeContext | None = None
 
     @property
     def auth(self) -> dict[str, str]:
@@ -158,8 +175,8 @@ async def make_world(pool, kind: str = "dev", sim_now=None, settings: Settings |
                                (uid, name.title(), w.refs.get(ramp_ref) if ramp_ref else None))
             await conn.execute("insert into app.user_roles (user_id, role) values (%s, %s)", (uid, role))
             w.users[name] = uid
-    w.resolver, w.voice = StandInResolver(), StandInVoice()
-    w.worker = Worker(pool, settings, connector, w.resolver, w.voice, sleep=_no_sleep)
+    w.resolver, w.voice, w.change_context = StandInResolver(), StandInVoice(), StandInChangeContext()
+    w.worker = Worker(pool, settings, connector, w.resolver, w.voice, sleep=_no_sleep, change_context=w.change_context)
     return w
 
 

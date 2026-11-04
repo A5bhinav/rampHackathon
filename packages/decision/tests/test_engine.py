@@ -2,14 +2,14 @@ from dataclasses import replace
 
 from dialback_decision import CallChecks, CaseFacts, decide
 from dialback_decision.engine import ENGINE_VERSION, TEMPLATES
-from dialback_decision.facts import facts_from_answers
+from dialback_decision.facts import EarlierCall, facts_from_answers
 from hypothesis import given
 from hypothesis import strategies as st
 
 CLEAN = CallChecks(disclosure_first=True, answers_grounded=True, agent_spoke_account_digits=False,
                    new_number_accepted=False, policy_violations=0, speech_guard_trips=0)
-GOOD = CaseFacts(call_result="answers_recorded", dialed_eligible_number=True, recording_consent="yes",
-                 company_named="Acme Fasteners", change_requested="yes", speaker_named=True,
+GOOD = CaseFacts(call_result="answers_recorded", dialed_eligible_number=True, recording_consent=("yes",),
+                 company_named=("Acme Fasteners",), change_requested=("yes",), speaker_named=True,
                  last_four_result="match", company_matches=True, checks=CLEAN)
 
 
@@ -23,7 +23,7 @@ def test_a_clean_confirmation_is_verified_and_says_what_was_not_checked():
 
 
 def test_not_verified_beats_everything_else():
-    d = decide(replace(GOOD, change_requested="no", flags=("pressure_to_approve",)))
+    d = decide(replace(GOOD, change_requested=("no",), flags=("pressure_to_approve",)))
     assert d.outcome == "not_verified" and d.rules_fired == ("NV01_vendor_denied_change",)
     assert decide(replace(GOOD, last_four_result="mismatch")).outcome == "not_verified"
     assert decide(replace(GOOD, last_four_result="matches_old_account")).outcome == "not_verified"
@@ -32,10 +32,10 @@ def test_not_verified_beats_everything_else():
 
 def test_each_review_condition_sends_the_case_to_a_person():
     variants = [
-        replace(GOOD, call_result="voicemail"), replace(GOOD, recording_consent="no"), replace(GOOD, company_matches=False),
+        replace(GOOD, call_result="voicemail"), replace(GOOD, recording_consent=("no",)), replace(GOOD, company_matches=False),
         replace(GOOD, speaker_in_change_thread=True), replace(GOOD, last_four_result="near_miss"),
         replace(GOOD, last_four_result="not_provided"), replace(GOOD, last_four_result="ambiguous"),
-        replace(GOOD, last_four_result="inconsistent"), replace(GOOD, change_requested="unsure"),
+        replace(GOOD, last_four_result="inconsistent"), replace(GOOD, change_requested=("unsure",)),
         replace(GOOD, flags=("opt_out",)), replace(GOOD, offered_number=True),
         replace(GOOD, checks=replace(CLEAN, answers_grounded=False)), replace(GOOD, checks=replace(CLEAN, disclosure_first=False)),
         replace(GOOD, checks=replace(CLEAN, policy_violations=1)), replace(GOOD, same_person_yes_and_digits=False),
@@ -47,7 +47,7 @@ def test_each_review_condition_sends_the_case_to_a_person():
 def test_missing_facts_fail_closed():
     assert decide(replace(GOOD, checks=None)).outcome == "needs_review"
     assert decide(replace(GOOD, company_matches=None)).rules_fired == ("NR99_nothing_decided",)
-    assert decide(replace(GOOD, recording_consent=None)).outcome == "needs_review"
+    assert decide(replace(GOOD, recording_consent=())).outcome == "needs_review"
     assert decide(replace(GOOD, dialed_eligible_number=False)).outcome == "needs_review"
 
 
@@ -58,7 +58,7 @@ def test_inputs_hash_is_stable_and_covers_every_fact():
 
 
 def test_every_fired_rule_has_a_sentence():
-    for facts in (GOOD, replace(GOOD, change_requested="no"), replace(GOOD, call_result="busy"), replace(GOOD, checks=None)):
+    for facts in (GOOD, replace(GOOD, change_requested=("no",)), replace(GOOD, call_result="busy"), replace(GOOD, checks=None)):
         assert all(r in TEMPLATES for r in decide(facts).rules_fired)
 
 
@@ -70,13 +70,15 @@ def test_facts_from_stored_answers():
         {"slot": "flag", "value": "pressure_to_approve"},
     ]
     f = facts_from_answers(answers, call_result="answers_recorded", dialed_eligible_number=True)
-    assert f.change_requested is None and f.speaker_named and f.flags == ("pressure_to_approve",)
+    assert f.change_requested == ("yes", "no") and f.speaker_named and f.flags == ("pressure_to_approve",)
+    assert decide(f).outcome == "needs_review", "the skeleton reads a changed answer as unknown, not yes"
+    assert (f.consent_first, f.answers_in_order, f.same_person_yes_and_digits) == (None, None, None), "no turns: unknown"
 
 
 @given(st.builds(CaseFacts, call_result=st.sampled_from(["answers_recorded", "no_answer", "voicemail"]),
                  dialed_eligible_number=st.booleans(),
-                 recording_consent=st.sampled_from([None, "yes", "no"]),
-                 change_requested=st.sampled_from([None, "yes", "no", "unsure"]),
+                 recording_consent=st.lists(st.sampled_from(["yes", "no"]), max_size=2).map(tuple),
+                 change_requested=st.lists(st.sampled_from(["yes", "no", "unsure"]), max_size=2).map(tuple),
                  last_four_result=st.sampled_from([None, "match", "mismatch", "near_miss", "not_provided"]),
                  company_matches=st.sampled_from([None, True, False]),
                  flags=st.lists(st.sampled_from(["opt_out", "other", "pressure_to_approve"]), max_size=2).map(tuple)))
@@ -84,4 +86,15 @@ def test_decide_is_total_and_never_verifies_without_matching_digits(facts):
     d = decide(facts)
     assert d.outcome in ("verified", "not_verified", "needs_review")
     if d.outcome == "verified":
-        assert facts.last_four_result == "match" and facts.change_requested == "yes"
+        assert facts.last_four_result == "match" and set(facts.change_requested) == {"yes"}
+
+
+def test_an_earlier_call_counts_against_the_change_never_for_it():
+    said_no = replace(GOOD, earlier_calls=(EarlierCall(result="failed", change_requested=("yes", "no")),))
+    assert decide(said_no).rules_fired == ("NV01_vendor_denied_change",)
+    wrong = replace(GOOD, earlier_calls=(EarlierCall(result="failed", last_four_result="mismatch"),))
+    assert decide(wrong).rules_fired == ("NV02_digits_mismatch",)
+    old = replace(GOOD, earlier_calls=(EarlierCall(result="failed", last_four_result="matches_old_account"),))
+    assert decide(old).rules_fired == ("NV03_digits_match_old_account",)
+    clean = replace(GOOD, earlier_calls=(EarlierCall(result="failed", recording_consent=("yes",)),))
+    assert decide(clean).outcome == "verified", "a clean dropped call neither helps nor hurts"

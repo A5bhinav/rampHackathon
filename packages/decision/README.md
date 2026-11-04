@@ -58,11 +58,17 @@ inside this package; the caller passes everything in.
 - A Hypothesis property: for random facts, `decide()` never raises, and anything it cannot classify is `needs_review`.
 - `inputs_hash` is stable across dict ordering (canonicalize with `rfc8785` before hashing).
 
-## What exists (skeleton engine, `decision-0.1.0-skeleton`)
+## What exists (skeleton engine, `decision-0.1.1-skeleton`)
 
 - `last_four.compare_last_four()`: the full comparison, in the designed order, with property tests. The core runs it when a call report arrives, so the digits never leave memory (spec 0002, D7).
 - `decide()`: Not verified (4 rules), Needs review (17 rules), Verified (10 conditions, all required), anything else Needs review, any error Needs review. Each rule carries the templated sentence the dashboard shows.
-- Three facts need data no slice supplies yet: whether the speaker first appeared in the change thread and whether an offered number came from the request (the ledger's change context), and whether one person gave both the confirmation and the digits (per-turn speaker identity). The skeleton engine records them in `rules_fired` as `U01`, `U02`, `U03` ("not checked by this engine version") instead of guessing, so the evidence shows exactly what was not checked. The Nov 4 engine must fail closed on them.
+- `CaseFacts` per spec 0005 (`facts.py`):
+  - A repeated answer keeps every value, in order.
+  - The call order (`consent_first`, `answers_in_order`) and the single declared speaker (`same_person_yes_and_digits`) are computed from the answers' turns.
+  - Earlier calls of the same generation are summarized as `EarlierCall`; they can count against a change, never for one. The skeleton's NV01–NV03 already act on them, so a dropped call's "no" still blocks the case.
+  - Telephony and change-context facts are `None` until their slices supply them.
+  - The skeleton engine reads a repeated answer as before: its value if every recording agrees, else unknown.
+- Still unknown, and recorded as "not checked by this engine version": `U01` (the speaker first appeared in the change thread) and `U03` (an offered number came from the request), until the ledger's `change_context` exists. `U02` (one person) is now computed. The Nov 4 engine (spec 0006) fails closed on all of them.
 - `inputs_hash` is SHA-256 over the RFC 8785 form of the facts.
 
 ```bash
