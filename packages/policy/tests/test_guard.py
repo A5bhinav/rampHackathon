@@ -75,12 +75,77 @@ def test_blocks_bank_names(text: str) -> None:
     assert not verdict.ok and "bank_name" in verdict.reasons
 
 
-@pytest.mark.parametrize("text", ["Am I speaking with Acme Fasteners?", "Is this ACME?", "acme fasteners, llc"])
-def test_blocks_the_vendor_name_until_the_callee_names_the_company(text: str) -> None:
+@pytest.mark.parametrize("text", ["Am I speaking with Acme Fasteners?", "Is this ACME?", "acme fasteners, llc",
+                                  "Is this AcmeFasteners?"])
+def test_blocks_the_vendor_name_until_the_callee_names_the_vendor(text: str) -> None:
     verdict = check(text, CTX)
     assert not verdict.ok and "vendor_name" in verdict.reasons
-    named = GuardContext(vendor_names=CTX.vendor_names, company_named=True)
-    assert check(text, named).ok
+    assert check(text, GuardContext(vendor_names=CTX.vendor_names, named_company="Acme Fasteners")).ok
+    # Naming some other company doesn't unlock the vendor's name: that would tell a stranger who we're checking.
+    assert not check(text, GuardContext(vendor_names=CTX.vendor_names, named_company="Globex")).ok
+
+
+@pytest.mark.parametrize(("vendor", "text"), [
+    ("First Choice Plumbing LLC", "Is this First Choice?"),
+    ("Big Sky Lumber", "Big Sky?"),
+    ("HP Inc", "Is this HP?"),
+    ("3M Company", "Am I speaking with 3M?"),
+])
+def test_vendor_name_variants(vendor: str, text: str) -> None:
+    assert not check(text, GuardContext(vendor_names=(vendor,))).ok
+
+
+def test_a_common_first_word_is_not_the_vendor_name() -> None:
+    ctx = GuardContext(vendor_names=("Quick Ship Logistics",))
+    assert check("Just a quick question, which department is this?", ctx).ok
+    assert not check("Is this Quick Ship?", ctx).ok
+
+
+@pytest.mark.parametrize("text", [
+    "Is it forty-eight twenty-one?",
+    "four oh two one",
+    "4; 8; 2; 1",
+    "4\u20148\u20142\u20141",
+    "4\u20268\u20262\u20261",
+    "4\u200b8\u200b2\u200b1",
+    "48 and 21",
+])
+def test_blocks_digits_in_disguise(text: str) -> None:
+    assert not check(text, CTX).ok
+
+
+def test_blocks_a_status_word_split_by_an_invisible_character() -> None:
+    assert not check("You're veri\u200bfied.", CTX).ok
+
+
+@pytest.mark.parametrize("text", ["the twelve hundred invoice", "the 12k payment", "nine hundred euros"])
+def test_blocks_amounts_in_words(text: str) -> None:
+    assert "amount" in check(text, CTX).reasons
+
+
+@pytest.mark.parametrize("text", ["J.P. Morgan", "your BofA account", "the one at Wells"])
+def test_blocks_bank_name_variants(text: str) -> None:
+    assert "bank_name" in check(text, CTX).reasons
+
+
+def test_allows_the_callback_number_in_any_format() -> None:
+    assert check("You can reach us at (415) 555-0100.", CTX).ok
+
+
+def test_allows_a_read_back_after_a_hesitation() -> None:
+    ctx = GuardContext(vendor_names=CTX.vendor_names, callee_last_turn="4 8, um, 2 1")
+    assert check("So that's 4821?", ctx).ok
+
+
+def test_the_customer_name_is_always_allowed() -> None:
+    ctx = GuardContext(vendor_names=CTX.vendor_names, customer_name="Swift Freight")
+    assert check("I'm calling for the AP team at Swift Freight.", ctx).ok
+    assert "bank_name" in check("Is that a SWIFT transfer?", ctx).reasons
+
+
+def test_lists_of_times_are_blocked_on_purpose() -> None:
+    """Erring toward blocking: "9, 10 or 11" reads as a run. The agent books times with schedule_callback."""
+    assert not check("Would 9, 10 or 11 work?", CTX).ok
 
 
 def test_ordinary_questions_pass() -> None:

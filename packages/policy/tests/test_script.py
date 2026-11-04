@@ -7,9 +7,26 @@ from dialback_policy.script import FALLBACK_LINE, ORDER, PHASE_SLOT, QUESTIONS, 
 SCRIPT = Script(customer_name="Fictional Co", callback_number="+1 415 555 0100")
 
 
+def first_sentence(text: str) -> str:
+    return re.split(r"(?<=[.!?])\s", text)[0]
+
+
 def test_first_sentence_discloses_ai_and_recording() -> None:
-    first = re.split(r"(?<=[.!?])\s", SCRIPT.disclosure())[0]
+    first = first_sentence(SCRIPT.disclosure())
     assert "AI" in first and "recorded" in first and "Fictional Co" in first
+
+
+def test_a_customer_name_with_punctuation_cannot_cut_the_disclosure_short() -> None:
+    for name in ("J. Crew Group", "Yahoo! Inc", "Dr. Pepper Co."):
+        script = Script(customer_name=name, callback_number="+1 415 555 0100")
+        for line in (script.disclosure(), script.voicemail()):
+            first = first_sentence(line)
+            assert "AI" in first and "recorded" in first, line
+
+
+def test_voicemail_discloses_ai_and_recording_too() -> None:
+    first = first_sentence(SCRIPT.voicemail())
+    assert "AI" in first and "recorded" in first
 
 
 def test_disclosure_gives_a_callback_number() -> None:
@@ -28,7 +45,8 @@ def test_company_question_never_names_the_vendor() -> None:
 
 
 def test_every_fixed_line_passes_the_guard() -> None:
-    ctx = GuardContext(vendor_names=("Acme Fasteners LLC",), callback_number=SCRIPT.callback_number)
+    ctx = GuardContext(vendor_names=("Acme Fasteners LLC",), callback_number=SCRIPT.callback_number,
+                       customer_name=SCRIPT.customer_name)
     lines = [SCRIPT.disclosure(), SCRIPT.consent_question(), SCRIPT.voicemail(), SCRIPT.close(),
              SCRIPT.consent_refused(), SCRIPT.callback_close(), SCRIPT.goodbye(), FALLBACK_LINE, STILL_THERE]
     lines += [QUESTIONS[p].wording(SCRIPT) for p in ORDER]

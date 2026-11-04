@@ -37,6 +37,7 @@ def test_bad_slot_and_bad_values() -> None:
     rejects(call("record_answer", slot="change_requested", value="maybe", turn_id=1), "bad_value")
     rejects(call("record_answer", slot="account_last4", value="48210", turn_id=1), "bad_value")
     rejects(call("record_answer", slot="account_last4", value=4821, turn_id=1), "bad_value")
+    rejects(call("record_answer", slot="account_last4", value="4821\n", turn_id=1), "bad_value")
     rejects(call("record_answer", slot="speaker_name", value="", turn_id=1), "bad_value")
     rejects(call("record_answer", slot="speaker_name", value="x" * 201, turn_id=1), "bad_value")
     rejects(call("record_answer", slot="flag", value="approve_now", turn_id=1), "bad_value")
@@ -77,4 +78,5 @@ def test_press_keys_only_in_a_menu_and_capped() -> None:
     assert validate(call("press_keys", digits="1#"), callee_turns=TURNS, in_menu=True) == {"digits": "1#"}
     rejects(call("press_keys", digits="1234"), "bad_value", in_menu=True)
     rejects(call("press_keys", digits="a"), "bad_value", in_menu=True)
+    rejects(call("press_keys", digits="1#\n"), "bad_value", in_menu=True)
     rejects(call("press_keys", digits="1"), "key_cap_reached", in_menu=True, keys_used=MAX_KEY_PRESSES)

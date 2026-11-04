@@ -45,15 +45,17 @@ class Script:
     callback_number: str
 
     def disclosure(self) -> str:
-        return (f"Hi, this is an AI assistant calling for the accounts payable team at {self.customer_name}, "
-                f"on a recorded line. If you'd rather call us back, our number is {self.callback_number}.")
+        # AI and recording come before the customer's name, so a name like "J. Crew" can't end the
+        # first sentence early (R8).
+        return (f"Hi, this is an AI assistant on a recorded line, calling for the accounts payable team at "
+                f"{self.customer_name}. If you'd rather call us back, our number is {self.callback_number}.")
 
     def consent_question(self) -> str:
         return "Is it okay to continue on this recorded line?"
 
     def voicemail(self) -> str:
-        return (f"Hi, this is an AI assistant calling for the accounts payable team at {self.customer_name}. "
-                f"Please call us back at {self.callback_number}. Thank you.")
+        return (f"Hi, this is an AI assistant on a recorded line, calling for the accounts payable team at "
+                f"{self.customer_name}. Please call us back at {self.callback_number}. Thank you.")
 
     def close(self) -> str:
         return "Thank you, that's everything I needed. Have a good day."

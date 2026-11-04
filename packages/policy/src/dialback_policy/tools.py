@@ -29,8 +29,8 @@ _FIELDS = {
     "press_keys": {"digits"},
 }
 _TEXT_SLOTS = {"company_named", "department", "speaker_name", "speaker_role"}
-_LAST4 = re.compile(r"^[0-9]{1,4}$")
-_KEYS = re.compile(r"^[0-9*#]{1,3}$")
+_LAST4 = re.compile(r"[0-9]{1,4}")  # used with fullmatch: "4821\n" is not 4821
+_KEYS = re.compile(r"[0-9*#]{1,3}")
 
 
 @dataclass(frozen=True)
@@ -57,7 +57,7 @@ def value_ok(slot: str, value: Any) -> bool:
     if slot in _TEXT_SLOTS:
         return 1 <= len(value) <= 200
     if slot == "account_last4":
-        return value in NO_DIGITS or bool(_LAST4.match(value))
+        return value in NO_DIGITS or bool(_LAST4.fullmatch(value))
     if slot == "offered_number":
         return 1 <= len(value) <= 32
     if slot == "flag":
@@ -120,6 +120,6 @@ def validate(call: ToolCall, *, callee_turns: frozenset[int], in_menu: bool = Fa
         raise ToolError("not_in_menu", "press_keys works only in a phone menu")
     if keys_used >= MAX_KEY_PRESSES:
         raise ToolError("key_cap_reached", f"press_keys is limited to {MAX_KEY_PRESSES} uses")
-    if not isinstance(args["digits"], str) or not _KEYS.match(args["digits"]):
+    if not isinstance(args["digits"], str) or not _KEYS.fullmatch(args["digits"]):
         raise ToolError("bad_value", "digits must be 1 to 3 of 0-9, * and #")
     return args
