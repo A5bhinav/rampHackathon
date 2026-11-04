@@ -20,7 +20,11 @@ The `images` CI job builds both Railway images on every PR. It migrates a databa
    - Copy it from Connect → Session pooler; it looks like `postgresql://postgres.<ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres`.
    - The direct host (`db.<ref>.supabase.co`) is IPv6-only unless the IPv4 add-on is bought, and Railway connects out over IPv4.
    - Use the session pooler (port 5432), not the transaction pooler (6543): the migration runner holds an advisory lock, and the worker uses session settings.
-3. Nothing else is needed yet. Migrations are applied by Railway (step 2). The dashboard's Supabase sign-in is the Nov 7 work; until then, use dev sign-in on a preview deploy (step 3).
+3. **Sign-in** (spec 0010). Follow "Setting up the Supabase project for sign-in" in `apps/web/README.md`:
+   - asymmetric JWT signing keys and a 15-minute access-token expiry;
+   - "Confirm email" off, new sign-ups off, and a 16-character minimum password;
+   - each person created on the Users page with a generated password, then given a role with `scripts/db/add_user.py`.
+4. Migrations are applied by Railway (step 2).
 
 ## 2. Railway (once)
 
@@ -57,7 +61,7 @@ FINGERPRINT_KEY_VERSION=1
 DIGITS_KEY=<openssl rand -hex 32>
 DIGITS_KEY_VERSION=1
 INTERNAL_API_TOKEN=<openssl rand -hex 32>
-DIALBACK_JWT_SECRET=<openssl rand -hex 32>
+SUPABASE_URL=https://<ref>.supabase.co
 PORT=8001
 ```
 
@@ -87,7 +91,8 @@ The `ramp-mock` URL uses Railway's reference variables (`${{service.VARIABLE}}`)
 | `INTERNAL_API_TOKEN` | yes | The voice service's bearer token for call reports; at least 24 characters. Give the same value to the voice service. |
 | `VOICE_URL` | no | The voice service. Unset: every call is refused and the case goes to a person. |
 | `DIALBACK_RESOLVER` | no | `stub` (default) or `ledger` |
-| `DIALBACK_JWT_SECRET` | yes | Verifies the dashboard's JWTs; at least 32 characters. Must match the dashboard's dev secret until Supabase sign-in lands. |
+| `SUPABASE_URL` | yes | The Supabase project's address, `https://<ref>.supabase.co`, with no path. The core verifies the dashboard's tokens with the project's public signing keys and issuer (spec 0010). |
+| `DIALBACK_JWT_SECRET` | no | Leave unset in production. Supabase advises against trusting a shared secret, the core refuses one committed to the repo, and alongside `SUPABASE_URL` it needs `DIALBACK_TRUST_LEGACY_SECRET=1`, which is only for moving a project off its legacy secret. |
 | `DIALBACK_CALLING_TZ`, `DIALBACK_CALLING_WINDOW`, `DIALBACK_CALLING_DAYS` | no | Default `America/Los_Angeles`, `09:00-16:30`, `mon-fri` |
 | `DIALBACK_RUN_WORKER`, `DIALBACK_RUN_JOBS` | no | `0` turns either off |
 | `DIALBACK_POLL_SECONDS`, `DIALBACK_RECONCILE_SECONDS`, `DIALBACK_FULL_SWEEP_SECONDS`, `DIALBACK_VERIFY_SECONDS` | no | Job intervals; default 60, 300, 86400 and 300 |
@@ -104,9 +109,11 @@ The `ramp-mock` URL uses Railway's reference variables (`${{service.VARIABLE}}`)
 | Variable | Preview | Production | Meaning |
 |---|---|---|---|
 | `CORE_URL` | yes | yes | The core's public Railway URL, `https://<core>.up.railway.app` |
-| `DIALBACK_AUTH_MODE` | `dev` | not `dev` | Dev sign-in is refused when `VERCEL_ENV=production`. Production needs Supabase sign-in, which is the Nov 7 work. |
-| `DIALBACK_JWT_SECRET` | yes | | Dev mode: the same value as the core's |
-| `DIALBACK_DEV_USERS` | yes | | Dev mode: the users to offer, as `stack.py` prints them |
+| `SUPABASE_URL` | yes | yes | The same project address as the core's. It is read at run time, so it is not `NEXT_PUBLIC_`. |
+| `SUPABASE_PUBLISHABLE_KEY` | yes | yes | The project's publishable key (`sb_publishable_…`) |
+| `DIALBACK_AUTH_MODE` | | | Leave unset: Supabase sign-in is used. Dev sign-in (`dev`) is only for local runs, and is refused when `VERCEL_ENV=production`. |
+
+Also add a Vercel Firewall rate-limit rule for POST requests to `/sign-in`, for example 20 a minute per IP (spec 0010, decision 8).
 
 ## 4. After the first deploy
 
