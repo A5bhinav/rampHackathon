@@ -45,8 +45,9 @@ B:
       role and party `unknown`, and no quote.
 - [ ] `source_type` and `seen_at` come from custody.
 - [ ] **Corpus gate B:** ingesting every corpus document, then running `select()`, reproduces
-      every frozen expectation (the spec 0015 gate, end to end), and the stub reader's roles
-      match the planted roles.
+      every frozen expectation (the spec 0015 gate, end to end). The stub reader's role
+      accuracy against the planted roles is reported, with every mismatch listed (design §7:
+      "Reported"), and is at least 95%.
 - [ ] A hostile labeler (wrong values, invented numbers, quotes from hidden text, instructions)
       gets 0 values accepted that the code didn't find in visible text.
 
