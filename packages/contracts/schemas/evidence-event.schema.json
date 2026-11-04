@@ -185,7 +185,21 @@
           "$ref": "#/$defs/Uuid",
           "description": "The Trust Ledger contact point that was dialed."
         },
-        "checks": { "$ref": "#/$defs/CallChecks" }
+        "checks": { "$ref": "#/$defs/CallChecks" },
+        "direction": {
+          "type": "string",
+          "enum": ["outbound", "inbound"],
+          "description": "The call's direction as Twilio reports it. Only an outbound call that Dialback placed can verify; an incoming call never counts (threat model, Spoofing). Absent: unknown (spec 0005, D6)."
+        },
+        "dialed_number_is_pick": {
+          "type": "boolean",
+          "description": "The voice adapter's own check, made when Twilio connects, that the number dialed is the case's chosen number for this attempt (design, 'How a call runs', step 2). Absent: unknown (spec 0005, D6)."
+        },
+        "answered_by": {
+          "type": "string",
+          "enum": ["human", "machine"],
+          "description": "Answering-machine detection on connect; machine covers voicemail greetings, fax and phone menus. Absent when detection gave no answer (spec 0005, D6)."
+        }
       }
     },
     "CallChecks": {
