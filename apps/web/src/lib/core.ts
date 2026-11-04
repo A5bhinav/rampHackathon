@@ -2,7 +2,7 @@ import "server-only";
 import { redirect } from "next/navigation";
 import { sessionToken } from "./session";
 import type {
-  ActionResult, Alert, ApiError, CaseDetail, CaseSummary, ChainStatus, Dataset, Me,
+  ActionResult, Alert, ApiError, CaseDetail, CaseSummary, ChainStatus, Dataset, Me, SelectionView,
 } from "./api-types";
 
 // The only way the dashboard talks to the core: server-side, with the signed-in user's
@@ -38,6 +38,7 @@ export const core = {
   cases: (datasetId: string) =>
     call<{ cases: CaseSummary[] }>(`/api/cases?dataset_id=${encodeURIComponent(datasetId)}`).then((r) => r.cases),
   case: (caseId: string) => call<CaseDetail>(`/api/cases/${caseId}`),
+  selection: (caseId: string) => call<SelectionView>(`/api/cases/${caseId}/selection`),
   release: (caseId: string, body: { expected_version: number; action: "approve" | "reject"; reason: string }) =>
     call<ActionResult>(`/api/cases/${caseId}/release`, { method: "POST", body: JSON.stringify(body) }),
   review: (caseId: string, body: { expected_version: number; action: "clear" | "block"; reason: string }) =>
