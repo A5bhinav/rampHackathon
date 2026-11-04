@@ -100,8 +100,10 @@
                   "opt_out",
                   "asked_what_is_checked",
                   "asked_to_call_another_number",
+                  "speaker_changed",
                   "other"
-                ]
+                ],
+                "description": "speaker_changed: someone else came on the line or gave a different name; the agent re-asks name and role (spec 0011, D4; read by decide() as NR in spec 0006)."
               }
             }
           }
