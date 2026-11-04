@@ -347,12 +347,13 @@ dev = [
 
 [[package]]
 name = "dialback-policy"
-version = "0.0.0"
+version = "0.1.0"
 source = { editable = "packages/policy" }
 
 [package.dev-dependencies]
 dev = [
     { name = "hypothesis" },
+    { name = "jsonschema" },
     { name = "pytest" },
 ]
 
@@ -361,6 +362,7 @@ dev = [
 [package.metadata.requires-dev]
 dev = [
     { name = "hypothesis", specifier = ">=6" },
+    { name = "jsonschema", specifier = ">=4.23" },
     { name = "pytest", specifier = ">=8" },
 ]
 
