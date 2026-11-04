@@ -28,6 +28,8 @@ from psycopg_pool import AsyncConnectionPool
 from pydantic import BaseModel, ConfigDict, Field
 
 from . import tokens
+from .chaos import SETTINGS as CHAOS_SETTINGS
+from .chaos import Chaos
 from .db import open_pool, transaction
 from .ratelimit import SlidingWindowLimiter
 from .settings import Settings
@@ -157,6 +159,17 @@ class SettingsPatch(Strict):
     fail_next_release: bool | None = None
     fail_holds: bool | None = None
     hold_readback_lag_ms: int | None = Field(default=None, ge=0, le=600_000)
+    # Spec 0008: the release side, and chaos mode. chaos_seed: null turns chaos off.
+    fail_releases: bool | None = None
+    ignore_releases: bool | None = None
+    fail_bill_updates: bool | None = None
+    chaos_seed: int | None = Field(default=None, ge=0, le=2_147_483_647)
+    chaos_error_permille: int | None = Field(default=None, ge=0, le=1000)
+    chaos_max_latency_ms: int | None = Field(default=None, ge=0, le=10_000)
+    chaos_drop_permille: int | None = Field(default=None, ge=0, le=1000)
+
+
+NULLABLE_SETTINGS = frozenset({"chaos_seed"})  # an explicit null turns chaos off; every other null means "unchanged"
 
 
 class PaymentRun(Strict):
@@ -266,7 +279,9 @@ async def scope(request: Request) -> AsyncIterator[Scope]:
         yield Scope(conn, row["id"], dataset_id)
 
 
-ScopeDep = Annotated[Scope, Depends(scope)]
+# scope="function": the transaction commits before the response goes out, so an answer the
+# chaos mode drops after the work (a lost response) never races the commit.
+ScopeDep = Annotated[Scope, Depends(scope, scope="function")]
 
 
 async def owned_vendor(s: Scope, vendor_id: UUID, lock: bool = False) -> dict:
@@ -335,9 +350,34 @@ def create_app(settings: Settings, pool: AsyncConnectionPool | None = None,
     app = FastAPI(title="Ramp mock", lifespan=lifespan)
     app.state.settings = settings
     app.state.limiter = SlidingWindowLimiter()
+    app.state.chaos = Chaos()
     if pool is not None:  # tests drive the app without running the lifespan
         app.state.pool = pool
         app.state.http = http
+
+    @app.middleware("http")
+    async def chaos_mode(request: Request, call_next):
+        """Spec 0008: Ramp's API only, never the mock's own routes."""
+        if not request.url.path.startswith(API):
+            return await call_next(request)
+        try:
+            dataset_id = dataset_from(request)
+        except MockError:
+            return await call_next(request)  # the route answers 401 itself
+        async with transaction(request.app.state.pool) as conn:
+            row = await (await conn.execute(CHAOS_SETTINGS, (dataset_id,))).fetchone()
+        if row is None:
+            return await call_next(request)
+        fault = request.app.state.chaos.next_fault(row)
+        if fault.latency_ms:
+            await asyncio.sleep(fault.latency_ms / 1000)
+        if fault.status is None:
+            return await call_next(request)
+        if fault.after_work:
+            done = await call_next(request)  # the work is done and committed; the answer is lost
+            async for _ in done.body_iterator:  # let the route finish before answering
+                pass
+        return error(fault.status, "chaos", "Simulated Ramp failure (chaos mode).")
 
     @app.exception_handler(MockError)
     async def _mock_error(_: Request, exc: MockError):
@@ -401,8 +441,10 @@ def create_app(settings: Settings, pool: AsyncConnectionPool | None = None,
     @app.post(f"{API}/vendors/{{vendor_id}}/release")
     async def release_hold(vendor_id: UUID, s: ScopeDep):
         await owned_vendor(s, vendor_id)
-        if await _switch(s, "fail_next_release"):
+        if await _switch(s, "fail_next_release") or await _switch(s, "fail_releases"):
             return error(500, "internal_error", "Simulated failure releasing the hold.")
+        if await _switch(s, "ignore_releases"):
+            return {"vendor_id": iso(vendor_id), "released": True}  # says yes, does nothing: the read-back must catch it
         released = (await (await s.conn.execute("select mock_ramp.release_hold(%s) as r", (vendor_id,))).fetchone())["r"]
         return {"vendor_id": iso(vendor_id), "released": released}
 
@@ -426,6 +468,8 @@ def create_app(settings: Settings, pool: AsyncConnectionPool | None = None,
 
     @app.patch(f"{API}/bills/{{bill_id}}")  # confirm: Ramp's path for updating a bill's payment date
     async def update_bill(bill_id: UUID, body: BillUpdate, s: ScopeDep):
+        if await _switch(s, "fail_bill_updates"):
+            return error(500, "internal_error", "Simulated failure updating the bill.")
         row = await (await s.conn.execute(
             "update mock_ramp.bills set payment_date = %s where id = %s and business_id = %s and paid_at is null returning *",
             (body.payment_date, bill_id, s.business_id))).fetchone()
@@ -496,7 +540,7 @@ async def _switch(s: Scope, name: str) -> bool:
 
 
 async def _apply_settings(conn: AsyncConnection, business_id: UUID, body: SettingsPatch) -> dict:
-    changes = body.model_dump(exclude_none=True)
+    changes = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None or k in NULLABLE_SETTINGS}
     await conn.execute("insert into mock_ramp.settings (business_id) values (%s) on conflict do nothing", (business_id,))
     if changes:
         sets = ", ".join(f"{k} = %s" for k in changes)

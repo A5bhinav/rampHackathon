@@ -396,35 +396,54 @@ class Worker:
         self._expect(case, cmd, ("releasing",))
         ramp = self.connector.for_dataset(case["dataset_id"])
         vendor = case["ramp_vendor_id"]
-        await ramp.release_vendor_hold(vendor)
-        for attempt in range(3):
-            if (await ramp.get_vendor(vendor)).hold_id is None:
-                break
-            await self._sleep(0.2 * (attempt + 1))
-        else:
-            raise Retry("read-back still shows the hold")
-
-        restored = []
-        for entry in await self._saved_schedule(case["id"]) or []:
-            if entry.get("payment_date"):
-                try:
-                    await ramp.set_bill_payment_date(entry["bill_id"], dt.date.fromisoformat(entry["payment_date"]))
-                    restored.append(entry)
-                except RampNotFound:
-                    log.info("bill %s is paid or gone; not rescheduled", entry["bill_id"])
+        # Until the case is `released`, any failure puts the hold back before the command retries
+        # or gives up, so the vendor is never left unheld in a case that isn't released (spec 0008,
+        # D3; R1, R7). That covers a release Ramp did but whose answer was lost, a read-back or a
+        # date restore that errors, and a database error on the last step. The next try releases
+        # again; placing a hold that is already on changes nothing.
         try:
+            await ramp.release_vendor_hold(vendor)
+            for attempt in range(3):
+                if (await ramp.get_vendor(vendor)).hold_id is None:
+                    break
+                await self._sleep(0.2 * (attempt + 1))
+            else:
+                raise Retry("read-back still shows the hold")
+            restored = []
+            for entry in await self._saved_schedule(case["id"]) or []:
+                if entry.get("payment_date"):
+                    try:
+                        await ramp.set_bill_payment_date(entry["bill_id"], dt.date.fromisoformat(entry["payment_date"]))
+                        restored.append(entry)
+                    except RampNotFound:
+                        log.info("bill %s is paid or gone; not rescheduled", entry["bill_id"])
             await self._emit(case, "hold_release_confirmed", f"{cmd.key}:confirmed",
                              {"readback_ok": True, "restored_schedule": restored})
         except Stale:
             # Another change arrived while we released (the case is held again). Put the hold
-            # back at once and say so: a release must never outlive the case's state (R1, R7).
-            await ramp.place_vendor_hold(vendor, HOLD_REASON)
+            # back at once and always say so: a release must never outlive the case's state.
+            back = await self._put_hold_back(ramp, vendor, case["id"])
             async with system_tx(self.pool) as conn:
                 await conn.execute(
                     "insert into app.alerts (dataset_id, case_id, kind, severity, message, raised_at) "
                     "values (%s, %s, 'vendor_not_held', 'critical', %s, app.now(%s))",
-                    (case["dataset_id"], case["id"], "A release raced a new bank change; the hold was put back.", case["dataset_id"]))
+                    (case["dataset_id"], case["id"],
+                     "A release raced a new bank change; the hold was put back." if back else
+                     "A release raced a new bank change and the hold could not be put back; reconciliation will retry.",
+                     case["dataset_id"]))
             raise
+        except Exception:
+            await self._put_hold_back(ramp, vendor, case["id"])
+            raise
+
+    async def _put_hold_back(self, ramp: RampPort, vendor: str, case_id: UUID) -> bool:
+        """Best effort: if Ramp is down too, the reconcile job puts it back (invariant I2)."""
+        try:
+            await ramp.place_vendor_hold(vendor, HOLD_REASON)
+            return True
+        except Exception as exc:  # noqa: BLE001  (best effort; the failure that got us here still propagates)
+            log.error("the hold on case %s could not be put back (%s); reconciliation will", case_id, type(exc).__name__)
+            return False
 
     async def notify(self, cmd: Command) -> None:
         log.info("notify: case %s outcome %s", cmd.case_id, cmd.payload.get("outcome"))

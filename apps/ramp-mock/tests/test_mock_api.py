@@ -156,3 +156,58 @@ async def test_requests_are_validated(api):
     r = await api.post(f"/_mock/vendors/{refs['acme']}/bank-change", headers=auth(ds),
                        json={"routing_number": "12", "account_number": "x", "extra": 1})
     assert r.status_code == 422 and r.json()["error"]["code"] == "invalid_request"
+
+
+# Chaos mode and the release-side failures (spec 0008) ----------------------------------------------
+
+async def _codes(api, ds, n):
+    return [(await api.get(f"{API}/vendors", headers=auth(ds))).status_code for _ in range(n)]
+
+
+async def test_chaos_is_seeded_scoped_and_can_lose_a_response(api):
+    ds, refs = await seeded(api)
+    assert set(await _codes(api, ds, 10)) == {200}, "off by default"
+
+    await api.patch("/_mock/settings", headers=auth(ds), json={"chaos_seed": 7, "chaos_error_permille": 500})
+    first = await _codes(api, ds, 40)
+    assert {200} < set(first) <= {200, 500, 502, 503}, "about half fail, with server errors only"
+    await api.patch("/_mock/settings", headers=auth(ds), json={"chaos_seed": 7})  # the same seed restarts the sequence
+    assert await _codes(api, ds, 40) == first, "the same seed gives the same faults"
+
+    for _ in range(10):  # the mock's own routes are never affected
+        assert (await api.post("/_mock/payment-run", headers=auth(ds), json={"as_of": "2026-01-01"})).status_code == 200
+
+    # A lost response: the hold was placed even though the answer was an error.
+    await api.patch("/_mock/settings", headers=auth(ds), json={"chaos_seed": 3, "chaos_error_permille": 1000})
+    codes = [(await api.post(f"{API}/vendors/{refs['acme']}/hold", headers=auth(ds))).status_code for _ in range(12)]
+    assert set(codes) <= {500, 502, 503}
+    await api.patch("/_mock/settings", headers=auth(ds), json={"chaos_seed": None})
+    assert (await api.get(f"{API}/vendors/{refs['acme']}", headers=auth(ds))).json()["hold"] is not None, \
+        "some failures happened after the work was done"
+
+
+async def test_chaos_drops_webhooks(api, receiver):
+    ds, refs = await seeded(api, settings={"chaos_seed": 1, "chaos_drop_permille": 1000})
+    await api.post(f"/_mock/vendors/{refs['acme']}/bank-change", headers=auth(ds),
+                   json={"routing_number": "026009593", "account_number": "000055556666"})
+    await api.post("/_mock/webhooks/deliver", headers=auth(ds))
+    assert receiver.requests == [], "dropped, never sent: the poller has to find the change"
+
+
+async def test_release_side_switches_stay_on_until_turned_off(api):
+    ds, refs = await seeded(api)
+    h, vendor = auth(ds), f"{API}/vendors/{refs['acme']}"
+    await api.post(f"{vendor}/hold", headers=h)
+
+    await api.patch("/_mock/settings", headers=h, json={"fail_releases": True})
+    assert [(await api.post(f"{vendor}/release", headers=h)).status_code for _ in range(2)] == [500, 500]
+    await api.patch("/_mock/settings", headers=h, json={"fail_releases": False, "ignore_releases": True})
+    r = await api.post(f"{vendor}/release", headers=h)
+    assert r.status_code == 200 and r.json()["released"] is True
+    assert (await api.get(vendor, headers=h)).json()["hold"] is not None, "Ramp said yes and did nothing"
+
+    await api.patch("/_mock/settings", headers=h, json={"ignore_releases": False, "fail_bill_updates": True})
+    [bill] = [b for b in (await api.get(f"{API}/bills", headers=h, params={"vendor_id": refs["acme"]})).json()["data"]][:1]
+    assert (await api.patch(f"{API}/bills/{bill['id']}", headers=h, json={"payment_date": "2026-11-20"})).status_code == 500
+    await api.patch("/_mock/settings", headers=h, json={"fail_bill_updates": False})
+    assert (await api.patch(f"{API}/bills/{bill['id']}", headers=h, json={"payment_date": "2026-11-20"})).status_code == 200
