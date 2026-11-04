@@ -190,12 +190,25 @@ def test_no_text_from_the_agent_means_the_fixed_wording() -> None:
     assert c.said[-1] == "Could you tell me the name of the company I've reached?"
 
 
-def test_volunteered_answers_count_and_the_order_skips_ahead() -> None:
+def test_answers_said_with_consent_are_asked_again_in_order() -> None:
+    """decide() needs consent strictly first, so answers in the consent turn aren't kept."""
     c = Call()
     c.connect()
     t = c.callee("Yes that's fine, this is Dana in accounts receivable at Acme Fasteners.")
     c.agent(rec("recording_consent", "yes", t), rec("company_named", "Acme Fasteners", t),
             rec("department", "accounts receivable", t), rec("speaker_name", "Dana", t))
+    assert [a["slot"] for a in c.state.answers] == ["recording_consent"]
+    assert c.state.phase == Phase.COMPANY and c.state.violations == 0
+
+
+def test_volunteered_answers_after_consent_count_and_the_order_skips_ahead() -> None:
+    c = Call()
+    c.connect()
+    t = c.callee("Yes, that's fine.")
+    c.agent(rec("recording_consent", "yes", t))
+    t = c.callee("This is Dana in accounts receivable at Acme Fasteners.")
+    c.agent(rec("company_named", "Acme Fasteners", t), rec("department", "accounts receivable", t),
+            rec("speaker_name", "Dana", t))
     assert c.state.phase == Phase.CHANGE
     assert checks(c.state)["answers_grounded"] is True
 
@@ -277,7 +290,7 @@ def test_grounding_a_yes_must_answer_its_own_question() -> None:
     c.connect()
     t = c.callee("Yes.")
     c.agent(rec("recording_consent", "yes", t), rec("change_requested", "yes", t))  # one "yes", two answers
-    assert checks(c.state)["answers_grounded"] is False
+    assert [a["slot"] for a in c.state.answers] == ["recording_consent"]
 
 
 def test_grounding_text_and_digits_must_appear_in_the_cited_turn() -> None:
@@ -354,3 +367,167 @@ def test_the_agent_never_gets_a_tool_that_changes_the_number() -> None:
             tool("schedule_callback", window={"start": "2026-11-05T15:00:00-08:00", "number": "4155550177"}))
     assert checks(c.state)["new_number_accepted"] is False
     assert any(a["slot"] == "offered_number" for a in answers_object(c.state)["answers"])
+
+
+# --- the review's findings (B1-B5, C1-C2, M1-M6), each pinned by a test ---------------------
+
+def test_a_sure_to_the_callback_question_is_not_consent() -> None:  # B1
+    c = Call()
+    c.connect()
+    c.callee("Can you call me back?")
+    c.agent(tool("schedule_callback", window=None))
+    t = c.callee("Sure, after two.")
+    c.agent(rec("recording_consent", "yes", t))
+    assert checks(c.state)["answers_grounded"] is False
+
+
+def test_the_yes_no_questions_are_always_code_s_wording() -> None:  # B1
+    c = Call()
+    c.connect()
+    t = c.callee("Yes.")
+    c.agent(rec("recording_consent", "yes", t))
+    t = c.callee("Acme Fasteners")
+    c.agent(rec("company_named", "Acme Fasteners", t))
+    t = c.callee("Accounts receivable")
+    c.agent(rec("department", "Accounts receivable", t))
+    t = c.callee("Dana Ruiz")
+    c.agent(rec("speaker_name", "Dana Ruiz", t), text="Is it okay if I ask about something else?")
+    assert c.said[-1] == f"Has your company recently asked {SCRIPT.customer_name} to change how you get paid?"
+
+
+def test_a_yes_next_to_a_negation_is_not_grounded() -> None:  # B2
+    for words in ("No, that's not okay.", "Absolutely not.", "No, we did not."):
+        c = Call()
+        c.connect()
+        t = c.callee(words)
+        c.agent(rec("recording_consent", "yes", t))
+        assert checks(c.state)["answers_grounded"] is False, words
+
+
+def test_a_negated_company_name_is_not_grounded() -> None:  # B2
+    c = Call()
+    c.connect()
+    t = c.callee("Yes.")
+    c.agent(rec("recording_consent", "yes", t))
+    t = c.callee("Not Acme Fasteners, this is Globex.")
+    c.agent(rec("company_named", "Acme Fasteners", t))
+    assert checks(c.state)["answers_grounded"] is False
+
+
+def test_a_closing_tool_never_drops_an_answer() -> None:  # B3
+    c = Call()
+    to_last4(c)
+    t = c.callee("Actually no, we never asked for that. Call me back tomorrow.")
+    c.agent(tool("schedule_callback", window={"start": "2026-11-05T15:00:00-08:00"}),
+            rec("change_requested", "no", t))
+    assert c.end.result == "callback_requested"
+    assert ("change_requested", "no") in [(a["slot"], a["value"]) for a in c.state.answers]
+
+
+def test_a_guessed_company_name_does_not_unlock_the_vendor_name() -> None:  # B4
+    c = Call()
+    c.connect()
+    t = c.callee("Yes.")
+    c.agent(rec("recording_consent", "yes", t))
+    t = c.callee("Who's calling?")
+    c.agent(rec("company_named", "Acme Fasteners", t), text="Is this Acme Fasteners?")
+    assert "Acme" not in c.said[-1] and checks(c.state)["speech_guard_trips"] == 1
+
+
+def test_nothing_is_said_before_the_disclosure() -> None:  # B5
+    c = Call()
+    c.callee("Hello?")
+    c.agent(text="Hi, who's this?")
+    assert c.said == [] and c.state.turns == ()
+    c.connect()
+    assert c.said[0] == SCRIPT.disclosure()
+
+
+def test_odd_tool_input_never_raises() -> None:  # C1
+    c = Call()
+    c.connect()
+    t = c.callee("Yes, call me back then.")
+    c.agent(rec("recording_consent", "yes", t), tool("schedule_callback", window={"start": "9999-12-31T23:00:00-05:00"}))
+    assert c.end is None and c.state.violations == 1
+    c.agent(ToolCall(id="tc_x", name=["end_call"], args={"reason": "completed"}))  # type: ignore[arg-type]
+    assert c.end.result == "failed"
+
+
+def test_bad_keypad_input_cannot_go_on_forever() -> None:  # C2
+    c = Call()
+    to_last4(c)
+    for _ in range(MAX_CALLEE_TURNS):
+        c.keys("123456789")
+        if c.end:
+            break
+    assert c.end.result == "failed"
+
+
+def test_pressure_in_the_consent_turn_is_still_flagged() -> None:  # M1
+    c = Call()
+    c.connect()
+    t = c.callee("Yes, but hurry, just appro\u200bve it today.")
+    c.agent(rec("recording_consent", "yes", t))
+    assert [(a["value"], a["turn_id"]) for a in c.state.answers if a["slot"] == "flag"] == [("pressure_to_approve", t)]
+
+
+def test_an_agent_line_that_accepts_a_new_number_is_never_spoken() -> None:  # M2, acceptance item 3
+    c = Call()
+    c.connect()
+    t = c.callee("Yes.")
+    c.agent(rec("recording_consent", "yes", t))
+    t = c.callee("Call my cell instead, 415 555 0177.")
+    c.agent(rec("offered_number", "415 555 0177", t), text="Sure, I'll call you back on your cell.")
+    assert "cell" not in c.said[-1] and checks(c.state)["new_number_accepted"] is False
+
+
+def test_checks_report_a_new_number_even_if_a_line_slipped_through() -> None:  # M2, the backstop
+    from dataclasses import replace
+
+    from dialback_policy.step import Turn
+
+    c = Call()
+    c.connect()
+    for line in ("Sure, I'll call you back on your cell.", "Okay, 415 555 0177 it is."):
+        state = replace(c.state, turns=c.state.turns + (Turn(len(c.state.turns), "agent", line),))
+        assert checks(state)["new_number_accepted"] is True, line
+
+
+def test_a_violation_after_the_last_answer_closes_the_call() -> None:  # M4
+    c = Call()
+    to_last4(c)
+    t = c.callee("4821")
+    c.agent(rec("account_last4", "4821", t), tool("approve_payment", case="x"))
+    assert c.end.result == "answers_recorded" and c.said[-1] == SCRIPT.close()
+
+
+def test_the_answers_never_exceed_the_contract_cap() -> None:  # M5
+    c = Call()
+    c.connect()
+    t = c.callee("Yes.")
+    c.agent(rec("recording_consent", "yes", t))
+    t = c.callee("Hmm, well, other things.")
+    c.agent(*[ToolCall(id=f"tc_{i}", name="record_answer", args={"slot": "flag", "value": "other", "turn_id": t})
+              for i in range(60)])
+    assert len(answers_object(c.state)["answers"]) <= 50 and c.end.result == "failed"
+
+
+def test_a_punctuation_only_answer_is_not_grounded() -> None:  # M6
+    c = Call()
+    c.connect()
+    t = c.callee("Yes.")
+    c.agent(rec("recording_consent", "yes", t))
+    t = c.callee("...")
+    c.agent(rec("company_named", "?", t))
+    assert checks(c.state)["answers_grounded"] is False
+
+
+def test_a_malformed_tool_call_never_records_a_yes() -> None:  # acceptance item 7
+    c = Call()
+    to_last4(c)
+    before = len(c.state.answers)
+    bad = ToolCall(id="tc_bad", name="record_answer",
+                   args={"slot": "change_requested", "value": "yes", "turn_id": c.last_callee_turn(), "sure": True})
+    c.agent(bad)
+    c.agent(bad)
+    assert c.end.result == "failed" and len(c.state.answers) == before

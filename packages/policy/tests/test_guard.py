@@ -165,3 +165,8 @@ def test_guard_speaks_the_fallback_line_instead() -> None:
 def test_a_phone_number_the_callee_offered_is_never_read_back() -> None:
     ctx = GuardContext(vendor_names=CTX.vendor_names, callee_last_turn="call my cell instead, 415 555 0177")
     assert not check("Sure, 415 555 0177.", ctx).ok
+
+
+@pytest.mark.parametrize("text", ["Sure, I'll call you back on your cell.", "We can reach you at that number instead."])
+def test_blocks_agreeing_to_call_another_number(text: str) -> None:
+    assert "new_number" in check(text, CTX).reasons

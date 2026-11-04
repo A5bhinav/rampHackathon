@@ -55,6 +55,10 @@ This replaces the `ScriptedVoice` test double in `scripts/dev/stack.py`. It is t
    - Text values and spoken digits must appear in that turn.
    - Keypad digits come only from keypad events, never from the model.
    - Any miss sets `answers_grounded: false`.
+   - The two yes/no questions (consent and the change) are always code's fixed wording, never the model's, so a
+     "yes" can only answer the question code asked. A "yes" next to a negation ("absolutely not") isn't grounded.
+   - Scripted answers given in the same turn as consent aren't kept; they're asked again in order, because
+     `decide()` needs consent strictly first. Flags and offered numbers are always kept.
 6. **Pressure.** Code flags `pressure_to_approve` from a fixed phrase list over the callee's turns: urgency, "approve it", "wire it today", claims of authority. The model may add the flag too, grounded like any answer; code's flag is the minimum (answers Q22).
 7. **Telephony facts on the text line:**
    - `direction: "outbound"`;
@@ -76,7 +80,8 @@ All additive, in Sami's contracts PR:
   - "verified", "approved" and "match";
   - amounts;
   - bank names;
-  - the vendor's name before `company_named`.
+  - the vendor's name before the callee has named the vendor;
+  - agreeing to call another number.
 
   It allows a read-back of digits the callee just said.
 - [ ] **Tools** reject an unknown tool, an extra field, a bad slot, a bad value and a missing `turn_id`. The first violation re-asks; the second ends the call `failed`.
