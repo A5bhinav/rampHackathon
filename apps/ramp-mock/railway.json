@@ -1,0 +1,16 @@
+{
+  "$schema": "https://railway.com/railway.schema.json",
+  "build": {
+    "builder": "DOCKERFILE",
+    "dockerfilePath": "apps/ramp-mock/Dockerfile",
+    "watchPatterns": ["apps/ramp-mock/**", "pyproject.toml", "uv.lock"]
+  },
+  "deploy": {
+    "startCommand": "dialback-ramp-mock",
+    "healthcheckPath": "/healthz",
+    "healthcheckTimeout": 60,
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 10,
+    "numReplicas": 1
+  }
+}
