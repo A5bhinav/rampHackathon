@@ -334,6 +334,7 @@ source = { editable = "packages/ledger" }
 [package.dev-dependencies]
 dev = [
     { name = "hypothesis" },
+    { name = "jsonschema" },
     { name = "pytest" },
 ]
 
@@ -342,6 +343,7 @@ dev = [
 [package.metadata.requires-dev]
 dev = [
     { name = "hypothesis", specifier = ">=6" },
+    { name = "jsonschema", specifier = ">=4" },
     { name = "pytest", specifier = ">=8" },
 ]
 
