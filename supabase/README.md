@@ -117,6 +117,8 @@ These extend the design doc; none contradict it. Shout if any is wrong.
 10. **Migration `app/0005`**: a repeated release request (a double click) returns its first result instead of a refusal, and only for the same person's own request. Test `008`.
 11. **Migration `app/0006`** (spec 0003): `app.job_runs` with `claim_job` and `finish_job` (due on the dataset clock, leased so one worker runs a job at a time), and `app.lock_case`, which lets reconciliation lock one case row so a re-hold and a release never interleave.
 12. **Migration `app/0007`** (spec 0004): `verify_chain` joins the scheduled jobs in `app.job_runs`. The job calls `audit.verify_chain`, the same check as the dashboard badge, and a broken row raises one critical `chain_broken` alert (one open per dataset, by a unique index).
+13. **Migration `app/0008`** (spec 0007): a call that ends with `callback_requested` (and the vendor's `retry_at`) is an attempt like a call nobody answered: `retry_wait` with tries left, `needs_review` without. The existing retry timer redials at the time asked, inside the calling window. Test `009`.
+14. **Migration `mock_ramp/0003`** (spec 0008): chaos mode's settings (`chaos_seed`, `chaos_error_permille`, `chaos_max_latency_ms`, `chaos_drop_permille`), and the release-side switches `fail_releases`, `ignore_releases` and `fail_bill_updates`.
 
 ## Hosted project setup (once, by Abhi)
 

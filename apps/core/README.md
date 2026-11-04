@@ -154,6 +154,10 @@ If this slice is behind at the Nov 4 checkpoint, `packages/decision` moves to In
 | The worker: commands with retries, deferral, stale drops and escalation; timers on the dataset clock | `worker.py` | `abhi/core-worker` |
 | `POST /internal/calls/{call_id}/ended` per Sami's `internal.yaml`: digits compared then hashed, only the current call counts | `calls.py`, `answers.py` | `abhi/core-worker` |
 | Ports to Inesh's `select_number` and Sami's `POST /calls`, both failing closed when the other side is missing | `ports.py` | `abhi/core-worker` |
+| What `decide()` reads (spec 0005): the report must name this version's ledger pick; earlier calls of the generation; every company answer must match; the ledger's `change_context` port (unknown until it exists) | `worker.py`, `ports.py` | `abhi/decision-facts` |
+| The voice report's telephony facts (`direction`, `dialed_number_is_pick`, `answered_by`; contract A5bhinav/rampHackathon#13), stored with the call and read into the decision facts | `calls.py`, `worker.py` | `abhi/core-telephony` |
+| Callbacks (spec 0007): `callback_requested` with `retry_at` redials at the time asked, inside the calling window, as one of the 3 attempts; the deadline survives a re-hold and only acts while code owns the case | `calls.py`, `timeline.py`, migration `app/0008` | `abhi/lifecycle` |
+| A release that can't finish puts the hold back: the release fails, is ignored, or the dates can't be restored. When the retries run out, a person takes over with the hold on. Under seeded chaos the money path keeps R1, I2 and an intact chain (spec 0008) | `worker.py`, `tests/test_chaos.py` | `abhi/failure-paths` |
 | Company-name match, calling window | `company.py`, `calling_window.py` | `abhi/core-worker` |
 | CLI: `serve`, `new-dataset`, `import-vendors`, `retire-dataset`, `run-job` | `main.py` | `abhi/core-worker`, `abhi/poller-reconcile` |
 | Scheduled jobs on the dataset clock: the poller (incremental, with a nightly full sweep) and reconciliation (a missing hold goes back on, with a critical alert) | `jobs.py` | `abhi/poller-reconcile` |
@@ -178,7 +182,8 @@ If this slice is behind at the Nov 4 checkpoint, `packages/decision` moves to In
 | `DIALBACK_RUN_WORKER` | no | `0` runs the API without the worker |
 | `DIALBACK_RUN_JOBS` | no | `0` turns off the scheduled jobs: poller, reconciliation, chain check (specs 0003, 0004) |
 | `DIALBACK_POLL_SECONDS`, `DIALBACK_RECONCILE_SECONDS`, `DIALBACK_FULL_SWEEP_SECONDS`, `DIALBACK_VERIFY_SECONDS` | no | Job intervals on the dataset clock; default 60, 300, 86400 and 300 |
-| `DIALBACK_JWT_SECRET` | yes | Verifies the dashboard's JWTs (Supabase's signing secret; a dev secret locally). 32+ characters |
+| `SUPABASE_URL` | one of these two | The Supabase project's URL (`https://<ref>.supabase.co`). The core verifies the dashboard's tokens with the project's public signing keys and checks they were issued by it (spec 0010). Production sets only this one |
+| `DIALBACK_JWT_SECRET` | one of these two | A shared HS256 secret for the dashboard's tokens: the local dev sign-in, or a project still on Supabase's legacy secret. 32+ characters. Leave unset in production |
 
 Secrets live in Railway variables and Supabase Vault; never in the repo or in logs.
 

@@ -13,6 +13,8 @@ What it proves, in order:
      "Hold not confirmed" alert (R7); when Ramp recovers, reconciliation puts the hold on.
   6. A hold lifted by hand in Ramp is put back by reconciliation, with a critical alert (I2).
   7. A bank change Ramp never announces is found by the poller (spec 0003).
+  7b. A vendor asks for a callback, is called back and confirms; no Dialback user made that
+     change, so the first approver's release waits for a second approver (spec 0007).
   8. The evidence chain is intact.
   9. One evidence row edited by hand is caught by the scheduled chain check, which points
      straight at it (spec 0004; the demo's sixth beat).
@@ -86,7 +88,7 @@ class Smoke:
         async def settled() -> bool:
             c = await self.cases()
             return (c.get(acme, {}).get("state"), c.get(bright, {}).get("state"), c.get(cobalt, {}).get("state")) == \
-                ("awaiting_release", "needs_review", "blocked")
+                ("awaiting_release", "needs_review", "blocked") and c.get("Delta Paper Co", {}).get("hold_status") == "confirmed"
         await self.until("three changes settle: confirmed awaits release, refused call needs review, denial is blocked", settled)
         c = await self.cases()
         self.check(c[acme]["outcome"] == "verified" and c[cobalt]["outcome"] == "not_verified", "code decided verified and not verified")
@@ -151,6 +153,8 @@ class Smoke:
         async with self.mock() as m:
             await m.patch("/_mock/settings", json={"silent_changes": False})
 
+        await self.callback_and_two_approvers()
+
         async with self.core() as approver:
             chain = (await approver.get(f"/api/datasets/{self.dataset_id}/chain")).json()
             self.check(chain["ok"], f"the evidence chain is intact ({chain['checked']} events)")
@@ -188,6 +192,31 @@ class Smoke:
         failed = [what for ok, what in self.results if not ok]
         print(f"\n{len(self.results) - len(failed)} of {len(self.results)} checks passed.")
         return 1 if failed else 0
+
+    async def callback_and_two_approvers(self) -> None:
+        delta = "Delta Paper Co"
+
+        async def verified_after_callback() -> bool:
+            return (await self.cases()).get(delta, {}).get("state") == "awaiting_release"
+        await self.until("a vendor who asked for a callback is called back and confirms", verified_after_callback)
+        case = (await self.cases())[delta]
+        async with self.core() as approver:
+            detail = (await approver.get(f"/api/cases/{case['id']}")).json()
+        summaries = [e["summary"] for e in detail["timeline"]]
+        self.check(any("asked to be called back" in s for s in summaries) and "Call attempt 2 started." in summaries,
+                   "the timeline shows the callback and the second call")
+        body = {"expected_version": case["version"], "action": "approve", "reason": "Called back on the ledger's number; digits match."}
+        async with self.core("approver1") as first:
+            r = (await first.post(f"/api/cases/{case['id']}/release", json=body)).json()
+        self.check(r.get("status") == "awaiting_second_approver" and r.get("to_state") == "awaiting_release",
+                   "with no known changer, the first approval waits for a second approver (ADR-10)")
+        async with self.core("approver2") as second:
+            r = await second.post(f"/api/cases/{case['id']}/release", json=body)
+        self.check(r.status_code == 200 and r.json()["to_state"] == "releasing", "a second, different approver releases it")
+
+        async def released() -> bool:
+            return (await self.cases()).get(delta, {}).get("state") == "released"
+        await self.until("the two-approver release lifts the hold", released)
 
 
 async def run_smoke(pool, settings, dataset_id, refs, users) -> int:

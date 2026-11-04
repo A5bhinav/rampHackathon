@@ -1,0 +1,42 @@
+{
+ "call": "A reviewer phoned the vendor and typed in the answers; every one is good.",
+ "answers": [
+  [
+   "recording_consent",
+   "yes",
+   1
+  ],
+  [
+   "company_named",
+   "Acme Fasteners",
+   3
+  ],
+  [
+   "speaker_name",
+   "Jordan Lee",
+   5
+  ],
+  [
+   "speaker_role",
+   "AR manager",
+   5
+  ],
+  [
+   "change_requested",
+   "yes",
+   7
+  ],
+  [
+   "account_last4",
+   "6666",
+   9
+  ]
+ ],
+ "source": "manual",
+ "expect": {
+  "outcome": "needs_review",
+  "rules_fired": [
+   "NR20_manual_answers"
+  ]
+ }
+}

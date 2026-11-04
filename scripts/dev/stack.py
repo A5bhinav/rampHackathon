@@ -20,6 +20,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import contextlib
+import datetime as dt
 import os
 import signal
 import sys
@@ -37,7 +38,7 @@ from dialback_core.datasets import create_dataset
 from dialback_core.db import open_pool, system_tx
 from dialback_core.detection import Keys, import_all
 from dialback_core.flags import RampMode
-from dialback_core.ports import PreDialRefused, Selection
+from dialback_core.ports import ChangeFacts, PreDialRefused, Selection
 from dialback_core.ramp import RampConnector
 from dialback_core.ramp.connector import mock_token
 from dialback_core.settings import Settings
@@ -64,13 +65,22 @@ class ScriptedLedger:
         return Selection(uuid.uuid4(), "scripted-double", CONTACT_POINT, source_types=("contract", "listing"))
 
 
+class ScriptedChangeContext:
+    """TEST DOUBLE for Inesh's change context: the speaker isn't in the change thread and is
+    known from before the request; an offered number's source stays unknown."""
+
+    async def check(self, **_) -> ChangeFacts:
+        return ChangeFacts(speaker_in_change_thread=False, speaker_known_before_request=True)
+
+
 class ScriptedVoice:
     """TEST DOUBLE for Sami's voice service. Accepts the call, then reports it to the core as
     internal.yaml describes. The vendor says their new account's last four digits, unless the
-    vendor's name is in `refuse` (a pre-dial refusal) or `deny` (the vendor denies the change)."""
+    vendor's name is in `refuse` (a pre-dial refusal), `deny` (the vendor denies the change) or
+    `callback` (the first call asks to be called back in a few seconds; spec 0007)."""
 
-    def __init__(self, pool, refuse: set[str], deny: set[str]) -> None:
-        self.pool, self.refuse, self.deny = pool, refuse, deny
+    def __init__(self, pool, refuse: set[str], deny: set[str], callback: set[str] = frozenset()) -> None:
+        self.pool, self.refuse, self.deny, self.callback = pool, refuse, deny, callback
         self.tasks: set[asyncio.Task] = set()
 
     async def place_call(self, *, case_id, attempt, idempotency_key) -> uuid.UUID:
@@ -93,16 +103,31 @@ class ScriptedVoice:
 
         def a(slot, value, turn):
             return {"slot": slot, "value": value, "turn_id": turn, "tool_call_id": f"tc_{turn}",
-                    "captured_at": "2026-11-01T17:02:11Z", "capture_method": "keypad" if slot == "account_last4" else "speech"}
+                    "captured_at": f"2026-11-01T17:02:{turn:02d}Z", "capture_method": "keypad" if slot == "account_last4" else "speech"}
 
+        if vendor in self.callback and attempt == 1:
+            when = (dt.datetime.now(dt.UTC) + dt.timedelta(seconds=2)).isoformat()
+            body = {"call_id": str(call_id), "case_id": str(case_id), "result": "callback_requested", "attempt": attempt,
+                    "retry_at": when, "contact_point_id": str(CONTACT_POINT), "direction": "outbound",
+                    "dialed_number_is_pick": True, "answered_by": "human", "agent_version": "scripted-double",
+                    "answers": {"schema_version": "call-answers/v0", "call_id": str(call_id),
+                                "answers": [a("recording_consent", "yes", 1)]}}
+            await self._send(case_id, attempt, call_id, body)
+            return
         answers = [a("recording_consent", "yes", 1), a("company_named", vendor.removesuffix(" LLC").removesuffix(" Inc"), 3),
-                   a("speaker_name", "Jordan Lee", 5), a("change_requested", "no" if denies else "yes", 7)]
+                   a("speaker_name", "Jordan Lee", 5), a("speaker_role", "AR manager", 5),
+                   a("change_requested", "no" if denies else "yes", 7)]
         if not denies:
             answers.append(a("account_last4", last4, 9))
         body = {"call_id": str(call_id), "case_id": str(case_id), "result": "answers_recorded", "attempt": attempt,
+                "contact_point_id": str(CONTACT_POINT), "direction": "outbound", "dialed_number_is_pick": True,
+                "answered_by": "human",
                 "agent_version": "scripted-double", "answers": {"schema_version": "call-answers/v0", "call_id": str(call_id), "answers": answers},
                 "checks": {"disclosure_first": True, "answers_grounded": True, "agent_spoke_account_digits": False,
                            "new_number_accepted": False, "policy_violations": 0, "speech_guard_trips": 0}}
+        await self._send(case_id, attempt, call_id, body)
+
+    async def _send(self, case_id, attempt, call_id, body: dict) -> None:
         async with httpx.AsyncClient(timeout=10.0) as http:
             for _ in range(10):
                 r = await http.post(f"{CORE_URL}/internal/calls/{call_id}/ended", json=body,
@@ -117,6 +142,7 @@ VENDORS = [
     ("acme", "Acme Fasteners LLC", "000011112222", "000033334444"),
     ("brightline", "Brightline Office Supply Inc", "000044445555", "000066667777"),
     ("cobalt", "Cobalt Freight LLC", "000077778888", "000099990000"),
+    ("delta", "Delta Paper Co", "000012121212", "000034343434"),
 ]
 
 
@@ -162,12 +188,15 @@ async def bank_change(settings: Settings, dataset_id, vendor_id: str, account: s
         (await mock.post(f"/_mock/vendors/{vendor_id}/bank-change", json=body)).raise_for_status()
 
 
-def core_settings(url: str, backoff: float = 1.0, jobs_every: int = 30) -> Settings:
+def core_settings(url: str, backoff: float = 1.0, jobs_every: int = 30, supabase_url: str | None = None) -> Settings:
     s = SECRETS
-    return Settings(database_url=url, ramp_mode=RampMode.MOCK, ramp_base_url=MOCK_URL,
+    # With a Supabase project (or scripts/dev/fake_supabase_auth.py), the core trusts only its
+    # signing keys; otherwise the dashboard's dev sign-in secret (spec 0010).
+    return Settings(database_url=url, ramp_mode=RampMode.MOCK, ramp_base_url=MOCK_URL, supabase_url=supabase_url,
                     ramp_webhook_secret=s["RAMP_WEBHOOK_SECRET"].encode(), fingerprint_key=s["FINGERPRINT_KEY"].encode(),
                     mock_ramp_secret=s["MOCK_RAMP_SECRET"].encode(), digits_key=s["DIGITS_KEY"].encode(),
-                    internal_api_token=s["INTERNAL_API_TOKEN"].encode(), jwt_secret=s["DIALBACK_JWT_SECRET"].encode(),
+                    internal_api_token=s["INTERNAL_API_TOKEN"].encode(),
+                    jwt_secret=b"" if supabase_url else s["DIALBACK_JWT_SECRET"].encode(),
                     calling_window="00:00-23:59", calling_days="all",  # the evening demo (spec 0002, Q7)
                     command_backoff_seconds=backoff, worker_poll_seconds=0.3, run_worker=True,
                     # The poller and reconciliation (spec 0003), much more often than in production.
@@ -191,10 +220,12 @@ async def run(url: str, args: argparse.Namespace) -> int:
     mock = await asyncio.create_subprocess_exec(sys.executable, "-m", "dialback_ramp_mock.main", env=env)
     try:
         await wait_for(f"{MOCK_URL}/healthz")
-        settings = core_settings(url, backoff=0.2 if args.smoke else 1.0, jobs_every=2 if args.smoke else 30)
+        settings = core_settings(url, backoff=0.2 if args.smoke else 1.0, jobs_every=2 if args.smoke else 30,
+                                 supabase_url=args.supabase_url)
         pool = await open_pool(url, max_size=10)
-        voice = ScriptedVoice(pool, refuse={"Brightline Office Supply Inc"}, deny={"Cobalt Freight LLC"})
-        app = create_app(settings, pool=pool, resolver=ScriptedLedger(), caller=voice)
+        voice = ScriptedVoice(pool, refuse={"Brightline Office Supply Inc"}, deny={"Cobalt Freight LLC"},
+                              callback={"Delta Paper Co"})
+        app = create_app(settings, pool=pool, resolver=ScriptedLedger(), caller=voice, change_context=ScriptedChangeContext())
         server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=CORE_PORT, log_level="warning"))
         serving = asyncio.create_task(server.serve())
         await wait_for(f"{CORE_URL}/healthz")
@@ -204,16 +235,24 @@ async def run(url: str, args: argparse.Namespace) -> int:
         print("\nThe walking skeleton is running.\n")
         print(f"  core      {CORE_URL}\n  ramp mock {MOCK_URL}\n  dataset   {dataset_id}\n")
         print("Start the dashboard in another terminal:\n")
-        print(f"  cd apps/web && CORE_URL={CORE_URL} DIALBACK_AUTH_MODE=dev DIALBACK_JWT_SECRET={SECRETS['DIALBACK_JWT_SECRET']} \\")
-        print(f"    DIALBACK_DEV_USERS='{dev_users}' pnpm dev\n")
+        if args.supabase_url:
+            print(f"  cd apps/web && CORE_URL={CORE_URL} SUPABASE_URL={args.supabase_url} \\")
+            print("    SUPABASE_PUBLISHABLE_KEY=sb_publishable_local pnpm dev\n")
+            print(f"  Seeded users (id:name), for the Supabase project or the stand-in: {dev_users}\n")
+        else:
+            print(f"  cd apps/web && CORE_URL={CORE_URL} DIALBACK_AUTH_MODE=dev DIALBACK_JWT_SECRET={SECRETS['DIALBACK_JWT_SECRET']} \\")
+            print(f"    DIALBACK_DEV_USERS='{dev_users}' pnpm dev\n")
 
         if args.changes or args.smoke:
-            # Three bank changes: Acme confirms (verified), Brightline's call is refused before
-            # dialing (needs review), Cobalt's contact denies the change (not verified).
+            # Four bank changes: Acme confirms (verified), Brightline's call is refused before
+            # dialing (needs review), Cobalt's contact denies the change (not verified), and
+            # Delta asks for a callback, then confirms; no Dialback user made Delta's change, so
+            # its release takes two approvers (spec 0007).
             await bank_change(settings, dataset_id, refs["acme"], "000012340001", refs["clerk"])
             await bank_change(settings, dataset_id, refs["brightline"], "000012340002", refs["clerk"])
             await bank_change(settings, dataset_id, refs["cobalt"], "000012340003", None)
-            print("Made three bank changes in the Ramp mock (Acme, Brightline, Cobalt).\n")
+            await bank_change(settings, dataset_id, refs["delta"], "000012340004", None)
+            print("Made four bank changes in the Ramp mock (Acme, Brightline, Cobalt, Delta).\n")
 
         code = 0
         if args.smoke:
@@ -238,6 +277,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--changes", action="store_true", help="make three bank changes after seeding")
     parser.add_argument("--smoke", action="store_true", help="run one case end to end, check it, and exit")
+    parser.add_argument("--supabase-url", help="trust this Supabase project's signing keys instead of the dev sign-in "
+                        "(e.g. http://127.0.0.1:54321 for scripts/dev/fake_supabase_auth.py)")
     args = parser.parse_args()
     sys.path.insert(0, str(Path(__file__).parent))
     # A fresh, migrated database: on DATABASE_URL's server if set (CI), else a throwaway Postgres.

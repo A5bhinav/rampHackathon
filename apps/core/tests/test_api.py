@@ -72,7 +72,7 @@ async def test_queue_detail_and_release(world):
     assert [e["type"] for e in detail["timeline"]] == ["change_detected", "hold_confirmed", "number_resolved", "call_started",
                                                        "call_ended", "decision_made"]
     assert detail["timeline"][4]["summary"] == "Call attempt 1 ended with answers recorded; the digits given matched the new account."
-    assert detail["decision"]["outcome"] == "verified" and any("Not checked by this engine version" in s for s in detail["decision"]["explanation"])
+    assert detail["decision"]["outcome"] == "verified" and "We dialed the number the Trust Ledger chose for this change." in detail["decision"]["explanation"]
     assert detail["chain"]["ok"] and detail["entered_by"]["display_name"] == "Clerk"
     assert (detail["change"]["old_account"]["last4"], detail["change"]["new_account"]["last4"]) == ("4444", "6666")
     assert detail["permissions"]["can_approve"] is True
@@ -163,3 +163,9 @@ async def test_not_found_and_invalid_requests(world):
     bad = await post(world, f"/api/cases/{missing}/release", "approver1", "/api/cases/{case_id}/release",
                      {"expected_version": 1, "action": "approve", "reason": "   "}, status=422)
     assert bad["code"] == "invalid_request"
+
+
+def test_the_timeline_says_plainly_when_no_digits_were_given():
+    from dialback_core.timeline import summary
+    body = {"attempt": 1, "result": "answers_recorded", "last_four_result": "not_provided"}
+    assert summary("call_ended", body, "Dialback") == "Call attempt 1 ended with answers recorded; the person did not give four digits."

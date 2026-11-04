@@ -1,0 +1,69 @@
+{
+ "call": "Call 1 gets consent and a name, then drops. Call 2 is complete and clean; only call 2's answers count.",
+ "answers": [
+  [
+   "recording_consent",
+   "yes",
+   1
+  ],
+  [
+   "company_named",
+   "Acme Fasteners",
+   3
+  ],
+  [
+   "speaker_name",
+   "Jordan Lee",
+   5
+  ],
+  [
+   "speaker_role",
+   "AR manager",
+   5
+  ],
+  [
+   "change_requested",
+   "yes",
+   7
+  ],
+  [
+   "account_last4",
+   "6666",
+   9
+  ]
+ ],
+ "earlier_calls": [
+  {
+   "result": "failed",
+   "answers": [
+    [
+     "recording_consent",
+     "yes",
+     1
+    ],
+    [
+     "speaker_name",
+     "Jordan Lee",
+     3
+    ]
+   ]
+  }
+ ],
+ "expect": {
+  "outcome": "verified",
+  "rules_fired": [
+   "V01_number_eligible",
+   "V02_outbound_dial",
+   "V03_live_person",
+   "V04_recording_consent",
+   "V05_company_matches",
+   "V06_speaker_identified",
+   "V07_right_person_confirmed",
+   "V08_digits_match",
+   "V09_same_person",
+   "V10_answers_grounded",
+   "V11_script_clean",
+   "V12_no_flags"
+  ]
+ }
+}

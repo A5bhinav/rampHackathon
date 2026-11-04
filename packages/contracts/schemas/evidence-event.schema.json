@@ -159,11 +159,17 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["call_id", "result", "attempt"],
+      "if": { "properties": { "result": { "const": "callback_requested" } }, "required": ["result"] },
+      "then": { "required": ["retry_at"] },
       "properties": {
         "call_id": { "$ref": "#/$defs/Uuid" },
-        "result": { "type": "string", "enum": ["answers_recorded", "no_answer", "voicemail", "busy", "failed", "machine", "declined"] },
+        "result": {
+          "type": "string",
+          "enum": ["answers_recorded", "no_answer", "voicemail", "busy", "failed", "machine", "declined", "callback_requested"],
+          "description": "callback_requested: a person asked to be called back (the agent's schedule_callback tool); retry_at is when (spec 0007, D1)."
+        },
         "attempt": { "type": "integer", "minimum": 1 },
-        "retry_at": { "type": "string" },
+        "retry_at": { "type": "string", "description": "When to call again: the voice service's suggestion after no answer, or the time the vendor asked for with callback_requested." },
         "recording_sha256": { "$ref": "#/$defs/Sha256Hex" },
         "transcript_sha256": { "$ref": "#/$defs/Sha256Hex" },
         "agent_version": { "type": "string" },
@@ -179,7 +185,21 @@
           "$ref": "#/$defs/Uuid",
           "description": "The Trust Ledger contact point that was dialed."
         },
-        "checks": { "$ref": "#/$defs/CallChecks" }
+        "checks": { "$ref": "#/$defs/CallChecks" },
+        "direction": {
+          "type": "string",
+          "enum": ["outbound", "inbound"],
+          "description": "The call's direction as Twilio reports it. Only an outbound call that Dialback placed can verify; an incoming call never counts (threat model, Spoofing). Absent: unknown (spec 0005, D6)."
+        },
+        "dialed_number_is_pick": {
+          "type": "boolean",
+          "description": "The voice adapter's own check, made when Twilio connects, that the number dialed is the case's chosen number for this attempt (design, 'How a call runs', step 2). Absent: unknown (spec 0005, D6)."
+        },
+        "answered_by": {
+          "type": "string",
+          "enum": ["human", "machine"],
+          "description": "Answering-machine detection on connect; machine covers voicemail greetings, fax and phone menus. Absent when detection gave no answer (spec 0005, D6)."
+        }
       }
     },
     "CallChecks": {

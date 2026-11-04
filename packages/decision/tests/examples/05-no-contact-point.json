@@ -1,0 +1,45 @@
+{
+ "call": "A clean call, but the voice report names no contact point, so nothing ties it to the ledger's pick.",
+ "answers": [
+  [
+   "recording_consent",
+   "yes",
+   1
+  ],
+  [
+   "company_named",
+   "Acme Fasteners",
+   3
+  ],
+  [
+   "speaker_name",
+   "Jordan Lee",
+   5
+  ],
+  [
+   "speaker_role",
+   "AR manager",
+   5
+  ],
+  [
+   "change_requested",
+   "yes",
+   7
+  ],
+  [
+   "account_last4",
+   "6666",
+   9
+  ]
+ ],
+ "known": {
+  "dialed_eligible_number": false
+ },
+ "expect": {
+  "outcome": "needs_review",
+  "rules_fired": [
+   "NR99_conditions_not_met",
+   "V01_number_eligible_unmet"
+  ]
+ }
+}

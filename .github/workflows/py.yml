@@ -38,6 +38,8 @@ jobs:
         run: cd apps/ramp-mock && uv run pytest -q
       - name: Core (with the Ramp mock in process)
         run: cd apps/core && uv run pytest -q
+      - name: Database scripts
+        run: uv run --with pytest pytest -q scripts/db/test_add_user.py
 
   boundaries:
     name: no imports between apps

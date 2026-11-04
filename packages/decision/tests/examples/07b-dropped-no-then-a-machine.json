@@ -1,0 +1,51 @@
+{
+ "call": "Call 1 had consent and the vendor said 'no, that wasn't us', then it dropped. The redial reaches a machine. The earlier denial still decides; this call's problem can't hide it.",
+ "answers": [
+  [
+   "recording_consent",
+   "yes",
+   1
+  ]
+ ],
+ "known": {
+  "answered_by": "machine"
+ },
+ "earlier_calls": [
+  {
+   "result": "failed",
+   "answers": [
+    [
+     "recording_consent",
+     "yes",
+     1
+    ],
+    [
+     "company_named",
+     "Acme Fasteners",
+     3
+    ],
+    [
+     "speaker_name",
+     "Jordan Lee",
+     5
+    ],
+    [
+     "speaker_role",
+     "AR manager",
+     5
+    ],
+    [
+     "change_requested",
+     "no",
+     7
+    ]
+   ]
+  }
+ ],
+ "expect": {
+  "outcome": "not_verified",
+  "rules_fired": [
+   "NV01_vendor_denied_change"
+  ]
+ }
+}

@@ -15,9 +15,10 @@ from typing import Annotated, Any, Literal
 from uuid import UUID
 
 from dialback_decision import compare_last_four
+from dialback_decision.rules import CHANGE, CONSENT, FLAGS
 from fastapi import APIRouter, Header, Request
 from fastapi.responses import JSONResponse, Response
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, StrictBool, field_validator, model_validator
 
 from .answers import NO_DIGITS, protect, spoken_last_four
 from .db import system_tx
@@ -26,6 +27,7 @@ from .events import TransitionRefused, apply_event
 log = logging.getLogger(__name__)
 router = APIRouter()
 _DIGITS = re.compile(r"^[0-9]{1,4}$")
+ALLOWED = {"recording_consent": CONSENT, "change_requested": CHANGE, "flag": FLAGS}
 
 
 class Strict(BaseModel):
@@ -48,6 +50,9 @@ class TransitAnswer(Strict):
         if slot == "account_last4":
             if not isinstance(value, str) or not (value in NO_DIGITS or _DIGITS.match(value)):
                 raise ValueError("account_last4 must be 1 to 4 digits, dont_know or refused")
+        elif slot in ALLOWED:
+            if value not in ALLOWED[slot]:  # the decision engine reads only these values (spec 0006)
+                raise ValueError(f"{slot} must be one of {', '.join(sorted(ALLOWED[slot]))}")
         elif not isinstance(value, str) or not value or len(value) > 200:
             raise ValueError("must be a non-empty string of at most 200 characters")
         return value
@@ -71,15 +76,26 @@ class Checks(Strict):
 class CallEndedRequest(Strict):
     call_id: UUID
     case_id: UUID
-    result: Literal["answers_recorded", "no_answer", "voicemail", "busy", "failed", "machine", "declined"]
+    result: Literal["answers_recorded", "no_answer", "voicemail", "busy", "failed", "machine", "declined",
+                    "callback_requested"]
     attempt: int = Field(ge=1)
-    retry_at: str | None = None
+    retry_at: AwareDatetime | None = None  # a real moment with its offset: never 'infinity' or a local time
     recording_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     transcript_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     agent_version: str | None = None
     answers: TransitAnswers | None = None
     contact_point_id: UUID | None = None
     checks: Checks | None = None
+    # Twilio's facts about the call (CallEndedBody; spec 0005, D6). Absent means unknown.
+    direction: Literal["outbound", "inbound"] | None = None
+    dialed_number_is_pick: StrictBool | None = None  # a real boolean only: never "yes" or 1
+    answered_by: Literal["human", "machine"] | None = None
+
+    @model_validator(mode="after")
+    def _callback_has_a_time(self) -> CallEndedRequest:
+        if self.result == "callback_requested" and not self.retry_at:
+            raise ValueError("retry_at is required with callback_requested: the time the vendor asked to be called")
+        return self
 
 
 def _error(status: int, code: str, message: str) -> JSONResponse:
