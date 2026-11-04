@@ -4,9 +4,8 @@ import json
 from pathlib import Path
 from uuid import uuid4
 
-from jsonschema import Draft202012Validator
-
 import dialback_ledger
+from jsonschema import Draft202012Validator
 
 CONTRACTS = Path(__file__).resolve().parents[2] / "contracts"
 SCHEMA = json.loads((CONTRACTS / "schemas" / "selection.schema.json").read_text())

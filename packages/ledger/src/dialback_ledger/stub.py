@@ -23,7 +23,7 @@ _EXAMPLE = files(__package__).joinpath("stub_selection.json").read_text(encoding
 def _utc(ts: dt.datetime) -> str:
     if ts.tzinfo is None or ts.utcoffset() is None:
         raise ValueError("cutoff must carry a time zone; a naive time is never guessed")
-    return ts.astimezone(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+    return ts.astimezone(dt.UTC).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
 
 def select_number_stub(*, case_id: UUID, dataset_id: UUID, vendor_id: UUID, cutoff: dt.datetime) -> dict[str, Any]:
