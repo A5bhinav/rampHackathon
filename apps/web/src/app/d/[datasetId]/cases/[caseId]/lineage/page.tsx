@@ -31,25 +31,25 @@ export default async function LineagePage({ params }: { params: Promise<{ datase
           <Chosen view={view} />
           <section className="card" aria-labelledby="all-h">
             <h2 id="all-h">Every number considered</h2>
-            <div className="table-wrap">
-              <table>
-                <thead><tr><th>Number</th><th>Result</th><th>Seen in</th><th>First seen</th><th>Why</th></tr></thead>
-                <tbody>
-                  {s.candidates.map((c) => (
-                    <tr key={c.contact_point_id}>
-                      <td className="mono">{phone(c.e164)}{c.on_file ? <div className="muted">on the old vendor master</div> : null}</td>
-                      <td>{c.eligible
-                        ? <span className={`badge ${c.rank === 1 && s.outcome === "picked" ? "tone-ok" : "tone-info"}`}>
-                            {c.rank === 1 ? "chosen" : `alternate ${(c.rank ?? 1) - 1}`}</span>
-                        : <span className="badge tone-bad">refused</span>}</td>
-                      <td><Sources candidate={c} /></td>
-                      <td title={when(c.first_seen_at)}>{seenBefore(c.first_seen_at, s.cutoff)}</td>
-                      <td><Reasons candidate={c} text={view.reason_text} /></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <ul className="plain" style={{ listStyle: "none", paddingLeft: 0, margin: 0 }}>
+              {s.candidates.map((c) => (
+                <li key={c.contact_point_id} style={{ padding: "12px 0", borderBottom: "1px solid var(--line)" }}>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                    <span className="mono" style={{ whiteSpace: "nowrap", fontSize: "1.05rem" }}>{phone(c.e164)}</span>
+                    {c.eligible
+                      ? <span className={`badge ${c.rank === 1 && s.outcome === "picked" ? "tone-ok" : "tone-info"}`}>
+                          {c.rank === 1 ? "chosen" : `alternate ${(c.rank ?? 1) - 1}`}</span>
+                      : <span className="badge tone-bad">refused</span>}
+                    {c.on_file ? <span className="muted">on the old vendor master</span> : null}
+                  </div>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 6 }}>
+                    <Sources candidate={c} />
+                    <span className="muted" title={when(c.first_seen_at)}>First seen {seenBefore(c.first_seen_at, s.cutoff)}</span>
+                  </div>
+                  {c.reasons.length ? <Reasons candidate={c} text={view.reason_text} /> : null}
+                </li>
+              ))}
+            </ul>
           </section>
           <p className="muted">
             Rule <span className="mono">{s.rule_version}</span> · cutoff {when(s.cutoff)} · minimum{" "}
@@ -96,6 +96,5 @@ function Sources({ candidate }: { candidate: Candidate }) {
 }
 
 function Reasons({ candidate, text }: { candidate: Candidate; text: SelectionView["reason_text"] }) {
-  if (candidate.reasons.length === 0) return <span className="muted">—</span>;
-  return <ul className="plain">{candidate.reasons.map((r) => <li key={r}>{text[r]}</li>)}</ul>;
+  return <ul style={{ margin: "8px 0 0", paddingLeft: 20 }}>{candidate.reasons.map((r) => <li key={r}>{text[r]}</li>)}</ul>;
 }
