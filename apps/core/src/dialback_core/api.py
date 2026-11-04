@@ -14,6 +14,7 @@ from typing import Annotated, Any, Literal
 from uuid import UUID
 
 from dialback_decision.engine import TEMPLATES
+from dialback_ledger.reasons import REASON_TEXT
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import JSONResponse
 from psycopg import AsyncConnection, errors
@@ -287,6 +288,24 @@ async def _refusal(conn: AsyncConnection, case_id: UUID, user: UUID, message: st
                        if user in (case["changer_ids"] or []) else "The rules refuse this action for you (R5): "
                        "the person who cleared the review cannot also approve the release.")
     return problem(409, "transition_refused", f"This case is {case['state'].replace('_', ' ')}, so that action is not available.")
+
+
+@router.get("/cases/{case_id}/selection")
+async def get_case_selection(case_id: UUID, request: Request, user: UserDep):
+    """The number lineage panel (spec 0017): the selection the case's latest selection event names."""
+    async with person_tx(request.app.state.pool, user.user_id, user.claims) as conn:
+        if await (await conn.execute("select 1 from app.cases where id = %s", (case_id,))).fetchone() is None:
+            return problem(404, "not_found", "No such case.")
+        event = await (await conn.execute(
+            "select body_jcs::jsonb -> 'body' ->> 'number_selection_id' as id from audit.evidence_events "
+            "where case_id = %s and type in ('number_resolved', 'no_provable_number') order by seq desc limit 1",
+            (case_id,))).fetchone()
+        row = None
+        if event and event["id"]:
+            row = await (await conn.execute(
+                "select selection from ledger.number_selections where id::text = %s and case_id = %s",
+                (event["id"], case_id))).fetchone()
+    return {"selection": row["selection"] if row else None, "reason_text": REASON_TEXT}
 
 
 @router.post("/cases/{case_id}/release")
