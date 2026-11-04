@@ -1,0 +1,33 @@
+{
+  "v": 1,
+  "chain_id": "0f3b7f2e-4d2a-4b1e-9c3d-1a2b3c4d5e6f",
+  "dataset_id": "7a1c9d2e-0b3f-4e5a-8c6d-9e0f1a2b3c4d",
+  "case_id": "c0ffee00-1111-4222-8333-444455556666",
+  "event_id": "e0000001-0000-4000-8000-000000000015",
+  "type": "call_ended",
+  "actor": {
+    "kind": "system",
+    "id": null
+  },
+  "occurred_at": "2026-11-01T17:20:41.000000Z",
+  "idempotency_key": "c0ffee00-1111-4222-8333-444455556666:call:7c2f3a1b-5d4e-4f6a-9b0c-1d2e3f4a5b6c:ended",
+  "from_state": "calling",
+  "to_state": "retry_wait",
+  "version": 1,
+  "body": {
+    "call_id": "7c2f3a1b-5d4e-4f6a-9b0c-1d2e3f4a5b6c",
+    "result": "callback_requested",
+    "attempt": 1,
+    "retry_at": "2026-11-02T22:00:00Z",
+    "agent_version": "agent-0.1.0",
+    "contact_point_id": "5d4c3b2a-1f0e-4d9c-8b7a-6f5e4d3c2b1a",
+    "checks": {
+      "disclosure_first": true,
+      "answers_grounded": true,
+      "agent_spoke_account_digits": false,
+      "new_number_accepted": false,
+      "policy_violations": 0,
+      "speech_guard_trips": 0
+    }
+  }
+}

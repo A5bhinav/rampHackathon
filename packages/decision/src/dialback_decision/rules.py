@@ -21,7 +21,8 @@ from dataclasses import dataclass
 from .facts import CallChecks, CaseFacts, EarlierCall
 from .last_four import LAST_FOUR_RESULTS
 
-CALL_RESULTS = frozenset({"answers_recorded", "no_answer", "voicemail", "busy", "failed", "machine", "declined"})
+CALL_RESULTS = frozenset({"answers_recorded", "no_answer", "voicemail", "busy", "failed", "machine", "declined",
+                          "callback_requested"})  # spec 0007: an earlier call may have asked for a callback
 CONSENT = frozenset({"yes", "no"})
 CHANGE = frozenset({"yes", "no", "unsure"})
 FLAGS = frozenset({"pressure_to_approve", "opt_out", "asked_what_is_checked", "asked_to_call_another_number", "other",
