@@ -83,6 +83,9 @@ def _words(text: str) -> str:
     return " " + " ".join(re.findall(r"[a-z0-9]+", _clean(text))) + " "
 
 
+words = _words
+
+
 def digit_runs(text: str) -> list[str]:
     """Every run of digits in `text`, with spoken digits ("four", "forty") turned into digits."""
     tokens = _TOKENS.findall(_clean(text))
