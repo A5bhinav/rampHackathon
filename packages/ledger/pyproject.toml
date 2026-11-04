@@ -2,7 +2,7 @@
 name = "dialback-ledger"
 version = "0.0.0"
 requires-python = ">=3.13"
-dependencies = ["rfc8785>=0.1"]
+dependencies = ["rfc8785>=0.1", "phonenumbers>=8.13"]
 
 [dependency-groups]
 dev = ["pytest>=8", "hypothesis>=6", "jsonschema>=4"]
