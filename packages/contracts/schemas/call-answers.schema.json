@@ -103,7 +103,7 @@
                   "speaker_changed",
                   "other"
                 ],
-                "description": "speaker_changed: someone else came on the line or gave a different name; the agent re-asks name and role (spec 0011, D4; read by decide() as NR in spec 0006)."
+                "description": "speaker_changed: someone else came on the line or gave a different name; the agent re-asks name and role (spec 0012, D4; read by decide() as NR in spec 0006)."
               }
             }
           }

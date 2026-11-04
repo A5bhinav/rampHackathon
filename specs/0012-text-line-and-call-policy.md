@@ -1,4 +1,4 @@
-# 0011: The text phone line and the call policy
+# 0012: The text phone line and the call policy
 
 **Owner:** Sami  **Slice:** call and adversary  **Target day:** Wed Nov 4
 
@@ -114,11 +114,11 @@ All additive, in Sami's contracts PR:
 
 ## Open questions
 
-- **Q36 (Inesh):** are `ledger.number_selections(case_id, contact_point_id)` and `ledger.contact_points(id, e164)` the final names? Can those two tables land first, even empty? Until then, the voice tests create them in a fixture.
-- **Q37 (team):** which model words the questions on live calls, Haiku 5.5 or Sonnet 5.5? Proposal: latency on the go/no-go call decides.
-- **Q38 (Abhi):** `stack.py` is yours. Shall I swap `ScriptedVoice` for the voice service in text mode, or will you?
-- **Q39 (team):** demo-smoke CI has no model key, so it keeps `ScriptedAgent`. OK?
-- **Q40 (Sami):** limits. Proposal: 30 callee turns, three silences of 8 seconds each, 6 minutes per call.
+- **Q40 (Inesh):** are `ledger.number_selections(case_id, contact_point_id)` and `ledger.contact_points(id, e164)` the final names? Can those two tables land first, even empty? Until then, the voice tests create them in a fixture.
+- **Q41 (team):** which model words the questions on live calls, Haiku 5.5 or Sonnet 5.5? Proposal: latency on the go/no-go call decides.
+- **Q42 (Abhi):** `stack.py` is yours. Shall I swap `ScriptedVoice` for the voice service in text mode, or will you?
+- **Q43 (team):** demo-smoke CI has no model key, so it keeps `ScriptedAgent`. OK?
+- **Q44 (Sami):** limits. Proposal: 30 callee turns, three silences of 8 seconds each, 6 minutes per call.
 
 ## Proposed answers to questions in other specs
 
@@ -126,6 +126,7 @@ All additive, in Sami's contracts PR:
 - **0002, Q8:** ConversationRelay gives no per-turn speaker identity. The voice service supplies the declared name and `speaker_changed` (decision 4).
 - **0006, Q21:** Twilio Lookup's line type (mobile, landline or VoIP) is a possible stretch fact. Its SIM-swap and call-forwarding checks have limited US coverage and need approval, so those are not for this hackathon (to check).
 - **0008, Q26:** `evals/heldout/MANIFEST.json` holds the sealed SHA-256, the count and when it was sealed. The scorecard will copy the hash it ran against, in an optional field added with the lab runner.
+- **0011, Q38:** a teammate's phone on the allowlist answers the live call; which one is still to pick. The voice service needs nothing at reset: the pick comes from the ledger as on any case. Its pre-dial check uses `DIALBACK_DEMO_CALLING_WINDOW` for demo datasets.
 - **0008, Q27:** your nine classes are adopted as written and listed in `evals/README.md`.
 
 ## Commands
