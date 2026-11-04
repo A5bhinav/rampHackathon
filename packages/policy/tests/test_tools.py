@@ -80,3 +80,12 @@ def test_press_keys_only_in_a_menu_and_capped() -> None:
     rejects(call("press_keys", digits="a"), "bad_value", in_menu=True)
     rejects(call("press_keys", digits="1#\n"), "bad_value", in_menu=True)
     rejects(call("press_keys", digits="1"), "key_cap_reached", in_menu=True, keys_used=MAX_KEY_PRESSES)
+
+
+def test_a_tool_name_that_is_not_a_string() -> None:
+    rejects(ToolCall(id="tc_1", name=["end_call"], args={"reason": "completed"}), "unknown_tool")  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize("start", ["9999-12-31T23:00:00-05:00", "0001-01-01T00:00:00+01:00", "1999-01-01T00:00:00Z"])
+def test_callback_times_out_of_range(start: str) -> None:
+    rejects(call("schedule_callback", window={"start": start}), "bad_value")

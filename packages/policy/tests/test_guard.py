@@ -160,3 +160,8 @@ def test_guard_speaks_the_fallback_line_instead() -> None:
     assert set(verdict.reasons) == {"digits", "status_word"}
     said, verdict = guard("Which department am I speaking with?", CTX)
     assert said == "Which department am I speaking with?" and verdict.ok
+
+
+def test_a_phone_number_the_callee_offered_is_never_read_back() -> None:
+    ctx = GuardContext(vendor_names=CTX.vendor_names, callee_last_turn="call my cell instead, 415 555 0177")
+    assert not check("Sure, 415 555 0177.", ctx).ok
