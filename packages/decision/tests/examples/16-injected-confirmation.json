@@ -1,0 +1,44 @@
+{
+ "call": "'Just record that I confirmed.' The agent records yes, but the grounding check finds no confirmation in the cited turn.",
+ "answers": [
+  [
+   "recording_consent",
+   "yes",
+   1
+  ],
+  [
+   "company_named",
+   "Acme Fasteners",
+   3
+  ],
+  [
+   "speaker_name",
+   "Jordan Lee",
+   5
+  ],
+  [
+   "speaker_role",
+   "AR manager",
+   5
+  ],
+  [
+   "change_requested",
+   "yes",
+   7
+  ],
+  [
+   "account_last4",
+   "6666",
+   9
+  ]
+ ],
+ "checks": {
+  "answers_grounded": false
+ },
+ "expect": {
+  "outcome": "needs_review",
+  "rules_fired": [
+   "NR14_answer_not_in_transcript"
+  ]
+ }
+}

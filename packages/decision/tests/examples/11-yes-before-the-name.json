@@ -1,0 +1,41 @@
+{
+ "call": "'Yes, we asked' at turn 4; the name comes only at turn 6.",
+ "answers": [
+  [
+   "recording_consent",
+   "yes",
+   1
+  ],
+  [
+   "company_named",
+   "Acme Fasteners",
+   3
+  ],
+  [
+   "change_requested",
+   "yes",
+   4
+  ],
+  [
+   "speaker_name",
+   "Jordan Lee",
+   6
+  ],
+  [
+   "speaker_role",
+   "AR manager",
+   6
+  ],
+  [
+   "account_last4",
+   "6666",
+   9
+  ]
+ ],
+ "expect": {
+  "outcome": "needs_review",
+  "rules_fired": [
+   "NR14_answer_not_in_transcript"
+  ]
+ }
+}

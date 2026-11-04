@@ -1,0 +1,55 @@
+{
+ "call": "The same new hire in standard mode.",
+ "answers": [
+  [
+   "recording_consent",
+   "yes",
+   1
+  ],
+  [
+   "company_named",
+   "Acme Fasteners",
+   3
+  ],
+  [
+   "speaker_name",
+   "Jordan Lee",
+   5
+  ],
+  [
+   "speaker_role",
+   "AR manager",
+   5
+  ],
+  [
+   "change_requested",
+   "yes",
+   7
+  ],
+  [
+   "account_last4",
+   "6666",
+   9
+  ]
+ ],
+ "known": {
+  "speaker_known_before_request": false
+ },
+ "expect": {
+  "outcome": "verified",
+  "rules_fired": [
+   "V01_number_eligible",
+   "V02_outbound_dial",
+   "V03_live_person",
+   "V04_recording_consent",
+   "V05_company_matches",
+   "V06_speaker_identified",
+   "V07_right_person_confirmed",
+   "V08_digits_match",
+   "V09_same_person",
+   "V10_answers_grounded",
+   "V11_script_clean",
+   "V12_no_flags"
+  ]
+ }
+}

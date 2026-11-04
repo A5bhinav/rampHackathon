@@ -1,0 +1,73 @@
+{
+ "call": "Call 1: the vendor says 'no, that wasn't us', then the line drops. Call 2 reaches someone who says yes, 6666.",
+ "answers": [
+  [
+   "recording_consent",
+   "yes",
+   1
+  ],
+  [
+   "company_named",
+   "Acme Fasteners",
+   3
+  ],
+  [
+   "speaker_name",
+   "Jordan Lee",
+   5
+  ],
+  [
+   "speaker_role",
+   "AR manager",
+   5
+  ],
+  [
+   "change_requested",
+   "yes",
+   7
+  ],
+  [
+   "account_last4",
+   "6666",
+   9
+  ]
+ ],
+ "earlier_calls": [
+  {
+   "result": "failed",
+   "answers": [
+    [
+     "recording_consent",
+     "yes",
+     1
+    ],
+    [
+     "company_named",
+     "Acme Fasteners",
+     3
+    ],
+    [
+     "speaker_name",
+     "Jordan Lee",
+     5
+    ],
+    [
+     "speaker_role",
+     "AR manager",
+     5
+    ],
+    [
+     "change_requested",
+     "no",
+     7
+    ]
+   ]
+  }
+ ],
+ "expect": {
+  "outcome": "not_verified",
+  "rules_fired": [
+   "NV01_vendor_denied_change"
+  ]
+ }
+}

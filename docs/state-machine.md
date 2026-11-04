@@ -18,6 +18,8 @@ stateDiagram-v2
     held --> needs_review: no_provable_number
     held --> calling: number_resolved [number_selected]
     calling --> deciding: call_ended [answers_recorded]
+    calling --> needs_review: call_ended [callback_tries_exhausted]
+    calling --> retry_wait: call_ended [callback_tries_left]
     calling --> needs_review: call_ended [no_person_tries_exhausted]
     calling --> retry_wait: call_ended [no_person_tries_left]
     calling --> calling: call_started [call_attempt_matches]
@@ -62,6 +64,8 @@ stateDiagram-v2
 | held | `no_provable_number` | system | `always` | needs_review | No number with two independent sources that predate the request |
 | held | `number_resolved` | system | `number_selected` | calling | The Trust Ledger rule passed |
 | calling | `call_ended` | system | `answers_recorded` | deciding | Answers recorded |
+| calling | `call_ended` | system | `callback_tries_exhausted` | needs_review | The person asked to be called back; no tries left |
+| calling | `call_ended` | system | `callback_tries_left` | retry_wait | The person asked to be called back; tries left |
 | calling | `call_ended` | system | `no_person_tries_exhausted` | needs_review | No person reached; no tries left |
 | calling | `call_ended` | system | `no_person_tries_left` | retry_wait | No person reached; tries left |
 | calling | `call_started` | system | `call_attempt_matches` | calling | The voice service accepted the call; pins the current call |

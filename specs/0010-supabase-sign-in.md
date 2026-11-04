@@ -4,7 +4,7 @@
 
 ## Goal
 
-People sign in to the deployed dashboard with an email magic link (Supabase Auth, design §7). The core trusts a token only if the Supabase project's own keys signed it, then runs every query in Postgres as that person, so R5 is enforced on the real identity: approver role, and never the person who entered the change.
+People sign in to the deployed dashboard with an email and password on accounts the team creates (Supabase Auth, design §7). The design named magic links; on Nov 2 the team chose passwords instead (decision 5). The core trusts a token only if the Supabase project's own keys signed it, then runs every query in Postgres as that person, so R5 is enforced on the real identity: approver role, and never the person who entered the change.
 
 Today the only sign-in is the local dev one. It is off in production, so a production deploy can't be used.
 
@@ -45,27 +45,55 @@ Today the only sign-in is the local dev one. It is off in production, so a produ
    - Set `SUPABASE_URL` on the core and leave `DIALBACK_JWT_SECRET` unset. Supabase advises against verifying with the shared secret.
    - If the project is still on the legacy secret, use "Migrate JWT secret" and then "Rotate keys" on its JWT signing keys page first. While tokens signed with both are still live, the core can take both sources with `DIALBACK_TRUST_LEGACY_SECRET=1`. It logs a warning while it does.
 
-5. **The dashboard signs in by magic link with `@supabase/ssr`:**
-   - **Request:** the sign-in page takes an email and calls `signInWithOtp` with `shouldCreateUser: false`. It answers the same way whether or not the email has an account. The link is requested after the page has answered (`after()`), so the response time doesn't reveal it either.
-   - **Link:** the email links to `/auth/confirm?token_hash=…&type=email`. That page signs in only when the person presses its button (`verifyOtp`), because email scanners open links and would use up a one-time token.
-   - **Session:** it lives in httpOnly cookies. `proxy.ts` refreshes it on each request (`getClaims`).
-   - **Calls to the core:** the server sends the session's access token. The dashboard never decides who someone is: the core verifies the token (decision 1).
-   - **Sign-out** ends the Supabase session and always deletes its cookies, even when Supabase can't be reached.
+5. **The dashboard signs in with an email and password, using `@supabase/ssr`.** We chose this over magic links on Nov 2:
+   - Supabase's built-in email reaches only members of our Supabase organization, so Ramp's judges couldn't sign in by link.
+   - Our own email provider would need a domain, DNS records and deliverability work.
+   - Links can be slow, land in spam or be opened by scanners on stage.
 
-6. **Invite-only.**
-   - Sign-ups are off in the project's Auth settings, with `shouldCreateUser: false` as a second guard.
-   - A person needs a Supabase invite plus a profile and a role in `app.user_profiles` and `app.user_roles`, added with `scripts/db/add_user.py`.
-   - A signed-in person with no role can see and do nothing, because the database grants decide.
-   - Removing a role takes effect on their next request.
+   Passwords need no email at all. In detail:
+   - **Sign-in:** the page takes an email and a password (`signInWithPassword`).
+     - An unknown email and a wrong password get the same answer.
+     - Supabase being down gets its own answer ("not available"), and so does a rate limit. Neither depends on the email.
+     - Each client gets 10 tries per 5 minutes in the app, plus a Vercel firewall rule on POST `/sign-in`.
+   - **Session:** it lives in httpOnly cookies. `proxy.ts` refreshes it on each request (`getClaims`).
+   - **Session length:** a sign-in lasts 12 hours from the moment the person signed in (decision 8).
+     - **The clock:** it is the sign-in time inside the signed access token (`amr`), which the person can't change. A marker cookie set at sign-in is the fallback if a token lacks it.
+     - **Expiry:** past 12 hours, `proxy.ts` ends the Supabase session (`signOut`, this session only) and deletes its cookies. The page then sends the person to sign in.
+     - **No redirect from the proxy:** a server action's redirect is followed by an internal fetch that can't drop cookies, so a redirect there would loop.
+   - **Calls to the core:** the server sends the session's access token. The dashboard never decides who someone is: the core verifies the token (decision 1).
+   - **Sign-out** ends this browser's Supabase session only (`scope: "local"`), since the judges share accounts. It always deletes the cookies, even when Supabase can't be reached.
+
+6. **Accounts are made by the team; nobody signs up.**
+   - **No sign-ups, no email:** sign-ups are off in the project's Auth settings, and so is "Confirm email". Supabase never sends mail.
+   - **Creating an account:** add each person on the Users page with their email and a generated password (16+ characters, never chosen by hand). Then give them a profile and a role in `app.user_profiles` and `app.user_roles` with `scripts/db/add_user.py`.
+   - **Judges:** they get one approver account and one clerk account.
+     - The clerk account is linked to the Ramp user who makes the demo's bank changes (`--ramp-user-id`). Otherwise every change has an unknown author and needs two approvers (ADR-10).
+     - Their passwords are sent privately, never in the repo or the video, and the accounts are deleted after Nov 19.
+   - **No role, no access:** a signed-in person with no role can see and do nothing, because the database grants decide.
+   - **Removing a role** takes effect on their next request.
 
 7. **The dev sign-in is unchanged** (`DIALBACK_AUTH_MODE=dev`, refused when `VERCEL_ENV=production`).
 
+8. **The team's decisions (Nov 2)** on the questions this spec first left open:
+   - **Q31, session length:**
+     - **Access tokens:** they expire after 15 minutes, a Supabase setting. Signing out, or deleting someone, therefore ends their access within 15 minutes.
+     - **Sign-ins:** each lasts at most 12 hours, measured from the token's own sign-in time, and the dashboard's proxy ends the session after that. Supabase's own session time-boxing needs a paid plan.
+   - **Q32, email reach:** moot. With passwords, Supabase sends no email.
+   - **Q33, MFA for approvers:** not for the hackathon. Approval already needs a second person, and the release always needs someone other than the changer. MFA is a production item.
+   - **Q34, an admin role:** no admin page. The team grants roles with `scripts/db/add_user.py`, using `DATABASE_URL`. An admin role that manages users but can't release (design §7) is a production item.
+   - **Q35, abuse:** no captcha.
+     - **Guessing:** generated passwords of 16+ characters make guessing hopeless.
+     - **Flooding:** Supabase limits `/token` requests per IP address, and every sign-in and session refresh comes from the dashboard's server, so all users share that limit.
+       - A sustained flood could exhaust it for as long as it lasts. A refresh refused then signs people out, and they can't sign back in.
+       - Two throttles keep one client from doing that: the app allows 10 tries per client per 5 minutes, and a Vercel firewall rule limits POST `/sign-in` per IP.
+       - Supabase's IP forwarding would separate clients, but it needs a secret key on the dashboard, which we chose not to hold.
+
 **Stated limits:**
-- **Token lifetime.** Signing out, or deleting the user in Supabase, doesn't end an access token already issued: the core checks tokens locally, so a token stays valid until it expires (Supabase's default is one hour). Removing a role is immediate. See Q31.
-- **Email delivery.** Supabase's built-in email sends only to members of the project's Supabase organization. Anyone else needs custom SMTP (Q32).
-- **Preview deployments.** Magic links go to the project's Site URL, so preview deployments can't complete a sign-in.
-- **Request logs.** An unspent link's `token_hash` is in the confirm page's URL, so it reaches the host's request logs. Keep the project's email OTP expiry short; 15 minutes is enough.
-- **Link requests.** Anyone can ask for links to any address: Supabase allows one per address per minute, and each new link replaces the last. Repeated requests can keep a person from signing in, and many addresses can use up the project's email quota (Q35).
+- **Token lifetime.** Signing out, or deleting the user in Supabase, doesn't end an access token already issued: the core checks tokens locally, so a token stays valid until it expires, at most 15 minutes (decision 8). Removing a role is immediate.
+  - Supabase's docs describe how to end it at once: check the token's `session_id` against `auth.sessions`. That needs a SQL function, so it is left for later.
+- **Shared rate limit.** Every sign-in and refresh reaches Supabase from the dashboard's server. A flood from many addresses, past both throttles, could sign everyone out until it stops (decision 8, Q35).
+- **The cap holds for the browser.** Someone who copies a person's cookies and refreshes the session outside the dashboard isn't stopped at 12 hours. Signing out, or deleting the account, ends that within 15 minutes.
+- **Shared accounts.** The judges share one approver and one clerk account. The evidence log names the account, not the individual judge.
 
 ## Contract touched
 
@@ -83,11 +111,13 @@ None. `dialback.yaml` already answers 401 `unauthenticated` on every dashboard e
 - [ ] With the JWKS unreachable, recent keys work for up to 20 minutes, then nothing verifies.
 - [ ] Settings need a key source, accept only the project's `https://` address, and derive the issuer and JWKS URL from it. They refuse a committed dev secret, and both sources together without `DIALBACK_TRUST_LEGACY_SECRET=1`.
 - [ ] Concurrent first requests fetch the keys once and all succeed. After an outage, the next fetch restores access.
-- [ ] With Supabase configured, the sign-in page asks for an email, gives the same answer for any email, and never creates an account.
-- [ ] A link signs in only after the button is pressed. A bad or used link shows a message and starts no session.
+- [ ] With Supabase configured, the sign-in page asks for an email and a password. An unknown email and a wrong password get the same answer and start no session.
+- [ ] A client past 10 tries in 5 minutes is told to wait, without reaching Supabase. Supabase being down gets its own message.
 - [ ] The session refreshes on each request, and the core receives its access token. A 401 from the core sends the person back to sign in.
+- [ ] A sign-in older than 12 hours, by the token's own sign-in time, ends: the session is signed out, its cookies are deleted, and the person signs in again.
+- [ ] Signing out in one browser leaves another browser on the same account signed in.
 - [ ] Sign-out ends the Supabase session and deletes its cookies even when Supabase can't be reached. The dev sign-in still works locally, and with neither configured the page says so.
-- [ ] End to end, against a local stand-in for Supabase Auth: a magic link signs a seeded approver in, and the queue loads as that person.
+- [ ] End to end, against a local stand-in for Supabase Auth: a password signs a seeded approver in, and the queue loads as that person.
 
 ## Tests (written first)
 
@@ -98,27 +128,21 @@ None. `dialback.yaml` already answers 401 `unauthenticated` on every dashboard e
 | key cache and rotation | `test_auth.py::test_keys_are_cached_and_an_unknown_key_id_refetches_at_most_once_in_a_while` |
 | JWKS unreachable, concurrency, recovery | `test_auth.py::test_an_unreachable_jwks_keeps_recent_keys_and_then_fails_closed`, `::test_concurrent_first_requests_fetch_the_keys_once_and_an_outage_recovers` |
 | settings | `test_auth.py::test_settings_need_a_key_source_and_derive_the_project_urls`, `::test_supabase_url_must_be_the_projects_https_address_alone`, `::test_a_deployed_core_never_trusts_a_committed_secret_or_the_shared_secret_by_accident` |
-| dashboard sign-in, link, session, sign-out | `apps/web/tests/auth.test.ts`, which covers the mode choice, link parameters and email cleanup; the flow itself is checked end to end |
+| dashboard sign-in, throttle, session, 12-hour cap, sign-out | `apps/web/tests/auth.test.ts`, which covers the mode choice, the email and password checks, the sign-in time from `amr`, the 12-hour cap and the throttle. The flow itself is checked end to end |
 | end to end | `scripts/dev/signin_e2e.cjs` (Playwright) against `scripts/dev/fake_supabase_auth.py`, a stand-in for Supabase Auth, and `scripts/dev/stack.py --supabase-url`. It runs by hand, because CI has no browser job; its output goes in the PR |
-| roles for invited users | `scripts/db/test_add_user.py` (in the `py` CI job) |
+| roles for created users | `scripts/db/test_add_user.py` (in the `py` CI job) |
 
 ## Out of scope
 
-- A user-admin page. The design's admin role, which manages users but can't release, isn't in `app.user_role` yet; see Q34.
-- MFA for approvers.
+- A user-admin page and the admin role (decision 8, Q34).
+- MFA for approvers (decision 8, Q33).
+- Magic links and an email provider (decision 5).
 - Realtime.
-- Setting up custom SMTP.
-- Checking with Supabase on every request whether a session was revoked.
+- Ending a session at once by checking `auth.sessions` (stated limits).
 
 ## Open questions
 
-- **Q31 (team):** how long should sessions last?
-  - **Access tokens:** Supabase's default is one hour. A shorter expiry, such as 15 minutes, narrows the window after a sign-out or a deleted user, at the cost of more refreshes. It is set on the project's JWT settings page.
-  - **Refresh tokens:** by default they don't expire, and the session cookies last 400 days, so a browser stays signed in until someone signs out. Supabase's session settings can time-box sessions or end them after inactivity.
-- **Q32 (team):** will anyone outside our Supabase organization sign in, for example Ramp's judges at the final? If so, we need custom SMTP, because the built-in email won't reach them.
-- **Q33 (team):** should approvers need MFA (`aal2`) before they can release? The design doesn't say.
-- **Q34 (team):** the design lists admin and lab roles, but `app.user_role` has only clerk, approver and auditor. Until an admin role exists, whoever holds `DATABASE_URL` grants roles with `scripts/db/add_user.py`.
-- **Q35 (team):** should the sign-in page add a captcha, which Supabase supports, and our own per-address limit before the live final? Without them, anyone who knows an approver's email can keep replacing their link (see the stated limits).
+None. Q31 to Q35 were decided on Nov 2 (decision 8).
 
 ## Commands
 

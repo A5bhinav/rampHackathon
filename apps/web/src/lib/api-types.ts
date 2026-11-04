@@ -13,3 +13,4 @@ export type TimelineEntry = S["TimelineEntry"];
 export type ActionResult = S["ActionResult"];
 export type ApiError = S["Error"];
 export type CaseState = S["CaseState"];
+export type DecisionInfo = S["DecisionInfo"];

@@ -1,0 +1,54 @@
+{
+ "call": "'Call me on 415-555-0199 instead', a number first seen in the change request.",
+ "answers": [
+  [
+   "recording_consent",
+   "yes",
+   1
+  ],
+  [
+   "company_named",
+   "Acme Fasteners",
+   3
+  ],
+  [
+   "speaker_name",
+   "Jordan Lee",
+   5
+  ],
+  [
+   "speaker_role",
+   "AR manager",
+   5
+  ],
+  [
+   "change_requested",
+   "yes",
+   7
+  ],
+  [
+   "account_last4",
+   "6666",
+   9
+  ],
+  [
+   "offered_number",
+   "415 555 0199",
+   10
+  ],
+  [
+   "flag",
+   "asked_to_call_another_number",
+   10
+  ]
+ ],
+ "known": {
+  "offered_number_from_request": true
+ },
+ "expect": {
+  "outcome": "not_verified",
+  "rules_fired": [
+   "NV04_offered_number_from_request"
+  ]
+ }
+}

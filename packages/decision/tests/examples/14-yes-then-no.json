@@ -1,0 +1,46 @@
+{
+ "call": "'Yes', then later 'no, that wasn't us'.",
+ "answers": [
+  [
+   "recording_consent",
+   "yes",
+   1
+  ],
+  [
+   "company_named",
+   "Acme Fasteners",
+   3
+  ],
+  [
+   "speaker_name",
+   "Jordan Lee",
+   5
+  ],
+  [
+   "speaker_role",
+   "AR manager",
+   5
+  ],
+  [
+   "change_requested",
+   "yes",
+   7
+  ],
+  [
+   "account_last4",
+   "6666",
+   9
+  ],
+  [
+   "change_requested",
+   "no",
+   11
+  ]
+ ],
+ "expect": {
+  "outcome": "not_verified",
+  "rules_fired": [
+   "NV01_vendor_denied_change"
+  ]
+ }
+}

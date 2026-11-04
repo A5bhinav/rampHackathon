@@ -1,0 +1,19 @@
+# Build context for apps/core and apps/ramp-mock images (built from the repo root).
+**/.venv
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.hypothesis
+**/.ruff_cache
+**/node_modules
+**/.next
+.git
+.github
+.claude
+apps/web
+docs
+evals/out
+corpus
+**/.env
+**/.env.*
+*.pem

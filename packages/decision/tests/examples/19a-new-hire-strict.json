@@ -1,0 +1,46 @@
+{
+ "call": "A new AR hire, not known from before the request, gives a clean confirmation. Strict mode.",
+ "answers": [
+  [
+   "recording_consent",
+   "yes",
+   1
+  ],
+  [
+   "company_named",
+   "Acme Fasteners",
+   3
+  ],
+  [
+   "speaker_name",
+   "Jordan Lee",
+   5
+  ],
+  [
+   "speaker_role",
+   "AR manager",
+   5
+  ],
+  [
+   "change_requested",
+   "yes",
+   7
+  ],
+  [
+   "account_last4",
+   "6666",
+   9
+  ]
+ ],
+ "known": {
+  "speaker_known_before_request": false
+ },
+ "strict": true,
+ "expect": {
+  "outcome": "needs_review",
+  "rules_fired": [
+   "NR99_conditions_not_met",
+   "S01_known_contact_unmet"
+  ]
+ }
+}

@@ -8,12 +8,14 @@ import uuid
 
 import pytest
 from conftest import core_settings, make_world
+from contract import CONTRACTS
 from dialback_core.db import system_tx
 from dialback_core.detection import import_all, sync_vendor
 from dialback_core.flags import ResolverMode
-from dialback_core.ports import LedgerResolver
+from dialback_core.ports import ChangeFacts, LedgerChangeContext, LedgerResolver
 from dialback_core.ramp import RampError
-from flows import _types, bills, case_of, change_and_detect, one, pay, release, report, transit
+from dialback_decision import rules
+from flows import _types, answer, bills, case_of, change_and_detect, one, pay, release, report, transit
 
 pytestmark = pytest.mark.anyio
 
@@ -35,7 +37,8 @@ async def test_a_bank_change_walks_all_the_way_to_release(world):
     case = await case_of(world)
     assert (case["state"], case["outcome"]) == ("awaiting_release", "verified")
     decision = await one(world.pool, "select * from app.decisions where case_id = %s", case["id"])
-    assert decision["last_four_result"] == "match" and "U01_speaker_thread_not_checked" in decision["rules_fired"]
+    assert decision["last_four_result"] == "match"
+    assert list(decision["rules_fired"]) == [r.id for r in rules.VERIFIED], "every condition checked (spec 0006)"
 
     ended = await one(world.pool, "select body_jcs from audit.evidence_events where case_id = %s and type = 'call_ended'", case["id"])
     assert '"value":"6666"' not in ended["body_jcs"] and '"digit_count":4' in ended["body_jcs"], "digits are never stored"
@@ -228,3 +231,315 @@ async def test_a_release_that_races_a_new_change_puts_the_hold_back(world):
     assert alert is not None
     case = await case_of(world)
     assert (case["state"], case["version"]) == ("held", 2)
+
+
+# What the decision engine reads (spec 0005) -------------------------------------------------------
+
+@pytest.mark.parametrize("dialed", [None, uuid.UUID("0f0f0f0f-0000-4000-8000-000000000000")], ids=["missing", "another"])
+async def test_a_report_without_the_picked_contact_point_is_not_eligible(world, dialed):
+    await import_all(world.pool, world.ramp, world.keys, world.dataset.id)
+    await change_and_detect(world)
+    case = await case_of(world)
+    assert (await report(world, case["id"], world.voice.placed[0]["call_id"], contact_point=dialed)).status_code == 204
+    await world.worker.drain(world.dataset.id)
+    decision = await one(world.pool, "select outcome, rules_fired from app.decisions where case_id = %s", case["id"])
+    assert (decision["outcome"], list(decision["rules_fired"])) == \
+        ("needs_review", ["NR99_conditions_not_met", "V01_number_eligible_unmet"])
+
+
+async def test_a_dropped_call_that_said_no_still_counts(world, monkeypatch):
+    import dialback_core.worker as worker_module
+    seen, real = [], worker_module.decide
+    monkeypatch.setattr(worker_module, "decide", lambda facts: seen.append(facts) or real(facts))
+    await import_all(world.pool, world.ramp, world.keys, world.dataset.id)
+    await change_and_detect(world)
+    case = await case_of(world)
+
+    first = world.voice.placed[0]["call_id"]
+    dropped = await report(world, case["id"], first, result="failed", answers=transit(first, change="no"),
+                           retry_at="2026-01-01T00:00:00Z")
+    assert dropped.status_code == 204 and (await case_of(world))["state"] == "retry_wait"
+    await world.worker.drain(world.dataset.id)  # the retry is already due
+    assert [p["attempt"] for p in world.voice.placed] == [1, 2]
+    assert (await report(world, case["id"], world.voice.placed[1]["call_id"], attempt=2)).status_code == 204
+    await world.worker.drain(world.dataset.id)
+
+    [facts] = seen
+    assert facts.change_requested == ("yes",), "the redial's own answers are the ones being decided"
+    assert [(c.result, c.change_requested) for c in facts.earlier_calls] == [("failed", ("no",))]
+    assert facts.dialed_eligible_number and facts.same_person_yes_and_digits and facts.consent_first
+    assert world.change_context.calls[-1]["speaker_names"] == ("Jordan Lee",)
+    case = await case_of(world)
+    assert (case["state"], case["outcome"]) == ("blocked", "not_verified"), "the dropped call's no still decides"
+
+
+async def test_only_this_generations_pick_and_calls_count(world, monkeypatch):
+    import dialback_core.worker as worker_module
+    seen, real = [], worker_module.decide
+    monkeypatch.setattr(worker_module, "decide", lambda facts: seen.append(facts) or real(facts))
+    await import_all(world.pool, world.ramp, world.keys, world.dataset.id)
+    await change_and_detect(world)
+    case = await case_of(world)
+    first = world.voice.placed[0]["call_id"]
+    dropped = await report(world, case["id"], first, result="failed", answers=transit(first, change="no"),
+                           retry_at="2030-01-01T00:00:00Z")
+    assert dropped.status_code == 204
+
+    world.resolver.point = uuid.UUID("0f0f0f0f-1111-4000-8000-000000000002")  # the ledger picks anew for v2
+    await change_and_detect(world, account_number="000077778888")
+    case = await case_of(world)
+    assert (case["version"], case["state"]) == (2, "calling")
+    second = world.voice.placed[-1]["call_id"]
+    v2 = await report(world, case["id"], second, attempt=case["call_attempts"], answers=transit(second, digits="8888"),
+                      contact_point=world.resolver.point)
+    assert v2.status_code == 204
+    await world.worker.drain(world.dataset.id)
+    [facts] = seen
+    assert facts.dialed_eligible_number, "v2's own pick"
+    assert facts.earlier_calls == (), "version 1's call (and its no) belongs to another change"
+
+
+async def test_a_change_context_failure_goes_to_a_person(world):
+    world.change_context.facts = RuntimeError("ledger down")
+    await import_all(world.pool, world.ramp, world.keys, world.dataset.id)
+    await change_and_detect(world)
+    case = await case_of(world)
+    assert (await report(world, case["id"], world.voice.placed[0]["call_id"])).status_code == 204
+    await world.worker.drain(world.dataset.id)
+    case = await case_of(world)
+    assert case["state"] == "needs_review" and case["outcome"] is None
+    alert = await one(world.pool, "select kind, message from app.alerts where case_id = %s", case["id"])
+    assert alert["kind"] == "command_stuck" and "decide" in alert["message"]
+
+
+async def test_every_company_answer_must_match(world):
+    await import_all(world.pool, world.ramp, world.keys, world.dataset.id)
+    await change_and_detect(world)
+    case = await case_of(world)
+    call_id = world.voice.placed[0]["call_id"]
+    answers = transit(call_id)
+    answers["answers"].append(answer("company_named", "Globex Corporation", 11))
+    assert (await report(world, case["id"], call_id, answers=answers)).status_code == 204
+    await world.worker.drain(world.dataset.id)
+    decision = await one(world.pool, "select outcome, rules_fired from app.decisions where case_id = %s", case["id"])
+    assert decision["outcome"] == "needs_review" and "NR03_wrong_company" in decision["rules_fired"]
+
+
+async def test_without_the_ledgers_change_context_every_answer_is_unknown(world):
+    facts = await LedgerChangeContext().check(case_id=uuid.uuid4(), dataset_id=world.dataset.id, vendor_id=uuid.uuid4(),
+                                              cutoff=dt.datetime(2026, 11, 3, tzinfo=dt.UTC), speaker_names=("Jordan Lee",),
+                                              offered_numbers=())
+    assert facts == ChangeFacts()
+
+
+async def test_the_ledgers_change_context_counts_only_booleans(world, monkeypatch):
+    import dialback_ledger
+    monkeypatch.setattr(dialback_ledger, "change_context", raising=False, value=lambda **_: {
+        "speaker_in_change_thread": "no", "offered_number_from_request": True, "speaker_known_before_request": None,
+        "something_else": True})
+    facts = await LedgerChangeContext().check(case_id=uuid.uuid4(), dataset_id=world.dataset.id, vendor_id=uuid.uuid4(),
+                                              cutoff=dt.datetime(2026, 11, 3, tzinfo=dt.UTC), speaker_names=(),
+                                              offered_numbers=("415 555 0177",))
+    assert facts == ChangeFacts(offered_number_from_request=True), "a string 'no' is not False"
+
+
+def test_every_company_answer_must_match_and_an_unreadable_one_is_unknown():
+    from dialback_core.company import every_name_matches
+    assert every_name_matches(["Acme Fasteners"], "Acme Fasteners LLC") is True
+    assert every_name_matches(["Acme Fasteners", "Globex"], "Acme Fasteners LLC") is False
+    assert every_name_matches(["Acme Fasteners", "LLC"], "Acme Fasteners LLC") is None, "'LLC' alone names nobody"
+    assert every_name_matches([], "Acme Fasteners LLC") is None
+
+
+@pytest.mark.parametrize("telephony, expected", [
+    ({"direction": "outbound", "dialed_number_is_pick": True, "answered_by": "human"}, (True, True, "human")),
+    ({"direction": "inbound", "dialed_number_is_pick": False, "answered_by": "machine"}, (False, False, "machine")),
+    ({"direction": "outbound", "dialed_number_is_pick": False}, (True, False, None)),
+    ({"direction": "inbound", "dialed_number_is_pick": True, "answered_by": "human"}, (False, True, "human")),
+    ({}, (None, None, None)),
+], ids=["placed", "suspect", "wrong-number", "inbound", "older-report"])
+async def test_the_voice_reports_telephony_facts(world, monkeypatch, telephony, expected):
+    """Spec 0005, D6: the call's direction, the adapter's dialed-number check and who answered
+    come from the voice report (contract: A5bhinav/rampHackathon#13). Missing means unknown."""
+    import json
+
+    import dialback_core.worker as worker_module
+    from jsonschema import Draft202012Validator
+    seen, real = [], worker_module.decide
+    monkeypatch.setattr(worker_module, "decide", lambda facts: seen.append(facts) or real(facts))
+    await import_all(world.pool, world.ramp, world.keys, world.dataset.id)
+    await change_and_detect(world)
+    case = await case_of(world)
+    assert (await report(world, case["id"], world.voice.placed[0]["call_id"], telephony=telephony)).status_code == 204
+    await world.worker.drain(world.dataset.id)
+    [facts] = seen
+    assert (facts.dialed_out, facts.dialed_number_is_pick, facts.answered_by) == expected
+
+    stored = await one(world.pool, "select body_jcs::jsonb -> 'body' as body from audit.evidence_events "
+                                   "where case_id = %s and type = 'call_ended'", case["id"])
+    schema = json.loads((CONTRACTS / "schemas" / "evidence-event.schema.json").read_text())
+    body = {k: v for k, v in stored["body"].items() if k != "answers"}  # answers are Sami's schema, not on main yet
+    assert not list(Draft202012Validator({"$defs": schema["$defs"], **schema["$defs"]["CallEndedBody"]}).iter_errors(body))
+
+
+@pytest.mark.parametrize("telephony", [{"dialed_number_is_pick": "yes"}, {"dialed_number_is_pick": 1},
+                                       {"direction": "sideways"}, {"answered_by": "fax"}],
+                         ids=["pick-yes", "pick-1", "direction", "answered-by"])
+async def test_a_telephony_fact_that_isnt_in_the_contract_is_refused(world, telephony):
+    await import_all(world.pool, world.ramp, world.keys, world.dataset.id)
+    await change_and_detect(world)
+    case = await case_of(world)
+    r = await report(world, case["id"], world.voice.placed[0]["call_id"], telephony=telephony)
+    assert r.status_code == 422 and "6666" not in r.text, "refused, and the body is never echoed"
+    assert (await case_of(world))["state"] == "calling", "nothing was recorded"
+
+
+@pytest.mark.parametrize("slot, value", [("recording_consent", "No"), ("change_requested", "maybe"), ("flag", "approve_now")],
+                         ids=["consent", "change", "flag"])
+async def test_an_answer_value_outside_the_contract_is_refused_on_arrival(world, slot, value):
+    """A value the engine would reject (NR97) is refused when the report arrives, so it can't sit in
+    the evidence and poison later decisions through earlier_calls."""
+    await import_all(world.pool, world.ramp, world.keys, world.dataset.id)
+    await change_and_detect(world)
+    case = await case_of(world)
+    call_id = world.voice.placed[0]["call_id"]
+    answers = transit(call_id)
+    answers["answers"].append(answer(slot, value, 11))
+    r = await report(world, case["id"], call_id, answers=answers)
+    assert r.status_code == 422 and "6666" not in r.text
+    assert (await case_of(world))["state"] == "calling"
+
+
+# Callbacks, deadlines (spec 0007) ------------------------------------------------------------------
+
+LAB_START = dt.datetime(2026, 11, 3, 17, 0, tzinfo=dt.UTC)  # a Tuesday, 09:00 in Los Angeles
+
+
+async def lab_world(pool):
+    return await make_world(pool, kind="lab", sim_now=LAB_START,
+                            settings=core_settings(calling_window="09:00-16:30", calling_days="mon-fri"))
+
+
+async def test_a_callback_without_a_time_is_refused(world):
+    await import_all(world.pool, world.ramp, world.keys, world.dataset.id)
+    await change_and_detect(world)
+    case = await case_of(world)
+    r = await report(world, case["id"], world.voice.placed[0]["call_id"], result="callback_requested")
+    assert r.status_code == 422 and "retry_at" in r.text
+    assert (await case_of(world))["state"] == "calling"
+
+
+async def test_a_callback_is_redialed_at_the_time_asked_and_inside_the_window(pool):
+    world = await lab_world(pool)
+    try:
+        await import_all(world.pool, world.ramp, world.keys, world.dataset.id)
+        await change_and_detect(world)
+        case = await case_of(world)
+        first = world.voice.placed[0]["call_id"]
+        consent = {"schema_version": "call-answers/v0", "call_id": str(first), "answers": [answer("recording_consent", "yes", 1)]}
+        # "Call me back at five": 17:00 in Los Angeles, after the window closes at 16:30.
+        asked = dt.datetime(2026, 11, 4, 1, 0, tzinfo=dt.UTC)
+        r = await report(world, case["id"], first, result="callback_requested", answers=consent, retry_at=asked.isoformat())
+        assert r.status_code == 204 and (await case_of(world))["state"] == "retry_wait"
+        timer = await one(pool, "select fire_at from app.timers where case_id = %s and kind = 'retry_call' and status = 'scheduled'",
+                          case["id"])
+        assert timer["fire_at"] == asked, "the time the vendor asked for, not the default two hours"
+
+        await _advance(pool, world, asked - dt.timedelta(minutes=1))
+        assert len(world.voice.placed) == 1, "not before the time asked"
+        await _advance(pool, world, asked)
+        assert len(world.voice.placed) == 1, "the time asked is outside the window: wait for it to open"
+        await _advance(pool, world, dt.datetime(2026, 11, 4, 17, 0, tzinfo=dt.UTC))  # Wednesday 09:00 in Los Angeles
+        assert [p["attempt"] for p in world.voice.placed] == [1, 2]
+
+        assert (await report(world, case["id"], world.voice.placed[1]["call_id"], attempt=2)).status_code == 204
+        await world.worker.drain(world.dataset.id)
+        case = await case_of(world)
+        assert (case["state"], case["outcome"]) == ("awaiting_release", "verified"), "the earlier callback call is valid input"
+    finally:
+        await world.core.aclose()
+        await world.mock.aclose()
+
+
+async def test_the_deadline_survives_a_re_hold_and_overtakes_a_callback(pool):
+    world = await lab_world(pool)
+    try:
+        await import_all(world.pool, world.ramp, world.keys, world.dataset.id)
+        await change_and_detect(world)
+        case = await case_of(world)
+        deadline = case["deadline_at"]
+        assert deadline == dt.datetime(2026, 11, 6, 17, 0, tzinfo=dt.UTC), "three business days"
+
+        await _advance(pool, world, LAB_START + dt.timedelta(hours=1))
+        await change_and_detect(world, account_number="000077778888")  # a second change re-holds the case
+        case = await case_of(world)
+        assert case["version"] == 2 and case["deadline_at"] == deadline, "a new change doesn't buy more time"
+        timer = await one(pool, "select fire_at from app.timers where case_id = %s and kind = 'deadline' and status = 'scheduled'",
+                          case["id"])
+        assert timer["fire_at"] == deadline
+
+        later = deadline + dt.timedelta(days=3)  # Monday 09:00 in Los Angeles: inside the window, after the deadline
+        r = await report(world, case["id"], world.voice.placed[-1]["call_id"], attempt=case["call_attempts"],
+                         result="callback_requested", retry_at=later.isoformat())
+        assert r.status_code == 204
+        await _advance(pool, world, deadline)
+        case = await case_of(world)
+        assert case["state"] == "needs_review", "the deadline overtakes the callback"
+        alert = await one(pool, "select kind from app.alerts where case_id = %s and kind = 'deadline_reached'", case["id"])
+        assert alert is not None
+        calls = len(world.voice.placed)
+        await _advance(pool, world, later)
+        assert len(world.voice.placed) == calls and (await case_of(world))["state"] == "needs_review", "no callback after it"
+    finally:
+        await world.core.aclose()
+        await world.mock.aclose()
+
+
+async def test_the_deadline_leaves_a_case_a_person_owns_alone(pool):
+    world = await lab_world(pool)
+    try:
+        await import_all(world.pool, world.ramp, world.keys, world.dataset.id)
+        await change_and_detect(world)
+        case = await case_of(world)
+        assert (await report(world, case["id"], world.voice.placed[0]["call_id"])).status_code == 204
+        await world.worker.drain(world.dataset.id)
+        assert (await case_of(world))["state"] == "awaiting_release"
+        await _advance(pool, world, case["deadline_at"] + dt.timedelta(minutes=1))
+        assert (await case_of(world))["state"] == "awaiting_release", "an approver owns it now"
+        assert await one(pool, "select 1 from app.alerts where case_id = %s and kind = 'deadline_reached'", case["id"]) is None
+
+        # A new change hands the case back to code after its deadline: the next check sends it to a person.
+        await change_and_detect(world, account_number="000077778888")
+        assert (await case_of(world))["state"] == "calling"
+        await _advance(pool, world, case["deadline_at"] + dt.timedelta(hours=1, minutes=1))
+        assert (await case_of(world))["state"] == "needs_review", "the deadline wasn't used up while a person owned the case"
+    finally:
+        await world.core.aclose()
+        await world.mock.aclose()
+
+
+async def test_a_callback_inside_the_window_is_redialed_exactly_then(pool):
+    world = await lab_world(pool)
+    try:
+        await import_all(world.pool, world.ramp, world.keys, world.dataset.id)
+        await change_and_detect(world)
+        case = await case_of(world)
+        asked = LAB_START + dt.timedelta(hours=3)  # noon in Los Angeles
+        r = await report(world, case["id"], world.voice.placed[0]["call_id"], result="callback_requested", retry_at=asked.isoformat())
+        assert r.status_code == 204
+        await _advance(pool, world, asked - dt.timedelta(seconds=1))
+        assert len(world.voice.placed) == 1
+        await _advance(pool, world, asked)
+        assert [p["attempt"] for p in world.voice.placed] == [1, 2]
+    finally:
+        await world.core.aclose()
+        await world.mock.aclose()
+
+
+@pytest.mark.parametrize("when", ["infinity", "soon", "2026-11-03T10:00:00"], ids=["infinity", "words", "no-offset"])
+async def test_a_callback_time_that_isnt_a_moment_is_refused(world, when):
+    await import_all(world.pool, world.ramp, world.keys, world.dataset.id)
+    await change_and_detect(world)
+    case = await case_of(world)
+    r = await report(world, case["id"], world.voice.placed[0]["call_id"], result="callback_requested", retry_at=when)
+    assert r.status_code == 422 and (await case_of(world))["state"] == "calling"

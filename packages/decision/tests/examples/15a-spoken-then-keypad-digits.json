@@ -1,0 +1,46 @@
+{
+ "call": "The callee says 6666, then keys 6656.",
+ "answers": [
+  [
+   "recording_consent",
+   "yes",
+   1
+  ],
+  [
+   "company_named",
+   "Acme Fasteners",
+   3
+  ],
+  [
+   "speaker_name",
+   "Jordan Lee",
+   5
+  ],
+  [
+   "speaker_role",
+   "AR manager",
+   5
+  ],
+  [
+   "change_requested",
+   "yes",
+   7
+  ],
+  [
+   "account_last4",
+   "6666",
+   9
+  ],
+  [
+   "account_last4",
+   "6656",
+   10
+  ]
+ ],
+ "expect": {
+  "outcome": "needs_review",
+  "rules_fired": [
+   "NR08_digits_inconsistent"
+  ]
+ }
+}

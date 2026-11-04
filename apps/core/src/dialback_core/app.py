@@ -16,7 +16,14 @@ from .auth import TokenVerifier, verifier_from_settings
 from .calls import router as calls_router
 from .db import open_pool
 from .detection import Keys
-from .ports import CallPlacer, LedgerResolver, NoVoiceService, NumberResolver, VoiceServiceClient
+from .ports import (
+    CallPlacer,
+    ChangeContext,
+    LedgerResolver,
+    NoVoiceService,
+    NumberResolver,
+    VoiceServiceClient,
+)
 from .ramp import RampConnector
 from .settings import Settings
 from .webhooks import router as webhooks_router
@@ -25,7 +32,7 @@ from .worker import Worker
 
 def create_app(settings: Settings, pool: AsyncConnectionPool | None = None, connector: RampConnector | None = None,
                resolver: NumberResolver | None = None, caller: CallPlacer | None = None,
-               verifier: TokenVerifier | None = None) -> FastAPI:
+               change_context: ChangeContext | None = None, verifier: TokenVerifier | None = None) -> FastAPI:
     @contextlib.asynccontextmanager
     async def lifespan(app: FastAPI):
         http = httpx.AsyncClient(timeout=10.0)
@@ -38,7 +45,8 @@ def create_app(settings: Settings, pool: AsyncConnectionPool | None = None, conn
             worker = Worker(app.state.pool, settings, app.state.connector,
                             resolver or LedgerResolver(settings.resolver_mode),
                             caller or (VoiceServiceClient(settings.voice_base_url, settings.internal_api_token, http)
-                                       if settings.voice_base_url else NoVoiceService()))
+                                       if settings.voice_base_url else NoVoiceService()),
+                            change_context=change_context)
             task = asyncio.create_task(worker.run_forever(stop))
         try:
             yield

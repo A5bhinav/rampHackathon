@@ -1,4 +1,6 @@
+import Link from "next/link";
 import type { Alert } from "@/lib/api-types";
+import { when } from "@/lib/format";
 
 const TITLES: Record<string, string> = {
   hold_not_confirmed: "Hold not confirmed",
@@ -11,8 +13,9 @@ const TITLES: Record<string, string> = {
   not_verified: "Not verified",
 };
 
-/** Critical and warning alerts across the top of every page (design: "Hold not confirmed" banner). */
-export function AlertBanners({ alerts }: { alerts: Alert[] }) {
+/** Critical and warning alerts across the top of every page (design: "Hold not confirmed" banner),
+ *  each linked to its case when it has one. */
+export function AlertBanners({ alerts, datasetId }: { alerts: Alert[]; datasetId: string }) {
   const shown = alerts.filter((a) => a.severity !== "info").slice(0, 5);
   if (shown.length === 0) return null;
   return (
@@ -20,6 +23,10 @@ export function AlertBanners({ alerts }: { alerts: Alert[] }) {
       {shown.map((a) => (
         <div key={a.id} className={`banner ${a.severity}`} role={a.severity === "critical" ? "alert" : "status"}>
           {TITLES[a.kind] ?? a.kind}: <span style={{ fontWeight: 400 }}>{a.message}</span>
+          <span className="banner-meta">
+            {when(a.raised_at)}
+            {a.case_id ? <> · <Link href={`/d/${datasetId}/cases/${a.case_id}`}>Open the case</Link></> : null}
+          </span>
         </div>
       ))}
     </section>

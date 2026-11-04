@@ -24,18 +24,18 @@ from typing import Any
 from uuid import UUID
 
 from dialback_decision import CallChecks, decide
-from dialback_decision.facts import facts_from_answers
+from dialback_decision.facts import earlier_call, facts_from_answers, values
 from psycopg import AsyncConnection
 from psycopg.types.json import Jsonb
 from psycopg_pool import AsyncConnectionPool
 
 from .calling_window import CallingWindow
-from .company import company_matches
+from .company import every_name_matches
 from .db import dataset_now, system_tx
 from .detection import Keys, process_inbound_webhooks
 from .events import TransitionRefused, apply_event
 from .jobs import Jobs, unique_worker_name
-from .ports import CallerError, CallPlacer, NumberResolver, PreDialRefused
+from .ports import CallerError, CallPlacer, ChangeContext, LedgerChangeContext, NumberResolver, PreDialRefused
 from .ramp import RampConnector, RampError, RampNotFound, RampPort
 from .settings import Settings
 from .timeline import PRE_DIAL
@@ -105,12 +105,26 @@ select c.*, v.ramp_vendor_id, v.legal_name, v.trade_names, ce.detected_at, ce.ra
  where c.id = %s
 """
 
+# The deadline acts only while code owns the case; otherwise it re-checks (spec 0007, D4).
+DEADLINE_ACTIVE = ("held", "calling", "retry_wait", "deciding")
+DEADLINE_RECHECK = dt.timedelta(hours=1)
+
+# This generation's evidence the decision reads (spec 0005): the ledger's pick and every call report.
+GENERATION = """
+select type, body_jcs::jsonb -> 'body' as body
+  from audit.evidence_events
+ where case_id = %s and (body_jcs::jsonb ->> 'version')::int = %s and type in ('number_resolved', 'call_ended')
+ order by seq
+"""
+
 
 class Worker:
     def __init__(self, pool: AsyncConnectionPool, settings: Settings, connector: RampConnector, resolver: NumberResolver,
-                 caller: CallPlacer, name: str | None = None, sleep=asyncio.sleep) -> None:
+                 caller: CallPlacer, name: str | None = None, sleep=asyncio.sleep,
+                 change_context: ChangeContext | None = None) -> None:
         self.pool, self.settings, self.connector = pool, settings, connector
         self.resolver, self.caller, self.name, self._sleep = resolver, caller, name or unique_worker_name(), sleep
+        self.change_context = change_context or LedgerChangeContext()
         self.keys = Keys(settings.fingerprint_key, settings.fingerprint_key_version)
         self.window = CallingWindow.parse(settings.calling_tz, settings.calling_window, settings.calling_days)
         self.jobs = Jobs(pool, settings, connector, self.keys, self.name)
@@ -345,20 +359,32 @@ class Worker:
         body = cmd.payload
         answers = (body.get("answers") or {}).get("answers") or []
         async with system_tx(self.pool) as conn:
-            picked = await (await conn.execute(
-                "select (body_jcs::jsonb -> 'body' ->> 'contact_point_id') as contact_point_id from audit.evidence_events "
-                "where case_id = %s and type = 'number_resolved' order by seq desc limit 1", (case["id"],))).fetchone()
-        dialed = body.get("contact_point_id")
-        dialed_eligible = picked is not None and (dialed is None or dialed == picked["contact_point_id"])
-        named = next((a["value"] for a in answers if a["slot"] == "company_named"), None)
+            generation = await (await conn.execute(GENERATION, (case["id"], case["version"]))).fetchall()
+        picks = [e["body"].get("contact_point_id") for e in generation if e["type"] == "number_resolved"]
+        # Only this version's pick counts, and a report that doesn't name it isn't eligible (D1).
+        dialed_eligible = bool(picks) and body.get("contact_point_id") == picks[-1]
+        # Earlier calls can count against the change, never for it (D2).
+        earlier = tuple(earlier_call(e["body"]) for e in generation
+                        if e["type"] == "call_ended" and e["body"].get("call_id") != body.get("call_id"))
+        context = await self.change_context.check(
+            case_id=case["id"], dataset_id=case["dataset_id"], vendor_id=case["vendor_id"],
+            cutoff=case["ramp_changed_at"] or case["detected_at"],
+            speaker_names=values(answers, "speaker_name"), offered_numbers=values(answers, "offered_number"))
         checks = body.get("checks")
         facts = facts_from_answers(
             answers,
             call_result=body["result"],
             dialed_eligible_number=dialed_eligible,
             last_four_result=body.get("last_four_result"),
-            company_matches=company_matches(named, case["legal_name"], case["trade_names"] or ()),
+            company_matches=every_name_matches(values(answers, "company_named"), case["legal_name"], case["trade_names"] or ()),
             checks=CallChecks(**checks) if checks else None,
+            earlier_calls=earlier,
+            dialed_out=None if body.get("direction") is None else body["direction"] == "outbound",
+            dialed_number_is_pick=body.get("dialed_number_is_pick"),
+            answered_by=body.get("answered_by"),
+            speaker_in_change_thread=context.speaker_in_change_thread,
+            offered_number_from_request=context.offered_number_from_request,
+            speaker_known_before_request=context.speaker_known_before_request,
         )
         decision = decide(facts)
         await self._emit(case, "decision_made", f"{cmd.key}:made", decision.body())
@@ -370,35 +396,54 @@ class Worker:
         self._expect(case, cmd, ("releasing",))
         ramp = self.connector.for_dataset(case["dataset_id"])
         vendor = case["ramp_vendor_id"]
-        await ramp.release_vendor_hold(vendor)
-        for attempt in range(3):
-            if (await ramp.get_vendor(vendor)).hold_id is None:
-                break
-            await self._sleep(0.2 * (attempt + 1))
-        else:
-            raise Retry("read-back still shows the hold")
-
-        restored = []
-        for entry in await self._saved_schedule(case["id"]) or []:
-            if entry.get("payment_date"):
-                try:
-                    await ramp.set_bill_payment_date(entry["bill_id"], dt.date.fromisoformat(entry["payment_date"]))
-                    restored.append(entry)
-                except RampNotFound:
-                    log.info("bill %s is paid or gone; not rescheduled", entry["bill_id"])
+        # Until the case is `released`, any failure puts the hold back before the command retries
+        # or gives up, so the vendor is never left unheld in a case that isn't released (spec 0008,
+        # D3; R1, R7). That covers a release Ramp did but whose answer was lost, a read-back or a
+        # date restore that errors, and a database error on the last step. The next try releases
+        # again; placing a hold that is already on changes nothing.
         try:
+            await ramp.release_vendor_hold(vendor)
+            for attempt in range(3):
+                if (await ramp.get_vendor(vendor)).hold_id is None:
+                    break
+                await self._sleep(0.2 * (attempt + 1))
+            else:
+                raise Retry("read-back still shows the hold")
+            restored = []
+            for entry in await self._saved_schedule(case["id"]) or []:
+                if entry.get("payment_date"):
+                    try:
+                        await ramp.set_bill_payment_date(entry["bill_id"], dt.date.fromisoformat(entry["payment_date"]))
+                        restored.append(entry)
+                    except RampNotFound:
+                        log.info("bill %s is paid or gone; not rescheduled", entry["bill_id"])
             await self._emit(case, "hold_release_confirmed", f"{cmd.key}:confirmed",
                              {"readback_ok": True, "restored_schedule": restored})
         except Stale:
             # Another change arrived while we released (the case is held again). Put the hold
-            # back at once and say so: a release must never outlive the case's state (R1, R7).
-            await ramp.place_vendor_hold(vendor, HOLD_REASON)
+            # back at once and always say so: a release must never outlive the case's state.
+            back = await self._put_hold_back(ramp, vendor, case["id"])
             async with system_tx(self.pool) as conn:
                 await conn.execute(
                     "insert into app.alerts (dataset_id, case_id, kind, severity, message, raised_at) "
                     "values (%s, %s, 'vendor_not_held', 'critical', %s, app.now(%s))",
-                    (case["dataset_id"], case["id"], "A release raced a new bank change; the hold was put back.", case["dataset_id"]))
+                    (case["dataset_id"], case["id"],
+                     "A release raced a new bank change; the hold was put back." if back else
+                     "A release raced a new bank change and the hold could not be put back; reconciliation will retry.",
+                     case["dataset_id"]))
             raise
+        except Exception:
+            await self._put_hold_back(ramp, vendor, case["id"])
+            raise
+
+    async def _put_hold_back(self, ramp: RampPort, vendor: str, case_id: UUID) -> bool:
+        """Best effort: if Ramp is down too, the reconcile job puts it back (invariant I2)."""
+        try:
+            await ramp.place_vendor_hold(vendor, HOLD_REASON)
+            return True
+        except Exception as exc:  # noqa: BLE001  (best effort; the failure that got us here still propagates)
+            log.error("the hold on case %s could not be put back (%s); reconciliation will", case_id, type(exc).__name__)
+            return False
 
     async def notify(self, cmd: Command) -> None:
         log.info("notify: case %s outcome %s", cmd.case_id, cmd.payload.get("outcome"))
@@ -430,11 +475,19 @@ class Worker:
                 await apply_event(conn, case["id"], "retry_timer_fired",
                                   f"{case['id']}:retry:v{case['version']}:{payload.get('after_attempt')}",
                                   {"in_window": True, "timer_id": timer["id"]})
-            elif timer["kind"] == "deadline" and case["state"] in ("held", "calling", "retry_wait", "deciding"):
+            elif timer["kind"] == "deadline" and case["state"] in DEADLINE_ACTIVE:
                 await apply_event(conn, case["id"], "deadline_reached", f"{case['id']}:deadline",
                                   {"timer_id": timer["id"], "deadline_at": timer["fire_at"].isoformat()})
+            elif timer["kind"] == "deadline" and case["state"] != "released":
+                # A person owns the case (or it is releasing), so the deadline waits rather than being
+                # used up: if a new change hands it back to code, the next check sends it to a person
+                # (spec 0007, D4). The hold stays on throughout.
+                await conn.execute("update app.timers set fire_at = %s where id = %s", (now + DEADLINE_RECHECK, timer["id"]))
+                return
             elif timer["kind"] == "callback":
-                log.info("callback timers are not built yet; timer %s fired with no action", timer["id"])
+                # A vendor's callback (spec 0007) is a retry_call timer at the time they asked for; this
+                # kind is never scheduled. One firing anyway does nothing rather than call.
+                log.warning("unexpected callback timer %s fired with no action", timer["id"])
         except TransitionRefused as exc:
             log.warning("timer %s (%s) refused for case %s: %s", timer["id"], timer["kind"], case["id"], exc)
         await conn.execute("update app.timers set status = 'fired', fired_at = %s where id = %s", (now, timer["id"]))

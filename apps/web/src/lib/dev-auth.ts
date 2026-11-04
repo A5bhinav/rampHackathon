@@ -1,14 +1,15 @@
 import "server-only";
 import { SignJWT } from "jose";
+import { authMode } from "./auth-mode";
 
 // Local development without Supabase (spec 0002, D9). The dashboard's server mints a
-// short-lived JWT for a seeded user with a dev secret; the core verifies it with exactly the
-// code it uses for Supabase tokens. Never available in a production deployment.
+// short-lived JWT for a seeded user with a dev secret, which the core accepts only when it is
+// given that secret and no Supabase project (spec 0010). Never available in a production deployment.
 
 export type DevUser = { id: string; name: string };
 
 export function devAuthEnabled(): boolean {
-  return process.env.DIALBACK_AUTH_MODE === "dev" && process.env.VERCEL_ENV !== "production";
+  return authMode(process.env) === "dev";
 }
 
 // DIALBACK_DEV_USERS="<uuid>:Pat Clerk,<uuid>:Riley Approver"
