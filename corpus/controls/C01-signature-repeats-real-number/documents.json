@@ -1,0 +1,834 @@
+[
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "contract",
+   "parent_document_id": null,
+   "received_at": "2023-03-11T16:00:00Z",
+   "sender": null,
+   "subject": null,
+   "thread_id": null
+  },
+  "header_date": null,
+  "id": "4e2ae905-16fb-5bee-8fe0-fa862648e1c1",
+  "kind": "contract",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Master supply agreement: Glenmar Facilities",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Main: 615-555-0117",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: 615-555-0142",
+      "x": 72,
+      "y": 100
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Notices: legal@glenmar.example",
+      "x": 72,
+      "y": 114
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "listing",
+   "parent_document_id": null,
+   "received_at": "2023-06-09T16:00:00Z",
+   "sender": null,
+   "subject": null,
+   "thread_id": null
+  },
+  "header_date": null,
+  "id": "ec8d7498-fb4d-50e4-8508-4b1a9c700290",
+  "kind": "listing",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Glenmar Facilities: business listing",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Main: 615.555.0117",
+      "x": 72,
+      "y": 86
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "listing",
+   "parent_document_id": null,
+   "received_at": "2024-06-08T16:00:00Z",
+   "sender": null,
+   "subject": null,
+   "thread_id": null
+  },
+  "header_date": null,
+  "id": "8c8990d5-1db0-54f9-bffe-644222de443e",
+  "kind": "listing",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Glenmar Facilities: business listing",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Main: (615) 555-0117",
+      "x": 72,
+      "y": 86
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "vendor_portal",
+   "parent_document_id": null,
+   "received_at": "2024-01-05T16:00:00Z",
+   "sender": null,
+   "subject": null,
+   "thread_id": null
+  },
+  "header_date": null,
+  "id": "fbc28447-58bf-509c-a21a-25404b092d2e",
+  "kind": "portal_entry",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Vendor profile: Glenmar Facilities",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: 615-555-0142",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Billing: 615.555.0142",
+      "x": 72,
+      "y": 100
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "email",
+   "parent_document_id": null,
+   "received_at": "2023-04-10T16:00:00Z",
+   "sender": "ar@glenmar.example",
+   "subject": "Invoice 1892",
+   "thread_id": "thr-signature-repeats-real-number-5"
+  },
+  "header_date": "2023-04-10T16:00:00Z",
+  "id": "9e7ef7d0-936e-5de0-8dc2-067393255713",
+  "kind": "email",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Hello, please find invoice 1892 attached.",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Thank you",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: (615) 555-0142",
+      "x": 72,
+      "y": 100
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Main: (615) 555-0117",
+      "x": 72,
+      "y": 114
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "email",
+   "parent_document_id": "9e7ef7d0-936e-5de0-8dc2-067393255713",
+   "received_at": "2023-04-10T16:00:00Z",
+   "sender": "ar@glenmar.example",
+   "subject": "Invoice 1892",
+   "thread_id": "thr-signature-repeats-real-number-5"
+  },
+  "header_date": null,
+  "id": "95b36c48-f0f3-5a77-b435-0d7ac2fdfa53",
+  "kind": "invoice",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "INVOICE 1892",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Glenmar Facilities",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Remit questions to:",
+      "x": 72,
+      "y": 100
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: 615-555-0142",
+      "x": 72,
+      "y": 114
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "email",
+   "parent_document_id": null,
+   "received_at": "2023-11-03T08:00:00Z",
+   "sender": "ar@glenmar.example",
+   "subject": "Invoice 1893",
+   "thread_id": "thr-signature-repeats-real-number-7"
+  },
+  "header_date": "2023-11-03T08:00:00Z",
+  "id": "37d91152-f717-5bba-8e9f-d0b034d792d3",
+  "kind": "email",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Hello, please find invoice 1893 attached.",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Thank you",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: 615-555-0142",
+      "x": 72,
+      "y": 100
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Main: 615-555-0117",
+      "x": 72,
+      "y": 114
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "email",
+   "parent_document_id": "37d91152-f717-5bba-8e9f-d0b034d792d3",
+   "received_at": "2023-11-03T08:00:00Z",
+   "sender": "ar@glenmar.example",
+   "subject": "Invoice 1893",
+   "thread_id": "thr-signature-repeats-real-number-7"
+  },
+  "header_date": null,
+  "id": "b7ab7a60-11f5-5fd2-ba35-7f81fa36da4c",
+  "kind": "invoice",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "INVOICE 1893",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Glenmar Facilities",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Remit questions to:",
+      "x": 72,
+      "y": 100
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: (615) 555-0142",
+      "x": 72,
+      "y": 114
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "email",
+   "parent_document_id": null,
+   "received_at": "2024-05-28T00:00:00Z",
+   "sender": "ar@glenmar.example",
+   "subject": "Invoice 1894",
+   "thread_id": "thr-signature-repeats-real-number-9"
+  },
+  "header_date": "2024-05-28T00:00:00Z",
+  "id": "533c7a18-5adb-5bb2-84a6-1051e1d36516",
+  "kind": "email",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Hello, please find invoice 1894 attached.",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Thank you",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: (615) 555-0142",
+      "x": 72,
+      "y": 100
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Main: 615.555.0117",
+      "x": 72,
+      "y": 114
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "email",
+   "parent_document_id": "533c7a18-5adb-5bb2-84a6-1051e1d36516",
+   "received_at": "2024-05-28T00:00:00Z",
+   "sender": "ar@glenmar.example",
+   "subject": "Invoice 1894",
+   "thread_id": "thr-signature-repeats-real-number-9"
+  },
+  "header_date": null,
+  "id": "e3f4ff38-f784-5e76-99e1-bf7fe11b3547",
+  "kind": "invoice",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "INVOICE 1894",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Glenmar Facilities",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Remit questions to:",
+      "x": 72,
+      "y": 100
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: (615) 555-0142",
+      "x": 72,
+      "y": 114
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "email",
+   "parent_document_id": null,
+   "received_at": "2024-12-20T16:00:00Z",
+   "sender": "ar@glenmar.example",
+   "subject": "Invoice 1895",
+   "thread_id": "thr-signature-repeats-real-number-11"
+  },
+  "header_date": "2024-12-20T16:00:00Z",
+  "id": "31bd85a5-2cc3-5791-958c-96fcf069bfaf",
+  "kind": "email",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Hello, please find invoice 1895 attached.",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Thank you",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: 615.555.0142",
+      "x": 72,
+      "y": 100
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Main: 615.555.0117",
+      "x": 72,
+      "y": 114
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "email",
+   "parent_document_id": "31bd85a5-2cc3-5791-958c-96fcf069bfaf",
+   "received_at": "2024-12-20T16:00:00Z",
+   "sender": "ar@glenmar.example",
+   "subject": "Invoice 1895",
+   "thread_id": "thr-signature-repeats-real-number-11"
+  },
+  "header_date": null,
+  "id": "f2793c22-1b49-5ebd-a01d-edc900ac959a",
+  "kind": "invoice",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "INVOICE 1895",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Glenmar Facilities",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Remit questions to:",
+      "x": 72,
+      "y": 100
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: (615) 555-0142",
+      "x": 72,
+      "y": 114
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "email",
+   "parent_document_id": null,
+   "received_at": "2025-07-15T08:00:00Z",
+   "sender": "ar@glenmar.example",
+   "subject": "Invoice 1896",
+   "thread_id": "thr-signature-repeats-real-number-13"
+  },
+  "header_date": "2025-07-15T08:00:00Z",
+  "id": "18ac91ac-7978-529f-888b-20fa20f8279f",
+  "kind": "email",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Hello, please find invoice 1896 attached.",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Thank you",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: 615-555-0142",
+      "x": 72,
+      "y": 100
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Main: 615.555.0117",
+      "x": 72,
+      "y": 114
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "email",
+   "parent_document_id": "18ac91ac-7978-529f-888b-20fa20f8279f",
+   "received_at": "2025-07-15T08:00:00Z",
+   "sender": "ar@glenmar.example",
+   "subject": "Invoice 1896",
+   "thread_id": "thr-signature-repeats-real-number-13"
+  },
+  "header_date": null,
+  "id": "b66abaca-2aad-5a53-9840-05b2b2fc5b3d",
+  "kind": "invoice",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "INVOICE 1896",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Glenmar Facilities",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Remit questions to:",
+      "x": 72,
+      "y": 100
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: (615) 555-0142",
+      "x": 72,
+      "y": 114
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "email",
+   "parent_document_id": null,
+   "received_at": "2026-02-07T00:00:00Z",
+   "sender": "ar@glenmar.example",
+   "subject": "Invoice 1897",
+   "thread_id": "thr-signature-repeats-real-number-15"
+  },
+  "header_date": "2026-02-07T00:00:00Z",
+  "id": "5e592707-46eb-569c-962b-1a5bbcf57a35",
+  "kind": "email",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Hello, please find invoice 1897 attached.",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Thank you",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: 615-555-0142",
+      "x": 72,
+      "y": 100
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Main: 615-555-0117",
+      "x": 72,
+      "y": 114
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "email",
+   "parent_document_id": "5e592707-46eb-569c-962b-1a5bbcf57a35",
+   "received_at": "2026-02-07T00:00:00Z",
+   "sender": "ar@glenmar.example",
+   "subject": "Invoice 1897",
+   "thread_id": "thr-signature-repeats-real-number-15"
+  },
+  "header_date": null,
+  "id": "27c6f420-cfb1-5979-aa9e-bdb5e016c77d",
+  "kind": "invoice",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "INVOICE 1897",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Glenmar Facilities",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Remit questions to:",
+      "x": 72,
+      "y": 100
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: (615) 555-0142",
+      "x": 72,
+      "y": 114
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "email",
+   "parent_document_id": null,
+   "received_at": "2026-10-01T16:00:00Z",
+   "sender": "ar@glenmar.example",
+   "subject": "Re: Invoice 1897",
+   "thread_id": "thr-signature-repeats-real-number-15"
+  },
+  "header_date": "2026-10-01T16:00:00Z",
+  "id": "a3d4eb7c-cde5-591e-8a44-b7a6bf7612e5",
+  "kind": "email",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "We have moved our banking. Please pay the account ending 4821 from today.",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Thank you",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: 615.555.0142",
+      "x": 72,
+      "y": 100
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Main: (615) 555-0117",
+      "x": 72,
+      "y": 114
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ }
+]

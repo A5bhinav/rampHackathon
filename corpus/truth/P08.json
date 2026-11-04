@@ -1,0 +1,280 @@
+{
+ "documents": "poison/P08-swapped-digits-established/documents.json",
+ "expected": {
+  "cutoff": "2026-10-01T16:00:00Z",
+  "outcome": "picked",
+  "pick": "+19195550142",
+  "rejected": {
+   "+19195550124": [
+    "near_miss_of_older_number"
+   ]
+  }
+ },
+ "id": "P08",
+ "kind": "poison",
+ "planted": [
+  {
+   "e164": "+19195550117",
+   "sightings": [
+    {
+     "channel": "contract",
+     "document_id": "4209abbd-69dd-52ea-b696-447217467b67",
+     "party": "vendor",
+     "quote": "Main: 919.555.0117",
+     "received_at": "2023-03-11T16:00:00Z",
+     "role": "main",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "55fb2ef6-b342-57a3-8b26-ffe916a52fa7",
+     "party": "vendor",
+     "quote": "Main: 919-555-0117",
+     "received_at": "2023-04-10T16:00:00Z",
+     "role": "main",
+     "visibility": "visible"
+    },
+    {
+     "channel": "listing",
+     "document_id": "5036a4c3-f4a9-5033-9cb6-6eb081531908",
+     "party": "vendor",
+     "quote": "Main: 919.555.0117",
+     "received_at": "2023-06-09T16:00:00Z",
+     "role": "main",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "6d0ce340-4cb2-51b2-a1f8-d3ff4513e8ca",
+     "party": "vendor",
+     "quote": "Main: (919) 555-0117",
+     "received_at": "2023-11-03T08:00:00Z",
+     "role": "main",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "b14ad2f7-bc7d-5686-89bc-822139d095bd",
+     "party": "vendor",
+     "quote": "Main: 919.555.0117",
+     "received_at": "2024-05-28T00:00:00Z",
+     "role": "main",
+     "visibility": "visible"
+    },
+    {
+     "channel": "listing",
+     "document_id": "f395b2c2-eb65-50fe-97ed-4e9ce298f1c5",
+     "party": "vendor",
+     "quote": "Main: (919) 555-0117",
+     "received_at": "2024-06-08T16:00:00Z",
+     "role": "main",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "9c325bcf-1ad4-539d-9668-4f4375d5e02c",
+     "party": "vendor",
+     "quote": "Main: (919) 555-0117",
+     "received_at": "2024-12-20T16:00:00Z",
+     "role": "main",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "9d4fea9c-7439-59a7-bdf6-92a951842343",
+     "party": "vendor",
+     "quote": "Main: (919) 555-0117",
+     "received_at": "2025-07-15T08:00:00Z",
+     "role": "main",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "dc1692b6-f038-576c-bf5c-ef394cdcb530",
+     "party": "vendor",
+     "quote": "Main: 919-555-0117",
+     "received_at": "2026-02-07T00:00:00Z",
+     "role": "main",
+     "visibility": "visible"
+    }
+   ],
+   "truth": "real"
+  },
+  {
+   "e164": "+19195550124",
+   "sightings": [
+    {
+     "channel": "email",
+     "document_id": "25b4f590-3a6c-52de-bc26-0d6fb81516f1",
+     "party": "vendor",
+     "quote": "AR direct: 919-555-0124",
+     "received_at": "2026-05-04T16:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "paper_mail",
+     "document_id": "435ea5b2-5158-5e56-bc5c-d1c4b43bbec9",
+     "party": "vendor",
+     "quote": "AR direct: (919) 555-0124",
+     "received_at": "2026-05-04T16:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    }
+   ],
+   "truth": "poison"
+  },
+  {
+   "e164": "+19195550142",
+   "sightings": [
+    {
+     "channel": "contract",
+     "document_id": "4209abbd-69dd-52ea-b696-447217467b67",
+     "party": "vendor",
+     "quote": "Accounts receivable: 919-555-0142",
+     "received_at": "2023-03-11T16:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "1343f9fd-cf4a-51d5-bb7b-c9a111a1661d",
+     "party": "vendor",
+     "quote": "Accounts receivable: (919) 555-0142",
+     "received_at": "2023-04-10T16:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "55fb2ef6-b342-57a3-8b26-ffe916a52fa7",
+     "party": "vendor",
+     "quote": "Accounts receivable: 919-555-0142",
+     "received_at": "2023-04-10T16:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "622a6a28-475d-5a3c-b7b9-4f212c390fad",
+     "party": "vendor",
+     "quote": "Accounts receivable: (919) 555-0142",
+     "received_at": "2023-11-03T08:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "6d0ce340-4cb2-51b2-a1f8-d3ff4513e8ca",
+     "party": "vendor",
+     "quote": "Accounts receivable: 919.555.0142",
+     "received_at": "2023-11-03T08:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "vendor_portal",
+     "document_id": "7870712e-f09f-5aa1-9949-bc26331820e4",
+     "party": "vendor",
+     "quote": "Accounts receivable: 919-555-0142",
+     "received_at": "2024-01-05T16:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "vendor_portal",
+     "document_id": "7870712e-f09f-5aa1-9949-bc26331820e4",
+     "party": "vendor",
+     "quote": "Billing: 919.555.0142",
+     "received_at": "2024-01-05T16:00:00Z",
+     "role": "billing",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "0764449c-dfd4-5182-b9ad-847263f62d23",
+     "party": "vendor",
+     "quote": "Accounts receivable: (919) 555-0142",
+     "received_at": "2024-05-28T00:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "b14ad2f7-bc7d-5686-89bc-822139d095bd",
+     "party": "vendor",
+     "quote": "Accounts receivable: 919.555.0142",
+     "received_at": "2024-05-28T00:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "9c325bcf-1ad4-539d-9668-4f4375d5e02c",
+     "party": "vendor",
+     "quote": "Accounts receivable: 919.555.0142",
+     "received_at": "2024-12-20T16:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "b43e059d-95de-56d7-b7dd-66afa8bd5de0",
+     "party": "vendor",
+     "quote": "Accounts receivable: (919) 555-0142",
+     "received_at": "2024-12-20T16:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "14e33e64-9757-5edb-a3e4-93eabfe5a656",
+     "party": "vendor",
+     "quote": "Accounts receivable: 919-555-0142",
+     "received_at": "2025-07-15T08:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "9d4fea9c-7439-59a7-bdf6-92a951842343",
+     "party": "vendor",
+     "quote": "Accounts receivable: (919) 555-0142",
+     "received_at": "2025-07-15T08:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "06af9189-da08-5877-9a48-8d92582fb7c4",
+     "party": "vendor",
+     "quote": "Accounts receivable: 919-555-0142",
+     "received_at": "2026-02-07T00:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "dc1692b6-f038-576c-bf5c-ef394cdcb530",
+     "party": "vendor",
+     "quote": "Accounts receivable: (919) 555-0142",
+     "received_at": "2026-02-07T00:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    }
+   ],
+   "truth": "real"
+  }
+ ],
+ "ramp_change_at": "2026-10-01T18:00:00Z",
+ "request_document_id": "c5610474-87a6-575a-b8a1-35095a12ce29",
+ "request_received_at": "2026-10-01T16:00:00Z",
+ "source": "proposed",
+ "title": "Two swapped digits, in two source types, 150 days old",
+ "vendor": {
+  "domain": "velden.example",
+  "lookalike": "ve1den.example",
+  "name": "Velden Electrical",
+  "slug": "swapped-digits-established"
+ }
+}

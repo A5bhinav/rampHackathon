@@ -1,0 +1,255 @@
+{
+ "documents": "controls/C05-resent-old-contract/documents.json",
+ "expected": {
+  "cutoff": "2026-10-01T16:00:00Z",
+  "first_seen_at": {
+   "+13365550142": "2025-09-26T16:00:00Z"
+  },
+  "outcome": "picked",
+  "pick": "+13365550142",
+  "rejected": {}
+ },
+ "id": "C05",
+ "kind": "control",
+ "planted": [
+  {
+   "e164": "+13365550117",
+   "sightings": [
+    {
+     "channel": "email",
+     "document_id": "a6c766f5-1ec2-5755-963e-c3461ba7a7b0",
+     "party": "vendor",
+     "quote": "Main: 336-555-0117",
+     "received_at": "2025-09-26T16:00:00Z",
+     "role": "main",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "d30dd628-a948-5a31-9eb2-3db07448c059",
+     "party": "vendor",
+     "quote": "Main: 336-555-0117",
+     "received_at": "2025-11-22T08:00:00Z",
+     "role": "main",
+     "visibility": "visible"
+    },
+    {
+     "channel": "listing",
+     "document_id": "b454f12e-ca45-5ff7-b3a6-a1b17a52667f",
+     "party": "vendor",
+     "quote": "Main: 336.555.0117",
+     "received_at": "2025-11-25T16:00:00Z",
+     "role": "main",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "3e3fe1fa-cca1-5e74-bed1-585d95cc4f33",
+     "party": "vendor",
+     "quote": "Main: 336.555.0117",
+     "received_at": "2026-01-18T00:00:00Z",
+     "role": "main",
+     "visibility": "visible"
+    },
+    {
+     "channel": "contract",
+     "document_id": "47afbb5b-9306-5d31-bb15-ad7cfed0ae68",
+     "party": "vendor",
+     "quote": "Main: 336-555-0117",
+     "received_at": "2026-03-15T16:00:00Z",
+     "role": "main",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "dc40cb9d-5141-55e7-a6c1-629e55b7fbc3",
+     "party": "vendor",
+     "quote": "Main: (336) 555-0117",
+     "received_at": "2026-03-15T16:00:00Z",
+     "role": "main",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "500d0618-b73c-5f38-9984-acb43797f629",
+     "party": "vendor",
+     "quote": "Main: (336) 555-0117",
+     "received_at": "2026-05-11T08:00:00Z",
+     "role": "main",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "951b2a00-895c-52cf-815f-ad72e4a8821b",
+     "party": "vendor",
+     "quote": "Main: 336-555-0117",
+     "received_at": "2026-07-07T00:00:00Z",
+     "role": "main",
+     "visibility": "visible"
+    },
+    {
+     "channel": "listing",
+     "document_id": "ba4f9208-f8e1-5109-9a5f-fd92672acf05",
+     "party": "vendor",
+     "quote": "Main: 336.555.0117",
+     "received_at": "2026-11-25T16:00:00Z",
+     "role": "main",
+     "visibility": "visible"
+    }
+   ],
+   "truth": "real"
+  },
+  {
+   "e164": "+13365550142",
+   "sightings": [
+    {
+     "channel": "email",
+     "document_id": "43a4e7a9-2476-5aa6-b0ac-b03644bd4c13",
+     "party": "vendor",
+     "quote": "Accounts receivable: 336-555-0142",
+     "received_at": "2025-09-26T16:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "a6c766f5-1ec2-5755-963e-c3461ba7a7b0",
+     "party": "vendor",
+     "quote": "Accounts receivable: 336.555.0142",
+     "received_at": "2025-09-26T16:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "d30dd628-a948-5a31-9eb2-3db07448c059",
+     "party": "vendor",
+     "quote": "Accounts receivable: 336.555.0142",
+     "received_at": "2025-11-22T08:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "e6820653-087f-59d2-94ac-bc22cb09e9e6",
+     "party": "vendor",
+     "quote": "Accounts receivable: 336.555.0142",
+     "received_at": "2025-11-22T08:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "3e3fe1fa-cca1-5e74-bed1-585d95cc4f33",
+     "party": "vendor",
+     "quote": "Accounts receivable: (336) 555-0142",
+     "received_at": "2026-01-18T00:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "9dde7e73-2eab-5475-8823-ff6dc76ecfab",
+     "party": "vendor",
+     "quote": "Accounts receivable: (336) 555-0142",
+     "received_at": "2026-01-18T00:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "contract",
+     "document_id": "47afbb5b-9306-5d31-bb15-ad7cfed0ae68",
+     "party": "vendor",
+     "quote": "Accounts receivable: (336) 555-0142",
+     "received_at": "2026-03-15T16:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "dc40cb9d-5141-55e7-a6c1-629e55b7fbc3",
+     "party": "vendor",
+     "quote": "Accounts receivable: 336.555.0142",
+     "received_at": "2026-03-15T16:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "f96df810-217e-5c51-a127-0fb599b2dbef",
+     "party": "vendor",
+     "quote": "Accounts receivable: 336.555.0142",
+     "received_at": "2026-03-15T16:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "500d0618-b73c-5f38-9984-acb43797f629",
+     "party": "vendor",
+     "quote": "Accounts receivable: (336) 555-0142",
+     "received_at": "2026-05-11T08:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "7af7078f-9436-5c5b-bacb-14f3e20222bd",
+     "party": "vendor",
+     "quote": "Accounts receivable: 336.555.0142",
+     "received_at": "2026-05-11T08:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "vendor_portal",
+     "document_id": "3a61090d-54fd-5fcd-a832-9ad92167b9ec",
+     "party": "vendor",
+     "quote": "Accounts receivable: (336) 555-0142",
+     "received_at": "2026-06-23T16:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "vendor_portal",
+     "document_id": "3a61090d-54fd-5fcd-a832-9ad92167b9ec",
+     "party": "vendor",
+     "quote": "Billing: 336-555-0142",
+     "received_at": "2026-06-23T16:00:00Z",
+     "role": "billing",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "951b2a00-895c-52cf-815f-ad72e4a8821b",
+     "party": "vendor",
+     "quote": "Accounts receivable: 336-555-0142",
+     "received_at": "2026-07-07T00:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "fbb1b1fd-f298-5de5-a805-511d3103dd08",
+     "party": "vendor",
+     "quote": "Accounts receivable: 336-555-0142",
+     "received_at": "2026-07-07T00:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    }
+   ],
+   "truth": "real"
+  }
+ ],
+ "ramp_change_at": "2026-10-01T18:00:00Z",
+ "request_document_id": "a6eaab7b-d784-542a-aa9d-d2fa9adb5774",
+ "request_received_at": "2026-10-01T16:00:00Z",
+ "source": "proposed",
+ "title": "A contract printed 2019, received 200 days ago",
+ "vendor": {
+  "domain": "thornbury.example",
+  "lookalike": "th0rnbury.example",
+  "name": "Thornbury Logistics",
+  "slug": "resent-old-contract"
+ }
+}
