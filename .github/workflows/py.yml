@@ -36,6 +36,8 @@ jobs:
         run: python3 corpus/generator/build.py --check && uv run --no-project --with pytest pytest -q corpus/generator
       - name: Decision engine
         run: cd packages/decision && uv run pytest -q
+      - name: Trust Ledger (selection rule against the frozen corpus)
+        run: cd packages/ledger && uv run pytest -q
       - name: Ramp mock
         run: cd apps/ramp-mock && uv run pytest -q
       - name: Core (with the Ramp mock in process)
