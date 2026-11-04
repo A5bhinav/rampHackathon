@@ -20,6 +20,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import contextlib
+import datetime as dt
 import os
 import signal
 import sys
@@ -75,10 +76,11 @@ class ScriptedChangeContext:
 class ScriptedVoice:
     """TEST DOUBLE for Sami's voice service. Accepts the call, then reports it to the core as
     internal.yaml describes. The vendor says their new account's last four digits, unless the
-    vendor's name is in `refuse` (a pre-dial refusal) or `deny` (the vendor denies the change)."""
+    vendor's name is in `refuse` (a pre-dial refusal), `deny` (the vendor denies the change) or
+    `callback` (the first call asks to be called back in a few seconds; spec 0007)."""
 
-    def __init__(self, pool, refuse: set[str], deny: set[str]) -> None:
-        self.pool, self.refuse, self.deny = pool, refuse, deny
+    def __init__(self, pool, refuse: set[str], deny: set[str], callback: set[str] = frozenset()) -> None:
+        self.pool, self.refuse, self.deny, self.callback = pool, refuse, deny, callback
         self.tasks: set[asyncio.Task] = set()
 
     async def place_call(self, *, case_id, attempt, idempotency_key) -> uuid.UUID:
@@ -103,6 +105,15 @@ class ScriptedVoice:
             return {"slot": slot, "value": value, "turn_id": turn, "tool_call_id": f"tc_{turn}",
                     "captured_at": f"2026-11-01T17:02:{turn:02d}Z", "capture_method": "keypad" if slot == "account_last4" else "speech"}
 
+        if vendor in self.callback and attempt == 1:
+            when = (dt.datetime.now(dt.UTC) + dt.timedelta(seconds=2)).isoformat()
+            body = {"call_id": str(call_id), "case_id": str(case_id), "result": "callback_requested", "attempt": attempt,
+                    "retry_at": when, "contact_point_id": str(CONTACT_POINT), "direction": "outbound",
+                    "dialed_number_is_pick": True, "answered_by": "human", "agent_version": "scripted-double",
+                    "answers": {"schema_version": "call-answers/v0", "call_id": str(call_id),
+                                "answers": [a("recording_consent", "yes", 1)]}}
+            await self._send(case_id, attempt, call_id, body)
+            return
         answers = [a("recording_consent", "yes", 1), a("company_named", vendor.removesuffix(" LLC").removesuffix(" Inc"), 3),
                    a("speaker_name", "Jordan Lee", 5), a("speaker_role", "AR manager", 5),
                    a("change_requested", "no" if denies else "yes", 7)]
@@ -114,6 +125,9 @@ class ScriptedVoice:
                 "agent_version": "scripted-double", "answers": {"schema_version": "call-answers/v0", "call_id": str(call_id), "answers": answers},
                 "checks": {"disclosure_first": True, "answers_grounded": True, "agent_spoke_account_digits": False,
                            "new_number_accepted": False, "policy_violations": 0, "speech_guard_trips": 0}}
+        await self._send(case_id, attempt, call_id, body)
+
+    async def _send(self, case_id, attempt, call_id, body: dict) -> None:
         async with httpx.AsyncClient(timeout=10.0) as http:
             for _ in range(10):
                 r = await http.post(f"{CORE_URL}/internal/calls/{call_id}/ended", json=body,
@@ -128,6 +142,7 @@ VENDORS = [
     ("acme", "Acme Fasteners LLC", "000011112222", "000033334444"),
     ("brightline", "Brightline Office Supply Inc", "000044445555", "000066667777"),
     ("cobalt", "Cobalt Freight LLC", "000077778888", "000099990000"),
+    ("delta", "Delta Paper Co", "000012121212", "000034343434"),
 ]
 
 
@@ -204,7 +219,8 @@ async def run(url: str, args: argparse.Namespace) -> int:
         await wait_for(f"{MOCK_URL}/healthz")
         settings = core_settings(url, backoff=0.2 if args.smoke else 1.0, jobs_every=2 if args.smoke else 30)
         pool = await open_pool(url, max_size=10)
-        voice = ScriptedVoice(pool, refuse={"Brightline Office Supply Inc"}, deny={"Cobalt Freight LLC"})
+        voice = ScriptedVoice(pool, refuse={"Brightline Office Supply Inc"}, deny={"Cobalt Freight LLC"},
+                              callback={"Delta Paper Co"})
         app = create_app(settings, pool=pool, resolver=ScriptedLedger(), caller=voice, change_context=ScriptedChangeContext())
         server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=CORE_PORT, log_level="warning"))
         serving = asyncio.create_task(server.serve())
@@ -219,12 +235,15 @@ async def run(url: str, args: argparse.Namespace) -> int:
         print(f"    DIALBACK_DEV_USERS='{dev_users}' pnpm dev\n")
 
         if args.changes or args.smoke:
-            # Three bank changes: Acme confirms (verified), Brightline's call is refused before
-            # dialing (needs review), Cobalt's contact denies the change (not verified).
+            # Four bank changes: Acme confirms (verified), Brightline's call is refused before
+            # dialing (needs review), Cobalt's contact denies the change (not verified), and
+            # Delta asks for a callback, then confirms; no Dialback user made Delta's change, so
+            # its release takes two approvers (spec 0007).
             await bank_change(settings, dataset_id, refs["acme"], "000012340001", refs["clerk"])
             await bank_change(settings, dataset_id, refs["brightline"], "000012340002", refs["clerk"])
             await bank_change(settings, dataset_id, refs["cobalt"], "000012340003", None)
-            print("Made three bank changes in the Ramp mock (Acme, Brightline, Cobalt).\n")
+            await bank_change(settings, dataset_id, refs["delta"], "000012340004", None)
+            print("Made four bank changes in the Ramp mock (Acme, Brightline, Cobalt, Delta).\n")
 
         code = 0
         if args.smoke:

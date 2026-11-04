@@ -156,6 +156,7 @@ If this slice is behind at the Nov 4 checkpoint, `packages/decision` moves to In
 | Ports to Inesh's `select_number` and Sami's `POST /calls`, both failing closed when the other side is missing | `ports.py` | `abhi/core-worker` |
 | What `decide()` reads (spec 0005): the report must name this version's ledger pick; earlier calls of the generation; every company answer must match; the ledger's `change_context` port (unknown until it exists) | `worker.py`, `ports.py` | `abhi/decision-facts` |
 | The voice report's telephony facts (`direction`, `dialed_number_is_pick`, `answered_by`; contract A5bhinav/rampHackathon#13), stored with the call and read into the decision facts | `calls.py`, `worker.py` | `abhi/core-telephony` |
+| Callbacks (spec 0007): `callback_requested` with `retry_at` redials at the time asked, inside the calling window, as one of the 3 attempts; the deadline survives a re-hold and only acts while code owns the case | `calls.py`, `timeline.py`, migration `app/0008` | `abhi/lifecycle` |
 | Company-name match, calling window | `company.py`, `calling_window.py` | `abhi/core-worker` |
 | CLI: `serve`, `new-dataset`, `import-vendors`, `retire-dataset`, `run-job` | `main.py` | `abhi/core-worker`, `abhi/poller-reconcile` |
 | Scheduled jobs on the dataset clock: the poller (incremental, with a nightly full sweep) and reconciliation (a missing hold goes back on, with a critical alert) | `jobs.py` | `abhi/poller-reconcile` |

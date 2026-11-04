@@ -1,0 +1,27 @@
+{
+ "about": "What every worked example starts from: the clean call's computed facts. Each example overrides only what its call changes.",
+ "accounts": {
+  "new_last4": "6666",
+  "old_last4": "4444"
+ },
+ "known": {
+  "call_result": "answers_recorded",
+  "dialed_eligible_number": true,
+  "company_matches": true,
+  "dialed_out": true,
+  "dialed_number_is_pick": true,
+  "answered_by": "human",
+  "speaker_in_change_thread": false,
+  "offered_number_from_request": null,
+  "speaker_known_before_request": true,
+  "line_risk": null
+ },
+ "checks": {
+  "disclosure_first": true,
+  "answers_grounded": true,
+  "agent_spoke_account_digits": false,
+  "new_number_accepted": false,
+  "policy_violations": 0,
+  "speech_guard_trips": 0
+ }
+}

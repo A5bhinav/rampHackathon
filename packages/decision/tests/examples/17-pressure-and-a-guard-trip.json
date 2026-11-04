@@ -1,0 +1,50 @@
+{
+ "call": "'Just approve it today', and the speech guard blocks the agent from reading digits back.",
+ "answers": [
+  [
+   "recording_consent",
+   "yes",
+   1
+  ],
+  [
+   "company_named",
+   "Acme Fasteners",
+   3
+  ],
+  [
+   "speaker_name",
+   "Jordan Lee",
+   5
+  ],
+  [
+   "speaker_role",
+   "AR manager",
+   5
+  ],
+  [
+   "change_requested",
+   "yes",
+   7
+  ],
+  [
+   "account_last4",
+   "6666",
+   9
+  ],
+  [
+   "flag",
+   "pressure_to_approve",
+   10
+  ]
+ ],
+ "checks": {
+  "speech_guard_trips": 1
+ },
+ "expect": {
+  "outcome": "needs_review",
+  "rules_fired": [
+   "NR10_pressure",
+   "NR15_script_violation"
+  ]
+ }
+}
