@@ -18,12 +18,12 @@ first hour and CI catches drift between spec and code.
 |---|---|---|---|
 | `schemas/evidence-event.schema.json` | The envelope `audit.append_evidence()` hashes, with a body schema per event type | Abhi | done |
 | `schemas/call-answers.schema.json` | The answer slots and their allowed values, shared by the agent's tools, the text line and `decide()`; referenced from `CallEndedBody.answers` | Sami | to write |
-| `schemas/selection.schema.json` | `select_number(case)` output: the chosen number, up to two alternates or `no_provable_number`, and every candidate with its reason | Inesh | to write |
+| `schemas/selection.schema.json` | `select_number(case)` output: the chosen number, up to two alternates or `no_provable_number`, and every candidate with its reason | Inesh | done (spec 0012) |
 | `schemas/scenario.schema.json`, `run-result.schema.json`, `scorecard.schema.json` | The attack lab's formats (`dialback.scenario/v1`) | Sami | to write |
 | `openapi/dialback.yaml` | Dashboard to core: REST with the user's token | Abhi | to write |
 | `openapi/internal.yaml` | Core to voice: `POST /calls`, then `call_ended` back | Abhi and Sami | to write |
 | `openapi/ramp-developer-api.json` | Ramp's own spec, committed for the mock and the adapter | Abhi | when obtained |
-| `examples/` | One or more examples per schema | each | evidence-event done |
+| `examples/` | One or more examples per schema | each | evidence-event, selection done |
 | `vectors/evidence-chain.json` | Golden JCS strings and chain hashes that Python and SQL must both reproduce | Abhi | done |
 | `generated/ts`, `generated/py` | Generated clients and models | CI | to set up |
 | `scripts/validate.py` | Validates schemas and examples | | done |

@@ -1,0 +1,38 @@
+{
+  "v": 1,
+  "number_selection_id": "8c2f5d3b-6e4a-4b9f-8d72-3a1e9c8b5f26",
+  "case_id": "4a7b0e3f-9c25-4d8b-b6f1-2e3d4c5b6a71",
+  "dataset_id": "0c9e8d7f-6a5b-4c3d-8e2f-1a0b9c8d7e6f",
+  "vendor_id": "b3c5d7e9-f1a2-4b4c-9d6e-8f0a1b2c3d4e",
+  "rule_version": "ledger-select-v1",
+  "rule_settings": { "min_source_types": 2, "min_age_days": 90, "near_miss_distance": 1, "same_subject_window_days": 30 },
+  "requested_cutoff": "2026-11-03T19:12:00.000000Z",
+  "cutoff": "2026-11-03T19:12:00.000000Z",
+  "outcome": "no_provable_number",
+  "reason": "No number was seen in two independent source types at least 90 days before the change request. The only other number first appeared in the request's thread.",
+  "candidates": [
+    {
+      "contact_point_id": "f4a5b6c7-d8e9-4f0a-9b2c-3d4e5f607182",
+      "e164": "+12125550168",
+      "first_seen_at": "2024-06-10T13:47:22.000000Z",
+      "source_types": ["email"],
+      "on_file": true,
+      "roles": ["main"],
+      "observation_count": 9,
+      "eligible": false,
+      "reasons": ["too_few_source_types"]
+    },
+    {
+      "contact_point_id": "a5b6c7d8-e9f0-4a1b-8c3d-4e5f60718293",
+      "e164": "+12125550191",
+      "first_seen_at": "2026-11-02T22:31:09.000000Z",
+      "source_types": ["email"],
+      "on_file": false,
+      "roles": ["billing"],
+      "observation_count": 1,
+      "eligible": false,
+      "reasons": ["first_seen_in_change_context", "too_few_source_types", "younger_than_minimum_age"]
+    }
+  ],
+  "inputs_sha256": "9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b3a2f1e0d9c8b7a6f5e4d3c2b1a0f9e8d"
+}
