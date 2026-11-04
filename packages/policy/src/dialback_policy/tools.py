@@ -70,17 +70,20 @@ def _moment(raw: Any, field: str) -> dt.datetime:
         raise ToolError("bad_value", f"{field} must be an ISO 8601 time with an offset")
     try:
         moment = dt.datetime.fromisoformat(raw)
-    except ValueError:
+        if moment.tzinfo is None:
+            raise ToolError("bad_value", f"{field} has no offset")
+        moment.astimezone(dt.UTC)  # a year 1 or 9999 time can't be converted: refuse it here
+    except (ValueError, OverflowError):
         raise ToolError("bad_value", f"{field} must be an ISO 8601 time with an offset") from None
-    if moment.tzinfo is None:
-        raise ToolError("bad_value", f"{field} has no offset")
+    if not 2000 <= moment.year <= 2100:
+        raise ToolError("bad_value", f"{field} is not a plausible callback time")
     return moment
 
 
 def validate(call: ToolCall, *, callee_turns: frozenset[int], in_menu: bool = False,
              keys_used: int = 0) -> dict[str, Any]:
     """Check one tool call and return its arguments, parsed. Raises ToolError."""
-    if call.name not in _FIELDS:
+    if not isinstance(call.name, str) or call.name not in _FIELDS:
         raise ToolError("unknown_tool", f"no tool named {call.name!r}")
     if not isinstance(call.id, str) or not 1 <= len(call.id) <= 128:
         raise ToolError("bad_arguments", "the tool call id must be 1 to 128 characters")

@@ -78,6 +78,9 @@ def _clean(text: str) -> str:
     return "".join(ch for ch in text if unicodedata.category(ch) != "Cf").lower()
 
 
+clean = _clean
+
+
 def _words(text: str) -> str:
     """Lowercase words separated by single spaces, padded so phrases match on word boundaries."""
     return " " + " ".join(re.findall(r"[a-z0-9]+", _clean(text))) + " "
@@ -109,8 +112,10 @@ def digit_runs(text: str) -> list[str]:
 
 
 def _allowed_runs(ctx: GuardContext) -> set[str]:
+    # A read-back is for the last four digits only: a longer run (a phone number the callee offered,
+    # a full account number) is never read back.
     callee = digit_runs(ctx.callee_last_turn)
-    allowed = set(callee) | {"".join(callee)}  # "4 8, um, 2 1" can be read back as 4821
+    allowed = {run for run in [*callee, "".join(callee)] if len(run) <= 4}  # "4 8, um, 2 1" reads back as 4821
     callback = "".join(ch for ch in ctx.callback_number if ch.isdigit())
     if callback:
         allowed.add(callback)
