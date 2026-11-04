@@ -230,6 +230,13 @@ components:
       type: object
       additionalProperties: false
       required: [call_id, case_id, result, attempt]
+      if:
+        required: [result]
+        properties:
+          result:
+            const: callback_requested
+      then:
+        required: [retry_at]
       properties:
         call_id:
           $ref: '../schemas/evidence-event.schema.json#/$defs/CallEndedBody/properties/call_id'
@@ -254,6 +261,12 @@ components:
           $ref: '../schemas/evidence-event.schema.json#/$defs/CallEndedBody/properties/contact_point_id'
         checks:
           $ref: '../schemas/evidence-event.schema.json#/$defs/CallChecks'
+        direction:
+          $ref: '../schemas/evidence-event.schema.json#/$defs/CallEndedBody/properties/direction'
+        dialed_number_is_pick:
+          $ref: '../schemas/evidence-event.schema.json#/$defs/CallEndedBody/properties/dialed_number_is_pick'
+        answered_by:
+          $ref: '../schemas/evidence-event.schema.json#/$defs/CallEndedBody/properties/answered_by'
 
     Error:
       type: object
