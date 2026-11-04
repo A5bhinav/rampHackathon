@@ -150,6 +150,27 @@ paths:
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /api/cases/{case_id}/selection:
+    get:
+      operationId: getCaseSelection
+      summary: The number lineage panel - the selection the case used, and why (spec 0017)
+      description: |
+        The selection named by the case's latest `number_resolved` or `no_provable_number`
+        event, as `ledger.number_selections` stores it (`selection.schema.json`), read under the
+        person's own token. `selection` is null when the case has no selection yet, or its event
+        names none that the ledger stored. `reason_text` gives the ledger's template sentence for
+        each reason code; the dashboard shows these and never writes its own.
+      parameters:
+        - $ref: '#/components/parameters/CaseId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SelectionView' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   /api/cases/{case_id}/release:
     post:
       operationId: releaseCase
@@ -542,6 +563,28 @@ components:
         to_state: { $ref: '../schemas/evidence-event.schema.json#/$defs/CaseState' }
         version: { type: integer, minimum: 1 }
         evidence_seq: { type: [integer, 'null'] }
+
+    SelectionView:
+      type: object
+      additionalProperties: false
+      required: [selection, reason_text]
+      properties:
+        selection:
+          description: The stored selection document, or null when there is none yet.
+          oneOf: [{ $ref: '../schemas/selection.schema.json' }, { type: 'null' }]
+        reason_text:
+          type: object
+          description: The ledger's sentence for each reason code a candidate can carry.
+          additionalProperties: false
+          required: [first_seen_in_change_context, too_few_source_types, younger_than_minimum_age, near_miss_of_older_number, hidden_text_only, not_vendor_party, fax_line]
+          properties:
+            first_seen_in_change_context: { type: string }
+            too_few_source_types: { type: string }
+            younger_than_minimum_age: { type: string }
+            near_miss_of_older_number: { type: string }
+            hidden_text_only: { type: string }
+            not_vendor_party: { type: string }
+            fax_line: { type: string }
 
     Error:
       type: object
