@@ -1,4 +1,4 @@
-"""The Nov 1 stand-ins the core calls under DIALBACK_RESOLVER=stub (spec 0012).
+"""The Nov 1 stand-ins the core calls under DIALBACK_RESOLVER=stub (spec 0018).
 
 `select_number_stub` returns the contract's `selection.picked.json` example (copied beside this
 file so the package works without the contracts folder; a test checks the copy hasn't drifted)
