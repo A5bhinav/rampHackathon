@@ -31,9 +31,11 @@ def test_visibility():
 def test_phones_are_found_and_nothing_else():
     doc = page(span("AR: (415) 555-0142, fax 212-555-0169"), span("Invoice 1042 dated 2026-10-01, account ending 4821"),
                span("919.555.0124", color="#ffffff"))
-    found = [(c.e164, c.visibility, c.line, c.raw) for c in find_phones(lines(doc))]
-    assert found == [("+14155550142", "visible", 0, "(415) 555-0142"), ("+12125550169", "visible", 0, "212-555-0169"),
-                     ("+19195550124", "white", 2, "919.555.0124")]
+    found = [(c.e164, c.visibility, c.line, c.start, c.end, c.raw) for c in find_phones(lines(doc))]
+    assert found == [("+14155550142", "visible", 0, 4, 18, "(415) 555-0142"), ("+12125550169", "visible", 0, 24, 36, "212-555-0169"),
+                     ("+19195550124", "white", 2, 0, 12, "919.555.0124")]
+    text = lines(doc)[0].text
+    assert text[4:18] == "(415) 555-0142" and text[24:36] == "212-555-0169"
 
 
 def test_an_attachment_takes_its_emails_custody():
@@ -62,3 +64,9 @@ def test_gate_a_every_planted_number_and_nothing_else(path):
     want = Counter((s["document_id"], p["e164"], s["visibility"]) for p in truth["planted"] for s in p["sightings"])
     got = Counter((d["id"], c.e164, c.visibility) for d in docs for c in find_phones(lines(d)))
     assert got == want
+
+
+def test_anything_unreadable_counts_as_hidden():
+    doc = page(span("no colour", color=None), span("odd colour", color="blue"), span("no x", x=None),
+               span("text x", x="left"), span("nan size", size=float("nan")), span("inf y", y=float("inf")))
+    assert [ln.visibility for ln in lines(doc)] == ["white", "white", "off_page", "off_page", "off_page", "off_page"]
