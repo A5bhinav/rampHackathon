@@ -14,9 +14,10 @@ import datetime as dt
 import json
 from importlib.resources import files
 from typing import Any
-from uuid import UUID
+from uuid import UUID, uuid5
 
 STUB_RULE_VERSION = "ledger-stub-v0"
+STUB_NAMESPACE = UUID("9a3c5e7f-1b2d-4f6a-8c0e-2d4f6a8c0e1b")
 _EXAMPLE = files(__package__).joinpath("stub_selection.json").read_text(encoding="utf-8")
 
 
@@ -30,7 +31,9 @@ def select_number_stub(*, case_id: UUID, dataset_id: UUID, vendor_id: UUID, cuto
     selection = json.loads(_EXAMPLE)
     at = _utc(cutoff)
     selection.update(case_id=str(case_id), dataset_id=str(dataset_id), vendor_id=str(vendor_id),
-                     requested_cutoff=at, cutoff=at, rule_version=STUB_RULE_VERSION)
+                     requested_cutoff=at, cutoff=at, rule_version=STUB_RULE_VERSION,
+                     # one selection id per case, so a stored stub selection never collides with another case's
+                     number_selection_id=str(uuid5(STUB_NAMESPACE, f"{case_id}:{STUB_RULE_VERSION}")))
     return selection
 
 
