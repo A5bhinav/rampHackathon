@@ -86,8 +86,8 @@ which run as their owner. Not even the service role can write them directly.
 |---|---|
 | `ledger.documents` | One source file and its custody: channel, our own `received_at`, sender, thread, SHA-256. `claimed_date` is shown, never trusted. An attachment must match its email's channel and receive time. Append-only. |
 | `ledger.observations` | "Value X was seen in document D." `source_type` and `seen_at` are copied from the document by a trigger, whatever the insert says, so a model can never set provenance. `recorded_at` is `app.now()`, so a selection replays from rows recorded before the case opened. Phones are E.164; a bank account is `routing:last4:fingerprint` with no quote (ADR-8). Append-only. |
-| `ledger.contact_points` | One number per vendor with its lineage summary, for the dashboard. The service role updates it; a selection never reads it as truth. |
-| `ledger.number_selections` | The `selection.schema.json` document for a case, with its outcome, rule version, contact point and inputs hash as columns that must match the document. A pick names a contact point; no pick doesn't. Append-only. |
+| `ledger.contact_points` | One number per vendor with its lineage summary, for the dashboard. The service role updates only the summary columns; the dataset, vendor and number are fixed. A selection never reads it as truth. |
+| `ledger.number_selections` | The `selection.schema.json` document for a case, with its outcome, rule version, contact point and inputs hash as columns that must match the document. A pick names a contact point of the case's own vendor, with the number the document names; no pick names none. Append-only. |
 
 Access: everyone signed in reads; the service role inserts; append-only tables refuse update,
 delete and truncate by grant and by trigger.

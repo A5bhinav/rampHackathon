@@ -169,6 +169,40 @@ begin
 end
 $$;
 
+-- A selection agrees with the case and the contact point it names: same dataset and vendor,
+-- and the number in the document is the contact point's number (review of spec 0013).
+create function ledger.check_selection_refs() returns trigger
+language plpgsql security definer set search_path = pg_catalog, pg_temp as $$
+declare
+  c app.cases%rowtype;
+  p ledger.contact_points%rowtype;
+begin
+  select * into c from app.cases where id = new.case_id;
+  if c.dataset_id <> new.dataset_id or c.vendor_id <> new.vendor_id then
+    raise exception 'a selection must be in its case''s dataset and for its case''s vendor' using errcode = 'check_violation';
+  end if;
+  if new.contact_point_id is not null then
+    select * into p from ledger.contact_points where id = new.contact_point_id;
+    if p.dataset_id <> new.dataset_id or p.vendor_id <> new.vendor_id or p.e164 is distinct from new.selection ->> 'e164' then
+      raise exception 'a selection''s contact point must be its vendor''s, with the number the selection names'
+        using errcode = 'check_violation';
+    end if;
+  end if;
+  return new;
+end
+$$;
+
+-- A contact point's identity never changes once written; only its summary does.
+create function ledger.freeze_contact_point() returns trigger
+language plpgsql as $$
+begin
+  if new.id <> old.id or new.dataset_id <> old.dataset_id or new.vendor_id <> old.vendor_id or new.e164 <> old.e164 then
+    raise exception 'a contact point''s dataset, vendor and number are fixed' using errcode = 'insufficient_privilege';
+  end if;
+  return new;
+end
+$$;
+
 create function ledger.refuse_mutation() returns trigger
 language plpgsql as $$
 begin
@@ -183,6 +217,8 @@ create trigger observations_recorded_at      before insert on ledger.observation
 create trigger observations_custody          before insert on ledger.observations      for each row execute function ledger.observation_from_custody();
 create trigger number_selections_recorded_at before insert on ledger.number_selections for each row execute function ledger.stamp_recorded_at();
 create trigger contact_points_touch          before update on ledger.contact_points    for each row execute function app.touch_updated_at();
+create trigger number_selections_refs        before insert on ledger.number_selections for each row execute function ledger.check_selection_refs();
+create trigger contact_points_frozen         before update on ledger.contact_points    for each row execute function ledger.freeze_contact_point();
 
 do $$
 declare
@@ -213,6 +249,6 @@ create policy number_selections_read on ledger.number_selections for select to a
 revoke all on all tables in schema ledger from public, anon, authenticated, service_role;
 grant select on all tables in schema ledger to authenticated, service_role;
 grant insert on ledger.documents, ledger.observations, ledger.number_selections, ledger.contact_points to service_role;
-grant update on ledger.contact_points to service_role;
+grant update (first_seen_at, source_types, status, exclusion_reason, updated_at) on ledger.contact_points to service_role;
 
 revoke execute on all functions in schema ledger from public;

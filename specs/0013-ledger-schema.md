@@ -33,7 +33,12 @@ table checks only the fields it also keeps as columns.
 - [ ] A selection row's `outcome`, `case_id`, `rule_version`, `contact_point_id` and
       `inputs_sha256` must match its stored document. A pick must name a contact point; no
       pick must not.
-- [ ] `contact_points` is a summary the service role may update. One row per (vendor, number).
+- [ ] `contact_points` is a summary the service role may update, but only its summary columns:
+      its dataset, vendor and number are fixed once written (grant and trigger). One row per (vendor, number).
+- [ ] A selection is for its case's dataset and vendor, and the contact point it names is that
+      vendor's, with the number the document names.
+- [ ] Append-only holds for truncate too. It holds while the triggers stay in place; the owner or
+      a superuser could still disable them, as for `audit.evidence_events`.
 - [ ] Signed-in users read everything and write nothing; the service role inserts; anon has no access.
 
 ## Tests (written first)
