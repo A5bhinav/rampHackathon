@@ -10,7 +10,7 @@
 --     records when we learned it, so a selection can be replayed (R6);
 --   * no full bank account number is ever stored: routing, last four, keyed fingerprint,
 --     and no quote (ADR-8);
---   * a stored selection agrees with its own selection.schema.json document (spec 0012).
+--   * a stored selection agrees with its own selection.schema.json document (spec 0018).
 --
 -- Every table carries dataset_id, like app, so a demo reset or a lab scenario starts fresh.
 
@@ -109,7 +109,7 @@ create table ledger.number_selections (
   outcome          ledger.selection_outcome not null,
   rule_version     text not null,
   inputs_sha256    text not null check (inputs_sha256 ~ '^[0-9a-f]{64}$'),
-  selection        jsonb not null,                              -- selection.schema.json (spec 0012)
+  selection        jsonb not null,                              -- selection.schema.json (spec 0018)
   recorded_at      timestamptz not null,
   constraint pick_has_contact_point check ((outcome = 'picked') = (contact_point_id is not null)),
   constraint matches_its_document check (

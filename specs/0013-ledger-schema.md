@@ -9,11 +9,11 @@ names: `documents`, `observations`, `contact_points`, `number_selections`. The d
 enforces the rules the selection rule depends on, so a bug in the Python can't break them:
 provenance comes from custody, never from a model (ADR-13, R9); sightings are append-only and
 replayable; no full bank account number is ever stored (ADR-8); and a stored selection agrees
-with its own document (spec 0012).
+with its own document (spec 0018).
 
 ## Contract touched
 
-None. `number_selections.selection` stores a `selection.schema.json` document (spec 0012); the
+None. `number_selections.selection` stores a `selection.schema.json` document (spec 0018); the
 table checks only the fields it also keeps as columns.
 
 ## Acceptance
