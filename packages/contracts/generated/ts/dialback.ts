@@ -119,7 +119,8 @@ export interface paths {
          *     event, as `ledger.number_selections` stores it (`selection.schema.json`), read under the
          *     person's own token. `selection` is null when the case has no selection yet, or its event
          *     names none that the ledger stored. `reason_text` gives the ledger's template sentence for
-         *     each reason code; the dashboard shows these and never writes its own.
+         *     each reason code, and `notes` its sentences for the panel's other states; the dashboard
+         *     shows these and never writes its own.
          */
         get: operations["getCaseSelection"];
         put?: never;
@@ -373,6 +374,15 @@ export interface components {
                 hidden_text_only: string;
                 not_vendor_party: string;
                 fax_line: string;
+            };
+            /** @description The ledger's sentences for the panel's other states, so the dashboard writes none of its own. */
+            notes: {
+                /** @description When `selection` is null: what that means for the case. */
+                no_selection: string;
+                /** @description Under a no_provable_number selection: what happens next. */
+                no_provable_number: string;
+                /** @description Beside the alternates: when they are used. */
+                alternates: string;
             };
         };
         Error: {
