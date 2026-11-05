@@ -25,6 +25,8 @@ def test_matches_the_frozen_truth(path: Path):
     for e164, reasons in exp["rejected"].items():
         assert not by_number[e164]["eligible"], e164
         assert set(reasons) <= set(by_number[e164]["reasons"]), (e164, by_number[e164]["reasons"])
+    for e164 in exp.get("eligible", []):
+        assert by_number[e164]["eligible"], (e164, by_number[e164]["reasons"])
     for e164, when in exp.get("first_seen_at", {}).items():
         assert at(by_number[e164]["first_seen_at"]) == at(when)
     poison = {p["e164"] for p in truth["planted"] if p["truth"] == "poison"}

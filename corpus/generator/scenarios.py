@@ -41,10 +41,15 @@ def scenario(id: str, slug: str, kind: str, source: str, title: str, vendor: str
     return register
 
 
-def expect(pick: Phone | None, rejected: dict[Phone, list[str]] | None = None, *, cutoff=T0, **extra) -> dict:
-    return {"cutoff": stamp(cutoff), "outcome": "picked" if pick else "no_provable_number",
-            "pick": pick.e164 if pick else None,
-            "rejected": {p.e164: sorted(r) for p, r in (rejected or {}).items()}} | extra
+def expect(pick: Phone | None, rejected: dict[Phone, list[str]] | None = None, *, cutoff=T0,
+           eligible: list[Phone] = (), **extra) -> dict:
+    """`rejected` lists, per number, the reasons it must at least be rejected for (others may apply)."""
+    out = {"cutoff": stamp(cutoff), "outcome": "picked" if pick else "no_provable_number",
+           "pick": pick.e164 if pick else None,
+           "rejected": {p.e164: sorted(r) for p, r in (rejected or {}).items()}}
+    if eligible:
+        out["eligible"] = sorted(p.e164 for p in eligible)
+    return out | extra
 
 
 def ordinary(v: Vendor, **kw) -> tuple[Phone, Phone, str]:
@@ -209,7 +214,7 @@ def p12(v):
     return expect(ar, {x: [FEW]})
 
 
-@scenario("K01", "known-limit-mailbox-and-listing", "known_limit", "named",
+@scenario("K01", "known-limit-mailbox-and-listing", "known_limit", "named",  # design §4, "Known limit"
           "Mailbox and listing controlled for 120 days, no stored contract (stated limit)", "Fenwick", "971")
 def k01(v):
     main, ar, _ = ordinary(v, contract=False, listing=False, portal=False)
@@ -232,13 +237,16 @@ def c01(v):
 
 
 @scenario("C02", "established-sibling-lines", "control", "proposed",
-          "Main and AR lines one digit apart, both years old (Q43: long-established)", "Kestrel", "248")
+          "A direct line one digit from the main line, added two years ago (Q43: long-established)", "Kestrel", "248")
 def c02(v):
-    main = v.phone(42, role="main", label="Main")
-    ar = v.phone(43, role="ar", label="Accounts receivable")
-    v.history(main, ar, start=START)
+    main, ar, _ = ordinary(v)
+    sibling = v.phone(43, role="ar", label="AR direct")  # one digit from main (...0142), and newer
+    added = T0 - days(700)
+    v.doc("contract", "contract", added, [f"Amendment 1: {v.name}", "New direct line:", sibling])
+    v.doc("portal_entry", "vendor_portal", added + days(10), [f"Vendor profile: {v.name}", sibling])
+    v.email(added + days(20), ["Our new direct line:", sibling], subject="New direct line")
     v.request()
-    return expect(ar)
+    return expect(ar, eligible=[main, ar, sibling])
 
 
 @scenario("C03", "email-only-vendor", "control", "proposed",
@@ -252,7 +260,7 @@ def c03(v):
 @scenario("C04", "scanned-contract", "control", "proposed",
           "The second source is a scanned contract (vision path)", "Norcott", "469")
 def c04(v):
-    main, ar, _ = ordinary(v, contract=False, listing=False)
+    main, ar, _ = ordinary(v, contract=False, listing=False, portal=False)  # without the scan, email only
     v.doc("contract", "contract", START, [f"Master supply agreement: {v.name}", main, ar], scan=True)
     v.request()
     return expect(ar)

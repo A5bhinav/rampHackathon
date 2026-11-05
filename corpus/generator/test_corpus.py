@@ -12,6 +12,16 @@ FICTIONAL_PHONE = re.compile(r"^\+1[2-9][0-9]{2}55501[0-9]{2}$")
 ANY_PHONE_TEXT = re.compile(r"\(?\b([2-9][0-9]{2})\)?[ .-]*([0-9]{3})[ .-]*([0-9]{4})\b")
 
 
+def long_digits(text: str) -> bool:
+    """A run of 7+ digits once phone numbers are removed, whatever separates them: an account number."""
+    return bool(re.search(r"\d{7,}", re.sub(r"[ .\-]", "", ANY_PHONE_TEXT.sub("", text))))
+
+
+def test_long_digits():
+    assert long_digits("Acct 0001-2345-67") and long_digits("acct 000.123.4567.8")
+    assert not long_digits("AR: (415) 555-0142, invoice 1042, ending 4821")
+
+
 def truths() -> dict[str, dict]:
     return {p: json.loads(c) for p, c in build.build().items() if p.startswith("truth/") and p.endswith(".json")}
 
@@ -31,9 +41,12 @@ def test_committed_corpus_matches_the_generator():
 def test_the_truth_is_frozen():
     manifest = (CORPUS / "truth" / "manifest.sha256").read_bytes()
     assert hashlib.sha256(manifest).hexdigest() == build.FROZEN_TRUTH_SHA256
+    names = set()
     for line in manifest.decode().splitlines():
         digest, name = line.split("  ")
-        assert hashlib.sha256((CORPUS / "truth" / name).read_bytes()).hexdigest() == digest, name
+        names.add(name)
+        assert hashlib.sha256((CORPUS / name).read_bytes()).hexdigest() == digest, name
+    assert {p for p in build.build() if p != "truth/manifest.sha256"} == names, "the manifest covers every file"
 
 
 def test_twelve_patterns_five_controls_and_the_known_limit():
@@ -84,7 +97,9 @@ def test_only_fictional_values():
                         assert m.group(2) == "555" and m.group(3).startswith("01"), (path, span["text"])
                     for dom in re.findall(r"[a-z0-9-]+\.[a-z]{2,}\b", span["text"].lower()):
                         assert dom.endswith(".example"), (path, span["text"])
-                    assert not re.search(r"\d{7,}", span["text"].replace(" ", "")), "no long digit runs (account numbers)"
+                    assert not long_digits(span["text"]), (path, span["text"])
+            for field in ("sender", "subject", "thread_id"):
+                assert not long_digits(d["custody"][field] or ""), (path, field)
 
 
 def test_a_vendors_real_numbers_are_not_near_misses():
