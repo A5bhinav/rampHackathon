@@ -1,12 +1,14 @@
 """ledger-select-v1: which number a case will call, or none (spec 0015, design §4).
 
 A pure function: sightings and their documents' custody in, a selection.schema.json document
-out. Code decides; no model output reaches here except role and party labels, which can only
-make a number ineligible (property 5).
+out. Code decides; no model output reaches here except role and party labels. A number needs
+every visible sighting labeled the vendor's, so a label can refuse a number or, for a number that
+already meets every rule in code, allow it; it can never make up for a rule in code (property 5).
 
-"Seen" for age, ranking and near misses means a visible sighting before the cutoff and outside
-the change context. A sighting inside the change context can only hurt a number: an old hijacked
-thread or a line hidden in a PDF never makes a number look established.
+"Seen" for age, ranking and near misses means a visible sighting before the cutoff, outside the
+change context, in a channel that counts (email only from the vendor's own domains). Nothing else
+can make a number look older or established: not an old hijacked thread, a lookalike's message,
+a line hidden in a PDF, or the old number on file (spec 0015).
 """
 from __future__ import annotations
 
@@ -91,7 +93,7 @@ def _utc(t: dt.datetime) -> str:
 
 def _subject(s: str | None) -> str:
     s = (s or "").strip().casefold()
-    while (m := re.match(r"^(re|fwd?|aw|sv)\s*:\s*", s)):
+    while (m := re.match(r"^((re|fwd?|aw|sv)\s*:|\[[^\]]*\])\s*", s)):  # Re:, Fwd:, [EXTERNAL] ...
         s = s[m.end():]
     return " ".join(s.split())
 
@@ -99,10 +101,21 @@ def _subject(s: str | None) -> str:
 def select(*, case_id: uuid.UUID, dataset_id: uuid.UUID, vendor_id: uuid.UUID, vendor_domains: Iterable[str],
            request: ChangeRequest | None, requested_cutoff: dt.datetime, case_opened_at: dt.datetime,
            documents: Sequence[DocumentRef], sightings: Sequence[Sighting], settings: Settings = DEFAULT) -> dict:
-    domains = tuple(vendor_domains)
-    docs = {d.id: d for d in documents if d.recorded_at < case_opened_at}                       # replay
-    rows = sorted((s for s in sightings if s.recorded_at < case_opened_at and s.document_id in docs),
-                  key=lambda s: (s.e164, s.document_id, s.visibility, s.role, s.party))
+    domains = tuple(d.strip().lower().rstrip(".") for d in vendor_domains)
+    docs: dict[str, DocumentRef] = {}
+    conflicted: set[str] = set()  # two different documents under one id: both count against (R7)
+    for d in sorted((d for d in documents if d.recorded_at < case_opened_at), key=repr):          # replay
+        if d.id in docs and docs[d.id] != d:
+            conflicted.add(d.id)
+        docs.setdefault(d.id, d)
+    rows = sorted((s for s in sightings if s.recorded_at < case_opened_at and s.document_id in docs), key=repr)
+
+    def counts(d: DocumentRef) -> bool:
+        """A source type that counts: a known channel, and for email the vendor's own domain."""
+        if d.channel not in SOURCE_TYPES:
+            return False
+        sd = sender_domain(d.sender) if d.channel == "email" else None
+        return d.channel != "email" or (sd is not None and any(sd == v or sd.endswith("." + v) for v in domains))
 
     look_ids = {d.id for d in docs.values() if (sd := sender_domain(d.sender)) and is_lookalike(sd, domains)}
     starts = [requested_cutoff, *(docs[i].received_at for i in look_ids)] + ([request.received_at] if request else [])
@@ -110,7 +123,7 @@ def select(*, case_id: uuid.UUID, dataset_id: uuid.UUID, vendor_id: uuid.UUID, v
     window = dt.timedelta(days=settings.same_subject_window_days)
 
     def in_context(d: DocumentRef) -> bool:
-        if d.received_at > cutoff or d.id in look_ids:
+        if d.received_at > cutoff or d.id in look_ids or d.id in conflicted:
             return True
         if request is None:
             return True  # unknown change context: everything counts against (R7)
@@ -125,18 +138,19 @@ def select(*, case_id: uuid.UUID, dataset_id: uuid.UUID, vendor_id: uuid.UUID, v
     facts = {}
     for e164, seen in numbers.items():
         visible = [(s, d, ctx) for s, d, ctx in seen if s.visibility == "visible"]
-        clean = [(s, d) for s, d, ctx in visible if not ctx]
+        outside = [d.received_at for _, d, ctx in visible if not ctx]
+        clean = [(s, d) for s, d, ctx in visible if not ctx and counts(d)]  # "seen": what age and rank rest on
         first_clean = min((d.received_at for _, d in clean), default=None)
         first_ctx = min((d.received_at for _, d, ctx in visible if ctx), default=None)
-        sources = sorted({d.channel for _, d in clean} & SOURCE_TYPES)
+        sources = sorted({d.channel for _, d in clean})
         reasons = set()
         if not visible:
             reasons.add("hidden_text_only")
-        elif first_ctx is not None and (first_clean is None or first_ctx <= first_clean):
+        elif first_ctx is not None and (not outside or first_ctx <= min(outside)):
             reasons.add("first_seen_in_change_context")
         if visible and any(s.party != "vendor" for s, _, _ in visible):
             reasons.add("not_vendor_party")
-        if any(s.role == "fax" for s, _, _ in visible):
+        if any(str(s.role).strip().lower() == "fax" for s, _, _ in visible):
             reasons.add("fax_line")
         if len(sources) < settings.min_source_types:
             reasons.add("too_few_source_types")
@@ -144,14 +158,17 @@ def select(*, case_id: uuid.UUID, dataset_id: uuid.UUID, vendor_id: uuid.UUID, v
             reasons.add("younger_than_minimum_age")
         shown = first_clean or min((d.received_at for _, d, _ in visible), default=None) or min(d.received_at for _, d, _ in seen)
         roles = {s.role if s.role in ROLES else "unknown" for s, _, _ in visible}
+        ranking_roles = {s.role for s, _ in clean}  # the change context can't reorder numbers
         facts[e164] = {"seen": first_clean, "shown": shown, "sources": sources, "reasons": reasons, "roles": roles,
+                       "ranking_roles": ranking_roles,
                        "on_file": any(d.channel == "vendor_master" for _, d, _ in visible), "count": len(seen)}
 
     established = dt.timedelta(days=settings.established_days)
     for a, fa in facts.items():
         mine = fa["seen"] or fa["shown"]
         for b, fb in facts.items():
-            if fb["seen"] is None or fb["seen"] >= mine or not near_miss(a, b, settings.near_miss_distance):
+            # Older or first seen together: a one-off sibling in the same document flags both.
+            if b == a or fb["seen"] is None or fb["seen"] > mine or not near_miss(a, b, settings.near_miss_distance):
                 continue
             if fa["seen"] is not None and cutoff - fa["seen"] >= established and cutoff - fb["seen"] >= established:
                 continue
@@ -159,7 +176,7 @@ def select(*, case_id: uuid.UUID, dataset_id: uuid.UUID, vendor_id: uuid.UUID, v
             fa.setdefault("near_miss_of", b)
 
     rank = sorted((e for e, f in facts.items() if not f["reasons"]),
-                  key=lambda e: (facts[e]["seen"], -len(facts[e]["sources"]), not facts[e]["roles"] & {"ar", "billing"}, e))
+                  key=lambda e: (facts[e]["seen"], -len(facts[e]["sources"]), not facts[e]["ranking_roles"] & {"ar", "billing"}, e))
     point = lambda e: str(uuid.uuid5(NAMESPACE, f"{vendor_id}:{e}"))
 
     candidates = []

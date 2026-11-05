@@ -25,8 +25,8 @@ def world(rows: list[dict], *, opened: dt.datetime = T0 + dt.timedelta(hours=3))
     for i, r in enumerate(rows):
         received = T0 - dt.timedelta(days=r["days_before"])
         recorded = opened + dt.timedelta(days=1) if r.get("recorded_late") else min(received, opened - dt.timedelta(seconds=1))
-        doc_id = f"d{i}"
-        sender = f"ar@{'acrne' if r.get('lookalike') else 'acme'}.example"
+        doc_id = r.get("doc_id", f"d{i}")
+        sender = f"ar@{r.get('domain') or ('acrne.example' if r.get('lookalike') else 'acme.example')}"
         docs.append(DocumentRef(doc_id, r["channel"], received, sender, r.get("thread"), r.get("subject", "Hello"), recorded))
         sightings.append(Sighting(r["e164"], doc_id, r["channel"], received, r["visibility"], r["role"], r["party"], recorded))
     return {"case_id": CASE, "dataset_id": DATASET, "vendor_id": VENDOR, "vendor_domains": ("acme.example",),
