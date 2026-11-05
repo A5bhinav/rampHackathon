@@ -41,8 +41,8 @@ def ground(labels: object, document_lines: list[Line], candidates: list[Candidat
         if not hits:
             dropped.append((raw, "the quote isn't in the visible text at a candidate"))
             continue
-        role = raw.get("role") if raw.get("role") in ROLES else "unknown"
-        party = raw.get("party") if raw.get("party") in PARTIES else "unknown"
+        role = raw.get("role") if isinstance(raw.get("role"), str) and raw["role"] in ROLES else "unknown"
+        party = raw.get("party") if isinstance(raw.get("party"), str) and raw["party"] in PARTIES else "unknown"
         for c in hits:
             found.setdefault(c, []).append((role, party, quote))
     accepted = []

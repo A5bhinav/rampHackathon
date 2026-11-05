@@ -44,7 +44,11 @@ B:
 - [ ] A visible candidate the labeler skipped is still observed, with role and party `unknown`
       (so the selection rule can't pick it). Hidden candidates are observed with their visibility,
       role and party `unknown`, and no quote.
-- [ ] `source_type` and `seen_at` come from custody.
+- [ ] `source_type` and `seen_at` come from custody, and a custody record for another document is
+      refused. An attachment cycle is refused with a clear error.
+- [ ] The stub labels a line the vendor's only when its label names one of the vendor's lines
+      (main, AR, billing, fax); a bank's line is the bank's; anything else is `unknown`. Garbled
+      labels (a role or party that isn't a string) keep the value with role and party `unknown`.
 - [ ] **Corpus gate B:** ingesting every corpus document, then running `select()`, reproduces
       every frozen expectation (the spec 0015 gate, end to end). The stub reader's role
       accuracy against the planted roles is reported, with every mismatch listed (design §7:
@@ -67,6 +71,13 @@ resolution. Database writes (Q45).
 
 ## Open questions
 
+- **Q49 (Abhi):** AGENTS.md says flags are read in one module per language. The core reads its
+  flags in `dialback_core/settings.py` and the ledger reads `DIALBACK_READER` in
+  `dialback_ledger/flags.py`. Is one module per package acceptable, or should the ledger take its
+  reader mode from the core?
+- **For Abhi as partner:** this spec reads role accuracy as "reported, at least 95%" rather than
+  "matches", because the frozen P09 truth labels a "Verified callback" line as AR, which no honest
+  keyword reader can know. Please agree or say otherwise.
 - **Q47 (Abhi, Sami):** the stub reader labels by keywords ("Accounts receivable", "Billing",
   "Fax", "bank"). Is a keyword labeler acceptable as the `stub` for the demo, with the LLM
   reader behind `llm` once the 100-document labeled set exists?

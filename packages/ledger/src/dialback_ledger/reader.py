@@ -30,7 +30,12 @@ def _role(label_words: list[str]) -> str:
 
 
 class StubReader:
-    """One label per visible line that holds exactly one phone; the words before the colon say the role."""
+    """One label per visible line that holds exactly one phone; the words before the colon say the role.
+
+    The party is the vendor only when that label names one of the vendor's own lines (main, AR,
+    billing, fax); a bank's number is the bank's; anything else is unknown, which the selection
+    rule refuses (R7). So text the stub can't place never counts for a number.
+    """
 
     def label(self, visible_text: str) -> list[dict]:
         out = []
@@ -38,8 +43,12 @@ class StubReader:
             if len(parse_phone(line)) != 1:
                 continue
             label_words = re.findall(r"[a-z]+", line.split(":", 1)[0].lower()) if ":" in line else []
-            party = "bank" if "bank" in re.findall(r"[a-z]+", line.lower()) else "vendor"
-            out.append({"quote": line, "role": _role(label_words), "party": party})
+            role = _role(label_words)
+            if "bank" in re.findall(r"[a-z]+", line.lower()):
+                party = "bank"
+            else:
+                party = "vendor" if role != "unknown" else "unknown"
+            out.append({"quote": line, "role": role, "party": party})
         return out
 
 

@@ -25,6 +25,8 @@ class IngestResult:
 
 def ingest(document: dict, custody: Custody, *, extractor_version: str, reader: Reader | None = None,
            result: IngestResult | None = None) -> IngestResult:
+    if custody.document_id != document["id"]:
+        raise ValueError(f"custody for {custody.document_id} given for document {document['id']}")
     result = result if result is not None else IngestResult()
     reader = reader or reader_for(reader_mode())
     ls = lines(document)
@@ -53,11 +55,13 @@ def ingest_all(documents: list[dict], *, extractor_version: str, reader: Reader 
     by_id = {d["id"]: d for d in documents}
     custody: dict[str, Custody] = {}
 
-    def resolve(doc_id: str) -> Custody:
+    def resolve(doc_id: str, chain: tuple[str, ...] = ()) -> Custody:
+        if doc_id in chain:
+            raise ValueError(f"attachment cycle: {' -> '.join((*chain, doc_id))}")
         if doc_id not in custody:
             doc = by_id[doc_id]
             parent = doc["custody"].get("parent_document_id")
-            custody[doc_id] = custody_for(doc, resolve(parent) if parent in by_id else None)
+            custody[doc_id] = custody_for(doc, resolve(parent, (*chain, doc_id)) if parent in by_id else None)
         return custody[doc_id]
 
     result = IngestResult()

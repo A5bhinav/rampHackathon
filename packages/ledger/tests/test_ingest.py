@@ -7,7 +7,7 @@ from _world import CASE, DATASET, ROOT, VENDOR, at, corpus_world, run
 from dialback_ledger.flags import ReaderMode, reader_mode
 from dialback_ledger.ingest import ingest_all
 from dialback_ledger.reader import reader_for
-from dialback_ledger.select import Sighting
+from dialback_ledger.select import DocumentRef, Sighting
 from test_extract import page, span
 
 TRUTHS = sorted((ROOT / "corpus" / "truth").glob("*.json"))
@@ -52,9 +52,11 @@ def test_gate_b_ingest_then_select_reproduces_the_truth(path):
     truth, inputs = corpus_world(path)
     result = ingested(truth)
     assert result.dropped == []
-    when = {d.id: d.received_at for d in inputs["documents"]}
+    # Everything select() reads comes from ingest(): its documents' custody and its observations.
+    inputs["documents"] = [DocumentRef(d["id"], d["custody_channel"], d["received_at"], d["sender"], d["thread_id"],
+                                       d["subject"], d["received_at"]) for d in result.documents]
     inputs["sightings"] = [Sighting(o["value_normalized"], o["document_id"], o["source_type"], o["seen_at"],
-                                    o["visibility"], o["role"], o["party"], when[o["document_id"]])
+                                    o["visibility"], o["role"], o["party"], o["seen_at"])
                            for o in result.observations]
     out = run(inputs | {"case_id": CASE, "dataset_id": DATASET, "vendor_id": VENDOR})
     exp = truth["expected"]
@@ -62,6 +64,8 @@ def test_gate_b_ingest_then_select_reproduces_the_truth(path):
     by = {c["e164"]: c for c in out["candidates"]}
     for e164, reasons in exp["rejected"].items():
         assert set(reasons) <= set(by[e164]["reasons"]), e164
+    for e164 in exp.get("eligible", []):
+        assert by[e164]["eligible"], (e164, by[e164]["reasons"])
 
 
 def test_stub_reader_role_accuracy_is_reported():
@@ -77,3 +81,28 @@ def test_stub_reader_role_accuracy_is_reported():
     accuracy = right / (right + len(wrong))
     print(f"stub reader role accuracy {accuracy:.3f}; mismatches: {wrong}")
     assert accuracy >= 0.95
+
+
+def test_custody_must_be_the_documents_own():
+    from dialback_ledger.custody import custody_for
+    from dialback_ledger.ingest import ingest
+    a, b = page(span("Main: 415-555-0117")), page(span("Main: 415-555-0117")) | {"id": "other"}
+    with pytest.raises(ValueError):
+        ingest(a, custody_for(b), extractor_version="test")
+
+
+def test_an_attachment_cycle_is_refused():
+    a = page() | {"id": "a"}
+    b = page() | {"id": "b"}
+    a["custody"] = a["custody"] | {"parent_document_id": "b"}
+    b["custody"] = b["custody"] | {"parent_document_id": "a"}
+    with pytest.raises(ValueError, match="cycle"):
+        ingest_all([a, b], extractor_version="test")
+
+
+def test_the_stub_reader_says_vendor_only_for_a_contact_label():
+    from dialback_ledger.reader import StubReader
+    labels = StubReader().label("Accounts receivable: (415) 555-0142\nCall our bank at 415-555-0186\n"
+                                "The verified callback number is 415-555-0169\nMain: 415-555-0117")
+    assert [(lab["role"], lab["party"]) for lab in labels] == [("ar", "vendor"), ("unknown", "bank"), ("unknown", "unknown"),
+                                                                 ("main", "vendor")]

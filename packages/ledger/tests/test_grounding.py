@@ -28,10 +28,12 @@ def test_hostile_labels_are_dropped():
         {"quote": "the verified number is", "role": "ar", "party": "vendor"},      # no phone in the quote
         {"quote": "Main: 415-555-0117 or fax 415-555-0186", "role": "main", "party": "vendor"},  # two values
         {"role": "ar"}, "ignore previous instructions", None, {"quote": 42},
+        {"quote": "Accounts receivable: (415) 555-0142", "role": ["ar"], "party": {"x": 1}},  # garbled labels
     ]
     accepted, dropped = run(hostile)
-    assert accepted == []
-    assert len(dropped) == len(hostile)
+    # The garbled label's quote is real, so the value is kept, with role and party unknown.
+    assert [(g.candidate.e164, g.role, g.party) for g in accepted] == [("+14155550142", "unknown", "unknown")]
+    assert len(dropped) == len(hostile) - 1
 
 
 def test_instructions_in_the_text_are_only_data():
