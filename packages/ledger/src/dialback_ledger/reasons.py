@@ -19,3 +19,11 @@ REASON_TEXT: dict[str, str] = {
                         "customer's, or their labels disagree.",
     "fax_line": "Not provable: the documents label it as a fax line.",
 }
+
+# The lineage panel's other states (spec 0017): the dashboard shows these and writes none itself.
+NOTES: dict[str, str] = {
+    "no_selection": "No number selection is recorded for this case yet. Until the Trust Ledger records one, "
+                    "no call is made and the hold stays on.",
+    "no_provable_number": "No call is made. The hold stays on and the case waits for a person.",
+    "alternates": "Alternates are used only if the chosen line is dead.",
+}

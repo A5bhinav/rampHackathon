@@ -14,6 +14,8 @@ from conftest import JWT_SECRET
 from contract import assert_matches
 from dialback_core.db import system_tx
 from dialback_core.detection import import_all
+from dialback_core.flags import ResolverMode
+from dialback_core.ports import LedgerResolver
 from flows import case_of, change_and_detect, report
 from psycopg.types.json import Jsonb
 
@@ -217,6 +219,15 @@ async def test_no_stored_selection_is_null_not_an_error(world):
     case = await case_of(world)  # the stand-in resolver's selection is in no table
     body = await get(world, f"/api/cases/{case['id']}/selection", "clerk", "/api/cases/{case_id}/selection")
     assert body["selection"] is None and body["reason_text"]
+
+
+async def test_an_unavailable_ledger_is_null_with_its_note(world):
+    world.worker.resolver = LedgerResolver(ResolverMode.LEDGER)  # no select_number yet: no_provable_number, no id
+    await import_all(world.pool, world.ramp, world.keys, world.dataset.id)
+    await change_and_detect(world)
+    case = await case_of(world)
+    body = await get(world, f"/api/cases/{case['id']}/selection", "clerk", "/api/cases/{case_id}/selection")
+    assert body["selection"] is None and body["notes"]["no_selection"]
 
 
 async def test_the_selection_of_an_unknown_case_is_not_found(world):

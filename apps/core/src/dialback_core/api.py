@@ -14,7 +14,7 @@ from typing import Annotated, Any, Literal
 from uuid import UUID
 
 from dialback_decision.engine import TEMPLATES
-from dialback_ledger.reasons import REASON_TEXT
+from dialback_ledger.reasons import NOTES, REASON_TEXT
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import JSONResponse
 from psycopg import AsyncConnection, errors
@@ -305,7 +305,7 @@ async def get_case_selection(case_id: UUID, request: Request, user: UserDep):
             row = await (await conn.execute(
                 "select selection from ledger.number_selections where id::text = %s and case_id = %s",
                 (event["id"], case_id))).fetchone()
-    return {"selection": row["selection"] if row else None, "reason_text": REASON_TEXT}
+    return {"selection": row["selection"] if row else None, "reason_text": REASON_TEXT, "notes": NOTES}
 
 
 @router.post("/cases/{case_id}/release")
