@@ -32,18 +32,28 @@ def _edits(a: str, b: str) -> int:
 
 
 def is_lookalike(domain: str, vendor_domains: Iterable[str]) -> bool:
-    """True if `domain` isn't one of the vendor's but a person could misread it as one."""
+    """True if `domain` isn't the vendor's (or a subdomain of it) but a person could misread it as one.
+
+    Each label of the domain is compared with the vendor's name: equal once lookalike characters
+    are folded, within two edits, or containing the name (a combosquat such as acme-billing). Any
+    punycode label counts. A false positive only puts more into the change context (R7).
+    """
     domain = domain.strip().lower().rstrip(".")
     known = [d.strip().lower().rstrip(".") for d in vendor_domains]
-    if domain in known:
+    if any(domain == k or domain.endswith("." + k) for k in known):
         return False
-    name = _name(domain)
+    labels = domain.split(".")
+    if any(label.startswith("xn--") for label in labels):
+        return True
     for k in known:
-        kn = _name(k)
-        if _fold(name) == _fold(kn):
-            return True
-        if min(len(name), len(kn)) >= MIN_NAME and _edits(name, kn) <= MAX_EDITS:
-            return True
+        name = k.split(".")[0]
+        for label in labels[:-1] or labels:
+            if _fold(label) == _fold(name):
+                return True
+            if min(len(label), len(name)) >= MIN_NAME and _edits(label, name) <= MAX_EDITS:
+                return True
+            if len(name) >= 4 and _fold(name) in _fold(label):
+                return True
     return False
 
 

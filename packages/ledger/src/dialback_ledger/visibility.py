@@ -5,6 +5,7 @@ as an unparseable colour, counts as hidden: fail closed (R7).
 """
 from __future__ import annotations
 
+import math
 import re
 
 TINY_POINTS = 4
@@ -23,6 +24,8 @@ def classify(span: dict, width: float, height: float) -> str:
         x, y, size = float(span["x"]), float(span["y"]), float(span["size"])
     except (KeyError, TypeError, ValueError):
         return "off_page"
+    if not all(math.isfinite(v) for v in (x, y, size)):
+        return "off_page"  # NaN or infinity: nowhere a person could read it
     if not (0 <= x < width and 0 <= y < height):
         return "off_page"
     if size < TINY_POINTS:

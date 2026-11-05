@@ -14,7 +14,7 @@ Two PRs:
 
 - **A, reading:** `custody.py`, `text.py` (the corpus page model: spans with position, size and
   colour, the facts pdfplumber reports per character), `visibility.py`, `candidates.py`
-  (libphonenumber, strict matching).
+  (libphonenumber, valid-number matching: `Leniency.VALID`).
 - **B, labeling:** `flags.py` (`DIALBACK_READER`, safe default `stub`), `reader.py` (the stub: a
   keyword labeler over visible lines), `grounding.py`, `ingest.py`.
 
@@ -27,9 +27,10 @@ None. Observations are dicts shaped like `ledger.observations` rows (spec 0013).
 A:
 - [ ] An attachment's custody is its parent email's channel and receive time, whatever the
       fixture says. The document's SHA-256 is computed by code.
-- [ ] A span is hidden if it's white (on the white page), under 4 points, or outside the page;
+- [ ] A span is hidden if it's white (on the white page), under 4 points, outside the page, or
+      unreadable (a missing or odd colour, position or size, NaN or infinity);
       `visibility` is `white`, `tiny`, `off_page` or `visible`.
-- [ ] Candidates: every phone number libphonenumber finds (strict, US), as E.164, with its line,
+- [ ] Candidates: every valid phone number libphonenumber finds (`Leniency.VALID`, US), as E.164, with its line,
       character offsets and the span's visibility. Invoice numbers, dates and "ending 4821" are not phones.
 - [ ] **Corpus gate A:** for every frozen sighting in all 20 scenarios, a candidate in that
       document with that number and visibility (recall 100%), and no candidate that wasn't

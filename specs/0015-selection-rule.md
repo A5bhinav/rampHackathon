@@ -9,15 +9,28 @@ their documents' custody and the change request, and returns a `selection.schema
 (spec 0018): a pick with up to two alternates, or `no_provable_number`, with every candidate and
 its reasons. It implements the rule in the ledger README and design §4. It serves R2 (never dial
 a number first seen in the change context), R3 (code decides) and R7 (anything unclear makes a
-number ineligible; nothing raises into the core).
+number ineligible). Malformed input, such as a time without a zone, raises `ValueError`; the
+database wiring turns any error into `no_provable_number` before it reaches the core.
 
 Reading `ledger.observations` and writing `ledger.number_selections`, and so `select_number`
 for `DIALBACK_RESOLVER=ledger`, are the next spec (Q45). Until then, `ledger` mode keeps failing closed.
 
-**"Seen" means visible, before the cutoff, and outside the change context.** Age, ranking and
-near misses use it, so a sighting in the change context can only hurt a number. An old hijacked
-thread, a lookalike's message or a line hidden in a PDF never makes a number look older or
-established. A near miss is checked only against older numbers that were seen this way.
+**"Seen" means a visible sighting, before the cutoff, outside the change context, in a channel
+that counts.** Counting channels are email, a stored contract, the vendor portal, a listing and
+paper mail; email counts only from the vendor's own domains (or their subdomains), because anyone
+can register a domain and write in advance. The old vendor master and unknown channels never
+count. Age, ranking and near misses use only "seen" sightings, so nothing else can make a number
+look older, more established or better ranked: not an old hijacked thread, a lookalike's message,
+the request's own labels, a line hidden in a PDF, or the old number on file.
+
+"First seen in the change context" compares the earliest visible sighting in the change context
+with the earliest visible one outside it (README property 4, "earliest dated sighting", read as
+the earliest a person could see).
+
+A **lookalike domain** is any domain that isn't the vendor's (or its subdomain) with a label that
+equals the vendor's name once lookalike characters are folded, is within two edits of it, or
+contains it (acme-billing, acme.co.uk, acme.example.evil.com), or any punycode label. A false
+positive only widens the change context and moves the cutoff earlier, so it can only refuse.
 
 ## Contract touched
 
@@ -30,18 +43,21 @@ None. The output is `selection.schema.json` (spec 0018).
       change in Ramp, all our receive times, never later than the requested cutoff.
 - [ ] Change context: the request's thread; its subject line (without Re:/Fwd:) within 30 days
       before the cutoff; anything from a lookalike domain; anything received after the cutoff.
-- [ ] A number is eligible only if it has a visible vendor-party sighting that isn't a fax line,
-      was first seen at least 90 days before the cutoff and outside the change context, and has
-      at least 2 source types before the cutoff and outside the change context
-      (`vendor_master` never counts, all email counts once).
+- [ ] A number is eligible only if every visible sighting is labeled the vendor's and none a fax
+      line, it was not first seen in the change context, and its "seen" sightings are at least 90
+      days old and in at least 2 source types (all email counts once).
 - [ ] A number one digit off, or two adjacent digits swapped, from an older vendor number is
       ineligible, unless both were first seen at least `established_days` (365) before the cutoff (Q43).
-- [ ] Rank: oldest first, then more source types, then AR or billing over main, then the number itself.
+      Two such numbers first seen together flag each other.
+- [ ] Rank: oldest first, then more source types, then AR or billing over main (from "seen" sightings
+      only), then the number itself.
 - [ ] The result validates against the schema; `inputs_sha256` hashes the canonical rows used;
       the same inputs in any order give the same document.
-- [ ] Unknown channels, visibility, roles or parties make a number ineligible, never eligible.
+- [ ] Unknown channels and visibility never count; an unknown or differently-cased party makes a
+      number ineligible; "fax" in any case is a fax. Two different documents under one id count
+      as change context.
 - [ ] **Corpus gate:** on all 20 frozen scenarios (P01 to P12 with P04 in three variants, K01, C01 to C05), the cutoff, outcome, pick, every listed
-      rejection reason, and C05's first-seen time match the truth. 0 poisoned numbers picked except K01.
+      rejection reason, C02's eligible numbers and C05's first-seen time match the truth. 0 poisoned numbers picked except K01.
 
 ## Tests (written first)
 

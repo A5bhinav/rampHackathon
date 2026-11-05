@@ -49,9 +49,10 @@ uv run --no-project --with pytest pytest corpus/generator -q
 
 A truth file lists every planted number with every sighting (document, channel, our receive
 time, visibility, role, party, real or poison) and what `ledger-select-v1` must do: the cutoff,
-the outcome, the pick, and the reasons each poisoned number must be rejected for. The manifest's
-digest is pinned as `FROZEN_TRUTH_SHA256` in `build.py`; moving the truth means changing that
-line in review. Documents are a page model (spans with position, size and colour) plus custody;
+the outcome, the pick, the reasons each refused number must at least be rejected for, and any
+numbers that must stay eligible. The manifest covers the truth and every documents file (an
+expectation rests on their custody); its digest is pinned as `FROZEN_TRUTH_SHA256` in
+`build.py`, so moving the truth or a document means changing that line in review. Documents are a page model (spans with position, size and colour) plus custody;
 rendering them to PDF, and the 500-vendor background company, come next.
 
 ## Start here
