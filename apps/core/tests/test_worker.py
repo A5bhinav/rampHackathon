@@ -182,7 +182,7 @@ async def _advance(pool, world, to: dt.datetime) -> None:
 
 
 async def test_the_ledger_stub_picks_its_contract_example(world):
-    world.worker.resolver = LedgerResolver(ResolverMode.STUB)  # the real resolver calling Inesh's stub (spec 0012)
+    world.worker.resolver = LedgerResolver(ResolverMode.STUB)  # the real resolver calling Inesh's stub (spec 0018)
     await import_all(world.pool, world.ramp, world.keys, world.dataset.id)
     await change_and_detect(world)
     case = await case_of(world)
