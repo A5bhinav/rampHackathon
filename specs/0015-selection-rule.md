@@ -6,7 +6,7 @@
 
 `dialback_ledger.select()`: a pure, deterministic function that takes a vendor's sightings,
 their documents' custody and the change request, and returns a `selection.schema.json` document
-(spec 0012): a pick with up to two alternates, or `no_provable_number`, with every candidate and
+(spec 0018): a pick with up to two alternates, or `no_provable_number`, with every candidate and
 its reasons. It implements the rule in the ledger README and design §4. It serves R2 (never dial
 a number first seen in the change context), R3 (code decides) and R7 (anything unclear makes a
 number ineligible; nothing raises into the core).
@@ -21,7 +21,7 @@ established. A near miss is checked only against older numbers that were seen th
 
 ## Contract touched
 
-None. The output is `selection.schema.json` (spec 0012).
+None. The output is `selection.schema.json` (spec 0018).
 
 ## Acceptance
 
