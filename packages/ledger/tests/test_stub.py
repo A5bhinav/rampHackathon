@@ -26,7 +26,7 @@ def test_stub_returns_the_picked_example():
     assert out["vendor_id"] == str(args["vendor_id"])
     assert out["requested_cutoff"] == out["cutoff"] == "2026-11-04T17:30:00.000000Z"
     assert out["rule_version"] == "ledger-stub-v0"
-    replaced = {"case_id", "dataset_id", "vendor_id", "requested_cutoff", "cutoff", "rule_version"}
+    replaced = {"case_id", "dataset_id", "vendor_id", "requested_cutoff", "cutoff", "rule_version", "number_selection_id"}
     assert {k: v for k, v in out.items() if k not in replaced} == {k: v for k, v in EXAMPLE.items() if k not in replaced}
 
 
@@ -65,3 +65,36 @@ def test_change_context_is_unknown():
 def test_no_real_select_number_yet():
     # DIALBACK_RESOLVER=ledger must keep failing closed until ledger-select-v1 lands.
     assert not hasattr(dialback_ledger, "select_number")
+
+
+def test_each_case_gets_its_own_selection_id():
+    case = uuid4()
+    assert call(case_id=case)[1]["number_selection_id"] == call(case_id=case)[1]["number_selection_id"]
+    assert call()[1]["number_selection_id"] != call()[1]["number_selection_id"]
+
+
+def test_the_schema_refuses_what_the_spec_forbids():
+    """The contract's rules, checked here because validate.py only shows the examples pass."""
+    import copy
+    no_pick = json.loads((CONTRACTS / "examples" / "selection.no-provable-number.json").read_text())
+
+    def refused(doc):
+        return list(Draft202012Validator(SCHEMA).iter_errors(doc)) != []
+
+    for change in (lambda d: d.update(contact_point_id=EXAMPLE["contact_point_id"]),
+                   lambda d: d.update(e164=EXAMPLE["e164"]),
+                   lambda d: d.update(alternates=[]),
+                   lambda d: d.pop("reason")):
+        doc = copy.deepcopy(no_pick)
+        change(doc)
+        assert refused(doc)
+    for change in (lambda d: d.pop("contact_point_id"),
+                   lambda d: d.update(alternates=d["alternates"] * 3),
+                   lambda d: d["candidates"][2].update(reasons=[]),
+                   lambda d: d["candidates"][0].update(reasons=["fax_line"]),
+                   lambda d: d["candidates"][2].update(rank=3),
+                   lambda d: d.update(e164="415-555-0142"),
+                   lambda d: d.update(account_number="000123456789")):
+        doc = copy.deepcopy(EXAMPLE)
+        change(doc)
+        assert refused(doc)

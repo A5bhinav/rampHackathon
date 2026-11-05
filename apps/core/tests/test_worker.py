@@ -190,6 +190,9 @@ async def test_the_ledger_stub_picks_its_contract_example(world):
                                      "where case_id = %s and type = 'number_resolved'", case["id"])
     assert resolved["body"]["rule_version"] == "ledger-stub-v0"
     assert resolved["body"]["contact_point_id"] == "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f"
+    assert case["state"] == "calling" and len(world.voice.placed) == 1, "the stub's pick goes on to the call"
+    hold = await one(world.pool, "select status::text as status from app.holds where case_id = %s", case["id"])
+    assert hold["status"] == "confirmed", "the hold stays on while the call is made"
 
 
 async def test_without_the_ledger_rule_no_number_is_provable_and_a_person_takes_over(world):
