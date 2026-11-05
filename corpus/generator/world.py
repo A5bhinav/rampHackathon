@@ -120,7 +120,8 @@ class Vendor:
                                                     f"Notices: legal@{self.domain}"])
         if listing:
             for k in (90, 455):
-                self.doc("listing", "listing", start + days(k), [f"{self.name}: business listing", main])
+                if start + days(k) < T0 - days(30):  # history is before the request, never after it
+                    self.doc("listing", "listing", start + days(k), [f"{self.name}: business listing", main])
         if portal:
             self.doc("portal_entry", "vendor_portal", start + days(300), [f"Vendor profile: {self.name}", ar,
                                                                          Phone(ar.e164, "billing", label="Billing")])

@@ -27,12 +27,16 @@ c off-page), **P05** backdated header, **P06** poisoned number on file.
 established (only the near-miss check catches it). **P09** injection text naming a "verified"
 number (R9). **P10** documents arriving between the request and the change in Ramp. **P11** a
 fake listing and emails, 60 days old. **P12** one number from several mailboxes, an attachment and
-a second domain (email counts once). **K01** the stated known limit: mailbox and listing
-controlled for 120 days, no stored contract; truth says the poisoned number *is* picked.
+a second domain (email counts once).
+
+**Named by the design's "Known limit" (§4):** **K01**, mailbox and listing controlled for 120
+days, no stored contract; truth says the poisoned number *is* picked.
 
 **Controls, proposed (Q42):** **C01** a real change whose thread repeats the established number
-(R2 in practice). **C02** established sibling lines one digit apart. **C03** an email-only
-vendor (correct refusal). **C04** the second source is a scanned contract. **C05** a re-sent
+(R2 in practice). **C02** a direct line one digit from the main line,
+added two years ago (it stays eligible: both lines are long-established). **C03** an email-only
+vendor (correct refusal). **C04** the second source is a scanned contract
+(without reading the scan the vendor is email-only). **C05** a re-sent
 contract whose printed date is years older than its receive time.
 
 ## Acceptance
@@ -41,14 +45,17 @@ contract whose printed date is years older than its receive time.
       on every run; `--check` rebuilds in memory and fails on any difference with the committed files.
 - [ ] 12 patterns (P01 to P12) and 5 controls (C01 to C05), plus K01.
 - [ ] Each truth file lists every planted number with every sighting (document, channel, receive
-      time, visibility, role, party, real or poison) and the expected cutoff, outcome, pick and
-      the reasons each poisoned number must be rejected for.
+      time, visibility, role, party, real or poison) and the expected cutoff, outcome, pick, the
+      reasons each refused number must *at least* be rejected for (others may also apply), and,
+      where the scenario is about one, the numbers that must stay eligible.
 - [ ] No poison scenario except K01 expects a poisoned number to be picked.
-- [ ] `truth/manifest.sha256` covers every truth file, and its own digest is pinned in
-      `build.py`. Changing the truth means changing that pin in review.
+- [ ] `truth/manifest.sha256` covers every truth file and every scenario's documents (an
+      expectation rests on their custody), and its own digest is pinned in `build.py`. Changing
+      the truth or a document means changing that pin in review.
 - [ ] Only fictional values: phones in 555-0100 to 555-0199, domains and email addresses under
       `.example`. A vendor's real numbers are never a near miss of each other, except in C02.
-- [ ] An attachment has its email's custody. No full bank account number appears anywhere.
+- [ ] An attachment has its email's custody. No run of 7 or more digits (an account number),
+      whatever separates them, in any document's text or custody. History never lands after the request.
 - [ ] CI runs `--check` and the tests.
 
 ## Tests (written first)
@@ -69,7 +76,7 @@ demo seed. Held-out scenarios (written by a teammate, hash only).
   number. If it meant "both older than `min_age_days` (90)", P08's swapped-digit number, planted
   150 days ago in two source types, would become an eligible alternate. The truth says it must
   be rejected, so "long-established" has to be stricter. Every scenario agrees with "both first
-  seen at least 365 days before the cutoff" (C02's siblings are years old). Is 365 the rule?
+  seen at least 365 days before the cutoff" (C02's sibling was added two years ago). Is 365 the rule?
 - **Q44 (all):** the corpus says "account ending 4821" and never prints a full account number,
   even a fictional one, because AGENTS.md says never store one anywhere. The extractor's
   "labeled account numbers" can't be tested without them. Allow fictional ones in `corpus/` only?

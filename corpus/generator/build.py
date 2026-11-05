@@ -20,7 +20,7 @@ from world import T0, Vendor, days, stamp
 
 CORPUS = Path(__file__).resolve().parents[1]
 OWNED = ("poison", "controls", "truth")
-FROZEN_TRUTH_SHA256 = "91641fa25349f3aef30f2ff237d1447f2d6f4c902bc1e456b657efd835d1684f"
+FROZEN_TRUTH_SHA256 = "5e5bfa4e3fd85aad1b35bcf91e1aadb046d2e0c7d13342b02cf75d0cc2108cee"
 
 
 def dumps(obj) -> str:
@@ -59,8 +59,9 @@ def build() -> dict[str, str]:
         truth["documents"] = f"{folder}/documents.json"
         out[f"{folder}/documents.json"] = dumps(v.docs)
         out[f"truth/{s.id}.json"] = dumps(truth)
-    out["truth/manifest.sha256"] = "".join(f"{sha256(c)}  {Path(p).name}\n" for p, c in sorted(out.items())
-                                           if p.startswith("truth/"))
+    # The manifest covers the documents too: an expectation rests on their custody (a thread, a
+    # subject line, a sender's domain), so changing a document must move the frozen digest.
+    out["truth/manifest.sha256"] = "".join(f"{sha256(c)}  {p}\n" for p, c in sorted(out.items()))
     return out
 
 
