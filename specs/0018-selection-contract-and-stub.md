@@ -1,4 +1,4 @@
-# 0012: Selection contract and the ledger stub
+# 0018: Selection contract and the ledger stub
 
 **Owner:** Inesh  **Slice:** evidence  **Target day:** Wed Nov 4
 
