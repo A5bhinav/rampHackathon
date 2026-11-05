@@ -1,4 +1,4 @@
-"""Spec 0012: the ledger stub returns the selection contract's example (DIALBACK_RESOLVER=stub)."""
+"""Spec 0018: the ledger stub returns the selection contract's example (DIALBACK_RESOLVER=stub)."""
 import datetime as dt
 import json
 from pathlib import Path
