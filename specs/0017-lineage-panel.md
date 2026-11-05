@@ -22,7 +22,8 @@ Three PRs, because the work crosses three owners:
 
 `openapi/dialback.yaml`: a new path and the `SelectionView` schema (`selection`, which is
 `selection.schema.json` or `null`, and `reason_text`, mapping each reason code to its template
-sentence). It only adds, so it's allowed after Nov 2. Its own PR.
+sentence, and `notes`, the ledger's sentences for the no-selection, no-pick and alternates
+states). It only adds, so it's allowed after Nov 2. Its own PR.
 
 ## Acceptance
 
