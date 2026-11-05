@@ -16,6 +16,7 @@ export default async function LineagePage({ params }: { params: Promise<{ datase
   const [detail, view] = await Promise.all([core.case(caseId).catch(missing), core.selection(caseId).catch(missing)]);
   const back = `/d/${datasetId}/cases/${caseId}`;
   const s = view.selection;
+  const chosen = s ? split(s).pick?.contact_point_id : undefined;  // the same rule as the card above
 
   return (
     <main>
@@ -23,8 +24,7 @@ export default async function LineagePage({ params }: { params: Promise<{ datase
       <h1>Number lineage</h1>
       {!s ? (
         <section className="card">
-          <p>No number selection is recorded for this case yet.</p>
-          <p className="muted">Until the Trust Ledger records one, no call is made and the hold stays on.</p>
+          <p>{view.notes.no_selection}</p>
         </section>
       ) : (
         <>
@@ -37,8 +37,8 @@ export default async function LineagePage({ params }: { params: Promise<{ datase
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
                     <span className="mono" style={{ whiteSpace: "nowrap", fontSize: "1.05rem" }}>{phone(c.e164)}</span>
                     {c.eligible
-                      ? <span className={`badge ${c.rank === 1 && s.outcome === "picked" ? "tone-ok" : "tone-info"}`}>
-                          {c.rank === 1 ? "chosen" : `alternate ${(c.rank ?? 1) - 1}`}</span>
+                      ? <span className={`badge ${c.contact_point_id === chosen ? "tone-ok" : "tone-info"}`}>
+                          {c.contact_point_id === chosen ? "chosen" : `alternate ${(c.rank ?? 1) - 1}`}</span>
                       : <span className="badge tone-bad">refused</span>}
                     {c.on_file ? <span className="muted">on the old vendor master</span> : null}
                   </div>
@@ -70,7 +70,7 @@ function Chosen({ view }: { view: SelectionView }) {
       <section className="card" aria-labelledby="pick-h">
         <h2 id="pick-h">No provable number</h2>
         <p>{s.reason}</p>
-        <p className="muted">No call is made; the case waits for a person.</p>
+        <p className="muted">{view.notes.no_provable_number}</p>
       </section>
     );
   }
@@ -84,7 +84,7 @@ function Chosen({ view }: { view: SelectionView }) {
         <dt>Sightings</dt><dd>{pick.observation_count ?? "—"}</dd>
         <dt>Alternates</dt>
         <dd>{alternates.length ? alternates.map((a) => phone(a.e164)).join(", ") : "none"}{" "}
-          <span className="muted">(used only if this line is dead)</span></dd>
+          <span className="muted">{view.notes.alternates}</span></dd>
       </dl>
     </section>
   );

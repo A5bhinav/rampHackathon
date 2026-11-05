@@ -23,7 +23,7 @@ test("with no provable number there is no pick and every number is refused", () 
 
 test("phone formats US numbers and leaves others as they are", () => {
   assert.equal(phone("+14155550142"), "(415) 555-0142");
-  assert.equal(phone("+442071838750"), "+442071838750");
+  assert.equal(phone("+442079460123"), "+442079460123");  // Ofcom's range for drama: fictional
 });
 
 test("seenBefore says how long before the cutoff a number was first seen", () => {
