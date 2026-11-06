@@ -51,3 +51,17 @@ SAMPLES = [
 @pytest.mark.parametrize(("slot", "value"), SAMPLES)
 def test_value_checks_agree_with_the_in_transit_shape(slot: str, value: object) -> None:
     assert value_ok(slot, value) == transit_ok(slot, value)
+
+
+def test_a_full_call_produces_valid_in_transit_answers() -> None:
+    from dialback_policy.step import answers_object
+    from test_step import Call, rec, to_last4  # a clean call, driven through step()
+
+    c = Call()
+    to_last4(c)
+    t = c.callee("It ends in 4821.")
+    c.agent(rec("account_last4", "4821", t))
+    whole = Draft202012Validator({"$ref": f"{PREFIX}call-answers.schema.json#/$defs/CallAnswersInTransit"},
+                                 registry=_registry())
+    errors = [e.message for e in whole.iter_errors(answers_object(c.state))]
+    assert errors == []

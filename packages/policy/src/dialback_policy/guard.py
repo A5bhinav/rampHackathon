@@ -9,7 +9,8 @@ fixed fallback line, so a fraudster on the call learns nothing:
 - the words "verified", "approved" and "match", in any form ("verification", "mismatch");
 - amounts;
 - bank names and routing words;
-- the vendor's name, until the callee has named the vendor's company themselves (spec 0012, D2).
+- the vendor's name, until the callee has named the vendor's company themselves (spec 0012, D2);
+- agreeing to call some other number ("I'll call you on your cell"; R2).
 
 It errs toward blocking: a blocked line costs one fallback sentence, a leaked one can cost the
 case. Fixed text from `script.py` is trusted and not guarded; the tests check it would pass.
@@ -44,6 +45,9 @@ BANK_NAMES = (
     "silicon valley bank", "svb", "santander", "hsbc", "ally bank", "schwab", "goldman sachs", "navy federal",
     "usaa", "mercury", "chime", "routing", "iban", "swift", "aba number",
 )
+# Agreeing to call some other number (R2): the agent never does, so it never says it would.
+NEW_NUMBER = re.compile(r"\b(call|reach|dial|try|ring) (you )?(back )?(at|on) (that|this|the other|the new|your cell"
+                        r"|your mobile|your personal|your other|another|it)\b")
 _COMPANY_SUFFIXES = frozenset({"llc", "inc", "incorporated", "co", "corp", "corporation", "ltd", "limited",
                                "company", "plc", "lp", "llp", "the"})
 # A first word this common is not a name on its own ("Quick Ship Logistics" must not block "a quick question").
@@ -84,6 +88,9 @@ clean = _clean
 def _words(text: str) -> str:
     """Lowercase words separated by single spaces, padded so phrases match on word boundaries."""
     return " " + " ".join(re.findall(r"[a-z0-9]+", _clean(text))) + " "
+
+
+words = _words
 
 
 def digit_runs(text: str) -> list[str]:
@@ -162,6 +169,8 @@ def check(text: str, ctx: GuardContext) -> Verdict:
         reasons.append("amount")
     if any(f" {bank} " in words for bank in BANK_NAMES):
         reasons.append("bank_name")
+    if NEW_NUMBER.search(words):
+        reasons.append("new_number")
     variants = vendor_variants(ctx.vendor_names)
     callee_named_vendor = _says_vendor(_words(ctx.named_company), variants)
     if not callee_named_vendor and _says_vendor(words, variants):
