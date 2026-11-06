@@ -40,6 +40,8 @@ jobs:
         run: cd apps/ramp-mock && uv run pytest -q
       - name: Core (with the Ramp mock in process)
         run: cd apps/core && uv run pytest -q
+      - name: Voice service (text line, agent port, fail-closed)
+        run: cd apps/voice && uv run pytest -q
       - name: Database scripts
         run: uv run --with pytest pytest -q scripts/db/test_add_user.py
 

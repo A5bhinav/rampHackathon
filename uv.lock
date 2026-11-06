@@ -405,6 +405,9 @@ dev = [
 name = "dialback-voice"
 version = "0.0.0"
 source = { editable = "apps/voice" }
+dependencies = [
+    { name = "dialback-policy" },
+]
 
 [package.dev-dependencies]
 dev = [
@@ -413,6 +416,7 @@ dev = [
 ]
 
 [package.metadata]
+requires-dist = [{ name = "dialback-policy", editable = "packages/policy" }]
 
 [package.metadata.requires-dev]
 dev = [
