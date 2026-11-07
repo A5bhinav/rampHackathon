@@ -70,8 +70,8 @@ def _ask(agent: Agent, request: policy.AgentRequest, at: dt.datetime) -> policy.
         return policy.AgentFailed(at, f"timeout:{exc}")
     except Exception as exc:  # noqa: BLE001  a model bug must never leave the call running
         return policy.AgentFailed(at, type(exc).__name__)
-    if reply is None or (reply.text is None and not reply.tool_calls):
-        return policy.AgentFailed(at, "empty_reply")
+    if reply is None or (not (reply.text or "").strip() and not reply.tool_calls):
+        return policy.AgentFailed(at, "empty_reply")   # blank text with no tool call says nothing
     return policy.AgentReplied(at, reply.text, tuple(reply.tool_calls))
 
 
