@@ -2,7 +2,7 @@
 name = "dialback-voice"
 version = "0.0.0"
 requires-python = ">=3.13"
-dependencies = []
+dependencies = ["dialback-policy"]
 
 [dependency-groups]
 dev = ["pytest>=8", "hypothesis>=6"]
