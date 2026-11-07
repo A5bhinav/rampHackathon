@@ -410,6 +410,7 @@ source = { editable = "apps/voice" }
 dev = [
     { name = "hypothesis" },
     { name = "pytest" },
+    { name = "pyyaml" },
 ]
 
 [package.metadata]
@@ -418,6 +419,7 @@ dev = [
 dev = [
     { name = "hypothesis", specifier = ">=6" },
     { name = "pytest", specifier = ">=8" },
+    { name = "pyyaml", specifier = ">=6" },
 ]
 
 [[package]]
