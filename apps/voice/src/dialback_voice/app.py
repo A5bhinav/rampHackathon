@@ -140,7 +140,8 @@ async def run_relay_call(twilio: TwilioDeps, call_id: UUID, ws: Any) -> None:
         return verify_setup(setup, key=twilio.call_token_key, case_id=dial.case_id,
                             attempt=dial.attempt, number_e164=dial.number_e164)
 
-    result = await run_relay(ctx, twilio.agent_for(), ws, verify=verify, clock=twilio.clock)
+    result = await run_relay(ctx, twilio.agent_for(), ws, verify=verify, clock=twilio.clock,
+                             greeting=ctx.script.disclosure())  # welcomeGreeting spoke it; don't repeat (R8)
     await twilio.report_ended(_report_body(result, call_id, dial))
 
 

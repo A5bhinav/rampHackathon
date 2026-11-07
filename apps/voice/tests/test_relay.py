@@ -64,7 +64,8 @@ def _by_value(result) -> dict[str, tuple[str, str]]:
 def test_bad_token_or_wrong_number_fails_closed(make_ctx, clock):
     good = tokens.mint(KEY, case_id=CASE, attempt=ATTEMPT, number_e164=NUMBER)
     for setup, why in [(_setup("deadbeef"), "wrong token"),
-                       (_setup(good, to="+19998887777"), "wrong dialed number")]:
+                       (_setup(good, to="+19998887777"), "wrong dialed number"),
+                       ({"type": "setup", "to": NUMBER}, "missing token")]:
         ws = FakeWS([setup])
         r = asyncio.run(run_relay(make_ctx(), ScriptedAgent(), ws, verify=_verify, clock=clock()))
         assert r.result == "failed", why
@@ -85,7 +86,7 @@ def test_ws_messages_reach_the_same_outcome_as_the_text_line(make_ctx, clock):
         if turn.speaker != "callee":
             continue
         if turn.text == "[keypad]":
-            inbound.append({"type": "dtmf", "digit": script.last4})
+            inbound += [{"type": "dtmf", "digit": d} for d in script.last4]  # one message per key, as Twilio sends
         else:
             inbound.append({"type": "prompt", "voicePrompt": turn.text, "last": True})
 
@@ -133,6 +134,36 @@ def test_the_websocket_route_runs_a_call_and_reports():
 
     asyncio.run(run_relay_call(deps, CALL, ws))
 
-    assert ws.sent[0]["token"] == Script("Northwind Traders", "(415) 555-0100").disclosure()  # R8
+    sent = [m["token"] for m in ws.sent]
+    script = Script("Northwind Traders", "(415) 555-0100")
+    assert script.disclosure() not in sent              # welcomeGreeting already spoke it; not repeated (R8)
+    assert sent[0] == script.consent_question()          # the first token over the socket is the consent ask
     assert reported and reported[0]["result"] == "answers_recorded"
     assert reported[0]["call_id"] == str(CALL) and reported[0]["case_id"] == str(CASE)
+
+
+def test_a_forged_setup_reports_failed_to_the_core():
+    # A socket presenting a token we never minted is reported `failed` to the core (not just dropped),
+    # so the case does not sit until the call_timeout. End-to-end through the route's run_relay_call.
+    import datetime as dt
+
+    from dialback_voice.app import CallDial, TwilioDeps, run_relay_call
+
+    dial = CallDial(case_id=CASE, attempt=ATTEMPT, number_e164=NUMBER, customer_name="Northwind Traders",
+                    callback_number="(415) 555-0100", vendor_names=("Acme Fasteners",))
+    reported: list[dict] = []
+
+    async def report(body: dict) -> None:
+        reported.append(body)
+
+    deps = TwilioDeps(call_token_key=KEY, twilio_auth_token=b"auth", ws_base_url="wss://voice.example",
+                      public_base_url="https://voice.example",
+                      lookup_call=lambda cid: dial if cid == CALL else None, report_ended=report,
+                      agent_for=ScriptedAgent, clock=lambda: dt.datetime(2026, 11, 1, 17, 0, tzinfo=dt.UTC))
+    ws = FakeWS([_setup("deadbeef")])
+
+    asyncio.run(run_relay_call(deps, CALL, ws))
+
+    assert ws.closed is True
+    assert reported and reported[0]["result"] == "failed"
+    assert "answers" not in reported[0]                  # a rejected setup records nothing
