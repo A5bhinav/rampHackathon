@@ -9,11 +9,18 @@ so it is retried (spec 0012). A 401 or 422 is our own bug and is not retried."""
 from __future__ import annotations
 
 import asyncio
+import json
+import pathlib
 import uuid
+from urllib.parse import urlparse
 
 import httpx
+import jsonschema
 import pytest
+import yaml
 from dialback_voice.report import CoreClient, CoreRejectedReport, CoreUnavailable
+from referencing import Registry, Resource
+from referencing.jsonschema import DRAFT202012
 
 TOKEN = b"internal-service-token-for-tests-0123456789"
 CASE = uuid.UUID("c0ffee00-1111-4222-8333-444455556666")
@@ -74,7 +81,6 @@ def test_the_request_matches_the_contract():
     assert req.url.path == f"/internal/calls/{CALL}/ended"
     assert req.headers["Authorization"] == f"Bearer {TOKEN.decode()}"
     assert req.headers["Idempotency-Key"] == f"{CASE}:call:{CALL}:ended"
-    import json
     assert json.loads(req.content) == BODY
 
 
@@ -119,3 +125,38 @@ def test_a_422_is_not_retried():
     with pytest.raises(CoreRejectedReport):
         asyncio.run(go())
     assert len(rec.requests) == 1
+
+
+CONTRACTS = pathlib.Path(__file__).resolve().parents[3] / "packages" / "contracts"
+SCHEMA_ID_PREFIX = "https://dialback.dev/schemas/"
+
+
+def _contract_registry() -> Registry:
+    """Resolve the contract's cross-file $refs from disk, never the network, the way
+    `packages/contracts/scripts/validate.py` does: the schemas' $ids map to `schemas/`, and a
+    relative file ref loads from its path."""
+
+    def retrieve(uri: str) -> Resource:
+        if uri.startswith(SCHEMA_ID_PREFIX):
+            path = CONTRACTS / "schemas" / uri[len(SCHEMA_ID_PREFIX):]
+        else:
+            parsed = urlparse(uri)
+            if parsed.scheme != "file":
+                raise LookupError(f"refusing to fetch {uri}: only local contracts resolve")
+            path = pathlib.Path(parsed.path)
+        text = path.read_text(encoding="utf-8")
+        data = yaml.safe_load(text) if path.suffix in (".yaml", ".yml") else json.loads(text)
+        return Resource.from_contents(data, default_specification=DRAFT202012)
+
+    return Registry(retrieve=retrieve)
+
+
+def test_the_report_body_is_a_valid_call_ended_request():
+    # The spec's acceptance "it validates against internal.yaml" is proven here; "the core accepts
+    # it" is the deferred psql test (Q40). This asserts the body we actually send conforms to the
+    # contract schema, rather than only equalling itself.
+    uri = (CONTRACTS / "openapi" / "internal.yaml").as_uri()
+    schema = {"$ref": f"{uri}#/components/schemas/CallEndedRequest"}
+    validator = jsonschema.Draft202012Validator(schema, registry=_contract_registry())
+    errors = sorted(validator.iter_errors(BODY), key=lambda e: list(e.absolute_path))
+    assert errors == [], [e.message for e in errors]

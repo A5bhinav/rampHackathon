@@ -77,6 +77,7 @@ def test_a_dialable_case_is_accepted_with_202_and_a_call_id():
 
 def test_each_pre_dial_refusal_returns_409_with_its_code():
     for over, code in [({"case_held": False}, "case_not_held"),
+                       ({"case_finished": True}, "case_finished"),
                        ({"has_number_pick": False}, "number_not_selected"),
                        ({"number_opted_out": True}, "number_opted_out"),
                        ({"within_calling_window": False}, "outside_calling_window"),
@@ -121,6 +122,23 @@ def test_a_wrong_service_token_is_401():
     store = FakeStore(_pre_dial())
     r = _post(_client(store), token=b"not-the-service-token-at-all-000000")
     assert r.status_code == 401
+
+
+def test_a_lost_idempotency_race_returns_200_not_a_second_call():
+    # find_call missed (two requests checked at once), but the insert hit the unique key: the
+    # store reports the row as not created, so the endpoint returns the first call with 200.
+    won = PlacedCall(call_id=uuid.uuid4(), case_id=CASE, attempt=1)
+
+    class RacingStore(FakeStore):
+        async def find_call(self, idempotency_key):
+            return None
+
+        async def record_call(self, **kwargs):
+            return won, False
+
+    r = _post(_client(RacingStore(_pre_dial())))
+    assert r.status_code == 200
+    assert r.json()["call_id"] == str(won.call_id)
 
 
 def test_a_malformed_request_is_422():
