@@ -80,7 +80,7 @@ Access: everyone signed in can read; the service role writes mirrors and plumbin
 `cases`, `decisions`, `releases` and `case_event_receipts` are written only by the functions,
 which run as their owner. Not even the service role can write them directly.
 
-### `ledger` (Inesh, spec 0013)
+### `ledger` (Inesh, spec 0019)
 
 | Object | Role |
 |---|---|

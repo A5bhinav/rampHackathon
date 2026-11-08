@@ -1,4 +1,4 @@
-# 0013: The Trust Ledger schema
+# 0019: The Trust Ledger schema
 
 **Owner:** Inesh  **Slice:** evidence  **Target day:** Wed Nov 4
 
@@ -45,7 +45,7 @@ table checks only the fields it also keeps as columns.
 
 | Acceptance item | Test |
 |---|---|
-| all of the above | `supabase/tests/010_ledger.sql` (one block per item) |
+| all of the above | `supabase/tests/011_ledger.sql` (one block per item) |
 | nothing else breaks | `scripts/db/test.sh`, `cd apps/core && uv run pytest` |
 
 ## Out of scope

@@ -1,4 +1,4 @@
--- 010: the Trust Ledger schema holds its own rules (spec 0013).
+-- 010: the Trust Ledger schema holds its own rules (spec 0019).
 begin;
 \i supabase/tests/_helpers.sql
 

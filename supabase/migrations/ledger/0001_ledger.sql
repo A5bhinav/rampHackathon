@@ -1,4 +1,4 @@
--- ledger: the Trust Ledger. Owner: Inesh. Partner: Abhi. Spec 0013.
+-- ledger: the Trust Ledger. Owner: Inesh. Partner: Abhi. Spec 0019.
 --
 -- Where every phone number in a vendor's history came from, and which number a case will
 -- call. The database enforces the rules the selection rule leans on, so a bug in the Python
@@ -170,7 +170,7 @@ end
 $$;
 
 -- A selection agrees with the case and the contact point it names: same dataset and vendor,
--- and the number in the document is the contact point's number (review of spec 0013).
+-- and the number in the document is the contact point's number (review of spec 0019).
 create function ledger.check_selection_refs() returns trigger
 language plpgsql security definer set search_path = pg_catalog, pg_temp as $$
 declare
