@@ -30,10 +30,11 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from .agent import Agent
 from .guards import pre_dial_refusal
-from .store import CallStore
+from .report import CoreRejectedReport, CoreUnavailable
+from .store import CallDial, CallStore, PlacedCall
 from .tokens import mint
 from .transport import CallResult, Clock
-from .twilio.origination import build_connect_twiml, status_result, valid_twilio_signature
+from .twilio.origination import Originator, build_connect_twiml, status_result, valid_twilio_signature
 from .twilio.relay import run_relay, verify_setup
 
 log = logging.getLogger(__name__)
@@ -71,20 +72,6 @@ def _error(status: int, code: str, message: str) -> JSONResponse:
 
 
 @dataclass(frozen=True)
-class CallDial:
-    """What the voice service knows about a placed call when Twilio calls back about it: enough to
-    mint the call_token, speak the right disclosure and report the result, and no more. The case id
-    never goes to Twilio or the model. The real source is `voice.calls` plus the pick (the live
-    adapter, spec 0013 Q47); the tests pass it directly."""
-    case_id: UUID
-    attempt: int
-    number_e164: str
-    customer_name: str
-    callback_number: str
-    vendor_names: tuple[str, ...]
-
-
-@dataclass(frozen=True)
 class TwilioDeps:
     """The Twilio-facing seams, injected so the routes run without a live account (spec 0013). The
     real wiring builds `report_ended` from CoreClient, `agent_for` from the live model, and
@@ -93,6 +80,8 @@ class TwilioDeps:
     twilio_auth_token: bytes
     ws_base_url: str
     public_base_url: str
+    from_number: str
+    originator: Originator
     lookup_call: Callable[[UUID], CallDial | None]
     report_ended: Callable[[dict[str, Any]], Awaitable[None]]
     agent_for: Callable[[], Agent]
@@ -124,6 +113,50 @@ def _report_body(result: CallResult, call_id: UUID, dial: CallDial) -> dict[str,
     if result.end.retry_at is not None:
         body["retry_at"] = result.end.retry_at.astimezone(dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     return body
+
+
+async def _dial(twilio: TwilioDeps, store: CallStore, placed: PlacedCall, number_e164: str | None) -> None:
+    """Originate the Twilio call for a freshly placed call, then record the outcome (spec 0014).
+    Fails closed (R7): a missing number or a Twilio rejection records the call `failed` and reports
+    `failed` to the core, and POST /calls still returns the call_id with 202 even when that report or
+    the bookkeeping write cannot land, so a dial outcome never 500s the placement; the failure rides
+    the normal report path, with the core's `call_timeout` as the backstop (Q49/Q51). Only the pick,
+    the caller id and our own URLs reach Twilio; never the case id."""
+    call_id = placed.call_id
+    if not number_e164:  # past pre_dial this should hold, but never dial a number we do not have (R2)
+        await _dial_failed(twilio, store, placed, "no_number")
+        return
+    try:
+        sid = await twilio.originator.originate(
+            to=number_e164, from_=twilio.from_number,
+            twiml_url=f"{twilio.public_base_url}/twilio/twiml/{call_id}",
+            status_url=f"{twilio.public_base_url}/twilio/status/{call_id}")
+    except Exception:  # noqa: BLE001  any REST error means no live call was placed: fail closed
+        log.warning("origination failed for call %s", call_id)
+        await _dial_failed(twilio, store, placed, "originate_failed")
+        return
+    try:
+        await store.mark_dialed(call_id, provider_call_id=sid)
+    except Exception:  # noqa: BLE001  the call is placed; a store blip recording the SID must not 500 it
+        log.warning("could not record the dialed SID for call %s", call_id)
+
+
+async def _dial_failed(twilio: TwilioDeps, store: CallStore, placed: PlacedCall, reason: str) -> None:
+    """Record and report a call that never reached a live conversation, best effort. Neither the store
+    write nor the core report may 500 the placement (R7, decision 3): on any failure the case stays
+    `calling` and the core's `call_timeout` sweeps it to a person. In the synchronous-dial path the
+    core is still awaiting this 202 and has not appended `call_started`, so the `failed` report 409s
+    through all its retries and raises rather than landing; the timeout is the real backstop (Q49/Q51)."""
+    try:
+        await store.mark_failed(placed.call_id, reason)
+    except Exception:  # noqa: BLE001  a store blip must not 500 the placement; the core timeout backstops it
+        log.warning("could not mark call %s failed (%s)", placed.call_id, reason)
+    try:
+        await twilio.report_ended({"call_id": str(placed.call_id), "case_id": str(placed.case_id),
+                                   "result": "failed", "attempt": placed.attempt})
+    except (CoreUnavailable, CoreRejectedReport):
+        log.warning("the failed report for call %s did not land; the core timeout will sweep it",
+                    placed.call_id)
 
 
 async def run_relay_call(twilio: TwilioDeps, call_id: UUID, ws: Any) -> None:
@@ -181,6 +214,8 @@ def create_app(*, store: CallStore, internal_api_token: bytes, agent_version: st
             contact_point_id=pre.contact_point_id, number_e164=pre.number_e164,
             agent_version=request.app.state.agent_version)
         log.info("call %s accepted for case %s attempt %s", placed.call_id, placed.case_id, placed.attempt)
+        if twilio is not None and created:  # live mode dials the pick; a replay (created=False) never redials
+            await _dial(twilio, store, placed, pre.number_e164)
         return JSONResponse(PlaceCallAccepted(**placed.__dict__).model_dump(mode="json"),
                             status_code=202 if created else 200)
 

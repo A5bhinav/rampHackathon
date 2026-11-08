@@ -32,7 +32,8 @@ def _client(reporter) -> TestClient:
     dial = CallDial(case_id=CASE, attempt=2, number_e164=NUMBER, customer_name="Northwind Traders",
                     callback_number="(415) 555-0100", vendor_names=("Acme Fasteners",))
     deps = TwilioDeps(call_token_key=b"k", twilio_auth_token=AUTH, ws_base_url="wss://voice.example",
-                      public_base_url=BASE, lookup_call=lambda cid: dial if cid == CALL else None,
+                      public_base_url=BASE, from_number="+14155550100", originator=None,
+                      lookup_call=lambda cid: dial if cid == CALL else None,
                       report_ended=reporter, agent_for=lambda: None, clock=lambda: None)
     app = create_app(store=None, internal_api_token=b"t", agent_version="a", twilio=deps)
     return TestClient(app)
