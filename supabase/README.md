@@ -89,6 +89,9 @@ which run as their owner. Not even the service role can write them directly.
 | `ledger.contact_points` | One number per vendor with its lineage summary, for the dashboard. The service role updates only the summary columns; the dataset, vendor and number are fixed. A selection never reads it as truth. |
 | `ledger.number_selections` | The `selection.schema.json` document for a case, with its outcome, rule version, contact point and inputs hash as columns that must match the document. A pick names a contact point of the case's own vendor, with the number the document names; no pick names none. Append-only. |
 
+| `ledger.vendor_domains` | The vendor's own email domains (spec 0024). Email counts as a source only from these. Append-only. |
+| `ledger.change_requests` | Which ledger document is a vendor's change request (spec 0024, Q46). `select_number` reads the latest one recorded before the case opened; with none, it refuses. Append-only. |
+
 Access: everyone signed in reads; the service role inserts; append-only tables refuse update,
 delete and truncate by grant and by trigger.
 
