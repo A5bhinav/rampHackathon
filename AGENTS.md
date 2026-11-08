@@ -59,6 +59,8 @@ second owner (the partner) who reviews it.
 | Core tests (core and the Ramp mock in process, on a throwaway Postgres) | `cd apps/core && uv run pytest` |
 | Ramp mock tests | `cd apps/ramp-mock && uv run pytest` |
 | Decision engine tests | `cd packages/decision && uv run pytest` |
+| Call policy tests (script, tools, speech guard) | `cd packages/policy && uv run pytest` |
+| Voice service tests (text line, agent port, fail-closed) | `cd apps/voice && uv run pytest` |
 | Run the whole skeleton locally (Postgres, Ramp mock, core with worker; seeded demo dataset) | `uv run python scripts/dev/stack.py --changes` |
 | End-to-end smoke run (the demo-smoke CI job) | `uv run python scripts/dev/stack.py --smoke` |
 | Dashboard checks | `cd apps/web && pnpm check:api && pnpm typecheck && pnpm build` |
