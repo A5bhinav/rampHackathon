@@ -1,0 +1,30 @@
+name: lab-smoke
+
+# The attack lab's voice slice (spec 0017). Runs on changes to the agent, the policy, the decision
+# engine, or the lab itself: a change that weakens the agent fails the build (AGENTS.md "done means").
+# Deterministic (ScriptedAgent via LabAgent, scripted callers), so it needs no API key and no spend.
+# The live-model gate and the full-pipeline run land later.
+on:
+  pull_request:
+    paths:
+      - "apps/voice/**"
+      - "packages/policy/**"
+      - "packages/decision/**"
+      - "evals/**"
+      - ".github/workflows/lab-smoke.yml"
+  push:
+    branches: [main]
+
+jobs:
+  lab-smoke:
+    name: attack lab, voice slice (text mode)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Install the Python workspace
+        run: uv sync --all-packages --locked
+      - name: Lab tests
+        run: cd evals && uv run pytest -q
+      - name: Lab run (scripted callers, no spend)
+        run: uv run lab run --split voice --max-usd 0

@@ -31,7 +31,7 @@ jobs:
       - name: Install the Python workspace
         run: uv sync --all-packages --locked
       - name: Lint
-        run: uv run --no-project --with ruff ruff check apps packages scripts
+        run: uv run --no-project --with ruff ruff check apps packages scripts evals
       - name: Decision engine
         run: cd packages/decision && uv run pytest -q
       - name: Call policy (script, tools, speech guard)
