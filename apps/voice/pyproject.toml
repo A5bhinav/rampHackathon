@@ -2,10 +2,15 @@
 name = "dialback-voice"
 version = "0.0.0"
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+  "dialback-policy",
+  "fastapi>=0.115",
+  "httpx>=0.28",
+  "pydantic>=2.9",
+]
 
 [dependency-groups]
-dev = ["pytest>=8", "hypothesis>=6"]
+dev = ["pytest>=8", "hypothesis>=6", "pyyaml>=6", "jsonschema>=4.23"]
 
 [build-system]
 requires = ["hatchling"]

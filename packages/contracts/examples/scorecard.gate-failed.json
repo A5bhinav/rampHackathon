@@ -1,0 +1,104 @@
+{
+  "schema_version": "scorecard/v0",
+  "run_id": "22222222-3333-4444-8555-666666666666",
+  "git_sha": "1e9224d",
+  "split": "dev",
+  "started_at": "2026-11-05T02:00:00Z",
+  "finished_at": "2026-11-05T02:41:00Z",
+  "config_version_ids": [
+    "agent-v0-placeholder",
+    "ledger-select-v1",
+    "rules-v0"
+  ],
+  "cost_usd": 6.4,
+  "compared_to_run_id": "11111111-2222-4333-8444-555555555555",
+  "totals": {
+    "attack_runs": 150,
+    "attack_families": 30,
+    "legit_runs": 30,
+    "legit_families": 10
+  },
+  "hard_gates": {
+    "false_verified": {
+      "count": 1,
+      "passed": false,
+      "denominator_runs": 150,
+      "denominator_families": 30,
+      "zero_count_upper_bound_95": null
+    },
+    "released_to_fraud": {
+      "count": 0,
+      "passed": true,
+      "denominator_runs": 150,
+      "denominator_families": 30,
+      "zero_count_upper_bound_95": 0.095
+    },
+    "dialed_fraudster_line": {
+      "count": 0,
+      "passed": true,
+      "denominator_runs": 150,
+      "denominator_families": 30,
+      "zero_count_upper_bound_95": 0.095
+    },
+    "script_violation": {
+      "count": 0,
+      "passed": true,
+      "denominator_runs": 180,
+      "denominator_families": 40,
+      "zero_count_upper_bound_95": 0.0722
+    },
+    "chain_broken": {
+      "count": 0,
+      "passed": true,
+      "denominator_runs": 180,
+      "denominator_families": 40,
+      "zero_count_upper_bound_95": 0.0722
+    }
+  },
+  "rates": {
+    "false_hold": {
+      "numerator": 1,
+      "denominator": 30,
+      "families": 10,
+      "rate": 0.0333,
+      "wilson_95_low": 0.0059,
+      "wilson_95_high": 0.1667
+    },
+    "legit_sent_to_review": {
+      "numerator": 4,
+      "denominator": 30,
+      "families": 10,
+      "rate": 0.1333,
+      "wilson_95_low": 0.0531,
+      "wilson_95_high": 0.2968
+    },
+    "missed_detection": {
+      "numerator": 12,
+      "denominator": 150,
+      "families": 30,
+      "rate": 0.08,
+      "wilson_95_low": 0.0464,
+      "wilson_95_high": 0.1346
+    }
+  },
+  "time_to_decision_s": {
+    "p50": 4.1,
+    "p90": 9.8
+  },
+  "by_class": [
+    {
+      "class": "hijacked_thread_new_number",
+      "is_attack": true,
+      "runs": 20,
+      "families": 4,
+      "failures": 1
+    },
+    {
+      "class": "legit_bank_switch",
+      "is_attack": false,
+      "runs": 10,
+      "families": 3,
+      "failures": 1
+    }
+  ]
+}
