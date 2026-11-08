@@ -1,4 +1,4 @@
-// The lineage panel's pure helpers (spec 0017), checked against the contract's own examples.
+// The lineage panel's pure helpers (spec 0023), checked against the contract's own examples.
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";

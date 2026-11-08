@@ -1,4 +1,4 @@
-// Pure helpers for the number lineage panel (spec 0017). No sentence here explains a decision:
+// Pure helpers for the number lineage panel (spec 0023). No sentence here explains a decision:
 // those come from the API's reason_text and the selection's own reason, written by the ledger.
 import type { Candidate, Selection } from "./api-types";
 

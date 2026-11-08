@@ -5,7 +5,7 @@ import { CoreError, core } from "@/lib/core";
 import { when } from "@/lib/format";
 import { phone, seenBefore, sourceLabel, split } from "@/lib/lineage";
 
-// Number lineage (spec 0017, owner Inesh): the number this case will call, where it came from,
+// Number lineage (spec 0023, owner Inesh): the number this case will call, where it came from,
 // and every number the Trust Ledger refused, with the ledger's own sentence for each reason.
 export default async function LineagePage({ params }: { params: Promise<{ datasetId: string; caseId: string }> }) {
   const { datasetId, caseId } = await params;
