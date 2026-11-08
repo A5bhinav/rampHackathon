@@ -66,7 +66,7 @@ class ClaudeAgent:
         try:
             turn_id, text = last_callee(request.transcript)
         except ValueError:
-            return AgentReply()  # no caller turn to cite: nothing to record, let step re-ask
+            return AgentReply()  # no caller turn to cite: an empty reply fails the call closed (R7)
         slot = PHASE_SLOT[request.phase]
         value = self._value(request, text)
         if value is None or not value_ok(slot, value):  # never emit a value step would reject
@@ -82,9 +82,14 @@ class ClaudeAgent:
         if phase is Phase.CONSENT or phase is Phase.CHANGE:
             return self._judge(request.goal, _ALLOWED[phase], text, _FAIL_CLOSED[phase])
         if phase is Phase.LAST4:
+            # Code reads the last four from the transcript; the model never sees this path (R4, ADR-8).
+            # Known limitation: digit_runs joins every run in the turn, so this is the last four across
+            # all of them. If the caller adds a second number (a callback), its tail wins over the
+            # account's. Fail-safe: a wrong four cannot match the ledger, so the check routes to manual
+            # review, never a false pass. (ScriptedAgent takes runs[0]; revisit when the two converge.)
             digits = "".join(digit_runs(text))
             if digits:
-                return digits[-4:]  # the last four only, from the transcript; the model never sees this path
+                return digits[-4:]
             return self._judge(request.goal, ("refused", "dont_know"), text, "dont_know")
         said = text.strip()[:200]  # free-text phases: record the caller's own words (company, department, name)
         return said or None

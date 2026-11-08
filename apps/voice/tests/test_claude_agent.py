@@ -142,6 +142,17 @@ def test_no_callee_turn_records_nothing():
     assert reply.text is None
 
 
+def test_empty_free_text_records_nothing_and_fails_closed():
+    # A free-text phase with only whitespace has no words to record and no fail-closed fallback value,
+    # so the agent returns an empty reply; transport turns that into AgentFailed and the call fails
+    # closed (R7). The model is never asked on a free-text phase.
+    model = FakeModel()
+    reply = ClaudeAgent(model=model).reply(_req(Phase.COMPANY, "   "))
+    assert reply.tool_calls == ()
+    assert reply.text is None
+    assert model.calls == []                           # free text never asks the model
+
+
 def test_model_pin_and_prompt_are_frozen():
     assert MODEL_PIN == "claude-sonnet-5-5"
     assert isinstance(SYSTEM_PROMPT, str) and SYSTEM_PROMPT.strip()

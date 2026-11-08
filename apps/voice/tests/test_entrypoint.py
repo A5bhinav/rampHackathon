@@ -8,7 +8,8 @@ from __future__ import annotations
 import uuid
 
 import httpx
-from dialback_voice.entrypoint import build_app, create_asgi_app
+import pytest
+from dialback_voice.entrypoint import _ledger_lookup, _ledger_store, build_app, create_asgi_app
 from dialback_voice.guards import PreDialInputs
 from dialback_voice.settings import Settings, TwilioConfig
 from dialback_voice.store import PreDial
@@ -85,3 +86,19 @@ def test_create_asgi_app_wires_injected_factories():
                           store_for=lambda: store, lookup_for=lambda: (lambda c: None),
                           http=httpx.AsyncClient(), clock=lambda: 0.0)
     assert TestClient(app).get("/healthz").json() == {"ok": True}
+
+
+def test_the_ledger_seam_factories_raise_fail_closed():
+    # The default store and lookup factories are the ledger seam (Q40/Q50): they must raise, not hand
+    # back a broken default, so a deploy without the real store cannot boot (R7).
+    with pytest.raises(NotImplementedError):
+        _ledger_store()
+    with pytest.raises(NotImplementedError):
+        _ledger_lookup()
+
+
+def test_create_asgi_app_with_default_factories_raises_on_boot():
+    # With no factories injected, create_asgi_app falls to the ledger seam and raises rather than
+    # serving a half-wired app (R7). A regression to a silent default would let it start.
+    with pytest.raises(NotImplementedError):
+        create_asgi_app(Settings(voice_mode="text", internal_api_token=TOKEN))
