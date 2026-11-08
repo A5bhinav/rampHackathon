@@ -1,0 +1,100 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import type { Candidate, SelectionView } from "@/lib/api-types";
+import { CoreError, core } from "@/lib/core";
+import { when } from "@/lib/format";
+import { phone, seenBefore, sourceLabel, split } from "@/lib/lineage";
+
+// Number lineage (spec 0023, owner Inesh): the number this case will call, where it came from,
+// and every number the Trust Ledger refused, with the ledger's own sentence for each reason.
+export default async function LineagePage({ params }: { params: Promise<{ datasetId: string; caseId: string }> }) {
+  const { datasetId, caseId } = await params;
+  const missing = (e: unknown) => {
+    if (e instanceof CoreError && e.status === 404) notFound();
+    throw e;
+  };
+  const [detail, view] = await Promise.all([core.case(caseId).catch(missing), core.selection(caseId).catch(missing)]);
+  const back = `/d/${datasetId}/cases/${caseId}`;
+  const s = view.selection;
+  const chosen = s ? split(s).pick?.contact_point_id : undefined;  // the same rule as the card above
+
+  return (
+    <main>
+      <p><Link href={back}>← {detail.case.vendor.legal_name}</Link></p>
+      <h1>Number lineage</h1>
+      {!s ? (
+        <section className="card">
+          <p>{view.notes.no_selection}</p>
+        </section>
+      ) : (
+        <>
+          <Chosen view={view} />
+          <section className="card" aria-labelledby="all-h">
+            <h2 id="all-h">Every number considered</h2>
+            <ul className="plain" style={{ listStyle: "none", paddingLeft: 0, margin: 0 }}>
+              {s.candidates.map((c) => (
+                <li key={c.contact_point_id} style={{ padding: "12px 0", borderBottom: "1px solid var(--line)" }}>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                    <span className="mono" style={{ whiteSpace: "nowrap", fontSize: "1.05rem" }}>{phone(c.e164)}</span>
+                    {c.eligible
+                      ? <span className={`badge ${c.contact_point_id === chosen ? "tone-ok" : "tone-info"}`}>
+                          {c.contact_point_id === chosen ? "chosen" : `alternate ${(c.rank ?? 1) - 1}`}</span>
+                      : <span className="badge tone-bad">refused</span>}
+                    {c.on_file ? <span className="muted">on the old vendor master</span> : null}
+                  </div>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 6 }}>
+                    <Sources candidate={c} />
+                    <span className="muted" title={when(c.first_seen_at)}>First seen {seenBefore(c.first_seen_at, s.cutoff)}</span>
+                  </div>
+                  {c.reasons.length ? <Reasons candidate={c} text={view.reason_text} /> : null}
+                </li>
+              ))}
+            </ul>
+          </section>
+          <p className="muted">
+            Rule <span className="mono">{s.rule_version}</span> · cutoff {when(s.cutoff)} · minimum{" "}
+            {s.rule_settings.min_source_types} source types and {s.rule_settings.min_age_days} days · inputs{" "}
+            <span className="mono" title={s.inputs_sha256}>{s.inputs_sha256.slice(0, 12)}</span>
+          </p>
+        </>
+      )}
+    </main>
+  );
+}
+
+function Chosen({ view }: { view: SelectionView }) {
+  const s = view.selection!;
+  const { pick, alternates } = split(s);
+  if (!pick) {
+    return (
+      <section className="card" aria-labelledby="pick-h">
+        <h2 id="pick-h">No provable number</h2>
+        <p>{s.reason}</p>
+        <p className="muted">{view.notes.no_provable_number}</p>
+      </section>
+    );
+  }
+  return (
+    <section className="card" aria-labelledby="pick-h">
+      <h2 id="pick-h">The number Dialback will call</h2>
+      <p className="mono" style={{ fontSize: "1.4rem", margin: "4px 0" }}>{phone(pick.e164)}</p>
+      <dl className="facts">
+        <dt>Seen in</dt><dd><Sources candidate={pick} /></dd>
+        <dt>First seen</dt><dd>{seenBefore(pick.first_seen_at, s.cutoff)} ({when(pick.first_seen_at)})</dd>
+        <dt>Sightings</dt><dd>{pick.observation_count ?? "—"}</dd>
+        <dt>Alternates</dt>
+        <dd>{alternates.length ? alternates.map((a) => phone(a.e164)).join(", ") : "none"}{" "}
+          <span className="muted">{view.notes.alternates}</span></dd>
+      </dl>
+    </section>
+  );
+}
+
+function Sources({ candidate }: { candidate: Candidate }) {
+  if (candidate.source_types.length === 0) return <span className="muted">no independent source</span>;
+  return <>{candidate.source_types.map((t) => <span key={t} className="badge tone-muted" style={{ marginRight: 4 }}>{sourceLabel(t)}</span>)}</>;
+}
+
+function Reasons({ candidate, text }: { candidate: Candidate; text: SelectionView["reason_text"] }) {
+  return <ul style={{ margin: "8px 0 0", paddingLeft: 20 }}>{candidate.reasons.map((r) => <li key={r}>{text[r]}</li>)}</ul>;
+}

@@ -49,6 +49,7 @@ export default async function CaseDetailPage({ params, searchParams }: {
         <OutcomeBadge outcome={c.outcome} />
         <ChainBadge chain={detail.chain} />
         <span className="muted">Version {c.version}</span>
+        <Link href={`${path}/lineage`}>Number lineage</Link>
         {c.unknown_changer ? <span className="badge tone-warn">Unknown changer: two approvers</span> : null}
         {c.deadline_at && !["released", "releasing"].includes(c.state) ? (
           <span className={`badge ${deadlinePassed ? "tone-bad" : "tone-muted"}`} title={when(c.deadline_at)}>

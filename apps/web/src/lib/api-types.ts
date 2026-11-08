@@ -14,3 +14,6 @@ export type ActionResult = S["ActionResult"];
 export type ApiError = S["Error"];
 export type CaseState = S["CaseState"];
 export type DecisionInfo = S["DecisionInfo"];
+export type SelectionView = S["SelectionView"];
+export type Selection = S["selection.schema"];
+export type Candidate = Selection["candidates"][number];
