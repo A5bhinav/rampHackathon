@@ -2,7 +2,12 @@
 name = "dialback-evals"
 version = "0.0.0"
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+  "dialback-policy",
+  "dialback-voice",
+  "dialback-decision",
+  "pyyaml>=6",
+]
 
 [dependency-groups]
 dev = ["pytest>=8", "hypothesis>=6"]

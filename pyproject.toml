@@ -26,6 +26,7 @@ dialback-decision = { workspace = true }
 dialback-evidence = { workspace = true }
 dialback-ledger   = { workspace = true }
 dialback-policy   = { workspace = true }
+dialback-voice    = { workspace = true }
 
 [tool.ruff]
 line-length = 110
