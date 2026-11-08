@@ -6,11 +6,21 @@ callee's words never redirect the record (R9). All of it runs against an injecte
 ANTHROPIC_API_KEY, no network, no live call."""
 from __future__ import annotations
 
+import json
+
+import httpx
 import pytest
 from dialback_policy.script import PHASE_SLOT, Phase
 from dialback_policy.step import AgentRequest
 from dialback_policy.tools import value_ok
-from dialback_voice.claude_agent import MAX_TOKENS, MODEL_PIN, SYSTEM_PROMPT, TEMPERATURE, ClaudeAgent
+from dialback_voice.claude_agent import (
+    MAX_TOKENS,
+    MODEL_PIN,
+    SYSTEM_PROMPT,
+    TEMPERATURE,
+    AnthropicVoiceModel,
+    ClaudeAgent,
+)
 
 
 class FakeModel:
@@ -137,3 +147,49 @@ def test_model_pin_and_prompt_are_frozen():
     assert isinstance(SYSTEM_PROMPT, str) and SYSTEM_PROMPT.strip()
     assert TEMPERATURE == 0
     assert isinstance(MAX_TOKENS, int) and MAX_TOKENS > 0
+
+
+def test_anthropic_model_posts_the_pinned_call_and_returns_the_word():
+    seen = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["url"] = str(request.url)
+        seen["key"] = request.headers.get("x-api-key", "")
+        seen["version"] = request.headers.get("anthropic-version", "")
+        seen["body"] = json.loads(request.content.decode())
+        return httpx.Response(200, json={"content": [{"type": "text", "text": "Yes"}]})
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as http:
+        model = AnthropicVoiceModel(http, api_key=b"sk-test-123")
+        value = model.classify(goal="ask consent", allowed=("yes", "no"), callee_text="sure, go ahead")
+
+    assert value == "yes"                                   # the model's word, normalized
+    assert seen["url"] == "https://api.anthropic.com/v1/messages"
+    assert seen["key"] == "sk-test-123"
+    assert seen["version"]                                   # the API version is pinned in a header
+    body = seen["body"]
+    assert body["model"] == MODEL_PIN and body["temperature"] == 0 and body["max_tokens"] == MAX_TOKENS
+    assert body["system"] == SYSTEM_PROMPT
+    content = body["messages"][0]["content"]
+    assert "sure, go ahead" in content                      # the caller's turn, quoted as data (R9)
+    assert "yes" in content and "no" in content             # the allowed answers are offered
+
+
+def test_anthropic_model_raises_when_there_is_no_text_to_read():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"content": [{"type": "tool_use", "name": "x", "input": {}}]})
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as http:
+        model = AnthropicVoiceModel(http, api_key=b"k")
+        with pytest.raises(ValueError):                     # ClaudeAgent catches this and fails closed
+            model.classify(goal="g", allowed=("yes", "no"), callee_text="sure")
+
+
+def test_anthropic_model_raises_on_an_http_error():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(500, json={"error": "overloaded"})
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as http:
+        model = AnthropicVoiceModel(http, api_key=b"k")
+        with pytest.raises(httpx.HTTPStatusError):
+            model.classify(goal="g", allowed=("yes", "no"), callee_text="sure")
