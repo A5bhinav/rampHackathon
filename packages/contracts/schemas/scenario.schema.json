@@ -1,0 +1,266 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dialback.dev/schemas/scenario.schema.json",
+  "title": "Scenario family (dialback.scenario/v1)",
+  "description": "One YAML file per scenario family, with variants. A scenario states facts, not answers: who really owns each phone number, what the fraudster controls, whether the change is real, and which documents the Trust Ledger can find. The oracle derives each variant's expected outcome from these facts, and those outcomes are frozen with a hash before a run. Scenario files live in evals/scenarios/ as YAML; examples here are JSON so validate.py can check them. Fictional data only: 555-0100 to 555-0199 numbers and .example domains.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "family_id",
+    "class",
+    "is_attack",
+    "held_out",
+    "author",
+    "door",
+    "facts",
+    "variants"
+  ],
+  "properties": {
+    "schema": {
+      "const": "dialback.scenario/v1",
+      "description": "Format version."
+    },
+    "family_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{2,63}$",
+      "description": "Stable ID of the scenario family; variants share it."
+    },
+    "class": {
+      "description": "Attack or control class the scorecard groups by, in snake_case. The list of classes lives in the README, not here, so new classes don't need a contract change.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{2,63}$"
+    },
+    "is_attack": {
+      "type": "boolean",
+      "description": "True for a fraud attempt, false for a legitimate-but-odd change."
+    },
+    "held_out": {
+      "type": "boolean",
+      "description": "True for the sealed set written by a teammate who didn't write the code under test."
+    },
+    "author": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "person",
+        "model"
+      ],
+      "properties": {
+        "person": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model": {
+          "description": "Model family that drafted the scenario, or 'none' if hand-written.",
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "description": "Who wrote the scenario and which model family helped, so no model grades its own work."
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 500,
+      "description": "One or two sentences for humans. Never read by the pipeline."
+    },
+    "door": {
+      "description": "How the change enters the real pipeline.",
+      "enum": [
+        "webhook",
+        "silent_change",
+        "forwarded_email"
+      ]
+    },
+    "clock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "start"
+      ],
+      "properties": {
+        "start": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Simulated clock start for this scenario (UTC)."
+        }
+      },
+      "description": "Simulated clock settings."
+    },
+    "facts": {
+      "$ref": "#/$defs/facts",
+      "description": "What is true in this scenario. The oracle derives expected outcomes from these, never from the pipeline."
+    },
+    "variants": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/variant"
+      },
+      "description": "At least one. Each variant may override facts and gets its own expected outcome."
+    }
+  },
+  "$defs": {
+    "e164": {
+      "type": "string",
+      "pattern": "^\\+[1-9][0-9]{6,14}$"
+    },
+    "facts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "vendor_ref",
+        "change_is_real",
+        "fraudster_controls",
+        "phone_numbers",
+        "ledger_documents"
+      ],
+      "properties": {
+        "vendor_ref": {
+          "description": "Vendor ID in the synthetic company corpus.",
+          "type": "string",
+          "minLength": 1
+        },
+        "change_is_real": {
+          "type": "boolean",
+          "description": "True if the vendor really asked for this bank change."
+        },
+        "fraudster_controls": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "vendor_mailbox",
+              "lookalike_domain",
+              "sent_documents",
+              "public_listing",
+              "phone_of_record",
+              "inbound_calls"
+            ]
+          },
+          "description": "Channels the fraudster controls in this scenario."
+        },
+        "phone_numbers": {
+          "description": "Every number in play and what really happens when it is dialed.",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "e164",
+              "true_owner",
+              "line_behavior"
+            ],
+            "properties": {
+              "e164": {
+                "$ref": "#/$defs/e164"
+              },
+              "true_owner": {
+                "enum": [
+                  "vendor",
+                  "fraudster",
+                  "unrelated"
+                ],
+                "description": "Who really answers this line."
+              },
+              "line_behavior": {
+                "enum": [
+                  "real_vendor_persona",
+                  "fraudster_persona",
+                  "no_answer",
+                  "busy",
+                  "voicemail",
+                  "phone_menu"
+                ],
+                "description": "What the text phone line does when this number is dialed."
+              },
+              "persona_ref": {
+                "description": "Persona card ID for persona lines.",
+                "type": "string"
+              }
+            }
+          }
+        },
+        "ledger_documents": {
+          "description": "Corpus document IDs the Trust Ledger can find before the case opens.",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "change_request_document": {
+          "description": "Corpus document ID of the change request, if the door is an email.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "variant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "variant_id"
+      ],
+      "properties": {
+        "variant_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]{0,31}$"
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "overrides": {
+          "description": "JSON Merge Patch (RFC 7396) applied to facts for this variant.",
+          "type": "object"
+        },
+        "expected": {
+          "$ref": "#/$defs/expected"
+        }
+      }
+    },
+    "expected": {
+      "description": "Written by the oracle for each variant (after applying its overrides), not by hand. Frozen with a hash before a run.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "oracle_version",
+        "allowed_decisions",
+        "must_not_dial",
+        "must_not_release"
+      ],
+      "properties": {
+        "oracle_version": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Version of the oracle rules that produced this."
+        },
+        "allowed_decisions": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "./evidence-event.schema.json#/$defs/Outcome"
+          },
+          "description": "Decisions that count as a pass."
+        },
+        "must_not_dial": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/e164"
+          },
+          "description": "Numbers the pipeline must never call (lines the fraudster controls)."
+        },
+        "must_not_release": {
+          "type": "boolean",
+          "description": "True if releasing the payment is a hard failure."
+        }
+      }
+    }
+  }
+}
