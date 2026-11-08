@@ -153,7 +153,7 @@ paths:
   /api/cases/{case_id}/selection:
     get:
       operationId: getCaseSelection
-      summary: The number lineage panel - the selection the case used, and why (spec 0017)
+      summary: The number lineage panel - the selection the case used, and why (spec 0023)
       description: |
         The selection named by the case's latest `number_resolved` or `no_provable_number`
         event, as `ledger.number_selections` stores it (`selection.schema.json`), read under the
