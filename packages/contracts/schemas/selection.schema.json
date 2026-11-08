@@ -1,0 +1,121 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dialback.dev/schemas/selection.schema.json",
+  "title": "Selection",
+  "description": "What dialback_ledger.select_number(case) returns, and what ledger.number_selections stores: the number a case will call, up to two alternates, or no_provable_number, plus every candidate the rule looked at and why it was or wasn't eligible. Owner: Inesh. The core reads number_selection_id, rule_version, contact_point_id, reason and source_types (spec 0002, D11). Rules: phone numbers only, in E.164; never a bank account number (ADR-8); numbers are integers; a selection reads only rows recorded before the cutoff and stores a hash of them, so it can be replayed.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["v", "number_selection_id", "case_id", "dataset_id", "vendor_id", "rule_version", "rule_settings", "requested_cutoff", "cutoff", "outcome", "candidates", "inputs_sha256"],
+  "properties": {
+    "v": { "const": 1, "description": "Selection document version." },
+    "number_selection_id": { "$ref": "#/$defs/Uuid", "description": "The ledger.number_selections row this document is stored in." },
+    "case_id": { "$ref": "#/$defs/Uuid" },
+    "dataset_id": { "$ref": "#/$defs/Uuid" },
+    "vendor_id": { "$ref": "#/$defs/Uuid" },
+    "rule_version": { "type": "string", "minLength": 1, "description": "The selection rule that ran, e.g. ledger-select-v1. The stub reports ledger-stub-v0." },
+    "rule_settings": { "$ref": "#/$defs/RuleSettings" },
+    "requested_cutoff": { "$ref": "#/$defs/Timestamp", "description": "The cutoff the core passed (the change's detection time)." },
+    "cutoff": { "$ref": "#/$defs/Timestamp", "description": "The cutoff the rule used: the earliest of the request's arrival, the first message from a lookalike domain and the change appearing in Ramp, never later than requested_cutoff. Our own receive times only, never a printed date or an email's Date: header." },
+    "outcome": { "enum": ["picked", "no_provable_number"], "description": "picked: call contact_point_id. no_provable_number: no call; the case goes to needs_review (R7)." },
+    "contact_point_id": { "$ref": "#/$defs/Uuid", "description": "The chosen ledger.contact_points row. Present only when outcome is picked." },
+    "e164": { "$ref": "#/$defs/E164", "description": "The chosen number. Present only when outcome is picked." },
+    "source_types": { "$ref": "#/$defs/SourceTypes", "description": "The independent source types behind the chosen number (copied into number_resolved)." },
+    "alternates": {
+      "type": "array",
+      "maxItems": 2,
+      "description": "Eligible runners-up in rank order, used only if the chosen number is dead. Present only when outcome is picked.",
+      "items": { "$ref": "#/$defs/Pick" }
+    },
+    "reason": { "type": "string", "minLength": 1, "description": "Why no number was picked, for a person. Required when outcome is no_provable_number." },
+    "candidates": {
+      "type": "array",
+      "description": "Every phone number the rule considered for this vendor, eligible or not, in rank order (eligible first).",
+      "items": { "$ref": "#/$defs/Candidate" }
+    },
+    "inputs_sha256": { "$ref": "#/$defs/Sha256", "description": "SHA-256 of the canonical (RFC 8785) list of ledger rows the rule read, so the selection can be replayed and checked." }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "outcome": { "const": "picked" } } },
+      "then": { "required": ["contact_point_id", "e164", "source_types"] }
+    },
+    {
+      "if": { "properties": { "outcome": { "const": "no_provable_number" } } },
+      "then": {
+        "required": ["reason"],
+        "not": { "anyOf": [{ "required": ["contact_point_id"] }, { "required": ["e164"] }, { "required": ["alternates"] }] }
+      }
+    }
+  ],
+  "$defs": {
+    "Uuid": { "type": "string", "format": "uuid", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" },
+    "Timestamp": { "type": "string", "format": "date-time", "description": "UTC, RFC 3339." },
+    "Sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "E164": { "type": "string", "pattern": "^\\+[1-9][0-9]{1,14}$" },
+    "SourceType": {
+      "enum": ["email", "contract", "vendor_portal", "listing", "paper_mail"],
+      "description": "How a value reached us, from custody metadata, never from a model (ADR-13). All email counts as one source type. The old vendor master's number on file is never a source type; see Candidate.on_file."
+    },
+    "SourceTypes": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/SourceType" } },
+    "Role": { "enum": ["main", "ar", "billing", "fax", "unknown"], "description": "The line's role as the labeler read it." },
+    "Pick": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contact_point_id", "e164", "source_types"],
+      "properties": {
+        "contact_point_id": { "$ref": "#/$defs/Uuid" },
+        "e164": { "$ref": "#/$defs/E164" },
+        "source_types": { "$ref": "#/$defs/SourceTypes" }
+      }
+    },
+    "Reason": {
+      "enum": [
+        "first_seen_in_change_context",
+        "too_few_source_types",
+        "younger_than_minimum_age",
+        "near_miss_of_older_number",
+        "hidden_text_only",
+        "not_vendor_party",
+        "fax_line"
+      ],
+      "description": "Why a candidate isn't eligible. first_seen_in_change_context: R2. too_few_source_types: fewer than rule_settings.min_source_types before the cutoff. younger_than_minimum_age: first seen less than rule_settings.min_age_days before the cutoff. near_miss_of_older_number: one digit off, or two swapped digits away from, an older vendor number, and not an established sibling line. hidden_text_only: seen only in text a person couldn't see (white, tiny or off-page). not_vendor_party: labeled as the customer's or a bank's number. fax_line: labeled as a fax."
+    },
+    "Candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contact_point_id", "e164", "first_seen_at", "source_types", "on_file", "eligible", "reasons"],
+      "properties": {
+        "contact_point_id": { "$ref": "#/$defs/Uuid" },
+        "e164": { "$ref": "#/$defs/E164" },
+        "first_seen_at": { "$ref": "#/$defs/Timestamp", "description": "Our receive time of the earliest observation before the cutoff." },
+        "source_types": { "$ref": "#/$defs/SourceTypes", "description": "Independent source types seen before the cutoff." },
+        "on_file": { "type": "boolean", "description": "The old vendor master lists this number. Shown, never counted." },
+        "roles": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/Role" } },
+        "observation_count": { "type": "integer", "minimum": 0, "description": "Observations before the cutoff that this candidate rests on." },
+        "near_miss_of": { "$ref": "#/$defs/Uuid", "description": "The older contact point this number is a near miss of, when reasons has near_miss_of_older_number." },
+        "eligible": { "type": "boolean" },
+        "rank": { "type": "integer", "minimum": 1, "description": "1 is the pick. Present only on eligible candidates." },
+        "reasons": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/Reason" }, "description": "Empty when eligible." }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "eligible": { "const": true } } },
+          "then": { "required": ["rank"], "properties": { "reasons": { "maxItems": 0 } } },
+          "else": { "properties": { "reasons": { "minItems": 1 } }, "not": { "required": ["rank"] } }
+        }
+      ]
+    },
+    "RuleSettings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["min_source_types", "min_age_days", "near_miss_distance", "same_subject_window_days"],
+      "description": "The settings the rule ran with; the ablations vary these.",
+      "properties": {
+        "min_source_types": { "type": "integer", "minimum": 1, "description": "Independent source types needed before the cutoff (v1: 2)." },
+        "min_age_days": { "type": "integer", "minimum": 0, "description": "Days the number must have been seen before the cutoff (v1: 90)." },
+        "near_miss_distance": { "type": "integer", "minimum": 0, "description": "Edit distance, in digits, that counts as a near miss (v1: 1, plus one swap of adjacent digits)." },
+        "same_subject_window_days": { "type": "integer", "minimum": 0, "description": "A message with the request's subject line within this many days counts as change context (v1: 30)." }
+      }
+    }
+  }
+}
