@@ -1,0 +1,36 @@
+{
+  "business_name": "Fictional Co (demo)",
+  "users": [
+    {"ref": "clerk", "email": "pat.clerk@fictional.example", "first_name": "Pat", "last_name": "Clerk"}
+  ],
+  "vendors": [
+    {
+      "ref": "acme", "name": "Acme Fasteners LLC",
+      "accounts": [{"routing_number": "021000021", "account_number": "000011112222"},
+                   {"routing_number": "121000248", "account_number": "000033334444"}],
+      "contacts": [{"first_name": "Jordan", "last_name": "Lee", "phone_number": "+14155550133", "is_primary": true}],
+      "bills": [{"ref": "acme-bill-1", "invoice_number": "ACME-1001", "amount_cents": 1250000, "issued_at": "-27d", "payment_date": "+3d"},
+                {"ref": "acme-bill-2", "invoice_number": "ACME-1002", "amount_cents": 480000, "issued_at": "-6d", "payment_date": "+10d"}]
+    },
+    {
+      "ref": "brightline", "name": "Brightline Office Supply Inc",
+      "accounts": [{"routing_number": "021000021", "account_number": "000044445555"},
+                   {"routing_number": "121000248", "account_number": "000066667777"}],
+      "contacts": [{"first_name": "Morgan", "last_name": "Diaz", "phone_number": "+14155550147", "is_primary": true}],
+      "bills": [{"ref": "brightline-bill-1", "invoice_number": "BOS-2210", "amount_cents": 312000, "issued_at": "-12d", "payment_date": "+4d"}]
+    },
+    {
+      "ref": "cobalt", "name": "Cobalt Freight LLC",
+      "accounts": [{"routing_number": "021000021", "account_number": "000077778888"},
+                   {"routing_number": "121000248", "account_number": "000099990000"}],
+      "contacts": [{"first_name": "Casey", "last_name": "Park", "phone_number": "+14155550162", "is_primary": true}],
+      "bills": [{"ref": "cobalt-bill-1", "invoice_number": "CF-88014", "amount_cents": 2760000, "issued_at": "-20d", "payment_date": "+2d"},
+                {"ref": "cobalt-bill-2", "invoice_number": "CF-88102", "amount_cents": 915000, "issued_at": "-3d", "payment_date": "+12d"}]
+    }
+  ],
+  "changes": {
+    "acme": {"routing_number": "026009593", "account_number": "000012340001"},
+    "brightline": {"routing_number": "026009593", "account_number": "000012340002"},
+    "cobalt": {"routing_number": "026009593", "account_number": "000012340003"}
+  }
+}

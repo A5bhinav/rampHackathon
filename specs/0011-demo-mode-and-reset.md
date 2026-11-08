@@ -32,6 +32,8 @@ This spec covers the parts in Abhi's slice: the reset, the bank change, the tamp
    - **Re-link:** each `--link clerk=judge.clerk@…` points that Dialback account's `ramp_user_id` at the seeded user with that ref. R5 then recognizes them as the changer (spec 0010, decision 6). Emails are given at run time, never committed. Without a link, a change by that user has no known author, so it needs two approvers; the reset warns about this.
    - **Print:** the new dataset's id, its vendors and the next command.
 
+   **As built:** every check (sandbox, link refs, emails) runs before anything is written, so a refused reset creates nothing. The new dataset is created hidden and becomes current only at the end, in the same transaction that hides the earlier demo datasets and sets the links. A reset that fails partway therefore never replaces the previous demo; its half-made dataset stays hidden (nothing is deleted).
+
    The dashboard's home page already opens the newest dataset, so after a reset everyone lands on the fresh demo.
 
 3. **The demo seed** is `scripts/demo/seed.json`. It uses the mock's seed format, plus relative dates and a `changes` list: per vendor ref, the new routing and account number, fictional. It starts with the dev stack's three vendors, Acme, Brightline and Cobalt. With the dev stack's scripted calls:
@@ -42,6 +44,8 @@ This spec covers the parts in Abhi's slice: the reset, the bank change, the tamp
    On the deployed stack, the live call decides instead.
 
    Inesh's frozen demo seed replaces it on Nov 8 (Q36).
+
+   **As built:** the core's image copies `scripts/demo/`, so the default `--seed` works from the Railway shell. A reset records the Ramp ids it seeded, by ref, in a new column `app.datasets.demo_refs` (migration `app/0009`). That way a later `demo change` from another shell finds the vendor and the person. Ids only: the new bank details stay in the seed file, which `demo change` reads each time (ADR-8).
 
 4. **`demo change --vendor <ref> [--by <ref> | --unknown]`** is beat 2. It makes that vendor's seeded bank change in the mock.
    - **Author:** by default it is the linked clerk. With `--unknown` it has no known author, so two approvers are needed (ADR-10).
@@ -71,16 +75,16 @@ This spec covers the parts in Abhi's slice: the reset, the bank change, the tamp
 
 ## Contract touched
 
-None: the CLI and two optional core settings, `CORE_PUBLIC_URL` and `DIALBACK_DEMO_CALLING_WINDOW`.
+None: the CLI and two optional core settings, `CORE_PUBLIC_URL` and `DIALBACK_DEMO_CALLING_WINDOW`. One nullable column, `app.datasets.demo_refs` (decision 3).
 
 ## Acceptance
 
-- [ ] **Reset:**
+- [x] **Reset:**
   - It creates a new demo dataset and chain, retires earlier demo datasets and deletes nothing.
   - The mock business is seeded, with relative dates resolved, and the vendors are imported.
   - The links are set. Webhooks are subscribed when `CORE_PUBLIC_URL` is set.
   - It refuses the sandbox, an unknown link ref and an email with no account.
-- [ ] **Change:**
+- [x] **Change:**
   - Made as the linked clerk, it opens the case, places the hold, and the clerk can't release it (R5).
   - With `--unknown`, two approvers are needed.
 - [ ] **Tamper:**
