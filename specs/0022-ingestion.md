@@ -1,11 +1,11 @@
-# 0016: Ingestion v0: custody, text, visibility, candidates, reader stub, grounding
+# 0022: Ingestion v0: custody, text, visibility, candidates, reader stub, grounding
 
 **Owner:** Inesh  **Slice:** evidence  **Target day:** Thu Nov 5 (was Nov 2)
 
 ## Goal
 
 `dialback_ledger.ingest(document, custody)` turns one document into the observation rows the
-selection rule reads (spec 0015), following the pipeline in the ledger README: code runs every
+selection rule reads (spec 0021), following the pipeline in the ledger README: code runs every
 stage except labeling. This serves R9 (document text is data: the labeler only labels values code
 found, and code parses every value from a quote it checks), ADR-13 (the source type comes from
 custody) and the visibility rule (hidden values are kept but never eligible).
@@ -20,7 +20,7 @@ Two PRs:
 
 ## Contract touched
 
-None. Observations are dicts shaped like `ledger.observations` rows (spec 0013).
+None. Observations are dicts shaped like `ledger.observations` rows (spec 0019).
 
 ## Acceptance
 
@@ -50,7 +50,7 @@ B:
       (main, AR, billing, fax); a bank's line is the bank's; anything else is `unknown`. Garbled
       labels (a role or party that isn't a string) keep the value with role and party `unknown`.
 - [ ] **Corpus gate B:** ingesting every corpus document, then running `select()`, reproduces
-      every frozen expectation (the spec 0015 gate, end to end). The stub reader's role
+      every frozen expectation (the spec 0021 gate, end to end). The stub reader's role
       accuracy against the planted roles is reported, with every mismatch listed (design §7:
       "Reported"), and is at least 95%.
 - [ ] A hostile labeler (wrong values, invented numbers, quotes from hidden text, instructions)

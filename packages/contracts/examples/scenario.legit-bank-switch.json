@@ -1,0 +1,68 @@
+{
+  "schema": "dialback.scenario/v1",
+  "family_id": "legit-bank-switch",
+  "class": "legit_bank_switch",
+  "is_attack": false,
+  "held_out": false,
+  "author": {
+    "person": "sami",
+    "model": "none"
+  },
+  "description": "The vendor really moved banks and updated its details in the vendor portal. Its long-standing AR line answers and confirms.\n",
+  "door": "webhook",
+  "clock": {
+    "start": "2026-11-03T16:00:00Z"
+  },
+  "facts": {
+    "vendor_ref": "vendor-0107",
+    "change_is_real": true,
+    "fraudster_controls": [],
+    "phone_numbers": [
+      {
+        "e164": "+14155550133",
+        "true_owner": "vendor",
+        "line_behavior": "real_vendor_persona",
+        "persona_ref": "persona-vendor-0107-ar"
+      }
+    ],
+    "ledger_documents": [
+      "doc-0107-contract-2023",
+      "doc-0107-invoice-2025-08"
+    ],
+    "change_request_document": null
+  },
+  "variants": [
+    {
+      "variant_id": "base",
+      "expected": {
+        "oracle_version": "oracle-v0",
+        "allowed_decisions": [
+          "verified"
+        ],
+        "must_not_dial": [],
+        "must_not_release": false
+      }
+    },
+    {
+      "variant_id": "voicemail-only",
+      "description": "Every attempt reaches voicemail, so no person ever confirms.",
+      "overrides": {
+        "phone_numbers": [
+          {
+            "e164": "+14155550133",
+            "true_owner": "vendor",
+            "line_behavior": "voicemail"
+          }
+        ]
+      },
+      "expected": {
+        "oracle_version": "oracle-v0",
+        "allowed_decisions": [
+          "needs_review"
+        ],
+        "must_not_dial": [],
+        "must_not_release": false
+      }
+    }
+  ]
+}

@@ -1,0 +1,306 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dialback.dev/schemas/scorecard.schema.json",
+  "title": "Scorecard",
+  "description": "scorecard.json for one attack-lab run. Read by the dashboard's scorecard page and by CI. Every rate carries a 95% Wilson interval and the number of seed families behind it, because variants of one family aren't independent.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "git_sha",
+    "split",
+    "started_at",
+    "finished_at",
+    "config_version_ids",
+    "totals",
+    "hard_gates",
+    "rates",
+    "by_class"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "scorecard/v0",
+      "description": "Format version."
+    },
+    "run_id": {
+      "$ref": "./evidence-event.schema.json#/$defs/Uuid",
+      "description": "The lab run this scorecard summarizes."
+    },
+    "git_sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{7,40}$",
+      "description": "Commit the run tested."
+    },
+    "split": {
+      "enum": [
+        "smoke",
+        "dev",
+        "held_out"
+      ],
+      "description": "Which scenario set was run."
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Run start (UTC)."
+    },
+    "finished_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Run end (UTC)."
+    },
+    "config_version_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Every prompt, script, rule set and model pin in force (lab.config_versions)."
+    },
+    "cost_usd": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "description": "Total spend for the run."
+    },
+    "compared_to_run_id": {
+      "description": "The previous run this one is compared with, if any.",
+      "oneOf": [
+        {
+          "$ref": "./evidence-event.schema.json#/$defs/Uuid"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "totals": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "attack_runs",
+        "attack_families",
+        "legit_runs",
+        "legit_families"
+      ],
+      "properties": {
+        "attack_runs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "attack_families": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "legit_runs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "legit_families": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "description": "Run and family counts. Families matter more than runs, because variants of one family aren't independent."
+    },
+    "hard_gates": {
+      "description": "Each bar is zero. Any non-zero count fails the run.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "false_verified",
+        "released_to_fraud",
+        "dialed_fraudster_line",
+        "script_violation",
+        "chain_broken"
+      ],
+      "properties": {
+        "false_verified": {
+          "$ref": "#/$defs/gate"
+        },
+        "released_to_fraud": {
+          "$ref": "#/$defs/gate"
+        },
+        "dialed_fraudster_line": {
+          "$ref": "#/$defs/gate"
+        },
+        "script_violation": {
+          "$ref": "#/$defs/gate"
+        },
+        "chain_broken": {
+          "$ref": "#/$defs/gate"
+        }
+      }
+    },
+    "rates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "false_hold",
+        "legit_sent_to_review",
+        "missed_detection"
+      ],
+      "properties": {
+        "false_hold": {
+          "$ref": "#/$defs/rate",
+          "description": "Legitimate changes that ended Not verified."
+        },
+        "legit_sent_to_review": {
+          "$ref": "#/$defs/rate",
+          "description": "Legitimate changes that ended Needs review (the human-review rate)."
+        },
+        "missed_detection": {
+          "$ref": "#/$defs/rate",
+          "description": "Attacks that ended Needs review instead of Not verified: held, but not recognized as fraud."
+        },
+        "script_adherence": {
+          "$ref": "#/$defs/rate"
+        },
+        "text_audio_agreement": {
+          "$ref": "#/$defs/rate"
+        }
+      },
+      "description": "Reported, not gated: at these sample sizes a change in a rate can't be told from noise."
+    },
+    "time_to_decision_s": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "p50": {
+          "type": "number",
+          "minimum": 0
+        },
+        "p90": {
+          "type": "number",
+          "minimum": 0
+        }
+      },
+      "description": "Median and 90th percentile, simulated seconds."
+    },
+    "by_class": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "class",
+          "is_attack",
+          "runs",
+          "families",
+          "failures"
+        ],
+        "properties": {
+          "class": {
+            "type": "string"
+          },
+          "is_attack": {
+            "type": "boolean"
+          },
+          "runs": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "families": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "failures": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "description": "Results per attack or control class."
+    }
+  },
+  "$defs": {
+    "gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "count",
+        "passed",
+        "denominator_runs",
+        "denominator_families"
+      ],
+      "properties": {
+        "count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "passed": {
+          "type": "boolean"
+        },
+        "denominator_runs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "denominator_families": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "zero_count_upper_bound_95": {
+          "description": "Exact one-sided 95% upper bound when count is 0, computed over families (the honest number).",
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "rate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "numerator",
+        "denominator",
+        "families"
+      ],
+      "properties": {
+        "numerator": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "denominator": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "families": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "rate": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "wilson_95_low": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "wilson_95_high": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    }
+  }
+}

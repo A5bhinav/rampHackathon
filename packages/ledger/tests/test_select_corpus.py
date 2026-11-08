@@ -1,4 +1,4 @@
-"""Spec 0015, the gate: ledger-select-v1 does what the frozen corpus truth says (spec 0014)."""
+"""Spec 0021, the gate: ledger-select-v1 does what the frozen corpus truth says (spec 0020)."""
 from pathlib import Path
 
 import pytest

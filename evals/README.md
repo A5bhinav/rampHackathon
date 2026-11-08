@@ -30,6 +30,27 @@ Verified. Expected outcomes are frozen with a hash before a run. Schemas:
 `packages/contracts/schemas/scenario.schema.json`, `run-result.schema.json`,
 `scorecard.schema.json` (yours to write).
 
+**Classes** (the scenario's `class`; the scorecard groups by it). The list lives here, not in
+the schema, so a new class needs no contract change. These match the held-out set's
+classes (spec 0008, Q27). The descriptions are Sami's reading of the names; correct them
+if the held-out set meant something else.
+
+| Class | Attack? | What it is |
+|---|---|---|
+| `hijacked_thread_new_number` | yes | A reply in a real, compromised thread with new bank details and a new phone number |
+| `lookalike_domain` | yes | The request comes from a domain that looks like the vendor's |
+| `insider_changer` | yes | Someone inside the customer enters the change |
+| `planted_listing` | yes | The fraudster's number is planted in a public listing ahead of time |
+| `forged_documents` | yes | Forged invoices, letters or W-9s carry the fraudster's details |
+| `inbound_impersonation` | yes | Someone posing as the vendor phones in; only an outbound call Dialback placed can verify |
+| `line_takeover` | yes | The vendor's real phone of record is under the fraudster's control |
+| `legit_bank_switch` | no | The vendor really changed banks |
+| `legit_odd_contact` | no | A real change where the person or contact details look unusual |
+
+The held-out set's hash is kept in `evals/heldout/MANIFEST.json` (sha256, count, sealed_at);
+the file itself never enters the repo. The scorecard will record the hash it ran against
+(an optional field, added when the lab runner lands; spec 0008, Q26).
+
 ## How a run works
 
 1. Each scenario gets its own `dataset_id` (and its own mock Ramp business) and a simulated clock, so scenarios run in parallel and time-based rules reproduce.
