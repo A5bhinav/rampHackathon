@@ -2,10 +2,10 @@
 
 `LabAgent` behaves like the voice service's `ScriptedAgent`, but it also records `speaker_role` from
 the name-and-role turn, so a clean call can satisfy the V06 verify condition and reach a `verified`
-decision. The production `ScriptedAgent` and `ClaudeAgent` record only `speaker_name` for the
-NAME_ROLE phase, so a call they drive never records a role and never verifies: a gap this lab
-surfaced (see the ledger). Once the voice agents record the role, the live-model gate runs against
-the real agent. Deterministic, so the gate stays reproducible."""
+decision. The production `ScriptedAgent` records only `speaker_name` for the NAME_ROLE phase (and the
+live agent slated for #40 does the same), so a call it drives never records a role and never verifies:
+a gap this lab surfaced (see the ledger). Once the voice agents record the role, the live-model gate
+runs against the real agent. Deterministic, so the gate stays reproducible."""
 from __future__ import annotations
 
 from dialback_policy.script import Phase

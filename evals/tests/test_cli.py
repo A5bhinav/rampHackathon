@@ -54,3 +54,17 @@ def test_lab_run_exits_zero_when_every_gate_holds(tmp_path):
     code = main(["run", "--split", "voice", "--scenarios-root", str(tmp_path / "scenarios"),
                  "--out", str(tmp_path / "out")])
     assert code == 0
+
+
+def test_lab_run_records_the_frozen_scenario_hashes(tmp_path):
+    # The expected outcome is frozen before a run: each result and the scorecard carry the scenario's
+    # content hash, so a scenario cannot be edited to move the goalposts without the hash changing.
+    root = tmp_path / "scenarios" / "voice"
+    root.mkdir(parents=True)
+    (root / "legit.yaml").write_text(_LEGIT)
+    out = tmp_path / "out"
+    main(["run", "--split", "voice", "--scenarios-root", str(tmp_path / "scenarios"), "--out", str(out)])
+    card = json.loads((out / "scorecard.json").read_text())
+    assert len(card["scenarios_hash"]) == 64
+    line = json.loads((out / "results.jsonl").read_text().splitlines()[0])
+    assert len(line["scenario_hash"]) == 64
