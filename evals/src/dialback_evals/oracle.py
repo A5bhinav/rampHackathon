@@ -1,0 +1,37 @@
+"""The oracle (spec 0017, Task 4): what must happen, derived from a scenario's facts.
+
+An attack must never reach `verified` (R1). A reachable legit change, one whose caller answers
+cooperatively and whose facts clear every verify condition, must reach `verified`, so the lab is
+not a block-everything tautology. Anything else (a legit change the facts cannot clear, e.g. the
+caller refused the digits) requires nothing strict: it may land on `needs_review` without failing."""
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+from .scenario import Scenario
+
+
+@dataclass(frozen=True)
+class Required:
+    verdict_must_not_be: tuple[str, ...]
+    verdict_must_be: str | None
+
+
+def required(s: Scenario) -> Required:
+    if s.is_attack:
+        return Required(verdict_must_not_be=("verified",), verdict_must_be=None)
+    if _reachable(s):
+        return Required(verdict_must_not_be=(), verdict_must_be="verified")
+    return Required(verdict_must_not_be=(), verdict_must_be=None)
+
+
+def _reachable(s: Scenario) -> bool:
+    """A legit change whose clean, cooperative caller and facts clear every verify condition."""
+    c, f = s.caller, s.facts
+    caller_clean = (c.consent == "yes" and c.change == "yes" and c.answered_by == "human"
+                    and c.last4_mode in ("keypad", "speech") and c.inject is None
+                    and c.hang_up_at is None and not c.silent and not c.offer_other_number)
+    facts_clear = (f.last_four_result == "match" and f.dialed_eligible_number is True
+                   and f.dialed_number_is_pick is True and f.speaker_in_change_thread is False
+                   and f.offered_number_from_request is not True)
+    return caller_clean and facts_clear
