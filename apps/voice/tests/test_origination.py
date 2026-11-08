@@ -11,6 +11,7 @@ import uuid
 import httpx
 from dialback_voice.app import TwilioDeps, create_app
 from dialback_voice.guards import PreDialInputs
+from dialback_voice.report import CoreUnavailable
 from dialback_voice.store import PlacedCall, PreDial
 from dialback_voice.twilio.origination import TwilioOriginator
 from fastapi.testclient import TestClient
@@ -43,11 +44,13 @@ class FakeStore:
     """The in-memory store from test_calls_endpoint, plus the two writes the dial makes:
     mark_dialed on success, mark_failed when origination fails."""
 
-    def __init__(self, pre_dial: PreDial):
+    def __init__(self, pre_dial: PreDial, *, raise_on_dialed: bool = False, raise_on_failed: bool = False):
         self._pre_dial = pre_dial
         self.by_key: dict[str, PlacedCall] = {}
         self.dialed: dict[uuid.UUID, str] = {}
         self.failed: dict[uuid.UUID, str] = {}
+        self._raise_on_dialed = raise_on_dialed   # simulate a voice.calls write blip on each path
+        self._raise_on_failed = raise_on_failed
 
     async def find_call(self, idempotency_key):
         return self.by_key.get(idempotency_key)
@@ -64,9 +67,13 @@ class FakeStore:
         return placed, True
 
     async def mark_dialed(self, call_id, *, provider_call_id):
+        if self._raise_on_dialed:
+            raise RuntimeError("voice.calls write failed")
         self.dialed[call_id] = provider_call_id
 
     async def mark_failed(self, call_id, reason):
+        if self._raise_on_failed:
+            raise RuntimeError("voice.calls write failed")
         self.failed[call_id] = reason
 
 
@@ -77,12 +84,12 @@ def _pre_dial(**over) -> PreDial:
     return PreDial(inputs=PreDialInputs(**(base | over)), contact_point_id=PICK, number_e164=NUMBER)
 
 
-def _deps(originator, reports: list) -> TwilioDeps:
-    async def report_ended(body):
+def _deps(originator, reports: list, *, report_ended=None) -> TwilioDeps:
+    async def _append(body):
         reports.append(body)
     return TwilioDeps(call_token_key=b"k", twilio_auth_token=b"auth", ws_base_url="wss://voice.example",
                       public_base_url=BASE, from_number=FROM, originator=originator,
-                      lookup_call=lambda cid: None, report_ended=report_ended,
+                      lookup_call=lambda cid: None, report_ended=report_ended or _append,
                       agent_for=lambda: None, clock=lambda: None)
 
 
@@ -139,6 +146,48 @@ def test_originate_failure_reports_failed():
     assert body["attempt"] == 1
     assert store.failed[uuid.UUID(call_id)] == "originate_failed"
     assert store.dialed == {}            # never recorded as dialed
+
+
+def test_placement_is_accepted_when_the_failed_report_cannot_land():
+    """Q51/decision 3: in the synchronous-dial path the `failed` report cannot land (the core is still
+    awaiting this 202 and has not appended `call_started`, so every retry 409s and `report_ended`
+    raises `CoreUnavailable`). The placement must still return 202, not 500; the case stays `failed`
+    and the core's `call_timeout` sweeps it to a person (R7)."""
+    store = FakeStore(_pre_dial())
+    orig = FakeOriginator(fail=True)
+
+    async def report_raises(body):
+        raise CoreUnavailable("the core did not accept the report")
+
+    r = _post(_client(store, _deps(orig, [], report_ended=report_raises)))
+    assert r.status_code == 202          # not 500: the dial outcome never fails the placement
+    call_id = r.json()["call_id"]
+    assert store.failed[uuid.UUID(call_id)] == "originate_failed"   # still recorded failed
+    assert store.dialed == {}
+
+
+def test_placement_is_accepted_when_marking_the_call_failed_raises():
+    """A store blip on the failure path must not 500 the placement either; once the call is recorded
+    the dial is best effort, with the core timeout as the backstop (R7, decision 3)."""
+    store = FakeStore(_pre_dial(), raise_on_failed=True)
+    orig = FakeOriginator(fail=True)
+    reports: list[dict] = []
+    r = _post(_client(store, _deps(orig, reports)))
+    assert r.status_code == 202
+    assert reports and reports[0]["result"] == "failed"   # the report is still attempted after the blip
+
+
+def test_placement_is_accepted_when_recording_the_sid_raises():
+    """The call was placed over Twilio; a store blip recording the CallSid must not 500 the placement.
+    The call is live and reports its own end over the relay or the status callback (R7)."""
+    store = FakeStore(_pre_dial(), raise_on_dialed=True)
+    orig = FakeOriginator()
+    r = _post(_client(store, _deps(orig, [])))
+    assert r.status_code == 202
+    assert len(orig.calls) == 1                       # the dial did happen
+    call_id = r.json()["call_id"]
+    assert uuid.UUID(call_id) not in store.dialed     # the SID just was not recorded
+    assert store.failed == {}                         # a placed call is not a failure
 
 
 def test_twilio_originator_posts_the_call_and_returns_the_sid():
