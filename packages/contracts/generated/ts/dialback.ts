@@ -114,7 +114,7 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * The number lineage panel - the selection the case used, and why (spec 0017)
+         * The number lineage panel - the selection the case used, and why (spec 0023)
          * @description The selection named by the case's latest `number_resolved` or `no_provable_number`
          *     event, as `ledger.number_selections` stores it (`selection.schema.json`), read under the
          *     person's own token. `selection` is null when the case has no selection yet, or its event
