@@ -121,7 +121,7 @@ Also add a Vercel Firewall rate-limit rule for POST requests to `/sign-in`, for 
 
 - **Migrations.** Railway's deploy log shows `apply ...` lines, and later deploys show `0 applied now`. A file changed after it was applied stops the deploy. Add a new migration instead of editing an old one.
 - **Status without deploying:** `railway run python scripts/db/migrate.py --status` from a linked checkout, or the same command in the core service's shell.
-- **The demo company:** `dialback-core demo reset --link clerk=<the judges' clerk email>` in the core service's shell, then `dialback-core demo change --vendor acme` for beat 2. Set `CORE_PUBLIC_URL` first so the mock's webhooks reach the core. Each beat's command is in spec 0011.
+- **The demo company:** `dialback-core demo reset --link clerk=<the judges' clerk email>` in the core service's shell, then `dialback-core demo status` as the pre-flight check and `dialback-core demo change --vendor acme` for beat 2. Rehearse the whole run locally first with `uv run python scripts/dev/demo_rehearsal.py`. Set `CORE_PUBLIC_URL` first so the mock's webhooks reach the core. Each beat's command is in spec 0011.
 - **Health:** `https://<core>/healthz` answers `{"ok": true}`.
 
 ## Things to check in Railway's UI
