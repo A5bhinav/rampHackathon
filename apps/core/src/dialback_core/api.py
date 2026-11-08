@@ -292,7 +292,7 @@ async def _refusal(conn: AsyncConnection, case_id: UUID, user: UUID, message: st
 
 @router.get("/cases/{case_id}/selection")
 async def get_case_selection(case_id: UUID, request: Request, user: UserDep):
-    """The number lineage panel (spec 0017): the selection the case's latest selection event names."""
+    """The number lineage panel (spec 0023): the selection the case's latest selection event names."""
     async with person_tx(request.app.state.pool, user.user_id, user.claims) as conn:
         if await (await conn.execute("select 1 from app.cases where id = %s", (case_id,))).fetchone() is None:
             return problem(404, "not_found", "No such case.")

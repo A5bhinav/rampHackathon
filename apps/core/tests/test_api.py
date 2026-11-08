@@ -176,7 +176,7 @@ def test_the_timeline_says_plainly_when_no_digits_were_given():
     assert summary("call_ended", body, "Dialback") == "Call attempt 1 ended with answers recorded; the person did not give four digits."
 
 
-# The number lineage panel (spec 0017) ---------------------------------------------------------
+# The number lineage panel (spec 0023) ---------------------------------------------------------
 
 SELECTION_EXAMPLE = json.loads((Path(__file__).resolve().parents[3]
                                 / "packages/contracts/examples/selection.picked.json").read_text())

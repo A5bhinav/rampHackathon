@@ -1,4 +1,4 @@
-"""The sentence for each reason a number isn't eligible (spec 0017).
+"""The sentence for each reason a number isn't eligible (spec 0023).
 
 The dashboard shows these and never writes its own. They say "provable" or "not provable",
 never "safe", and name no number or setting, so they read the same for every case.
@@ -20,7 +20,7 @@ REASON_TEXT: dict[str, str] = {
     "fax_line": "Not provable: the documents label it as a fax line.",
 }
 
-# The lineage panel's other states (spec 0017): the dashboard shows these and writes none itself.
+# The lineage panel's other states (spec 0023): the dashboard shows these and writes none itself.
 NOTES: dict[str, str] = {
     "no_selection": "No number selection is recorded for this case yet. Until the Trust Ledger records one, "
                     "no call is made and the hold stays on.",

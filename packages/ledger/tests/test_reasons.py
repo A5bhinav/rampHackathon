@@ -1,4 +1,4 @@
-"""Spec 0017: one template sentence per reason code, in the dashboard's vocabulary."""
+"""Spec 0023: one template sentence per reason code, in the dashboard's vocabulary."""
 import json
 from pathlib import Path
 
