@@ -2,8 +2,10 @@
 the signed-in person, and the database (not the API) decides who may act."""
 from __future__ import annotations
 
+import json
 import time
 import uuid
+from pathlib import Path
 
 import jwt
 import psycopg
@@ -12,7 +14,10 @@ from conftest import JWT_SECRET
 from contract import assert_matches
 from dialback_core.db import system_tx
 from dialback_core.detection import import_all
+from dialback_core.flags import ResolverMode
+from dialback_core.ports import LedgerResolver
 from flows import case_of, change_and_detect, report
+from psycopg.types.json import Jsonb
 
 pytestmark = pytest.mark.anyio
 
@@ -169,3 +174,61 @@ def test_the_timeline_says_plainly_when_no_digits_were_given():
     from dialback_core.timeline import summary
     body = {"attempt": 1, "result": "answers_recorded", "last_four_result": "not_provided"}
     assert summary("call_ended", body, "Dialback") == "Call attempt 1 ended with answers recorded; the person did not give four digits."
+
+
+# The number lineage panel (spec 0023) ---------------------------------------------------------
+
+SELECTION_EXAMPLE = json.loads((Path(__file__).resolve().parents[3]
+                                / "packages/contracts/examples/selection.picked.json").read_text())
+
+
+async def _store_selection(world, case: dict) -> dict:
+    """Store the selection the case's number_resolved event names, as the ledger wiring will."""
+    async with world.pool.connection() as conn:
+        resolved = await (await conn.execute(
+            "select body_jcs::jsonb -> 'body' as b from audit.evidence_events where case_id = %s "
+            "and type = 'number_resolved' order by seq desc limit 1", (case["id"],))).fetchone()
+        sel_id, point = resolved["b"]["number_selection_id"], resolved["b"]["contact_point_id"]
+        doc = SELECTION_EXAMPLE | {"number_selection_id": sel_id, "case_id": str(case["id"]),
+                                   "dataset_id": str(world.dataset.id), "vendor_id": str(case["vendor_id"]),
+                                   "contact_point_id": point}
+        await conn.execute("insert into ledger.contact_points (id, dataset_id, vendor_id, e164, first_seen_at, status) "
+                           "values (%s, %s, %s, %s, now() - interval '3 years', 'eligible')",
+                           (point, world.dataset.id, case["vendor_id"], doc["e164"]))
+        await conn.execute("insert into ledger.number_selections (id, dataset_id, case_id, vendor_id, contact_point_id, outcome, "
+                           "rule_version, inputs_sha256, selection) values (%s, %s, %s, %s, %s, 'picked', %s, %s, %s)",
+                           (sel_id, world.dataset.id, case["id"], case["vendor_id"], point, doc["rule_version"],
+                            doc["inputs_sha256"], Jsonb(doc)))
+    return doc
+
+
+async def test_the_selection_the_case_used_is_served(world):
+    await import_all(world.pool, world.ramp, world.keys, world.dataset.id)
+    await change_and_detect(world)
+    case = await case_of(world)
+    stored = await _store_selection(world, case)
+    spec = "/api/cases/{case_id}/selection"
+    body = await get(world, f"/api/cases/{case['id']}/selection", "approver1", spec)
+    assert body["selection"] == stored
+    assert all(text.startswith("Not provable:") for text in body["reason_text"].values())
+
+
+async def test_no_stored_selection_is_null_not_an_error(world):
+    await import_all(world.pool, world.ramp, world.keys, world.dataset.id)
+    await change_and_detect(world)
+    case = await case_of(world)  # the stand-in resolver's selection is in no table
+    body = await get(world, f"/api/cases/{case['id']}/selection", "clerk", "/api/cases/{case_id}/selection")
+    assert body["selection"] is None and body["reason_text"]
+
+
+async def test_an_unavailable_ledger_is_null_with_its_note(world):
+    world.worker.resolver = LedgerResolver(ResolverMode.LEDGER)  # no select_number yet: no_provable_number, no id
+    await import_all(world.pool, world.ramp, world.keys, world.dataset.id)
+    await change_and_detect(world)
+    case = await case_of(world)
+    body = await get(world, f"/api/cases/{case['id']}/selection", "clerk", "/api/cases/{case_id}/selection")
+    assert body["selection"] is None and body["notes"]["no_selection"]
+
+
+async def test_the_selection_of_an_unknown_case_is_not_found(world):
+    await get(world, f"/api/cases/{uuid.uuid4()}/selection", "clerk", "/api/cases/{case_id}/selection", status=404)
