@@ -45,6 +45,12 @@ class Settings:
     voice_mode: VoiceMode = "text"
     agent_version: str = AGENT_VERSION
     twilio: TwilioConfig | None = None
+    # The agent key, read only in live mode. It gates the live Claude agent (spec 0015), not the
+    # Twilio routes: present, wire.py swaps in ClaudeAgent; absent, it keeps the ScriptedAgent double.
+    anthropic_api_key: bytes | None = None
+    # POST /calls auth (create_app): the shared internal token, read in both modes, since the core
+    # authenticates to the text line too. Empty when unset, so create_app rejects every call (R7).
+    internal_api_token: bytes = b""
 
 
 def load_settings(env: Mapping[str, str] | None = None) -> Settings:
@@ -52,7 +58,10 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
     mode = env.get("DIALBACK_VOICE", "text")
     if mode not in ("text", "live"):
         mode = "text"  # any unknown value takes the safe default
-    return Settings(voice_mode=mode, twilio=_load_twilio(env) if mode == "live" else None)
+    key = env.get("ANTHROPIC_API_KEY") if mode == "live" else None
+    return Settings(voice_mode=mode, twilio=_load_twilio(env) if mode == "live" else None,
+                    anthropic_api_key=key.encode() if key else None,
+                    internal_api_token=env.get("DIALBACK_INTERNAL_TOKEN", "").encode())
 
 
 def _load_twilio(env: Mapping[str, str]) -> TwilioConfig | None:
