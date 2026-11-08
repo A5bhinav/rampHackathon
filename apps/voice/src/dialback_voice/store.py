@@ -52,3 +52,13 @@ class CallStore(Protocol):
         Idempotency-Key first, return that existing call with False. The unique key is the guard,
         so two identical requests can never place two calls."""
         ...
+
+    async def mark_dialed(self, call_id: UUID, *, provider_call_id: str) -> None:
+        """Record that Twilio accepted the call: set provider='twilio', status='ringing', and the
+        returned CallSid on the row (spec 0014). The call now runs over the WebSocket."""
+        ...
+
+    async def mark_failed(self, call_id: UUID, reason: str) -> None:
+        """Record that the dial never placed a call: result='failed', with a short reason for the
+        call log (never bank details). The core is told separately through the report (R7)."""
+        ...

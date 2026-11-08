@@ -16,7 +16,42 @@ import base64
 import hashlib
 import hmac
 from collections.abc import Mapping
+from typing import Protocol
 from xml.sax.saxutils import quoteattr
+
+import httpx
+
+
+class Originator(Protocol):
+    """The seam that actually dials. `run_relay` and the routes are pure of Twilio's REST API; the
+    handler asks this to place the call and gets back the CallSid. The tests pass a fake, so the
+    dial is exercised with no live account; `TwilioOriginator` is the real client."""
+    async def originate(self, *, to: str, from_: str, twiml_url: str, status_url: str) -> str: ...
+
+
+class TwilioOriginator:
+    """Places a ConversationRelay call through Twilio's REST API. `url` is the TwiML endpoint Twilio
+    fetches for the call's instructions, `status_url` is where terminal status and answering-machine
+    detection are POSTed back. Machine detection is on so `status_result` can map voicemail to
+    `machine`. A non-2xx raises (httpx `raise_for_status`), which the caller turns into a fail-closed
+    `failed` (R7). Only the pick, the caller id and our own URLs are sent: never the case id."""
+
+    _API = "https://api.twilio.com/2010-04-01"
+
+    def __init__(self, http: httpx.AsyncClient, *, account_sid: str, auth_token: bytes) -> None:
+        self._http = http
+        self._sid = account_sid
+        self._auth = (account_sid, auth_token.decode())
+
+    async def originate(self, *, to: str, from_: str, twiml_url: str, status_url: str) -> str:
+        resp = await self._http.post(
+            f"{self._API}/Accounts/{self._sid}/Calls.json",
+            data={"To": to, "From": from_, "Url": twiml_url,
+                  "StatusCallback": status_url, "StatusCallbackEvent": "completed",
+                  "MachineDetection": "Enable"},
+            auth=self._auth)
+        resp.raise_for_status()
+        return resp.json()["sid"]
 
 
 def build_connect_twiml(*, ws_url: str, call_token: str, disclosure: str) -> str:

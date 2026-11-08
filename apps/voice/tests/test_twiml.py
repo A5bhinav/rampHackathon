@@ -33,7 +33,8 @@ def _deps() -> TwilioDeps:
     dial = CallDial(case_id=CASE, attempt=1, number_e164=NUMBER, customer_name=CUSTOMER,
                     callback_number=CALLBACK, vendor_names=("Acme Fasteners",))
     return TwilioDeps(call_token_key=KEY, twilio_auth_token=AUTH, ws_base_url=WS_BASE,
-                      public_base_url=BASE, lookup_call=lambda cid: dial if cid == CALL else None,
+                      public_base_url=BASE, from_number="+14155550100", originator=None,
+                      lookup_call=lambda cid: dial if cid == CALL else None,
                       report_ended=_no_report, agent_for=lambda: None, clock=lambda: None)
 
 

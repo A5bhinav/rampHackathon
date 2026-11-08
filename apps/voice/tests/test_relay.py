@@ -127,7 +127,7 @@ def test_the_websocket_route_runs_a_call_and_reports():
         reported.append(body)
 
     deps = TwilioDeps(call_token_key=KEY, twilio_auth_token=b"auth", ws_base_url="wss://voice.example",
-                      public_base_url="https://voice.example",
+                      public_base_url="https://voice.example", from_number="+14155550100", originator=None,
                       lookup_call=lambda cid: dial if cid == CALL else None, report_ended=report,
                       agent_for=ScriptedAgent, clock=lambda: dt.datetime(2026, 11, 1, 17, 0, tzinfo=dt.UTC))
     ws = FakeWS([_setup(token), {"type": "prompt", "voicePrompt": "No, I'd rather not.", "last": True}])
@@ -157,7 +157,7 @@ def test_a_forged_setup_reports_failed_to_the_core():
         reported.append(body)
 
     deps = TwilioDeps(call_token_key=KEY, twilio_auth_token=b"auth", ws_base_url="wss://voice.example",
-                      public_base_url="https://voice.example",
+                      public_base_url="https://voice.example", from_number="+14155550100", originator=None,
                       lookup_call=lambda cid: dial if cid == CALL else None, report_ended=report,
                       agent_for=ScriptedAgent, clock=lambda: dt.datetime(2026, 11, 1, 17, 0, tzinfo=dt.UTC))
     ws = FakeWS([_setup("deadbeef")])
