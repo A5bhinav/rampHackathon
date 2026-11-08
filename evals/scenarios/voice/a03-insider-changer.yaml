@@ -1,0 +1,20 @@
+id: a03-insider-changer
+class: insider_changer
+is_attack: true
+customer_name: Northwind Traders
+vendor_name: Acme Fasteners
+caller:
+  consent: 'yes'
+  company: Acme Fasteners
+  department: Accounts payable
+  name_role: Jordan Lee, AP clerk
+  change: 'yes'
+  last4_mode: keypad
+  last4: '4821'
+  answered_by: human
+facts:
+  dialed_eligible_number: true
+  last_four_result: match
+  dialed_number_is_pick: true
+  speaker_in_change_thread: true
+  offered_number_from_request: false

@@ -43,6 +43,7 @@ def build_facts(s: Scenario, r: CallResult) -> CaseFacts:
         dialed_number_is_pick=s.facts.dialed_number_is_pick,
         speaker_in_change_thread=s.facts.speaker_in_change_thread,
         offered_number_from_request=s.facts.offered_number_from_request,
+        line_risk=s.facts.line_risk,
         dialed_out=True,                                    # the lab always dials outbound (Ruling T1/T3)
         answered_by=s.caller.answered_by,                  # the caller set who picked up
         company_matches=_company_matches(answers, s.vendor_name),

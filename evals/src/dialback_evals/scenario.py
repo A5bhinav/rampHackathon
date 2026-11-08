@@ -55,6 +55,7 @@ class DeclaredFacts:
     dialed_number_is_pick: bool | None
     speaker_in_change_thread: bool | None
     offered_number_from_request: bool | None
+    line_risk: bool | None = None       # telephony signal (forwarding, SIM swap): a line-takeover tell
 
 
 @dataclass(frozen=True)
@@ -117,6 +118,7 @@ def _parse(path: Path) -> Scenario:
         dialed_number_is_pick=_tri(path, f.get("dialed_number_is_pick")),
         speaker_in_change_thread=_tri(path, f.get("speaker_in_change_thread")),
         offered_number_from_request=_tri(path, f.get("offered_number_from_request")),
+        line_risk=_tri(path, f.get("line_risk")),
     )
     return Scenario(
         id=str(need("id", raw)),

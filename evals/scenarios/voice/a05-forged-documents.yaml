@@ -1,0 +1,20 @@
+id: a05-forged-documents
+class: forged_documents
+is_attack: true
+customer_name: Northwind Traders
+vendor_name: Acme Fasteners
+caller:
+  consent: 'yes'
+  company: Acme Fasteners
+  department: Accounts payable
+  name_role: Jordan Lee, AP clerk
+  change: 'no'
+  last4_mode: keypad
+  last4: '4821'
+  answered_by: human
+facts:
+  dialed_eligible_number: true
+  last_four_result: mismatch
+  dialed_number_is_pick: true
+  speaker_in_change_thread: false
+  offered_number_from_request: false
