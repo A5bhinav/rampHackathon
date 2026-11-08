@@ -54,7 +54,8 @@ This spec covers the parts in Abhi's slice: the reset, the bank change, the tamp
 
 5. **`demo tamper --yes-break-the-chain [--seq N]`** is beat 6.
    - **The edit:** it changes one row of the current demo dataset's chain, the way `supabase/tests/001_evidence_chain.sql` does. As the table's owner, inside one transaction, it turns the update trigger off, edits the row's `body_jcs`, and turns the trigger back on before committing. Other sessions never see the trigger off: they wait on the lock.
-   - **Which row:** by default, the latest `decision_made` whose outcome isn't `verified`, rewritten to `verified`: the insider flipping a decision to get paid. `--seq N` picks another row, and is required when there is no such decision.
+   - **Which row:** by default, the latest `decision_made` whose outcome isn't `verified`, rewritten to `verified`: the insider flipping a decision to get paid. `--seq N` picks another row, and is required when there is no such decision. **As built:** a row with no outcome to flip gets `"edited_by_hand":true` appended. `--dataset` refuses a retired demo.
+   - **As built, after the edit:** the row is committed before the verify job runs, so nothing after it is a refusal. If the deployed worker holds the job's lease, the command prints that no alert is raised yet; the scheduled check raises it within `DIALBACK_VERIFY_SECONDS`. A dataset has one open `chain_broken` alert at a time, so a second tamper on the same demo reports the first broken row.
    - **Then:** it runs the verify job, whose one critical alert names the row.
    - **Refusals:** any dataset that isn't kind `demo`, and any run without the flag. It needs the owner's connection (`DATABASE_URL`). If the core's role doesn't own the table, the command fails and nothing changes.
 
@@ -87,14 +88,14 @@ None: the CLI and two optional core settings, `CORE_PUBLIC_URL` and `DIALBACK_DE
 - [x] **Change:**
   - Made as the linked clerk, it opens the case, places the hold, and the clerk can't release it (R5).
   - With `--unknown`, two approvers are needed.
-- [ ] **Tamper:**
+- [x] **Tamper:**
   - It refuses a non-demo dataset, and refuses to run without the flag.
   - Afterwards the verify job raises one critical alert naming the edited row.
   - Other datasets' chains are untouched, and an ordinary update is still refused.
-- [ ] **Status** reports the dataset, its cases, the chain result and the alerts.
-- [ ] **Chaos** on and off changes only the demo business's mock settings, and a reset turns it off.
+- [x] **Status** reports the dataset, its cases, the chain result and the alerts.
+- [x] **Chaos** on and off changes only the demo business's mock settings, and a reset turns it off.
 - [x] **Calling hours:** a demo dataset places a call at 21:00 in the calling time zone, while a dev dataset waits for the window.
-- [ ] **End to end** against the dev stack: reset, change, scripted call, Verified, the changer refused, a second approver releases, tamper, the alert.
+- [x] **End to end** against the dev stack: reset, change, scripted call, Verified, the changer refused, a second approver releases, tamper, the alert.
 
 ## Tests (written first)
 
