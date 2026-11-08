@@ -1,0 +1,894 @@
+[
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "contract",
+   "parent_document_id": null,
+   "received_at": "2023-03-11T16:00:00Z",
+   "sender": null,
+   "subject": null,
+   "thread_id": null
+  },
+  "header_date": null,
+  "id": "4209abbd-69dd-52ea-b696-447217467b67",
+  "kind": "contract",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Master supply agreement: Velden Electrical",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Main: 919.555.0117",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: 919-555-0142",
+      "x": 72,
+      "y": 100
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Notices: legal@velden.example",
+      "x": 72,
+      "y": 114
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "listing",
+   "parent_document_id": null,
+   "received_at": "2023-06-09T16:00:00Z",
+   "sender": null,
+   "subject": null,
+   "thread_id": null
+  },
+  "header_date": null,
+  "id": "5036a4c3-f4a9-5033-9cb6-6eb081531908",
+  "kind": "listing",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Velden Electrical: business listing",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Main: 919.555.0117",
+      "x": 72,
+      "y": 86
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "listing",
+   "parent_document_id": null,
+   "received_at": "2024-06-08T16:00:00Z",
+   "sender": null,
+   "subject": null,
+   "thread_id": null
+  },
+  "header_date": null,
+  "id": "f395b2c2-eb65-50fe-97ed-4e9ce298f1c5",
+  "kind": "listing",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Velden Electrical: business listing",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Main: (919) 555-0117",
+      "x": 72,
+      "y": 86
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "vendor_portal",
+   "parent_document_id": null,
+   "received_at": "2024-01-05T16:00:00Z",
+   "sender": null,
+   "subject": null,
+   "thread_id": null
+  },
+  "header_date": null,
+  "id": "7870712e-f09f-5aa1-9949-bc26331820e4",
+  "kind": "portal_entry",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Vendor profile: Velden Electrical",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: 919-555-0142",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Billing: 919.555.0142",
+      "x": 72,
+      "y": 100
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "email",
+   "parent_document_id": null,
+   "received_at": "2023-04-10T16:00:00Z",
+   "sender": "ar@velden.example",
+   "subject": "Invoice 1860",
+   "thread_id": "thr-swapped-digits-established-5"
+  },
+  "header_date": "2023-04-10T16:00:00Z",
+  "id": "55fb2ef6-b342-57a3-8b26-ffe916a52fa7",
+  "kind": "email",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Hello, please find invoice 1860 attached.",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Thank you",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: 919-555-0142",
+      "x": 72,
+      "y": 100
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Main: 919-555-0117",
+      "x": 72,
+      "y": 114
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "email",
+   "parent_document_id": "55fb2ef6-b342-57a3-8b26-ffe916a52fa7",
+   "received_at": "2023-04-10T16:00:00Z",
+   "sender": "ar@velden.example",
+   "subject": "Invoice 1860",
+   "thread_id": "thr-swapped-digits-established-5"
+  },
+  "header_date": null,
+  "id": "1343f9fd-cf4a-51d5-bb7b-c9a111a1661d",
+  "kind": "invoice",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "INVOICE 1860",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Velden Electrical",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Remit questions to:",
+      "x": 72,
+      "y": 100
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: (919) 555-0142",
+      "x": 72,
+      "y": 114
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "email",
+   "parent_document_id": null,
+   "received_at": "2023-11-03T08:00:00Z",
+   "sender": "ar@velden.example",
+   "subject": "Invoice 1861",
+   "thread_id": "thr-swapped-digits-established-7"
+  },
+  "header_date": "2023-11-03T08:00:00Z",
+  "id": "6d0ce340-4cb2-51b2-a1f8-d3ff4513e8ca",
+  "kind": "email",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Hello, please find invoice 1861 attached.",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Thank you",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: 919.555.0142",
+      "x": 72,
+      "y": 100
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Main: (919) 555-0117",
+      "x": 72,
+      "y": 114
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "email",
+   "parent_document_id": "6d0ce340-4cb2-51b2-a1f8-d3ff4513e8ca",
+   "received_at": "2023-11-03T08:00:00Z",
+   "sender": "ar@velden.example",
+   "subject": "Invoice 1861",
+   "thread_id": "thr-swapped-digits-established-7"
+  },
+  "header_date": null,
+  "id": "622a6a28-475d-5a3c-b7b9-4f212c390fad",
+  "kind": "invoice",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "INVOICE 1861",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Velden Electrical",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Remit questions to:",
+      "x": 72,
+      "y": 100
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: (919) 555-0142",
+      "x": 72,
+      "y": 114
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "email",
+   "parent_document_id": null,
+   "received_at": "2024-05-28T00:00:00Z",
+   "sender": "ar@velden.example",
+   "subject": "Invoice 1862",
+   "thread_id": "thr-swapped-digits-established-9"
+  },
+  "header_date": "2024-05-28T00:00:00Z",
+  "id": "b14ad2f7-bc7d-5686-89bc-822139d095bd",
+  "kind": "email",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Hello, please find invoice 1862 attached.",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Thank you",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: 919.555.0142",
+      "x": 72,
+      "y": 100
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Main: 919.555.0117",
+      "x": 72,
+      "y": 114
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "email",
+   "parent_document_id": "b14ad2f7-bc7d-5686-89bc-822139d095bd",
+   "received_at": "2024-05-28T00:00:00Z",
+   "sender": "ar@velden.example",
+   "subject": "Invoice 1862",
+   "thread_id": "thr-swapped-digits-established-9"
+  },
+  "header_date": null,
+  "id": "0764449c-dfd4-5182-b9ad-847263f62d23",
+  "kind": "invoice",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "INVOICE 1862",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Velden Electrical",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Remit questions to:",
+      "x": 72,
+      "y": 100
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: (919) 555-0142",
+      "x": 72,
+      "y": 114
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "email",
+   "parent_document_id": null,
+   "received_at": "2024-12-20T16:00:00Z",
+   "sender": "ar@velden.example",
+   "subject": "Invoice 1863",
+   "thread_id": "thr-swapped-digits-established-11"
+  },
+  "header_date": "2024-12-20T16:00:00Z",
+  "id": "9c325bcf-1ad4-539d-9668-4f4375d5e02c",
+  "kind": "email",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Hello, please find invoice 1863 attached.",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Thank you",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: 919.555.0142",
+      "x": 72,
+      "y": 100
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Main: (919) 555-0117",
+      "x": 72,
+      "y": 114
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "email",
+   "parent_document_id": "9c325bcf-1ad4-539d-9668-4f4375d5e02c",
+   "received_at": "2024-12-20T16:00:00Z",
+   "sender": "ar@velden.example",
+   "subject": "Invoice 1863",
+   "thread_id": "thr-swapped-digits-established-11"
+  },
+  "header_date": null,
+  "id": "b43e059d-95de-56d7-b7dd-66afa8bd5de0",
+  "kind": "invoice",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "INVOICE 1863",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Velden Electrical",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Remit questions to:",
+      "x": 72,
+      "y": 100
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: (919) 555-0142",
+      "x": 72,
+      "y": 114
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "email",
+   "parent_document_id": null,
+   "received_at": "2025-07-15T08:00:00Z",
+   "sender": "ar@velden.example",
+   "subject": "Invoice 1864",
+   "thread_id": "thr-swapped-digits-established-13"
+  },
+  "header_date": "2025-07-15T08:00:00Z",
+  "id": "9d4fea9c-7439-59a7-bdf6-92a951842343",
+  "kind": "email",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Hello, please find invoice 1864 attached.",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Thank you",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: (919) 555-0142",
+      "x": 72,
+      "y": 100
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Main: (919) 555-0117",
+      "x": 72,
+      "y": 114
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "email",
+   "parent_document_id": "9d4fea9c-7439-59a7-bdf6-92a951842343",
+   "received_at": "2025-07-15T08:00:00Z",
+   "sender": "ar@velden.example",
+   "subject": "Invoice 1864",
+   "thread_id": "thr-swapped-digits-established-13"
+  },
+  "header_date": null,
+  "id": "14e33e64-9757-5edb-a3e4-93eabfe5a656",
+  "kind": "invoice",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "INVOICE 1864",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Velden Electrical",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Remit questions to:",
+      "x": 72,
+      "y": 100
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: 919-555-0142",
+      "x": 72,
+      "y": 114
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "email",
+   "parent_document_id": null,
+   "received_at": "2026-02-07T00:00:00Z",
+   "sender": "ar@velden.example",
+   "subject": "Invoice 1865",
+   "thread_id": "thr-swapped-digits-established-15"
+  },
+  "header_date": "2026-02-07T00:00:00Z",
+  "id": "dc1692b6-f038-576c-bf5c-ef394cdcb530",
+  "kind": "email",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Hello, please find invoice 1865 attached.",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Thank you",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: (919) 555-0142",
+      "x": 72,
+      "y": 100
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Main: 919-555-0117",
+      "x": 72,
+      "y": 114
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "email",
+   "parent_document_id": "dc1692b6-f038-576c-bf5c-ef394cdcb530",
+   "received_at": "2026-02-07T00:00:00Z",
+   "sender": "ar@velden.example",
+   "subject": "Invoice 1865",
+   "thread_id": "thr-swapped-digits-established-15"
+  },
+  "header_date": null,
+  "id": "06af9189-da08-5877-9a48-8d92582fb7c4",
+  "kind": "invoice",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "INVOICE 1865",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Velden Electrical",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Remit questions to:",
+      "x": 72,
+      "y": 100
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: 919-555-0142",
+      "x": 72,
+      "y": 114
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "email",
+   "parent_document_id": null,
+   "received_at": "2026-05-04T16:00:00Z",
+   "sender": "ar@velden.example",
+   "subject": "Contact update",
+   "thread_id": "thr-swapped-digits-established-17"
+  },
+  "header_date": "2026-05-04T16:00:00Z",
+  "id": "25b4f590-3a6c-52de-bc26-0d6fb81516f1",
+  "kind": "email",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Please note our AR line.",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "AR direct: 919-555-0124",
+      "x": 72,
+      "y": 86
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "paper_mail",
+   "parent_document_id": null,
+   "received_at": "2026-05-04T16:00:00Z",
+   "sender": null,
+   "subject": null,
+   "thread_id": null
+  },
+  "header_date": null,
+  "id": "435ea5b2-5158-5e56-bc5c-d1c4b43bbec9",
+  "kind": "letter",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Velden Electrical: accounts receivable",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "AR direct: (919) 555-0124",
+      "x": 72,
+      "y": 86
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "email",
+   "parent_document_id": null,
+   "received_at": "2026-10-01T16:00:00Z",
+   "sender": "ar@velden.example",
+   "subject": "Updated banking details",
+   "thread_id": "thr-swapped-digits-established-19"
+  },
+  "header_date": "2026-10-01T16:00:00Z",
+  "id": "c5610474-87a6-575a-b8a1-35095a12ce29",
+  "kind": "email",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "We have moved our banking. Please pay the account ending 4821 from today.",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Thank you",
+      "x": 72,
+      "y": 86
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ }
+]

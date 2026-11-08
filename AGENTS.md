@@ -59,6 +59,8 @@ second owner (the partner) who reviews it.
 | Core tests (core and the Ramp mock in process, on a throwaway Postgres) | `cd apps/core && uv run pytest` |
 | Ramp mock tests | `cd apps/ramp-mock && uv run pytest` |
 | Decision engine tests | `cd packages/decision && uv run pytest` |
+| Ledger tests (selection rule, properties, frozen-corpus gate) | `cd packages/ledger && uv run pytest` |
+| Corpus: committed files match the generator, truth unchanged | `python3 corpus/generator/build.py --check` |
 | Call policy tests (script, tools, speech guard) | `cd packages/policy && uv run pytest` |
 | Voice service tests (text line, agent port, fail-closed) | `cd apps/voice && uv run pytest` |
 | Run the whole skeleton locally (Postgres, Ramp mock, core with worker; seeded demo dataset) | `uv run python scripts/dev/stack.py --changes` |

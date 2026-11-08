@@ -1,0 +1,216 @@
+{
+ "documents": "controls/C04-scanned-contract/documents.json",
+ "expected": {
+  "cutoff": "2026-10-01T16:00:00Z",
+  "outcome": "picked",
+  "pick": "+14695550142",
+  "rejected": {}
+ },
+ "id": "C04",
+ "kind": "control",
+ "planted": [
+  {
+   "e164": "+14695550117",
+   "sightings": [
+    {
+     "channel": "contract",
+     "document_id": "4671363f-c612-5d5e-8ecc-4c7c500663de",
+     "party": "vendor",
+     "quote": "Main: 469.555.0117",
+     "received_at": "2023-03-11T16:00:00Z",
+     "role": "main",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "b32566cf-f25f-5089-a3f1-ddce777cbb28",
+     "party": "vendor",
+     "quote": "Main: (469) 555-0117",
+     "received_at": "2023-04-10T16:00:00Z",
+     "role": "main",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "41feceb1-672b-5ce6-8895-b3be638723a3",
+     "party": "vendor",
+     "quote": "Main: 469-555-0117",
+     "received_at": "2023-11-03T08:00:00Z",
+     "role": "main",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "451820da-6311-5862-841f-ecb7098df137",
+     "party": "vendor",
+     "quote": "Main: (469) 555-0117",
+     "received_at": "2024-05-28T00:00:00Z",
+     "role": "main",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "663dfe7e-0053-5aa6-af8d-df2e07a00927",
+     "party": "vendor",
+     "quote": "Main: 469-555-0117",
+     "received_at": "2024-12-20T16:00:00Z",
+     "role": "main",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "0449ebae-e5e9-558a-b7e6-6c81d7e12455",
+     "party": "vendor",
+     "quote": "Main: (469) 555-0117",
+     "received_at": "2025-07-15T08:00:00Z",
+     "role": "main",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "bfe638b9-5698-5622-931d-745719cff18c",
+     "party": "vendor",
+     "quote": "Main: (469) 555-0117",
+     "received_at": "2026-02-07T00:00:00Z",
+     "role": "main",
+     "visibility": "visible"
+    }
+   ],
+   "truth": "real"
+  },
+  {
+   "e164": "+14695550142",
+   "sightings": [
+    {
+     "channel": "contract",
+     "document_id": "4671363f-c612-5d5e-8ecc-4c7c500663de",
+     "party": "vendor",
+     "quote": "Accounts receivable: (469) 555-0142",
+     "received_at": "2023-03-11T16:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "b32566cf-f25f-5089-a3f1-ddce777cbb28",
+     "party": "vendor",
+     "quote": "Accounts receivable: 469-555-0142",
+     "received_at": "2023-04-10T16:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "bbd601c8-1f14-5dd2-bdda-9b6ea4f4d8b1",
+     "party": "vendor",
+     "quote": "Accounts receivable: (469) 555-0142",
+     "received_at": "2023-04-10T16:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "41feceb1-672b-5ce6-8895-b3be638723a3",
+     "party": "vendor",
+     "quote": "Accounts receivable: (469) 555-0142",
+     "received_at": "2023-11-03T08:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "a4f779e1-d304-5d8e-9efa-3d35a3161988",
+     "party": "vendor",
+     "quote": "Accounts receivable: 469-555-0142",
+     "received_at": "2023-11-03T08:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "451820da-6311-5862-841f-ecb7098df137",
+     "party": "vendor",
+     "quote": "Accounts receivable: 469.555.0142",
+     "received_at": "2024-05-28T00:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "ed48c637-0495-55cb-acb9-2d829d3b93b4",
+     "party": "vendor",
+     "quote": "Accounts receivable: 469.555.0142",
+     "received_at": "2024-05-28T00:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "663dfe7e-0053-5aa6-af8d-df2e07a00927",
+     "party": "vendor",
+     "quote": "Accounts receivable: 469-555-0142",
+     "received_at": "2024-12-20T16:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "7398e727-1dfe-5c06-aded-fa60b38f3ac4",
+     "party": "vendor",
+     "quote": "Accounts receivable: 469-555-0142",
+     "received_at": "2024-12-20T16:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "0449ebae-e5e9-558a-b7e6-6c81d7e12455",
+     "party": "vendor",
+     "quote": "Accounts receivable: 469-555-0142",
+     "received_at": "2025-07-15T08:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "99398193-0e41-587c-bfe9-b348f27531c7",
+     "party": "vendor",
+     "quote": "Accounts receivable: 469-555-0142",
+     "received_at": "2025-07-15T08:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "bfe638b9-5698-5622-931d-745719cff18c",
+     "party": "vendor",
+     "quote": "Accounts receivable: 469-555-0142",
+     "received_at": "2026-02-07T00:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "ed10efb0-4c4a-56eb-80f8-1ef648ead3f2",
+     "party": "vendor",
+     "quote": "Accounts receivable: 469.555.0142",
+     "received_at": "2026-02-07T00:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    }
+   ],
+   "truth": "real"
+  }
+ ],
+ "ramp_change_at": "2026-10-01T18:00:00Z",
+ "request_document_id": "37d55a41-d263-50bf-91f8-3f6145eb0756",
+ "request_received_at": "2026-10-01T16:00:00Z",
+ "source": "proposed",
+ "title": "The second source is a scanned contract (vision path)",
+ "vendor": {
+  "domain": "norcott.example",
+  "lookalike": "n0rcott.example",
+  "name": "Norcott Coatings",
+  "slug": "scanned-contract"
+ }
+}

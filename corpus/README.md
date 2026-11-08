@@ -34,6 +34,27 @@ corpus/
 - Expected outcomes are frozen and hashed before extractor code is written, and the hash is checked in CI so the truth can't drift to match the code.
 - Every file the ledger ingests gets a custody record (channel, receive time, sender, thread) in the fixture, because provenance comes from custody metadata, never from a model.
 
+## What's here now (spec 0020)
+
+`generator/` builds 12 poisoning patterns (P01 to P12; P04 has three variants), 5 controls
+(C01 to C05) and the stated known limit (K01), one fictional vendor each, into `poison/` and
+`controls/`, with one truth file per scenario in `truth/`. P07 to P12, K01 and the controls are
+proposed in the spec and await the team's confirmation (Q42).
+
+```bash
+uv run python corpus/generator/build.py            # rebuild (byte for byte)
+uv run python corpus/generator/build.py --check    # CI: committed files match, truth unchanged
+uv run --no-project --with pytest pytest corpus/generator -q
+```
+
+A truth file lists every planted number with every sighting (document, channel, our receive
+time, visibility, role, party, real or poison) and what `ledger-select-v1` must do: the cutoff,
+the outcome, the pick, the reasons each refused number must at least be rejected for, and any
+numbers that must stay eligible. The manifest covers the truth and every documents file (an
+expectation rests on their custody); its digest is pinned as `FROZEN_TRUTH_SHA256` in
+`build.py`, so moving the truth or a document means changing that line in review. Documents are a page model (spans with position, size and colour) plus custody;
+rendering them to PDF, and the 500-vendor background company, come next.
+
 ## Start here
 
 1. `generator/` with a seedable builder and a `make corpus` or `uv run` entry point; commit either the output or the exact command that regenerates it byte for byte.

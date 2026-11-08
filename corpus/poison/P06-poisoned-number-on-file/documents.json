@@ -1,0 +1,938 @@
+[
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "contract",
+   "parent_document_id": null,
+   "received_at": "2023-03-11T16:00:00Z",
+   "sender": null,
+   "subject": null,
+   "thread_id": null
+  },
+  "header_date": null,
+  "id": "b6230804-a6b3-597a-a047-687e6a79fb5d",
+  "kind": "contract",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Master supply agreement: Rossmere Print Works",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Main: 404.555.0117",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: 404-555-0142",
+      "x": 72,
+      "y": 100
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Notices: legal@rossmere.example",
+      "x": 72,
+      "y": 114
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "listing",
+   "parent_document_id": null,
+   "received_at": "2023-06-09T16:00:00Z",
+   "sender": null,
+   "subject": null,
+   "thread_id": null
+  },
+  "header_date": null,
+  "id": "9115929a-b9cb-55b1-9ec5-f54733ca23cb",
+  "kind": "listing",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Rossmere Print Works: business listing",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Main: (404) 555-0117",
+      "x": 72,
+      "y": 86
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "listing",
+   "parent_document_id": null,
+   "received_at": "2024-06-08T16:00:00Z",
+   "sender": null,
+   "subject": null,
+   "thread_id": null
+  },
+  "header_date": null,
+  "id": "749bff6e-c68a-5afd-8bae-f3e376264a34",
+  "kind": "listing",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Rossmere Print Works: business listing",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Main: (404) 555-0117",
+      "x": 72,
+      "y": 86
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "vendor_portal",
+   "parent_document_id": null,
+   "received_at": "2024-01-05T16:00:00Z",
+   "sender": null,
+   "subject": null,
+   "thread_id": null
+  },
+  "header_date": null,
+  "id": "1bc3fc07-28b4-5e50-adb1-f7d53ee6e16b",
+  "kind": "portal_entry",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Vendor profile: Rossmere Print Works",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: (404) 555-0142",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Billing: 404.555.0142",
+      "x": 72,
+      "y": 100
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "email",
+   "parent_document_id": null,
+   "received_at": "2023-04-10T16:00:00Z",
+   "sender": "ar@rossmere.example",
+   "subject": "Invoice 1534",
+   "thread_id": "thr-poisoned-number-on-file-5"
+  },
+  "header_date": "2023-04-10T16:00:00Z",
+  "id": "58933287-f26c-530d-ad38-d2b12ce40cd2",
+  "kind": "email",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Hello, please find invoice 1534 attached.",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Thank you",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: 404.555.0142",
+      "x": 72,
+      "y": 100
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Main: 404.555.0117",
+      "x": 72,
+      "y": 114
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "email",
+   "parent_document_id": "58933287-f26c-530d-ad38-d2b12ce40cd2",
+   "received_at": "2023-04-10T16:00:00Z",
+   "sender": "ar@rossmere.example",
+   "subject": "Invoice 1534",
+   "thread_id": "thr-poisoned-number-on-file-5"
+  },
+  "header_date": null,
+  "id": "4f840483-59fb-588a-a610-b28bfb118df1",
+  "kind": "invoice",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "INVOICE 1534",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Rossmere Print Works",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Remit questions to:",
+      "x": 72,
+      "y": 100
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: 404.555.0142",
+      "x": 72,
+      "y": 114
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "email",
+   "parent_document_id": null,
+   "received_at": "2023-11-03T08:00:00Z",
+   "sender": "ar@rossmere.example",
+   "subject": "Invoice 1535",
+   "thread_id": "thr-poisoned-number-on-file-7"
+  },
+  "header_date": "2023-11-03T08:00:00Z",
+  "id": "7444302b-cc21-5f4b-a0c9-db0d0eb074f8",
+  "kind": "email",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Hello, please find invoice 1535 attached.",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Thank you",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: 404.555.0142",
+      "x": 72,
+      "y": 100
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Main: (404) 555-0117",
+      "x": 72,
+      "y": 114
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "email",
+   "parent_document_id": "7444302b-cc21-5f4b-a0c9-db0d0eb074f8",
+   "received_at": "2023-11-03T08:00:00Z",
+   "sender": "ar@rossmere.example",
+   "subject": "Invoice 1535",
+   "thread_id": "thr-poisoned-number-on-file-7"
+  },
+  "header_date": null,
+  "id": "ecd55af9-d3cf-525b-8368-9ef2b3b0ee3b",
+  "kind": "invoice",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "INVOICE 1535",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Rossmere Print Works",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Remit questions to:",
+      "x": 72,
+      "y": 100
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: 404-555-0142",
+      "x": 72,
+      "y": 114
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "email",
+   "parent_document_id": null,
+   "received_at": "2024-05-28T00:00:00Z",
+   "sender": "ar@rossmere.example",
+   "subject": "Invoice 1536",
+   "thread_id": "thr-poisoned-number-on-file-9"
+  },
+  "header_date": "2024-05-28T00:00:00Z",
+  "id": "5f69583d-0605-5b41-94f6-8d5ad1c00eda",
+  "kind": "email",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Hello, please find invoice 1536 attached.",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Thank you",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: (404) 555-0142",
+      "x": 72,
+      "y": 100
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Main: (404) 555-0117",
+      "x": 72,
+      "y": 114
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "email",
+   "parent_document_id": "5f69583d-0605-5b41-94f6-8d5ad1c00eda",
+   "received_at": "2024-05-28T00:00:00Z",
+   "sender": "ar@rossmere.example",
+   "subject": "Invoice 1536",
+   "thread_id": "thr-poisoned-number-on-file-9"
+  },
+  "header_date": null,
+  "id": "84fa8500-ab91-5e45-9b35-23ce8dc0aea7",
+  "kind": "invoice",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "INVOICE 1536",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Rossmere Print Works",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Remit questions to:",
+      "x": 72,
+      "y": 100
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: 404-555-0142",
+      "x": 72,
+      "y": 114
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "email",
+   "parent_document_id": null,
+   "received_at": "2024-12-20T16:00:00Z",
+   "sender": "ar@rossmere.example",
+   "subject": "Invoice 1537",
+   "thread_id": "thr-poisoned-number-on-file-11"
+  },
+  "header_date": "2024-12-20T16:00:00Z",
+  "id": "1fab5092-a5de-50ab-9790-654209c51955",
+  "kind": "email",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Hello, please find invoice 1537 attached.",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Thank you",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: 404.555.0142",
+      "x": 72,
+      "y": 100
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Main: 404-555-0117",
+      "x": 72,
+      "y": 114
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "email",
+   "parent_document_id": "1fab5092-a5de-50ab-9790-654209c51955",
+   "received_at": "2024-12-20T16:00:00Z",
+   "sender": "ar@rossmere.example",
+   "subject": "Invoice 1537",
+   "thread_id": "thr-poisoned-number-on-file-11"
+  },
+  "header_date": null,
+  "id": "1ac1c61b-cbd9-5c2f-a1ae-fb3ec6b82a86",
+  "kind": "invoice",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "INVOICE 1537",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Rossmere Print Works",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Remit questions to:",
+      "x": 72,
+      "y": 100
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: 404-555-0142",
+      "x": 72,
+      "y": 114
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "email",
+   "parent_document_id": null,
+   "received_at": "2025-07-15T08:00:00Z",
+   "sender": "ar@rossmere.example",
+   "subject": "Invoice 1538",
+   "thread_id": "thr-poisoned-number-on-file-13"
+  },
+  "header_date": "2025-07-15T08:00:00Z",
+  "id": "1fd6b4fb-f4c9-53a8-86b1-fb536066e4b8",
+  "kind": "email",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Hello, please find invoice 1538 attached.",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Thank you",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: (404) 555-0142",
+      "x": 72,
+      "y": 100
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Main: 404.555.0117",
+      "x": 72,
+      "y": 114
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "email",
+   "parent_document_id": "1fd6b4fb-f4c9-53a8-86b1-fb536066e4b8",
+   "received_at": "2025-07-15T08:00:00Z",
+   "sender": "ar@rossmere.example",
+   "subject": "Invoice 1538",
+   "thread_id": "thr-poisoned-number-on-file-13"
+  },
+  "header_date": null,
+  "id": "2ef8bc8f-9470-5bcd-8288-be53cbe2243a",
+  "kind": "invoice",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "INVOICE 1538",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Rossmere Print Works",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Remit questions to:",
+      "x": 72,
+      "y": 100
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: 404.555.0142",
+      "x": 72,
+      "y": 114
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "email",
+   "parent_document_id": null,
+   "received_at": "2026-02-07T00:00:00Z",
+   "sender": "ar@rossmere.example",
+   "subject": "Invoice 1539",
+   "thread_id": "thr-poisoned-number-on-file-15"
+  },
+  "header_date": "2026-02-07T00:00:00Z",
+  "id": "1cced51e-72c6-506c-a18f-88f19ae81ea9",
+  "kind": "email",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Hello, please find invoice 1539 attached.",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Thank you",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: 404.555.0142",
+      "x": 72,
+      "y": 100
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Main: 404.555.0117",
+      "x": 72,
+      "y": 114
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "email",
+   "parent_document_id": "1cced51e-72c6-506c-a18f-88f19ae81ea9",
+   "received_at": "2026-02-07T00:00:00Z",
+   "sender": "ar@rossmere.example",
+   "subject": "Invoice 1539",
+   "thread_id": "thr-poisoned-number-on-file-15"
+  },
+  "header_date": null,
+  "id": "64c4a101-4dce-5fa6-8a04-eebf098003af",
+  "kind": "invoice",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "INVOICE 1539",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Rossmere Print Works",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Remit questions to:",
+      "x": 72,
+      "y": 100
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: (404) 555-0142",
+      "x": 72,
+      "y": 114
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "vendor_master",
+   "parent_document_id": null,
+   "received_at": "2022-08-23T16:00:00Z",
+   "sender": null,
+   "subject": null,
+   "thread_id": null
+  },
+  "header_date": null,
+  "id": "a7bc857e-623c-55fe-ac27-935ed883115b",
+  "kind": "vendor_master_record",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Vendor master: Rossmere Print Works",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Phone on file: 404.555.0169",
+      "x": 72,
+      "y": 86
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "email",
+   "parent_document_id": null,
+   "received_at": "2026-03-15T16:00:00Z",
+   "sender": "ar@rossmere.example",
+   "subject": "Remittance advice",
+   "thread_id": "thr-poisoned-number-on-file-18"
+  },
+  "header_date": "2026-03-15T16:00:00Z",
+  "id": "bda56120-2950-5f77-91a5-0df6e660191a",
+  "kind": "email",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Remittance advice attached.",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Phone on file: 404-555-0169",
+      "x": 72,
+      "y": 86
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "email",
+   "parent_document_id": null,
+   "received_at": "2026-05-04T16:00:00Z",
+   "sender": "ar@rossmere.example",
+   "subject": "Remittance advice",
+   "thread_id": "thr-poisoned-number-on-file-19"
+  },
+  "header_date": "2026-05-04T16:00:00Z",
+  "id": "ef5ba429-3f5c-50b3-bc9c-7013075a40e3",
+  "kind": "email",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Remittance advice attached.",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Phone on file: 404.555.0169",
+      "x": 72,
+      "y": 86
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "email",
+   "parent_document_id": null,
+   "received_at": "2026-10-01T16:00:00Z",
+   "sender": "ar@rossmere.example",
+   "subject": "Updated banking details",
+   "thread_id": "thr-poisoned-number-on-file-20"
+  },
+  "header_date": "2026-10-01T16:00:00Z",
+  "id": "32a6f35d-77dd-59f0-9518-ec350434495f",
+  "kind": "email",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "We have moved our banking. Please pay the account ending 4821 from today.",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Thank you",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Please call the number on file with any questions.",
+      "x": 72,
+      "y": 100
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ }
+]

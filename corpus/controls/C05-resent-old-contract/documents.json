@@ -1,0 +1,776 @@
+[
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "listing",
+   "parent_document_id": null,
+   "received_at": "2025-11-25T16:00:00Z",
+   "sender": null,
+   "subject": null,
+   "thread_id": null
+  },
+  "header_date": null,
+  "id": "b454f12e-ca45-5ff7-b3a6-a1b17a52667f",
+  "kind": "listing",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Thornbury Logistics: business listing",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Main: 336.555.0117",
+      "x": 72,
+      "y": 86
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "vendor_portal",
+   "parent_document_id": null,
+   "received_at": "2026-06-23T16:00:00Z",
+   "sender": null,
+   "subject": null,
+   "thread_id": null
+  },
+  "header_date": null,
+  "id": "ba4f9208-f8e1-5109-9a5f-fd92672acf05",
+  "kind": "portal_entry",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Vendor profile: Thornbury Logistics",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: 336.555.0142",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Billing: (336) 555-0142",
+      "x": 72,
+      "y": 100
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "email",
+   "parent_document_id": null,
+   "received_at": "2025-09-26T16:00:00Z",
+   "sender": "ar@thornbury.example",
+   "subject": "Invoice 1327",
+   "thread_id": "thr-resent-old-contract-3"
+  },
+  "header_date": "2025-09-26T16:00:00Z",
+  "id": "3a61090d-54fd-5fcd-a832-9ad92167b9ec",
+  "kind": "email",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Hello, please find invoice 1327 attached.",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Thank you",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: 336-555-0142",
+      "x": 72,
+      "y": 100
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Main: 336.555.0117",
+      "x": 72,
+      "y": 114
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "email",
+   "parent_document_id": "3a61090d-54fd-5fcd-a832-9ad92167b9ec",
+   "received_at": "2025-09-26T16:00:00Z",
+   "sender": "ar@thornbury.example",
+   "subject": "Invoice 1327",
+   "thread_id": "thr-resent-old-contract-3"
+  },
+  "header_date": null,
+  "id": "a6c766f5-1ec2-5755-963e-c3461ba7a7b0",
+  "kind": "invoice",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "INVOICE 1327",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Thornbury Logistics",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Remit questions to:",
+      "x": 72,
+      "y": 100
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: 336-555-0142",
+      "x": 72,
+      "y": 114
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "email",
+   "parent_document_id": null,
+   "received_at": "2025-11-22T08:00:00Z",
+   "sender": "ar@thornbury.example",
+   "subject": "Invoice 1328",
+   "thread_id": "thr-resent-old-contract-5"
+  },
+  "header_date": "2025-11-22T08:00:00Z",
+  "id": "43a4e7a9-2476-5aa6-b0ac-b03644bd4c13",
+  "kind": "email",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Hello, please find invoice 1328 attached.",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Thank you",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: 336-555-0142",
+      "x": 72,
+      "y": 100
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Main: 336.555.0117",
+      "x": 72,
+      "y": 114
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "email",
+   "parent_document_id": "43a4e7a9-2476-5aa6-b0ac-b03644bd4c13",
+   "received_at": "2025-11-22T08:00:00Z",
+   "sender": "ar@thornbury.example",
+   "subject": "Invoice 1328",
+   "thread_id": "thr-resent-old-contract-5"
+  },
+  "header_date": null,
+  "id": "d30dd628-a948-5a31-9eb2-3db07448c059",
+  "kind": "invoice",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "INVOICE 1328",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Thornbury Logistics",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Remit questions to:",
+      "x": 72,
+      "y": 100
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: 336-555-0142",
+      "x": 72,
+      "y": 114
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "email",
+   "parent_document_id": null,
+   "received_at": "2026-01-18T00:00:00Z",
+   "sender": "ar@thornbury.example",
+   "subject": "Invoice 1329",
+   "thread_id": "thr-resent-old-contract-7"
+  },
+  "header_date": "2026-01-18T00:00:00Z",
+  "id": "e6820653-087f-59d2-94ac-bc22cb09e9e6",
+  "kind": "email",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Hello, please find invoice 1329 attached.",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Thank you",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: 336.555.0142",
+      "x": 72,
+      "y": 100
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Main: (336) 555-0117",
+      "x": 72,
+      "y": 114
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "email",
+   "parent_document_id": "e6820653-087f-59d2-94ac-bc22cb09e9e6",
+   "received_at": "2026-01-18T00:00:00Z",
+   "sender": "ar@thornbury.example",
+   "subject": "Invoice 1329",
+   "thread_id": "thr-resent-old-contract-7"
+  },
+  "header_date": null,
+  "id": "3e3fe1fa-cca1-5e74-bed1-585d95cc4f33",
+  "kind": "invoice",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "INVOICE 1329",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Thornbury Logistics",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Remit questions to:",
+      "x": 72,
+      "y": 100
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: 336.555.0142",
+      "x": 72,
+      "y": 114
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "email",
+   "parent_document_id": null,
+   "received_at": "2026-03-15T16:00:00Z",
+   "sender": "ar@thornbury.example",
+   "subject": "Invoice 1330",
+   "thread_id": "thr-resent-old-contract-9"
+  },
+  "header_date": "2026-03-15T16:00:00Z",
+  "id": "9dde7e73-2eab-5475-8823-ff6dc76ecfab",
+  "kind": "email",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Hello, please find invoice 1330 attached.",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Thank you",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: (336) 555-0142",
+      "x": 72,
+      "y": 100
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Main: 336.555.0117",
+      "x": 72,
+      "y": 114
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "email",
+   "parent_document_id": "9dde7e73-2eab-5475-8823-ff6dc76ecfab",
+   "received_at": "2026-03-15T16:00:00Z",
+   "sender": "ar@thornbury.example",
+   "subject": "Invoice 1330",
+   "thread_id": "thr-resent-old-contract-9"
+  },
+  "header_date": null,
+  "id": "dc40cb9d-5141-55e7-a6c1-629e55b7fbc3",
+  "kind": "invoice",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "INVOICE 1330",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Thornbury Logistics",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Remit questions to:",
+      "x": 72,
+      "y": 100
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: (336) 555-0142",
+      "x": 72,
+      "y": 114
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "email",
+   "parent_document_id": null,
+   "received_at": "2026-05-11T08:00:00Z",
+   "sender": "ar@thornbury.example",
+   "subject": "Invoice 1331",
+   "thread_id": "thr-resent-old-contract-11"
+  },
+  "header_date": "2026-05-11T08:00:00Z",
+  "id": "f96df810-217e-5c51-a127-0fb599b2dbef",
+  "kind": "email",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Hello, please find invoice 1331 attached.",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Thank you",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: 336.555.0142",
+      "x": 72,
+      "y": 100
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Main: (336) 555-0117",
+      "x": 72,
+      "y": 114
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "email",
+   "parent_document_id": "f96df810-217e-5c51-a127-0fb599b2dbef",
+   "received_at": "2026-05-11T08:00:00Z",
+   "sender": "ar@thornbury.example",
+   "subject": "Invoice 1331",
+   "thread_id": "thr-resent-old-contract-11"
+  },
+  "header_date": null,
+  "id": "500d0618-b73c-5f38-9984-acb43797f629",
+  "kind": "invoice",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "INVOICE 1331",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Thornbury Logistics",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Remit questions to:",
+      "x": 72,
+      "y": 100
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: (336) 555-0142",
+      "x": 72,
+      "y": 114
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "email",
+   "parent_document_id": null,
+   "received_at": "2026-07-07T00:00:00Z",
+   "sender": "ar@thornbury.example",
+   "subject": "Invoice 1332",
+   "thread_id": "thr-resent-old-contract-13"
+  },
+  "header_date": "2026-07-07T00:00:00Z",
+  "id": "7af7078f-9436-5c5b-bacb-14f3e20222bd",
+  "kind": "email",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Hello, please find invoice 1332 attached.",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Thank you",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: 336.555.0142",
+      "x": 72,
+      "y": 100
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Main: 336-555-0117",
+      "x": 72,
+      "y": 114
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "email",
+   "parent_document_id": "7af7078f-9436-5c5b-bacb-14f3e20222bd",
+   "received_at": "2026-07-07T00:00:00Z",
+   "sender": "ar@thornbury.example",
+   "subject": "Invoice 1332",
+   "thread_id": "thr-resent-old-contract-13"
+  },
+  "header_date": null,
+  "id": "951b2a00-895c-52cf-815f-ad72e4a8821b",
+  "kind": "invoice",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "INVOICE 1332",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Thornbury Logistics",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Remit questions to:",
+      "x": 72,
+      "y": 100
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: 336-555-0142",
+      "x": 72,
+      "y": 114
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": "2019-03-01",
+  "custody": {
+   "channel": "contract",
+   "parent_document_id": null,
+   "received_at": "2026-03-15T16:00:00Z",
+   "sender": null,
+   "subject": null,
+   "thread_id": null
+  },
+  "header_date": null,
+  "id": "fbb1b1fd-f298-5de5-a805-511d3103dd08",
+  "kind": "contract",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Master supply agreement: Thornbury Logistics",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Main: 336-555-0117",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: 336-555-0142",
+      "x": 72,
+      "y": 100
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "email",
+   "parent_document_id": null,
+   "received_at": "2026-10-01T16:00:00Z",
+   "sender": "ar@thornbury.example",
+   "subject": "Updated banking details",
+   "thread_id": "thr-resent-old-contract-16"
+  },
+  "header_date": "2026-10-01T16:00:00Z",
+  "id": "47afbb5b-9306-5d31-bb15-ad7cfed0ae68",
+  "kind": "email",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "We have moved our banking. Please pay the account ending 4821 from today.",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Thank you",
+      "x": 72,
+      "y": 86
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ }
+]

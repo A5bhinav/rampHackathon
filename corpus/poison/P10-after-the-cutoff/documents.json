@@ -1,0 +1,901 @@
+[
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "contract",
+   "parent_document_id": null,
+   "received_at": "2023-03-11T16:00:00Z",
+   "sender": null,
+   "subject": null,
+   "thread_id": null
+  },
+  "header_date": null,
+  "id": "ef18128c-37d2-54fc-b8f5-c66bbfbe918c",
+  "kind": "contract",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Master supply agreement: Yarrow Facilities",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Main: 614-555-0117",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: 614-555-0142",
+      "x": 72,
+      "y": 100
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Notices: legal@yarrow.example",
+      "x": 72,
+      "y": 114
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "listing",
+   "parent_document_id": null,
+   "received_at": "2023-06-09T16:00:00Z",
+   "sender": null,
+   "subject": null,
+   "thread_id": null
+  },
+  "header_date": null,
+  "id": "7b46f896-48ae-516b-9848-db470eff1409",
+  "kind": "listing",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Yarrow Facilities: business listing",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Main: 614.555.0117",
+      "x": 72,
+      "y": 86
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "listing",
+   "parent_document_id": null,
+   "received_at": "2024-06-08T16:00:00Z",
+   "sender": null,
+   "subject": null,
+   "thread_id": null
+  },
+  "header_date": null,
+  "id": "d0ca93b8-899d-59ed-9af5-1ca0e07ce255",
+  "kind": "listing",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Yarrow Facilities: business listing",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Main: (614) 555-0117",
+      "x": 72,
+      "y": 86
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "vendor_portal",
+   "parent_document_id": null,
+   "received_at": "2024-01-05T16:00:00Z",
+   "sender": null,
+   "subject": null,
+   "thread_id": null
+  },
+  "header_date": null,
+  "id": "a5e44bf8-70cd-5ae2-9255-d67c11170a6e",
+  "kind": "portal_entry",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Vendor profile: Yarrow Facilities",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: 614-555-0142",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Billing: (614) 555-0142",
+      "x": 72,
+      "y": 100
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "email",
+   "parent_document_id": null,
+   "received_at": "2023-04-10T16:00:00Z",
+   "sender": "ar@yarrow.example",
+   "subject": "Invoice 1627",
+   "thread_id": "thr-after-the-cutoff-5"
+  },
+  "header_date": "2023-04-10T16:00:00Z",
+  "id": "137b899c-7fd3-5281-be01-ea4f98b0862c",
+  "kind": "email",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Hello, please find invoice 1627 attached.",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Thank you",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: (614) 555-0142",
+      "x": 72,
+      "y": 100
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Main: 614-555-0117",
+      "x": 72,
+      "y": 114
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "email",
+   "parent_document_id": "137b899c-7fd3-5281-be01-ea4f98b0862c",
+   "received_at": "2023-04-10T16:00:00Z",
+   "sender": "ar@yarrow.example",
+   "subject": "Invoice 1627",
+   "thread_id": "thr-after-the-cutoff-5"
+  },
+  "header_date": null,
+  "id": "70c68c5e-2d35-580a-a820-04df8afe56a7",
+  "kind": "invoice",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "INVOICE 1627",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Yarrow Facilities",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Remit questions to:",
+      "x": 72,
+      "y": 100
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: 614-555-0142",
+      "x": 72,
+      "y": 114
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "email",
+   "parent_document_id": null,
+   "received_at": "2023-11-03T08:00:00Z",
+   "sender": "ar@yarrow.example",
+   "subject": "Invoice 1628",
+   "thread_id": "thr-after-the-cutoff-7"
+  },
+  "header_date": "2023-11-03T08:00:00Z",
+  "id": "de4e45ef-58d6-5fec-83a0-011631c3e71a",
+  "kind": "email",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Hello, please find invoice 1628 attached.",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Thank you",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: 614.555.0142",
+      "x": 72,
+      "y": 100
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Main: (614) 555-0117",
+      "x": 72,
+      "y": 114
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "email",
+   "parent_document_id": "de4e45ef-58d6-5fec-83a0-011631c3e71a",
+   "received_at": "2023-11-03T08:00:00Z",
+   "sender": "ar@yarrow.example",
+   "subject": "Invoice 1628",
+   "thread_id": "thr-after-the-cutoff-7"
+  },
+  "header_date": null,
+  "id": "8b83ce99-be28-57af-8374-b1e45ae36d32",
+  "kind": "invoice",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "INVOICE 1628",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Yarrow Facilities",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Remit questions to:",
+      "x": 72,
+      "y": 100
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: 614-555-0142",
+      "x": 72,
+      "y": 114
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "email",
+   "parent_document_id": null,
+   "received_at": "2024-05-28T00:00:00Z",
+   "sender": "ar@yarrow.example",
+   "subject": "Invoice 1629",
+   "thread_id": "thr-after-the-cutoff-9"
+  },
+  "header_date": "2024-05-28T00:00:00Z",
+  "id": "bbae3082-1869-50ab-9c27-c145ec484351",
+  "kind": "email",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Hello, please find invoice 1629 attached.",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Thank you",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: (614) 555-0142",
+      "x": 72,
+      "y": 100
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Main: 614-555-0117",
+      "x": 72,
+      "y": 114
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "email",
+   "parent_document_id": "bbae3082-1869-50ab-9c27-c145ec484351",
+   "received_at": "2024-05-28T00:00:00Z",
+   "sender": "ar@yarrow.example",
+   "subject": "Invoice 1629",
+   "thread_id": "thr-after-the-cutoff-9"
+  },
+  "header_date": null,
+  "id": "9c799919-c54a-5bfa-908c-e882c00a097d",
+  "kind": "invoice",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "INVOICE 1629",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Yarrow Facilities",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Remit questions to:",
+      "x": 72,
+      "y": 100
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: 614.555.0142",
+      "x": 72,
+      "y": 114
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "email",
+   "parent_document_id": null,
+   "received_at": "2024-12-20T16:00:00Z",
+   "sender": "ar@yarrow.example",
+   "subject": "Invoice 1630",
+   "thread_id": "thr-after-the-cutoff-11"
+  },
+  "header_date": "2024-12-20T16:00:00Z",
+  "id": "6363a7a2-c13d-5012-9a6f-053bb114020f",
+  "kind": "email",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Hello, please find invoice 1630 attached.",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Thank you",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: (614) 555-0142",
+      "x": 72,
+      "y": 100
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Main: 614.555.0117",
+      "x": 72,
+      "y": 114
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "email",
+   "parent_document_id": "6363a7a2-c13d-5012-9a6f-053bb114020f",
+   "received_at": "2024-12-20T16:00:00Z",
+   "sender": "ar@yarrow.example",
+   "subject": "Invoice 1630",
+   "thread_id": "thr-after-the-cutoff-11"
+  },
+  "header_date": null,
+  "id": "98148722-e19e-5d27-876b-2dcd6b445cdb",
+  "kind": "invoice",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "INVOICE 1630",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Yarrow Facilities",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Remit questions to:",
+      "x": 72,
+      "y": 100
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: (614) 555-0142",
+      "x": 72,
+      "y": 114
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "email",
+   "parent_document_id": null,
+   "received_at": "2025-07-15T08:00:00Z",
+   "sender": "ar@yarrow.example",
+   "subject": "Invoice 1631",
+   "thread_id": "thr-after-the-cutoff-13"
+  },
+  "header_date": "2025-07-15T08:00:00Z",
+  "id": "c153f13f-aa99-5e35-a009-0712da189730",
+  "kind": "email",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Hello, please find invoice 1631 attached.",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Thank you",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: (614) 555-0142",
+      "x": 72,
+      "y": 100
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Main: 614-555-0117",
+      "x": 72,
+      "y": 114
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "email",
+   "parent_document_id": "c153f13f-aa99-5e35-a009-0712da189730",
+   "received_at": "2025-07-15T08:00:00Z",
+   "sender": "ar@yarrow.example",
+   "subject": "Invoice 1631",
+   "thread_id": "thr-after-the-cutoff-13"
+  },
+  "header_date": null,
+  "id": "70a0cbe0-e508-53cf-bd04-15c0d3094a3d",
+  "kind": "invoice",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "INVOICE 1631",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Yarrow Facilities",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Remit questions to:",
+      "x": 72,
+      "y": 100
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: 614-555-0142",
+      "x": 72,
+      "y": 114
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "email",
+   "parent_document_id": null,
+   "received_at": "2026-02-07T00:00:00Z",
+   "sender": "ar@yarrow.example",
+   "subject": "Invoice 1632",
+   "thread_id": "thr-after-the-cutoff-15"
+  },
+  "header_date": "2026-02-07T00:00:00Z",
+  "id": "7f205bd1-ccf7-54fa-aa54-0a9a9b08a4de",
+  "kind": "email",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Hello, please find invoice 1632 attached.",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Thank you",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: 614-555-0142",
+      "x": 72,
+      "y": 100
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Main: 614.555.0117",
+      "x": 72,
+      "y": 114
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "email",
+   "parent_document_id": "7f205bd1-ccf7-54fa-aa54-0a9a9b08a4de",
+   "received_at": "2026-02-07T00:00:00Z",
+   "sender": "ar@yarrow.example",
+   "subject": "Invoice 1632",
+   "thread_id": "thr-after-the-cutoff-15"
+  },
+  "header_date": null,
+  "id": "ceeb8094-52b1-5406-8d64-d3efba2af96e",
+  "kind": "invoice",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "INVOICE 1632",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Yarrow Facilities",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Remit questions to:",
+      "x": 72,
+      "y": 100
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Accounts receivable: (614) 555-0142",
+      "x": 72,
+      "y": 114
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "email",
+   "parent_document_id": null,
+   "received_at": "2026-10-01T16:00:00Z",
+   "sender": "ar@yarrow.example",
+   "subject": "Updated banking details",
+   "thread_id": "thr-after-the-cutoff-17"
+  },
+  "header_date": "2026-10-01T16:00:00Z",
+  "id": "ed3dbc86-77f4-5808-9c95-2ec8ed6477aa",
+  "kind": "email",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "We have moved our banking. Please pay the account ending 4821 from today.",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Thank you",
+      "x": 72,
+      "y": 86
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "contract",
+   "parent_document_id": null,
+   "received_at": "2026-10-01T17:00:00Z",
+   "sender": null,
+   "subject": null,
+   "thread_id": null
+  },
+  "header_date": null,
+  "id": "bfa010eb-577f-5ef9-be25-b0e3eca074f0",
+  "kind": "contract",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Amendment 3: Yarrow Facilities",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Updated contacts:",
+      "x": 72,
+      "y": 86
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "AR direct: 614-555-0169",
+      "x": 72,
+      "y": 100
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ },
+ {
+  "claimed_date": null,
+  "custody": {
+   "channel": "vendor_portal",
+   "parent_document_id": null,
+   "received_at": "2026-10-01T17:00:00Z",
+   "sender": null,
+   "subject": null,
+   "thread_id": null
+  },
+  "header_date": null,
+  "id": "d9c4f9a7-03ef-5e08-98ec-165f4c2e7a4c",
+  "kind": "portal_entry",
+  "pages": [
+   {
+    "height": 792,
+    "spans": [
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "Vendor profile: Yarrow Facilities",
+      "x": 72,
+      "y": 72
+     },
+     {
+      "color": "#000000",
+      "size": 10,
+      "text": "AR direct: (614) 555-0169",
+      "x": 72,
+      "y": 86
+     }
+    ],
+    "width": 612
+   }
+  ],
+  "scan": false
+ }
+]
