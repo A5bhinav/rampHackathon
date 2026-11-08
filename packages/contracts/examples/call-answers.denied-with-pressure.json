@@ -1,0 +1,12 @@
+{
+  "schema_version": "call-answers/v0",
+  "call_id": "9a8b7c6d-5e4f-4a3b-9c2d-1e0f9a8b7c6d",
+  "answers": [
+    { "slot": "recording_consent", "value": "yes", "turn_id": 1, "tool_call_id": "tc_01", "captured_at": "2026-11-03T18:10:05Z", "capture_method": "speech" },
+    { "slot": "company_named", "value": "Acme Supply", "turn_id": 3, "tool_call_id": "tc_02", "captured_at": "2026-11-03T18:10:14Z", "capture_method": "speech" },
+    { "slot": "change_requested", "value": "no", "turn_id": 5, "tool_call_id": "tc_03", "captured_at": "2026-11-03T18:10:30Z", "capture_method": "speech" },
+    { "slot": "offered_number", "value": "415 555 0177", "turn_id": 7, "tool_call_id": "tc_04", "captured_at": "2026-11-03T18:10:41Z", "capture_method": "speech" },
+    { "slot": "flag", "value": "asked_to_call_another_number", "turn_id": 7, "tool_call_id": "tc_05", "captured_at": "2026-11-03T18:10:41Z", "capture_method": "speech" },
+    { "slot": "account_last4", "value": "refused", "turn_id": 9, "tool_call_id": "tc_06", "captured_at": "2026-11-03T18:10:51Z", "capture_method": "speech" }
+  ]
+}

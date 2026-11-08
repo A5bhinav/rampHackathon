@@ -1,0 +1,37 @@
+{
+  "v": 1,
+  "chain_id": "0f3b7f2e-4d2a-4b1e-9c3d-1a2b3c4d5e6f",
+  "dataset_id": "7a1c9d2e-0b3f-4e5a-8c6d-9e0f1a2b3c4d",
+  "case_id": "c0ffee00-1111-4222-8333-444455556666",
+  "event_id": "e0000001-0000-4000-8000-000000000001",
+  "type": "call_ended",
+  "actor": { "kind": "system", "id": null },
+  "occurred_at": "2026-11-01T17:21:39.000001Z",
+  "idempotency_key": "c0ffee00-1111-4222-8333-444455556666:call:1:ended",
+  "from_state": "calling",
+  "to_state": "deciding",
+  "version": 1,
+  "body": {
+    "call_id": "6b1e2f0a-4c3d-4e5f-8a9b-0c1d2e3f4a5b",
+    "result": "answers_recorded",
+    "attempt": 1,
+    "recording_sha256": "a3f1c2d4e5b6a7980f1e2d3c4b5a69788f7e6d5c4b3a2918f7e6d5c4b3a29180",
+    "agent_version": "agent-0.1.0",
+    "answers": {
+      "schema_version": "call-answers/v0",
+      "call_id": "6b1e2f0a-4c3d-4e5f-8a9b-0c1d2e3f4a5b",
+      "answers": [
+        { "slot": "recording_consent", "value": "yes", "turn_id": 1, "tool_call_id": "tc_01", "captured_at": "2026-11-01T17:20:11Z", "capture_method": "speech" },
+        { "slot": "change_requested", "value": "yes", "turn_id": 7, "tool_call_id": "tc_06", "captured_at": "2026-11-01T17:20:44Z", "capture_method": "speech" },
+        {
+          "slot": "account_last4",
+          "value": { "digits_hmac": "3c9a1f0e7b5d2a4c6e8f0a1b3c5d7e9f1a2b4c6d8e0f2a4b6c8d0e2f4a6b8c0d", "digit_count": 4, "key_version": 1 },
+          "turn_id": 9,
+          "tool_call_id": "dtmf_01",
+          "captured_at": "2026-11-01T17:21:02Z",
+          "capture_method": "keypad"
+        }
+      ]
+    }
+  }
+}

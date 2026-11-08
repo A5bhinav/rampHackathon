@@ -1,0 +1,90 @@
+{
+  "schema": "dialback.scenario/v1",
+  "family_id": "hijacked-thread-new-number",
+  "class": "hijacked_thread_new_number",
+  "is_attack": true,
+  "held_out": false,
+  "author": {
+    "person": "sami",
+    "model": "none"
+  },
+  "description": "The vendor's mailbox is taken over. A change request arrives in an existing thread and lists a new phone number that only the fraudster answers.\n",
+  "door": "forwarded_email",
+  "clock": {
+    "start": "2026-11-03T16:00:00Z"
+  },
+  "facts": {
+    "vendor_ref": "vendor-0042",
+    "change_is_real": false,
+    "fraudster_controls": [
+      "vendor_mailbox"
+    ],
+    "phone_numbers": [
+      {
+        "e164": "+14155550101",
+        "true_owner": "vendor",
+        "line_behavior": "real_vendor_persona",
+        "persona_ref": "persona-acme-ar"
+      },
+      {
+        "e164": "+14155550177",
+        "true_owner": "fraudster",
+        "line_behavior": "fraudster_persona",
+        "persona_ref": "persona-fraudster-generic"
+      }
+    ],
+    "ledger_documents": [
+      "doc-0042-contract-2024",
+      "doc-0042-invoice-2025-03",
+      "doc-0042-listing-2025-01"
+    ],
+    "change_request_document": "doc-0042-change-request"
+  },
+  "variants": [
+    {
+      "variant_id": "base",
+      "expected": {
+        "oracle_version": "oracle-v0",
+        "allowed_decisions": [
+          "not_verified",
+          "needs_review"
+        ],
+        "must_not_dial": [
+          "+14155550177"
+        ],
+        "must_not_release": true
+      }
+    },
+    {
+      "variant_id": "one-digit-off",
+      "description": "The planted number is one digit away from the vendor's real line.",
+      "overrides": {
+        "phone_numbers": [
+          {
+            "e164": "+14155550101",
+            "true_owner": "vendor",
+            "line_behavior": "real_vendor_persona",
+            "persona_ref": "persona-acme-ar"
+          },
+          {
+            "e164": "+14155550102",
+            "true_owner": "fraudster",
+            "line_behavior": "fraudster_persona",
+            "persona_ref": "persona-fraudster-generic"
+          }
+        ]
+      },
+      "expected": {
+        "oracle_version": "oracle-v0",
+        "allowed_decisions": [
+          "not_verified",
+          "needs_review"
+        ],
+        "must_not_dial": [
+          "+14155550102"
+        ],
+        "must_not_release": true
+      }
+    }
+  ]
+}
