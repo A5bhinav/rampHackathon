@@ -1,4 +1,4 @@
-"""Spec 0016 A: custody, text, visibility and phone candidates, gated on the frozen corpus."""
+"""Spec 0022 A: custody, text, visibility and phone candidates, gated on the frozen corpus."""
 import datetime as dt
 import json
 from collections import Counter
