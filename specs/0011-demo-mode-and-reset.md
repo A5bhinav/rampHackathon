@@ -95,7 +95,7 @@ None: the CLI and two optional core settings, `CORE_PUBLIC_URL` and `DIALBACK_DE
 - [x] **Status** reports the dataset, its cases, the chain result and the alerts.
 - [x] **Chaos** on and off changes only the demo business's mock settings, and a reset turns it off.
 - [x] **Calling hours:** a demo dataset places a call at 21:00 in the calling time zone, while a dev dataset waits for the window.
-- [ ] **End to end** against the dev stack: reset, change, scripted call, Verified, the changer refused, a second approver releases, tamper, the alert.
+- [x] **End to end** against the dev stack: reset, change, scripted call, Verified, the changer refused, a second approver releases, tamper, the alert.
 
 ## Tests (written first)
 

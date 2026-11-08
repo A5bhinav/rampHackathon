@@ -65,6 +65,8 @@ second owner (the partner) who reviews it.
 | Voice service tests (text line, agent port, fail-closed) | `cd apps/voice && uv run pytest` |
 | Run the whole skeleton locally (Postgres, Ramp mock, core with worker; seeded demo dataset) | `uv run python scripts/dev/stack.py --changes` |
 | End-to-end smoke run (the demo-smoke CI job) | `uv run python scripts/dev/stack.py --smoke` |
+| Rehearse the demo beats (reset, change, release, tamper) on the local stack | `uv run python scripts/dev/demo_rehearsal.py` |
+| Demo commands (core shell) | `dialback-core demo reset [--link clerk=<email>]`, `demo change --vendor acme [--unknown]`, `demo tamper --yes-break-the-chain`, `demo status`, `demo chaos on\|off` |
 | Dashboard checks | `cd apps/web && pnpm check:api && pnpm typecheck && pnpm build` |
 | No imports between apps | `python3 scripts/ci/boundaries.py` |
 
