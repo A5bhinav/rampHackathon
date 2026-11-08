@@ -72,3 +72,10 @@ def test_live_reads_the_anthropic_key_when_present():
 def test_anthropic_key_is_absent_without_it_or_in_text_mode():
     assert load_settings(LIVE_ENV).anthropic_api_key is None   # live, Twilio set, no agent key
     assert load_settings({"DIALBACK_VOICE": "text", "ANTHROPIC_API_KEY": "sk"}).anthropic_api_key is None
+
+
+def test_internal_token_is_read_in_both_modes():
+    # POST /calls is authenticated on the text line too, so the token is read whatever the mode.
+    assert load_settings(LIVE_ENV).internal_api_token == b"internal-service-token-test-value"
+    assert load_settings({"DIALBACK_VOICE": "text", "DIALBACK_INTERNAL_TOKEN": "t"}).internal_api_token == b"t"
+    assert load_settings({}).internal_api_token == b""   # unset: empty, so create_app rejects every call
