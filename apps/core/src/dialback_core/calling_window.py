@@ -16,7 +16,7 @@ def _days(spec: str) -> frozenset[int]:
         return frozenset(range(7))
     if "-" in spec:
         a, b = (DAYS.index(x.strip()) for x in spec.split("-", 1))
-        return frozenset(range(a, b + 1))
+        return frozenset(range(a, b + 1)) if a <= b else frozenset(range(a, 7)) | frozenset(range(b + 1))  # fri-mon wraps
     return frozenset(DAYS.index(x.strip()) for x in spec.split(","))
 
 
@@ -26,15 +26,34 @@ class CallingWindow:
     start: dt.time
     end: dt.time
     days: frozenset[int]
+    always: bool = False
 
     @classmethod
     def parse(cls, tz: str, window: str, days: str) -> CallingWindow:
         a, b = (dt.time.fromisoformat(x.strip()) for x in window.split("-", 1))
         if not a < b:
             raise ValueError("the calling window must start before it ends")
-        return cls(ZoneInfo(tz), a, b, _days(days))
+        open_days = _days(days)
+        if not open_days:  # a window that never opens would fail every call and timer at run time
+            raise ValueError(f"the calling window has no open day: {days!r}")
+        return cls(ZoneInfo(tz), a, b, open_days)
+
+    @classmethod
+    def parse_spec(cls, tz: str, spec: str) -> CallingWindow:
+        """One setting for a whole window: `always`, `HH:MM-HH:MM` (every day) or `HH:MM-HH:MM <days>`
+        (demo datasets, spec 0011 D8). Anything else is refused at startup, never guessed at."""
+        spec = spec.strip().lower()
+        if spec == "always":
+            return cls(ZoneInfo(tz), dt.time.min, dt.time.max, frozenset(range(7)), always=True)
+        window, _, days = spec.partition(" ")
+        try:
+            return cls.parse(tz, window, days or "all")
+        except (ValueError, IndexError) as exc:
+            raise ValueError(f"not a calling window: {spec!r} (use 'always', 'HH:MM-HH:MM' or 'HH:MM-HH:MM mon-fri')") from exc
 
     def contains(self, now: dt.datetime) -> bool:
+        if self.always:
+            return True
         local = now.astimezone(self.tz)
         return local.weekday() in self.days and self.start <= local.time() < self.end
 

@@ -72,6 +72,8 @@ class Settings:
     calling_tz: str = "America/Los_Angeles"
     calling_window: str = "09:00-16:30"
     calling_days: str = "mon-fri"
+    # Demo datasets only (spec 0011, D8): every demo number is a team phone, and the final is in the evening.
+    demo_calling_window: str = "always"
     # Worker pacing.
     command_backoff_seconds: float = 5.0
     lease_seconds: int = 300
@@ -119,6 +121,7 @@ class Settings:
             calling_tz=env.get("DIALBACK_CALLING_TZ", "America/Los_Angeles"),
             calling_window=env.get("DIALBACK_CALLING_WINDOW", "09:00-16:30"),
             calling_days=env.get("DIALBACK_CALLING_DAYS", "mon-fri"),
+            demo_calling_window=env.get("DIALBACK_DEMO_CALLING_WINDOW", "always"),
             run_worker=env.get("DIALBACK_RUN_WORKER", "1") != "0",
             run_jobs=env.get("DIALBACK_RUN_JOBS", "1") != "0",
             poll_interval_seconds=int(env.get("DIALBACK_POLL_SECONDS", "60")),

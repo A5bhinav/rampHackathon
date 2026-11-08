@@ -60,6 +60,7 @@ This spec covers the parts in Abhi's slice: the reset, the bank change, the tamp
 
 8. **Calling hours.**
    - Demo datasets call within `DIALBACK_DEMO_CALLING_WINDOW`, which defaults to any time on any day. The live final is in the evening (spec 0002, Q7), and every demo number is a team phone on the voice service's allowlist.
+   - **As built:** the value is `always` (the default), `HH:MM-HH:MM` (every day) or `HH:MM-HH:MM <days>`, in `DIALBACK_CALLING_TZ`. A day range may wrap the week (`fri-mon`). Anything unreadable, including a window with no open day, stops the core at startup. Both the first call and each retry timer use the dataset's window.
    - Dev and lab datasets keep the normal window.
 
 **Stated limits:**
@@ -88,7 +89,7 @@ None: the CLI and two optional core settings, `CORE_PUBLIC_URL` and `DIALBACK_DE
   - Other datasets' chains are untouched, and an ordinary update is still refused.
 - [ ] **Status** reports the dataset, its cases, the chain result and the alerts.
 - [ ] **Chaos** on and off changes only the demo business's mock settings, and a reset turns it off.
-- [ ] **Calling hours:** a demo dataset places a call at 21:00 in the calling time zone, while a dev dataset waits for the window.
+- [x] **Calling hours:** a demo dataset places a call at 21:00 in the calling time zone, while a dev dataset waits for the window.
 - [ ] **End to end** against the dev stack: reset, change, scripted call, Verified, the changer refused, a second approver releases, tamper, the alert.
 
 ## Tests (written first)
@@ -99,7 +100,7 @@ None: the CLI and two optional core settings, `CORE_PUBLIC_URL` and `DIALBACK_DE
 | change | `test_demo.py::test_the_demo_change_is_the_clerks_and_they_cant_release_it`, `::test_an_unknown_author_needs_two_approvers` |
 | tamper | `test_demo.py::test_tamper_breaks_only_a_demo_chain_and_the_verify_job_names_the_row` |
 | status, chaos | `test_demo.py::test_status_reports_the_demo`, `::test_chaos_toggles_only_the_demo_business` |
-| calling hours | `apps/core/tests/test_worker.py::test_demo_datasets_call_outside_the_normal_window` |
+| calling hours | `apps/core/tests/test_worker.py::test_demo_datasets_call_outside_the_normal_window` (a demo dataset's clock is real, so the test closes the normal window for the whole of today rather than setting 21:00; it covers the first call and a retry), `::test_the_demo_calling_window_setting`, `::test_an_unreadable_demo_window_stops_the_worker_at_startup` |
 | end to end | `scripts/dev/demo_rehearsal.py`, a rehearsal script against `scripts/dev/stack.py`; its output goes in the PR |
 
 ## Out of scope

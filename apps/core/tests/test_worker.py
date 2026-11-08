@@ -5,15 +5,18 @@ from __future__ import annotations
 
 import datetime as dt
 import uuid
+from zoneinfo import ZoneInfo
 
 import pytest
 from conftest import core_settings, make_world
 from contract import CONTRACTS
+from dialback_core.calling_window import DAYS, CallingWindow
 from dialback_core.db import system_tx
 from dialback_core.detection import import_all, sync_vendor
 from dialback_core.flags import ResolverMode
 from dialback_core.ports import ChangeFacts, LedgerChangeContext, LedgerResolver
 from dialback_core.ramp import RampError
+from dialback_core.worker import Worker
 from dialback_decision import rules
 from flows import _types, answer, bills, case_of, change_and_detect, one, pay, release, report, transit
 
@@ -557,3 +560,53 @@ async def test_a_callback_time_that_isnt_a_moment_is_refused(world, when):
     case = await case_of(world)
     r = await report(world, case["id"], world.voice.placed[0]["call_id"], result="callback_requested", retry_at=when)
     assert r.status_code == 422 and (await case_of(world))["state"] == "calling"
+
+
+# Demo calling hours (spec 0011, D8) ----------------------------------------------------------------
+
+async def test_demo_datasets_call_outside_the_normal_window(pool):
+    """The normal window is closed all day today (it opens on another weekday only). A demo
+    dataset calls anyway, within DIALBACK_DEMO_CALLING_WINDOW (default: any time), while a dev
+    dataset waits for the window."""
+    today = dt.datetime.now(ZoneInfo("America/Los_Angeles")).weekday()
+    settings = core_settings(calling_window="09:00-16:30", calling_days=DAYS[(today + 3) % 7])
+    dev, demo = await make_world(pool, settings=settings), await make_world(pool, kind="demo", settings=settings)
+    try:
+        for w in (dev, demo):
+            await import_all(w.pool, w.ramp, w.keys, w.dataset.id)
+            await change_and_detect(w)
+            assert (await case_of(w))["state"] == "calling"
+        assert dev.voice.placed == [], "a dev dataset waits for the window"
+        assert len(demo.voice.placed) == 1, "a demo dataset calls now"
+
+        # The retry timer takes the same window: once due, it redials now rather than waiting days.
+        case = await case_of(demo)
+        assert (await report(demo, case["id"], demo.voice.placed[0]["call_id"], result="no_answer")).status_code == 204
+        async with system_tx(pool) as conn:  # the retry's back-off has passed
+            await conn.execute("update app.timers set fire_at = now() where case_id = %s and kind = 'retry_call' "
+                               "and status = 'scheduled'", (case["id"],))
+        await demo.worker.drain(demo.dataset.id)
+        assert [p["attempt"] for p in demo.voice.placed] == [1, 2]
+    finally:
+        for w in (dev, demo):
+            await w.core.aclose()
+            await w.mock.aclose()
+
+
+def test_the_demo_calling_window_setting():
+    always = CallingWindow.parse_spec("America/Los_Angeles", "always")
+    assert always.contains(dt.datetime(2026, 11, 8, 23, 59, 59, tzinfo=dt.UTC))
+    assert always.contains(dt.datetime(2026, 11, 9, 7, 59, 59, tzinfo=dt.UTC))  # 23:59:59 in Los Angeles
+    evening = CallingWindow.parse_spec("America/Los_Angeles", "17:00-22:00 all")
+    assert evening.contains(dt.datetime(2026, 11, 20, 5, 0, tzinfo=dt.UTC))  # Thu 21:00 in Los Angeles
+    assert not evening.contains(dt.datetime(2026, 11, 19, 20, 0, tzinfo=dt.UTC))  # Thu 12:00
+    weekend = CallingWindow.parse_spec("America/Los_Angeles", "17:00-22:00 fri-mon")  # a range that wraps the week
+    assert weekend.days == frozenset({4, 5, 6, 0})
+    for bad in ("whenever", "22:00-17:00", "17:00-22:00 someday", "17:00-22:00 ,"):
+        with pytest.raises(ValueError):
+            CallingWindow.parse_spec("America/Los_Angeles", bad)
+
+
+async def test_an_unreadable_demo_window_stops_the_worker_at_startup(world):
+    with pytest.raises(ValueError, match="not a calling window"):
+        Worker(world.pool, core_settings(demo_calling_window="evenings"), world.connector, world.resolver, world.voice)

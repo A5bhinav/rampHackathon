@@ -94,6 +94,7 @@ The `ramp-mock` URL uses Railway's reference variables (`${{service.VARIABLE}}`)
 | `SUPABASE_URL` | yes | The Supabase project's address, `https://<ref>.supabase.co`, with no path. The core verifies the dashboard's tokens with the project's public signing keys and issuer (spec 0010). |
 | `DIALBACK_JWT_SECRET` | no | Leave unset in production. Supabase advises against trusting a shared secret, the core refuses one committed to the repo, and alongside `SUPABASE_URL` it needs `DIALBACK_TRUST_LEGACY_SECRET=1`, which is only for moving a project off its legacy secret. |
 | `DIALBACK_CALLING_TZ`, `DIALBACK_CALLING_WINDOW`, `DIALBACK_CALLING_DAYS` | no | Default `America/Los_Angeles`, `09:00-16:30`, `mon-fri` |
+| `DIALBACK_DEMO_CALLING_WINDOW` | no | Demo datasets only: `always` (default), `HH:MM-HH:MM` or `HH:MM-HH:MM mon-fri`, in `DIALBACK_CALLING_TZ`. An unreadable value stops the core at startup (spec 0011). |
 | `DIALBACK_RUN_WORKER`, `DIALBACK_RUN_JOBS` | no | `0` turns either off |
 | `DIALBACK_POLL_SECONDS`, `DIALBACK_RECONCILE_SECONDS`, `DIALBACK_FULL_SWEEP_SECONDS`, `DIALBACK_VERIFY_SECONDS` | no | Job intervals; default 60, 300, 86400 and 300 |
 | `PORT`, `HOST` | no | Set by the image (8001; an empty `HOST` binds IPv4 and IPv6) |
