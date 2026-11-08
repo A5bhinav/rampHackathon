@@ -1,4 +1,4 @@
-"""Spec 0015: the six properties in the ledger README, over random vendor histories."""
+"""Spec 0021: the six properties in the ledger README, over random vendor histories."""
 import datetime as dt
 import random
 
@@ -154,7 +154,7 @@ def test_ties_go_to_more_sources_then_ar_over_main():
 
 
 
-# Review findings (spec 0015) --------------------------------------------------------------------
+# Review findings (spec 0021) --------------------------------------------------------------------
 
 def test_an_uncounted_sighting_never_makes_a_number_old():
     young = [old(NUMBERS[4], "email", days_before=20), old(NUMBERS[4], "listing", days_before=10)]

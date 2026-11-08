@@ -1,4 +1,4 @@
-"""ledger-select-v1: which number a case will call, or none (spec 0015, design §4).
+"""ledger-select-v1: which number a case will call, or none (spec 0021, design §4).
 
 A pure function: sightings and their documents' custody in, a selection.schema.json document
 out. Code decides; no model output reaches here except role and party labels. A number needs
@@ -8,7 +8,7 @@ already meets every rule in code, allow it; it can never make up for a rule in c
 "Seen" for age, ranking and near misses means a visible sighting before the cutoff, outside the
 change context, in a channel that counts (email only from the vendor's own domains). Nothing else
 can make a number look older or established: not an old hijacked thread, a lookalike's message,
-a line hidden in a PDF, or the old number on file (spec 0015).
+a line hidden in a PDF, or the old number on file (spec 0021).
 """
 from __future__ import annotations
 

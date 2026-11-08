@@ -1,4 +1,4 @@
-"""Spec 0015: lookalike domains are flagged, never merged."""
+"""Spec 0021: lookalike domains are flagged, never merged."""
 import json
 
 from _world import ROOT
