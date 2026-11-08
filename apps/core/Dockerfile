@@ -15,6 +15,8 @@ WORKDIR /app
 COPY --from=build /app/.venv /app/.venv
 COPY scripts/db/migrate.py scripts/db/migrate.py
 COPY supabase/migrations supabase/migrations
+# The demo seed, so `dialback-core demo reset` works from the Railway shell (spec 0011).
+COPY scripts/demo scripts/demo
 # An empty HOST binds every address family the host has: IPv4, and IPv6 where it exists (Railway's
 # private network). "::" alone would be IPv6-only and fail to start on a host without IPv6.
 ENV PATH=/app/.venv/bin:$PATH PYTHONUNBUFFERED=1 HOST="" PORT=8001

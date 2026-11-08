@@ -5,6 +5,7 @@
     dialback-core import-vendors --dataset <id>          initial import (baseline) or a full sweep
     dialback-core retire-dataset --dataset <id>          hide a dataset; nothing is deleted
     dialback-core run-job --dataset <id> --job reconcile run poll, full_sweep, reconcile or verify_chain now
+    dialback-core demo reset|change                      one command per demo beat (spec 0011)
 """
 from __future__ import annotations
 
@@ -18,6 +19,7 @@ from uuid import UUID
 import httpx
 import uvicorn
 
+from . import demo
 from .app import create_app
 from .datasets import create_dataset, retire_dataset
 from .db import open_pool, system_tx
@@ -70,6 +72,39 @@ async def _retire(settings: Settings, dataset_id: UUID) -> None:
         await pool.close()
 
 
+async def _demo(settings: Settings, args: argparse.Namespace) -> int:
+    pool = await open_pool(settings.database_url, max_size=3)
+    async with httpx.AsyncClient(base_url=settings.ramp_base_url, timeout=15.0) as mock, httpx.AsyncClient(timeout=10.0) as http:
+        env = demo.DemoEnv(pool=pool, settings=settings, mock=mock, connector=RampConnector(settings, http),
+                           owner_url=settings.database_url)
+        try:
+            if args.action == "reset":
+                links, seed = dict(_link(x) for x in args.link), demo.load_seed(args.seed)
+                r = await demo.reset(env, seed, links)
+                for w in r.warnings:
+                    print(f"warning: {w}")
+                print(f"dataset {r.dataset.id}\nchain   {r.dataset.chain_id}")
+                print("vendors " + ", ".join(f"{v['ref']} ({v['name']})" for v in seed["vendors"]))
+                print(f"linked  {', '.join(r.linked) or 'nobody'}")
+                print("next    dialback-core demo change --vendor acme")
+            elif args.action == "change":
+                account = await demo.change(env, demo.load_seed(args.seed), args.vendor, by=args.by, unknown=args.unknown)
+                print(f"bank change made in the Ramp mock (new account {account}); the core opens the case and places the hold")
+        except demo.DemoError as exc:
+            print(f"refused: {exc}")
+            return 2
+        finally:
+            await pool.close()
+    return 0
+
+
+def _link(raw: str) -> tuple[str, str]:
+    ref, sep, email = raw.partition("=")
+    if not sep or not ref or "@" not in email:
+        raise demo.DemoError(f"--link takes <ref>=<email>, not {raw!r}")
+    return ref, email
+
+
 def run() -> None:
     logging.basicConfig(level=os.environ.get("LOG_LEVEL", "INFO"))
     parser = argparse.ArgumentParser(prog="dialback-core")
@@ -84,6 +119,17 @@ def run() -> None:
     rj = sub.add_parser("run-job")
     rj.add_argument("--dataset", type=UUID, required=True)
     rj.add_argument("--job", choices=JOBS, required=True)
+    dm = sub.add_parser("demo").add_subparsers(dest="action", required=True)
+    reset = dm.add_parser("reset", help="a fresh demo company; earlier demo datasets are hidden, nothing is deleted")
+    reset.add_argument("--seed", default=str(demo.DEFAULT_SEED))
+    reset.add_argument("--link", action="append", default=[], metavar="REF=EMAIL",
+                       help="point that Dialback account at the seeded Ramp user with this ref (repeatable)")
+    ch = dm.add_parser("change", help="beat 2: the vendor's seeded bank change")
+    ch.add_argument("--vendor", required=True)
+    ch.add_argument("--seed", default=str(demo.DEFAULT_SEED))
+    who = ch.add_mutually_exclusive_group()
+    who.add_argument("--by", default="clerk", help="the seeded user who makes it (default: clerk)")
+    who.add_argument("--unknown", action="store_true", help="no known author: two approvers are needed")
     args = parser.parse_args()
 
     settings = Settings.from_env()
@@ -97,6 +143,8 @@ def run() -> None:
         asyncio.run(_retire(settings, args.dataset))
     elif args.cmd == "run-job":
         asyncio.run(_run_job(settings, args.dataset, args.job))
+    elif args.cmd == "demo":
+        raise SystemExit(asyncio.run(_demo(settings, args)))
 
 
 if __name__ == "__main__":

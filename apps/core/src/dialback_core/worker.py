@@ -127,6 +127,7 @@ class Worker:
         self.change_context = change_context or LedgerChangeContext()
         self.keys = Keys(settings.fingerprint_key, settings.fingerprint_key_version)
         self.window = CallingWindow.parse(settings.calling_tz, settings.calling_window, settings.calling_days)
+        self.demo_window = CallingWindow.parse_spec(settings.calling_tz, settings.demo_calling_window)
         self.jobs = Jobs(pool, settings, connector, self.keys, self.name)
         self.handlers = {
             "place_hold": self.place_hold, "select_number": self.select_number, "place_call": self.place_call,
@@ -332,6 +333,11 @@ class Worker:
 
     # place_call (D6) ---------------------------------------------------------------------------
 
+    async def _window(self, conn: AsyncConnection, dataset_id: UUID) -> CallingWindow:
+        """Demo datasets call within the demo window (spec 0011, D8); every other kind keeps the normal one."""
+        row = await (await conn.execute("select kind from app.datasets where id = %s", (dataset_id,))).fetchone()
+        return self.demo_window if row is not None and row["kind"] == "demo" else self.window
+
     async def place_call(self, cmd: Command) -> None:
         case = await self._case(cmd.case_id)
         self._expect(case, cmd, ("calling",))
@@ -340,8 +346,9 @@ class Worker:
             raise Stale(f"case is on attempt {case['call_attempts']}, command was for attempt {attempt}")
         async with system_tx(self.pool) as conn:
             now = await dataset_now(conn, case["dataset_id"])
-        if not self.window.contains(now):
-            raise Defer(self.window.next_open(now), "outside the calling window")
+            window = await self._window(conn, case["dataset_id"])
+        if not window.contains(now):
+            raise Defer(window.next_open(now), "outside the calling window")
         try:
             call_id = await self.caller.place_call(case_id=case["id"], attempt=attempt, idempotency_key=cmd.key)
         except PreDialRefused as refused:
@@ -469,8 +476,9 @@ class Worker:
         payload = timer["payload"] or {}
         try:
             if timer["kind"] == "retry_call" and case["state"] == "retry_wait" and payload.get("version") in (None, case["version"]):
-                if not self.window.contains(now):
-                    await conn.execute("update app.timers set fire_at = %s where id = %s", (self.window.next_open(now), timer["id"]))
+                window = await self._window(conn, timer["dataset_id"])
+                if not window.contains(now):
+                    await conn.execute("update app.timers set fire_at = %s where id = %s", (window.next_open(now), timer["id"]))
                     return
                 await apply_event(conn, case["id"], "retry_timer_fired",
                                   f"{case['id']}:retry:v{case['version']}:{payload.get('after_attempt')}",
