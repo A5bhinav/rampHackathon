@@ -34,7 +34,7 @@ corpus/
 - Expected outcomes are frozen and hashed before extractor code is written, and the hash is checked in CI so the truth can't drift to match the code.
 - Every file the ledger ingests gets a custody record (channel, receive time, sender, thread) in the fixture, because provenance comes from custody metadata, never from a model.
 
-## What's here now (spec 0014)
+## What's here now (spec 0020)
 
 `generator/` builds 12 poisoning patterns (P01 to P12; P04 has three variants), 5 controls
 (C01 to C05) and the stated known limit (K01), one fictional vendor each, into `poison/` and

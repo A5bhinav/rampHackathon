@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the corpus scenarios and their frozen truth (spec 0014). Standard library only.
+"""Build the corpus scenarios and their frozen truth (spec 0020). Standard library only.
 
     uv run python corpus/generator/build.py            write corpus/{poison,controls,truth}/
     uv run python corpus/generator/build.py --check    rebuild in memory; fail on any difference
