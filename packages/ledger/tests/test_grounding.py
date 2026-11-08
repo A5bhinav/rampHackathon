@@ -1,4 +1,4 @@
-"""Spec 0016 B: a hostile labeler gets nothing accepted that code didn't find in visible text."""
+"""Spec 0022 B: a hostile labeler gets nothing accepted that code didn't find in visible text."""
 from dialback_ledger.candidates import find_phones
 from dialback_ledger.grounding import ground
 from dialback_ledger.text import lines

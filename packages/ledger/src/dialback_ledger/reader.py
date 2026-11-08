@@ -55,4 +55,4 @@ class StubReader:
 def reader_for(mode: ReaderMode) -> Reader:
     if mode is ReaderMode.STUB:
         return StubReader()
-    raise NotImplementedError("DIALBACK_READER=llm: the quarantined LLM reader isn't built yet (spec 0016); use stub")
+    raise NotImplementedError("DIALBACK_READER=llm: the quarantined LLM reader isn't built yet (spec 0022); use stub")

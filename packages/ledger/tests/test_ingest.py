@@ -1,4 +1,4 @@
-"""Spec 0016 B: ingest() end to end on the frozen corpus, then select() reproduces the truth."""
+"""Spec 0022 B: ingest() end to end on the frozen corpus, then select() reproduces the truth."""
 import json
 from collections import Counter
 

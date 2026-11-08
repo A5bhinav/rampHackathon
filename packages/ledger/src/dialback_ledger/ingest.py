@@ -1,4 +1,4 @@
-"""ingest(): documents in, ledger.observations-shaped rows out (spec 0016).
+"""ingest(): documents in, ledger.observations-shaped rows out (spec 0022).
 
 Code runs every stage but labeling: custody, text, visibility, candidates, then the reader on
 visible text only, then grounding. Every candidate code found becomes an observation; a label can
