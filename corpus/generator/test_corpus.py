@@ -1,4 +1,4 @@
-"""Spec 0014: the corpus is deterministic, fictional, complete, and its truth is frozen."""
+"""Spec 0020: the corpus is deterministic, fictional, complete, and its truth is frozen."""
 import hashlib
 import json
 import re

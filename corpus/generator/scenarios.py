@@ -1,4 +1,4 @@
-"""The twelve poisoning patterns, the five controls and the known limit (spec 0014).
+"""The twelve poisoning patterns, the five controls and the known limit (spec 0020).
 
 Each scenario builds one vendor with an ordinary history, then the attack or the odd change,
 and states by hand what ledger-select-v1 must do. Those expectations are the frozen truth: they
@@ -24,7 +24,7 @@ class Scenario:
     id: str
     slug: str
     kind: str          # poison, control, known_limit
-    source: str        # named (by the design doc) or proposed (spec 0014, Q42)
+    source: str        # named (by the design doc) or proposed (spec 0020, Q42)
     title: str
     vendor: str
     area: str
@@ -144,7 +144,7 @@ def p06(v):
     return expect(ar, {x: [FEW]})
 
 
-# Patterns proposed in spec 0014 (Q42): one per clause the named six don't isolate ---------
+# Patterns proposed in spec 0020 (Q42): one per clause the named six don't isolate ---------
 
 @scenario("P07", "same-subject-new-thread", "poison", "proposed",
           "The request's subject line in another thread twelve days earlier", "Tavish", "702")
