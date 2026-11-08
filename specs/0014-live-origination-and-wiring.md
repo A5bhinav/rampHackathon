@@ -26,7 +26,7 @@ None. The report already exists (`internal.yaml` `reportCallEnded`, spec 0012). 
 
 - [ ] In live mode, a fresh `POST /calls` placement originates one Twilio call whose `to` is the recorded pick, whose `from_` is the configured number, and whose `url` and `statusCallback` are built from `public_base_url`; the returned CallSid is stored on `voice.calls` and neither the case id nor the number's lineage is passed to Twilio.
 - [ ] A replayed Idempotency-Key returns the first call (200) and places no second Twilio call.
-- [ ] `lookup_call` returns the `CallDial` for a known call that has a pick, and `None` when the call or its pick is missing, so the routes fail closed (404 / socket closed / nothing reported).
+- [ ] The `lookup_call` mapper (`dial_from_row`) returns a `CallDial` for a complete call row and `None` when the row or any token-or-disclosure field is missing, so the routes fail closed (404 / socket closed / nothing reported). The psycopg query that builds the row joins `voice.calls`, `app.cases` and the ledger pick, and lands with the ledger (Q40/Q50).
 - [ ] In live mode with any required secret or URL missing, the service starts in text mode and mounts no Twilio routes, logging the missing keys; it never starts half-live.
 - [ ] Failure path: an `Originator` error ends the call `failed` and reports `failed` to the core (or leaves the case `calling` for the core timeout if the report cannot land); it is never a placed-but-silent live call, and never a recorded "yes".
 
@@ -36,11 +36,11 @@ None. The report already exists (`internal.yaml` `reportCallEnded`, spec 0012). 
 |---|---|
 | 1 | `apps/voice/tests/test_origination.py::test_live_placement_dials_the_pick` |
 | 2 | `apps/voice/tests/test_origination.py::test_a_replayed_key_places_no_second_call` |
-| 3 | `apps/voice/tests/test_lookup_call.py::test_lookup_returns_dial_or_fails_closed` (in-memory and the psql-backed adapter) |
+| 3 | `apps/voice/tests/test_lookup_call.py` (the `dial_from_row` mapper and its fail-closed contract; the psql query that fills a row lands with the ledger, Q40/Q50) |
 | 4 | `apps/voice/tests/test_wiring.py::test_live_without_config_falls_back_to_text` |
 | 5 | `apps/voice/tests/test_origination.py::test_originate_failure_reports_failed` |
 
-All drive a fake `Originator` that records its arguments, an in-memory store, and signed `TestClient` requests. The DB-backed `lookup_call` is covered by the psql test, like the `POST /calls` store adapter. No live Twilio account, phone number, or model key.
+All drive a fake `Originator` that records its arguments, an in-memory store, and signed `TestClient` requests, plus an httpx `MockTransport` for the `TwilioOriginator` REST client. The `lookup_call` mapper (`dial_from_row`) is tested pure; its psycopg query is the deferred thin piece the psql CI test will cover once the ledger lands, exactly as the `POST /calls` store adapter is. No live Twilio account, phone number, or model key.
 
 ## Out of scope
 
@@ -54,7 +54,7 @@ All drive a fake `Originator` that records its arguments, an in-memory store, an
 
 - **Q49:** origination is synchronous in the `POST /calls` path (decision 2). If Twilio REST latency makes the 202 too slow, it moves to a background task kicked off after the 202, which needs a "dialed yet?" guard so a process that dies between `record_call` and the dial still fails closed. Confirm synchronous is fine for the demo.
 - **Q50:** `lookup_call` needs `customer_name`, `callback_number` and `vendor_names` (decision 4). These cross into `app.cases` (Abhi) and the Trust Ledger (Inesh), whose shapes are not final (spec 0012, Q40). Confirm each field's source. In particular, `callback_number` is likely a single configured team number, not a per-case column; confirm. Until confirmed, the adapter reads what it can and fails closed on the rest.
-- **Q51:** an origination failure records `failed`, reports `failed`, and still returns 202 (decision 3). Confirm this over returning a 5xx that makes the core retry.
+- **Q51:** an origination failure records `failed`, reports `failed`, and still returns 202 (decision 3). Confirm this over returning a 5xx that makes the core retry. **Found while building:** because the dial is synchronous (Q49), the failed report is awaited inside `POST /calls`, before the 202. In production the core has not appended `call_started` yet at that point, so the report hits the 409 race that `report.py` retries with backoff, and can burn much of that backoff inside the request. It still fails closed (the core's `call_timeout` is the backstop), but it reinforces Q49's background-task alternative, which fixes both the latency and this race. Until then the failed-report await is accepted as a rare, slow path.
 - Carried from 0013: **Q45** (whether the greeting alone can be non-interruptible), **Q46** (the WS handshake is not Twilio-signed and the `call_token` is a stateless HMAC, not single-use; decide if a single-use nonce is needed before a real dial), **Q47** (confirmed here: the voice service originates via REST and the status callback points back at it), **Q48** (the live go/no-go), **Q41** (the model pin, in the agent spec).
 
 ## Commands

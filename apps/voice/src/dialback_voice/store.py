@@ -11,8 +11,9 @@ are not final yet (spec 0012, Q40), so the adapter fails closed on a missing pic
 number means `has_number_pick=False`, which refuses the call with `number_not_selected` (R2, R7)."""
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Any, Protocol
 from uuid import UUID
 
 from .guards import PreDialInputs
@@ -24,6 +25,38 @@ class PlacedCall:
     call_id: UUID
     case_id: UUID
     attempt: int
+
+
+@dataclass(frozen=True)
+class CallDial:
+    """What the voice service knows about a placed call when Twilio calls back about it: enough to
+    mint the call_token, speak the right disclosure and report the result, and no more. The case id
+    never goes to Twilio or the model. Built from `voice.calls` plus the pick (spec 0013 Q47); the
+    tests pass it directly, or go through `dial_from_row` below."""
+    case_id: UUID
+    attempt: int
+    number_e164: str
+    customer_name: str
+    callback_number: str
+    vendor_names: tuple[str, ...]
+
+
+def dial_from_row(row: Mapping[str, Any] | None) -> CallDial | None:
+    """Assemble a `CallDial` from a joined call row, or `None` if the row is missing or any field
+    the token and the disclosure need is absent. Fail closed (R2, R7): never invent a number or a
+    name, so a route reads `None` and declines a call it only half knows. `vendor_names` is allowed
+    to be empty (there may be no vendor to name; the disclosure does not use it). The query that
+    builds the row joins `voice.calls`, `app.cases` and the ledger pick, whose shapes are not final
+    (Q40/Q50), so it lands with the ledger; this mapper is the fixed contract it fills."""
+    if row is None:
+        return None
+    required = ("case_id", "attempt", "number_e164", "customer_name", "callback_number")
+    if any(row.get(key) in (None, "") for key in required):
+        return None
+    return CallDial(case_id=row["case_id"], attempt=int(row["attempt"]),
+                    number_e164=row["number_e164"], customer_name=row["customer_name"],
+                    callback_number=row["callback_number"],
+                    vendor_names=tuple(row.get("vendor_names") or ()))
 
 
 @dataclass(frozen=True)

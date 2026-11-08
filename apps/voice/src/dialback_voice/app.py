@@ -30,7 +30,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from .agent import Agent
 from .guards import pre_dial_refusal
-from .store import CallStore, PlacedCall
+from .store import CallDial, CallStore, PlacedCall
 from .tokens import mint
 from .transport import CallResult, Clock
 from .twilio.origination import Originator, build_connect_twiml, status_result, valid_twilio_signature
@@ -68,20 +68,6 @@ class PlaceCallAccepted(Strict):
 
 def _error(status: int, code: str, message: str) -> JSONResponse:
     return JSONResponse({"code": code, "message": message}, status_code=status)
-
-
-@dataclass(frozen=True)
-class CallDial:
-    """What the voice service knows about a placed call when Twilio calls back about it: enough to
-    mint the call_token, speak the right disclosure and report the result, and no more. The case id
-    never goes to Twilio or the model. The real source is `voice.calls` plus the pick (the live
-    adapter, spec 0013 Q47); the tests pass it directly."""
-    case_id: UUID
-    attempt: int
-    number_e164: str
-    customer_name: str
-    callback_number: str
-    vendor_names: tuple[str, ...]
 
 
 @dataclass(frozen=True)
