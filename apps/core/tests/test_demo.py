@@ -237,12 +237,14 @@ async def test_tamper_without_owner_rights_fails_and_changes_nothing(demo):
     r, _ = await _denied_case(demo)
     async with await psycopg.AsyncConnection.connect(demo.env.owner_url, autocommit=True) as owner:
         await owner.execute("do $$ begin if not exists (select 1 from pg_roles where rolname = 'demo_not_owner') then "
-                            "create role demo_not_owner login bypassrls; end if; end $$")
+                            "create role demo_not_owner nologin bypassrls; end if; end $$")
         await owner.execute("grant usage on schema audit to demo_not_owner")
         await owner.execute("grant select on audit.evidence_events to demo_not_owner")
     before = await one(demo.pool, "select seq, body_jcs from audit.evidence_events where chain_id = %s and type = 'decision_made' "
                        "order by seq desc limit 1", r.dataset.chain_id)
-    not_owner = dataclasses.replace(demo.env, owner_url=make_conninfo(demo.env.owner_url, user="demo_not_owner"))
+    # Sign in exactly as the owner URL does (trust locally, a password in CI), then act as a role
+    # that can read the table but doesn't own it: the core's role on a database it didn't create.
+    not_owner = dataclasses.replace(demo.env, owner_url=make_conninfo(demo.env.owner_url, options="-c role=demo_not_owner"))
     with pytest.raises(psycopg.errors.InsufficientPrivilege):
         await tamper(not_owner, confirmed=True)
     after = await one(demo.pool, "select body_jcs from audit.evidence_events where chain_id = %s and seq = %s",
