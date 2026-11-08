@@ -1,0 +1,20 @@
+{
+  "schema_version": "call-answers/v0",
+  "call_id": "6b1e2f0a-4c3d-4e5f-8a9b-0c1d2e3f4a5b",
+  "answers": [
+    { "slot": "recording_consent", "value": "yes", "turn_id": 1, "tool_call_id": "tc_01", "captured_at": "2026-11-03T17:02:11Z", "capture_method": "speech" },
+    { "slot": "company_named", "value": "Acme Supply", "turn_id": 3, "tool_call_id": "tc_02", "captured_at": "2026-11-03T17:02:20Z", "capture_method": "speech" },
+    { "slot": "department", "value": "Accounts receivable", "turn_id": 3, "tool_call_id": "tc_03", "captured_at": "2026-11-03T17:02:20Z", "capture_method": "speech" },
+    { "slot": "speaker_name", "value": "Jordan Lee", "turn_id": 5, "tool_call_id": "tc_04", "captured_at": "2026-11-03T17:02:31Z", "capture_method": "speech" },
+    { "slot": "speaker_role", "value": "AR manager", "turn_id": 5, "tool_call_id": "tc_05", "captured_at": "2026-11-03T17:02:31Z", "capture_method": "speech" },
+    { "slot": "change_requested", "value": "yes", "turn_id": 7, "tool_call_id": "tc_06", "captured_at": "2026-11-03T17:02:44Z", "capture_method": "speech" },
+    {
+      "slot": "account_last4",
+      "value": { "digits_hmac": "3c9a1f0e7b5d2a4c6e8f0a1b3c5d7e9f1a2b4c6d8e0f2a4b6c8d0e2f4a6b8c0d", "digit_count": 4, "key_version": 1 },
+      "turn_id": 9,
+      "tool_call_id": "dtmf_01",
+      "captured_at": "2026-11-03T17:03:02Z",
+      "capture_method": "keypad"
+    }
+  ]
+}
