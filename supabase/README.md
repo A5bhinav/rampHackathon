@@ -13,7 +13,7 @@ supabase/
     _bootstrap/   schemas, roles, grants                              shared, applied first
     audit/        chains, evidence_events, append_evidence, verify    Abhi
     app/          cases, holds, releases, plumbing, the two functions Abhi
-    ledger/       documents, observations, contact_points, selections Inesh   (to add)
+    ledger/       documents, observations, contact_points, selections Inesh
     voice/        calls, call_answers                                 Sami    (to add)
     lab/          config_versions, scenarios, lab_runs, lab_results   Sami    (to add)
     mock_ramp/    the Ramp-shaped mock's tables and behavior          Abhi
@@ -79,6 +79,18 @@ Plumbing: `case_transitions` (the state machine as rows), `case_event_receipts`
 Access: everyone signed in can read; the service role writes mirrors and plumbing;
 `cases`, `decisions`, `releases` and `case_event_receipts` are written only by the functions,
 which run as their owner. Not even the service role can write them directly.
+
+### `ledger` (Inesh, spec 0019)
+
+| Object | Role |
+|---|---|
+| `ledger.documents` | One source file and its custody: channel, our own `received_at`, sender, thread, SHA-256. `claimed_date` is shown, never trusted. An attachment must match its email's channel and receive time. Append-only. |
+| `ledger.observations` | "Value X was seen in document D." `source_type` and `seen_at` are copied from the document by a trigger, whatever the insert says, so a model can never set provenance. `recorded_at` is `app.now()`, so a selection replays from rows recorded before the case opened. Phones are E.164; a bank account is `routing:last4:fingerprint` with no quote (ADR-8). Append-only. |
+| `ledger.contact_points` | One number per vendor with its lineage summary, for the dashboard. The service role updates only the summary columns; the dataset, vendor and number are fixed. A selection never reads it as truth. |
+| `ledger.number_selections` | The `selection.schema.json` document for a case, with its outcome, rule version, contact point and inputs hash as columns that must match the document. A pick names a contact point of the case's own vendor, with the number the document names; no pick names none. Append-only. |
+
+Access: everyone signed in reads; the service role inserts; append-only tables refuse update,
+delete and truncate by grant and by trigger.
 
 ### `mock_ramp` (Abhi)
 
