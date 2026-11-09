@@ -10,6 +10,8 @@
 
 **Spec:** `specs/0033-generative-selection-pressure.md`
 
+**After the final review (Nov 8):** this plan is the pre-review argument. The fix pass changed several of its names and interfaces: I1 is now R2's first-seen rule (`I1_first_seen_in_context_eligible`), I7 covers every eligible number (`I7_near_miss_eligible`), the reference is conservative on shared ids, numbers are fictional (NPA-555-01XX), fuzz cases are named by content hash, the over-block sweep has planted rows, and lab-fuzz runs the green lab checks first. The spec's "Resolved and carried" section and the ledger hold the record.
+
 **Base branch:** This plan extends the `evals` lab package and its `lab` CLI (`dialback_evals.cli:main`) from spec 0017, which are not on `origin/main`. The branch `sami/attack-lab-generative` integrated them by merging `sami/attack-lab-voice` (merge `6441eef`), so it carries both the 0017 package and main's ledger rule. Every "Modify" path below (`cli.py`, `pyproject.toml`) refers to the 0017 version of that file.
 
 ## Global Constraints
