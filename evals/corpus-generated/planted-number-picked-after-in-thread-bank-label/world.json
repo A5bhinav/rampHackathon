@@ -1,9 +1,9 @@
 {
   "label": "planted-number-picked-after-in-thread-bank-label",
   "labels": [
-    "M_incontext_label_blocked"
+    "M_incontext_label_moved_pick"
   ],
-  "why": "Reachable today (v1 settings, no shared ids). The vendor's real number +14155550142 is in a contract and a listing 200 days before the request; a planted provable number +16455550177 is in a contract and a listing 150 days before, so on its own it ranks below the real one. The attacker's email in the request's thread (d1-0, ar@other.example) names the real number as a bank line, which ingestion labels party=bank. select()'s party check reads change-context sightings, so the real number gets not_vendor_party and the pick moves to the planted number: the verification call reaches the attacker. I12 (gated by the user Nov 8) says a change-context label must never revoke a number first seen outside the context; its probe fails here on the planted number too.",
+  "why": "Reachable today (v1 settings, no shared ids). The vendor's real number +14155550142 is in a contract and a listing 200 days before the request; a planted provable number +16455550177 is in a contract and a listing 150 days before, so on its own it ranks below the real one. The attacker's email in the request's thread (d1-0, ar@other.example) names the real number as a bank line, which ingestion labels party=bank. select()'s party check reads change-context sightings, so the real number gets not_vendor_party and the pick moves to the planted number: the verification call reaches the attacker. I12 (gated Nov 8, narrowed the same day): a label in the change context never moves the call to a different number. With the context labels made neutral the rule picks the real number, so this fails I12's removal half. Frozen under the label M_incontext_label_blocked; notes refreshed Nov 8.",
   "case_id": "00000000-0000-0000-0000-000000000001",
   "dataset_id": "00000000-0000-0000-0000-000000000002",
   "vendor_id": "00000000-0000-0000-0000-000000000003",
