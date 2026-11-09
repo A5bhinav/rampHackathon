@@ -44,7 +44,7 @@ The defects come from `evals/FINDINGS.md` on `sami/attack-lab-generative`, as of
   - Digits collect until `#`. There is no auto-submit at four.
   - `*` empties what is typed and emits a new `KeypadReset` event.
   - If digits are in hand and no key comes for 5 seconds, the entry is submitted as if `#` were
-    pressed. The 5 seconds is my call (Q69).
+    pressed. The 5 seconds is my call (Q76).
   - The relay keeps at most 16 keys and drops further digits. The entry is still submitted, and
     the policy refuses it.
   - A spoken turn or a silence still clears a partial entry, as today.
@@ -74,11 +74,11 @@ The defects come from `evals/FINDINGS.md` on `sami/attack-lab-generative`, as of
     answers (`app.py`). The core redials while the case has call attempts left, and otherwise sends
     the case to a person (`docs/state-machine.md`; a `failed` result counts as no person in
     `app.eval_guard`, migration `app/0011`). No `retry_at` is set, so the core waits its default 2 hours
-    (Q73).
+    (Q80).
   - **Second unclear, at the digits question:** the call finishes `answers_recorded` with no digits,
     keeping every other answer, so `decide` gives NR06 and a person sees the full call. This is my
     call: a redial would make an honest vendor answer everything again, for a keypad problem a
-    redial will not fix (Q70).
+    redial will not fix (Q77).
   - The violation count (`MAX_VIOLATIONS`) and the silence count keep their own budgets.
 - **D6. Unclear is never an answer.**
   - An agent says it with `AgentReply(unclear=True)`, and the text line and the relay turn that
@@ -98,7 +98,7 @@ The defects come from `evals/FINDINGS.md` on `sami/attack-lab-generative`, as of
     "they said they are not sure".
   - A model error or an out-of-set answer becomes `unclear`, where today it is the phase's safe
     value. So a timeout gets one more try, and a `no` the caller never said is never recorded.
-    This revises spec 0015's fail-closed values; it is my call (Q71).
+    This revises spec 0015's fail-closed values; it is my call (Q78).
 - **D8. Digits never reach the model.** `ClaudeAgent` replaces each run of three or more digits
   with `[digits]` in the text it sends to the model, through a `redact_digits` helper beside
   `digit_runs`.
@@ -179,10 +179,10 @@ None:
 - The company check (A10, A8). Model extraction of the company name is its own spec, and
   `company.py` belongs to `apps/core`.
 - The refused role (A9), and unclear answers to the free-text questions.
-- Earlier-call evidence never reaching `decide` (FINDINGS A15).
+- Earlier-call evidence never reaching `decide` (FINDINGS A16).
 - Removing the guard's exception for reading back spoken digits. It is harmless now, because no
   agent writes text.
-- Redacting digits from the in-memory transcript itself (Q72).
+- Redacting digits from the in-memory transcript itself (Q79).
 - The voice lab (spec 0017, not yet merged). Any frozen scenario whose call flow changes is
   refrozen by whichever of the two lands second.
 
@@ -190,14 +190,14 @@ None:
 
 These are for Sami. Each one has a call above, so the build is not blocked.
 
-- **Q69.** How long to wait after the last key before submitting? This spec uses 5 seconds.
-- **Q70.** After a second unclear on the digits question, should the call finish with no digits
+- **Q76.** How long to wait after the last key before submitting? This spec uses 5 seconds.
+- **Q77.** After a second unclear on the digits question, should the call finish with no digits
   (NR06, a person sees it now), or end `failed` like consent and the change (a redial)? This spec
   finishes it.
-- **Q71.** Should a model error become `unclear` (D7), or keep spec 0015's safe value?
-- **Q72.** Should spoken digits be redacted from the transcript as soon as they are heard, not only
+- **Q78.** Should a model error become `unclear` (D7), or keep spec 0015's safe value?
+- **Q79.** Should spoken digits be redacted from the transcript as soon as they are heard, not only
   in what the model gets?
-- **Q73.** Should an `unclear:*` failure set `retry_at`? This spec sets none, so the core waits 2
+- **Q80.** Should an `unclear:*` failure set `retry_at`? This spec sets none, so the core waits 2
   hours. A dropped call uses now plus 5 minutes.
 
 ## Commands
