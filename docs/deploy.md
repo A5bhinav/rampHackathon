@@ -22,8 +22,8 @@ The `images` CI job builds both Railway images on every PR. It migrates a databa
    - Use the session pooler (port 5432), not the transaction pooler (6543): the migration runner holds an advisory lock, and the worker uses session settings.
 3. **Sign-in** (spec 0010). Follow "Setting up the Supabase project for sign-in" in `apps/web/README.md`:
    - asymmetric JWT signing keys and a 15-minute access-token expiry;
-   - "Confirm email" off, new sign-ups off, and a 16-character minimum password;
-   - each person created on the Users page with a generated password, then given a role with `scripts/db/add_user.py`.
+   - "Confirm email" off, sign-ups on, and an 8-character minimum password (spec 0027);
+   - people sign up on `/sign-up` and get clerk; approver and auditor are granted with `scripts/db/add_user.py --user-id`.
 4. Migrations are applied by Railway (step 2).
 
 ## 2. Railway (once)

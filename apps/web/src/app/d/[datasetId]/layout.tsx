@@ -30,10 +30,9 @@ export default async function DatasetShell({ children, params }: { children: Rea
               </ul>
             </details>
           ) : null}
-          <span className="person">
-            <span className="avatar" aria-hidden="true">{initials(me.display_name)}</span>
-            <span><strong>{me.display_name}</strong> · {me.roles.join(", ") || "no role"}</span>
-          </span>
+          <span>{me.display_name} · {me.roles.join(", ") || "no role"}</span>
+          {/* The team grants approver by this id (spec 0027), so the person can read it here. */}
+          <span className="muted mono" title="Your user ID: give it to the team to be made an approver">ID {me.user_id}</span>
           <form action="/sign-out" method="post"><button type="submit">Sign out</button></form>
         </div>
       </header>
