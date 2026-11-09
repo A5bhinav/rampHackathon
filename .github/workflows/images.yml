@@ -1,12 +1,14 @@
 name: images
 
-# The Railway images (docs/deploy.md): build both, migrate a database with the core image the
+# The Railway images (docs/deploy.md): build all three, migrate a database with the core image the
 # way Railway's pre-deploy step does, then start each service and wait for /healthz.
 on:
   pull_request:
     paths:
       - "apps/core/**"
       - "apps/ramp-mock/**"
+      - "apps/voice/**"
+      - "packages/policy/**"
       - "packages/decision/**"
       - "packages/ledger/**"
       - "supabase/migrations/**"
@@ -46,13 +48,14 @@ jobs:
         run: |
           docker build -f apps/core/Dockerfile -t dialback-core .
           docker build -f apps/ramp-mock/Dockerfile -t dialback-ramp-mock .
+          docker build -f apps/voice/Dockerfile -t dialback-voice .
       - name: Migrate with the core image, twice (the second run must change nothing)
         run: |
           psql -X -q -v ON_ERROR_STOP=1 "$DATABASE_URL" -f supabase/tests/_local_auth_stub.sql  # Supabase has auth.uid()
           docker run --rm --network host -e DATABASE_URL dialback-core python scripts/db/migrate.py
           docker run --rm --network host -e DATABASE_URL dialback-core python scripts/db/migrate.py | tee second.txt
           grep -q "0 applied now" second.txt
-      - name: Start both services and wait for /healthz
+      - name: Start the services and wait for /healthz
         run: |
           docker run -d --name mock --network host -e DATABASE_URL -e MOCK_RAMP_SECRET=ci-mock-secret-0123456789 \
             -e PORT=8003 dialback-ramp-mock
@@ -61,10 +64,12 @@ jobs:
             -e RAMP_WEBHOOK_SECRET=ci-webhook-secret-0123 -e FINGERPRINT_KEY=ci-fingerprint-key-0123456789abcdef \
             -e DIGITS_KEY=ci-digits-key-0123456789abcdef0123 -e INTERNAL_API_TOKEN=ci-internal-token-0123456789 \
             -e DIALBACK_JWT_SECRET=ci-jwt-secret-0123456789abcdef0123456 dialback-core
-          for svc in 8003 8001; do
+          docker run -d --name voice --network host -e DATABASE_URL -e PORT=8080 \
+            -e DIALBACK_INTERNAL_TOKEN=ci-internal-token-0123456789 dialback-voice
+          for svc in 8003 8001 8080; do
             for i in $(seq 1 30); do curl -fsS "http://localhost:$svc/healthz" && break; sleep 1; done
             curl -fsS "http://localhost:$svc/healthz" > /dev/null
           done
       - name: Service logs
         if: always()
-        run: docker logs mock; docker logs core
+        run: docker logs mock; docker logs core; docker logs voice

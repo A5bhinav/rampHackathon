@@ -54,7 +54,7 @@ class TwilioOriginator:
         return resp.json()["sid"]
 
 
-def build_connect_twiml(*, ws_url: str, call_token: str, disclosure: str) -> str:
+def build_connect_twiml(*, ws_url: str, call_token: str, disclosure: str, answered_by: str | None = None) -> str:
     """The TwiML that connects the call to our ConversationRelay socket. `quoteattr` escapes every
     value, so the disclosure's punctuation cannot break out of its attribute."""
     # interruptible="false" keeps the disclosure from being cut off (R8). Whether the greeting alone
@@ -66,7 +66,8 @@ def build_connect_twiml(*, ws_url: str, call_token: str, disclosure: str) -> str
             "<Response><Connect>"
             f"<ConversationRelay {attrs}>"
             f"<Parameter name=\"call_token\" value={quoteattr(call_token)}/>"
-            "</ConversationRelay>"
+            + (f"<Parameter name=\"answered_by\" value={quoteattr(answered_by)}/>" if answered_by else "")
+            + "</ConversationRelay>"
             "</Connect></Response>")
 
 

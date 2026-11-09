@@ -62,6 +62,6 @@ def pre_dial_refusal(f: PreDialInputs) -> str | None:
         return ATTEMPT_CAP_REACHED
     if f.number_calls_last_30d >= MAX_CALLS_PER_NUMBER_30D:
         return NUMBER_CAP_REACHED
-    if f.demo_dataset and not f.number_on_allowlist:
+    if not f.number_on_allowlist:     # AGENTS.md: never call outside the team allowlist, any dataset (spec 0030)
         return NOT_ON_DIAL_ALLOWLIST
     return None

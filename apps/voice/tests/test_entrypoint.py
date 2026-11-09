@@ -110,3 +110,14 @@ def test_create_asgi_app_with_default_factories_raises_on_boot():
     # serving a half-wired app (R7). A regression to a silent default would let it start.
     with pytest.raises(NotImplementedError):
         create_asgi_app(Settings(voice_mode="text", internal_api_token=TOKEN))
+
+
+def test_create_asgi_app_with_a_database_builds_the_postgres_store(database_url):
+    # Spec 0029: with DATABASE_URL the default factories build the Postgres store and lookup, so the
+    # service boots for real; without it, the seam above still refuses to boot.
+    from dialback_voice.pg_store import PgCallStore
+    settings = Settings(voice_mode="text", internal_api_token=TOKEN, database_url=database_url,
+                        customer_name="Northwind Traders", callback_number="+14155550100")
+    app = create_asgi_app(settings, http=httpx.AsyncClient(), clock=lambda: 0.0)
+    assert isinstance(app.state.store, PgCallStore)
+    assert TestClient(app).get("/healthz").json() == {"ok": True}

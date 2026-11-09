@@ -45,7 +45,7 @@ def _seed(url: str, *, legal: str = "Acme Fasteners", trade=("Acme",), with_pick
         call = c.execute("insert into voice.calls (dataset_id, case_id, attempt, idempotency_key, contact_point_id, "
                          "agent_version) values (%s,%s,%s,%s,%s,'agent-test') returning id",
                          (ds, case, attempt, f"{case}:call:v1:{attempt}", cp)).fetchone()["id"]
-    return {"call_id": call, "case_id": uuid.UUID(str(case)), "attempt": attempt}
+    return {"call_id": call, "case_id": uuid.UUID(str(case)), "attempt": attempt, "cp": cp}
 
 
 def _lookup(url: str, *, customer: str = CUSTOMER, callback: str = CALLBACK):
@@ -56,7 +56,8 @@ def test_a_complete_call_resolves_to_a_call_dial(database_url):
     s = _seed(database_url)
     assert _lookup(database_url)(s["call_id"]) == CallDial(
         case_id=s["case_id"], attempt=2, number_e164=E164, customer_name=CUSTOMER,
-        callback_number=CALLBACK, vendor_names=("Acme Fasteners", "Acme"))
+        callback_number=CALLBACK, vendor_names=("Acme Fasteners", "Acme"),
+        contact_point_id=s["cp"])  # the pick, for the call report (spec 0029, the store)
 
 
 def test_an_unknown_call_id_is_none(database_url):
