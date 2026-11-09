@@ -15,7 +15,8 @@ gets the stub's example number or no number at all.
   `LedgerResolver` already calls, reads the vendor's ledger rows, runs `select()`, stores the
   candidates in `ledger.contact_points` and the document in `ledger.number_selections`, and returns
   what spec 0002 D11 asks for.
-- `dialback_ledger.change_context(...)` answers `offered_number_from_request` from the ledger.
+- `dialback_ledger.change_context(...)` answers `offered_number_from_request` and
+  `speaker_in_change_thread` from the ledger.
 
 Serves R2 (the stored pick is the rule's), R6 (selections are append-only and replayable) and R7
 (any error is a refusal, never a pick, and never an exception into the core).
@@ -60,7 +61,13 @@ None. `ledger/0002_wiring.sql` adds two tables.
       and selected through the database, reproduce their expected pick and outcome.
 - [ ] `change_context` returns `offered_number_from_request` True for a number first seen in the
       change context, False for one seen first outside it, and leaves it out (unknown) for a number
-      the ledger never saw. The two speaker facts stay unknown: the ledger stores no names.
+      the ledger never saw.
+- [ ] `speaker_in_change_thread`, which the decision engine's V07 needs to be known False before
+      anything can be Verified: True if every word of a declared speaker name appears in the
+      display name or address of a sender in the change context (the request, its thread, a
+      lookalike); False only if every such sender has a display name and none matches; otherwise
+      unknown, because an unnamed sender could be anyone (R7). `speaker_known_before_request`
+      stays unknown.
 
 ## Tests (written first)
 

@@ -14,6 +14,8 @@ from __future__ import annotations
 import datetime as dt
 import logging
 import os
+import re
+from email.utils import parseaddr
 from typing import Any
 from uuid import UUID, uuid5
 
@@ -23,7 +25,7 @@ from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
 from .ingest import IngestResult
-from .select import RULE_VERSION, ChangeRequest, DocumentRef, Sighting, select
+from .select import RULE_VERSION, ChangeRequest, DocumentRef, Sighting, change_context_documents, select
 
 log = logging.getLogger(__name__)
 NAMESPACE = UUID("3b8e1f6a-2c4d-4e7f-9a1b-5c6d7e8f9a0b")
@@ -195,9 +197,10 @@ def _e164(text: str) -> str | None:
 async def change_context(*, case_id: UUID, dataset_id: UUID, vendor_id: UUID, cutoff: dt.datetime,
                          speaker_names: tuple[str, ...], offered_numbers: tuple[str, ...],
                          database_url: str | None = None) -> dict[str, bool]:
-    """What the ledger knows about the change request (spec 0005, D5). Only keys it can answer:
-    `offered_number_from_request`. The speaker facts stay unknown (the ledger stores no names).
-    Any error answers nothing, which the core reads as unknown."""
+    """What the ledger knows about the change request (spec 0005, D5), only the keys it can answer:
+    `offered_number_from_request` from where the number was first seen, and `speaker_in_change_thread`
+    from the change context's senders (see `_speaker_in`). `speaker_known_before_request` stays
+    unknown. Any error answers nothing, which the core reads as unknown."""
     url = _url(database_url)
     if url is None:
         return {}
@@ -208,9 +211,14 @@ async def change_context(*, case_id: UUID, dataset_id: UUID, vendor_id: UUID, cu
         if inputs is None or inputs["request"] is None:
             return {}
         by_number = {c["e164"]: c for c in select(**inputs)["candidates"]}
+        context = change_context_documents(**inputs)
     except Exception:
         log.exception("change_context failed for case %s", case_id)
         return {}
+    known: dict[str, bool] = {}
+    speaker = _speaker_in(context, speaker_names)
+    if speaker is not None:
+        known["speaker_in_change_thread"] = speaker
     answers = []
     for raw in offered_numbers:
         c = by_number.get(_e164(raw) or "")
@@ -219,7 +227,30 @@ async def change_context(*, case_id: UUID, dataset_id: UUID, vendor_id: UUID, cu
         else:
             answers.append("first_seen_in_change_context" in c["reasons"])
     if any(a is True for a in answers):
-        return {"offered_number_from_request": True}
-    if answers and all(a is False for a in answers):
-        return {"offered_number_from_request": False}
-    return {}
+        known["offered_number_from_request"] = True
+    elif answers and all(a is False for a in answers):
+        known["offered_number_from_request"] = False
+    return known
+
+
+def _tokens(text: str) -> set[str]:
+    return set(re.findall(r"[a-z]+", text.casefold()))
+
+
+def _speaker_in(context: list[DocumentRef], speaker_names: tuple[str, ...]) -> bool | None:
+    """Is the person on the call someone who wrote in the change context (the request, its thread,
+    a lookalike)? True if every word of a declared name appears in a sender's display name or
+    address; False only if every sender there has a display name and none matches; otherwise
+    unknown, because an unnamed sender could be anyone (R7)."""
+    speakers = [t for t in (_tokens(n) for n in speaker_names) if t]
+    if not speakers or not context:
+        return None
+    unnamed = False
+    for d in context:
+        name, address = parseaddr(d.sender or "")
+        if not name.strip():
+            unnamed = True
+        sender = _tokens(name) | _tokens(address.split("@")[0])
+        if any(s <= sender for s in speakers):
+            return True
+    return None if unnamed else False
