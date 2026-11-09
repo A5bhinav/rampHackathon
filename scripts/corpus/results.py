@@ -4,6 +4,8 @@
     uv run python scripts/corpus/results.py           # rewrite apps/web/src/data/corpus-results.json
     uv run python scripts/corpus/results.py --check   # exit 1 if the committed file is stale
 
+Run with the workspace (`uv sync --all-packages`), which has jsonschema through the ledger's dev group.
+
 The inputs are built exactly as packages/ledger/tests/test_select_corpus.py builds them, and
 `matches` applies the same checks that gate does. The dashboard only shows this file; it
 computes nothing. This is the selection rule against planted attacks, not the attack lab.
@@ -18,9 +20,11 @@ import uuid
 from pathlib import Path
 
 from dialback_ledger.select import ChangeRequest, DocumentRef, Sighting, select
+from jsonschema import Draft202012Validator
 
 ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / "apps" / "web" / "src" / "data" / "corpus-results.json"
+SCHEMA = json.loads((ROOT / "packages" / "contracts" / "schemas" / "selection.schema.json").read_text())
 CASE, DATASET, VENDOR = (uuid.UUID(int=n) for n in (1, 2, 3))
 
 
@@ -45,6 +49,8 @@ def problems(truth: dict, out: dict) -> list[str]:
     """What test_select_corpus.py would fail on, in words; empty when the rule did what the truth says."""
     exp, found = truth["expected"], []
     by_number = {c["e164"]: c for c in out["candidates"]}
+    if list(Draft202012Validator(SCHEMA).iter_errors(out)):
+        found.append("the selection doesn't match selection.schema.json")
     if at(out["cutoff"]) != at(exp["cutoff"]):
         found.append("cutoff differs")
     if out["outcome"] != exp["outcome"] or out.get("e164") != exp["pick"]:
@@ -56,6 +62,9 @@ def problems(truth: dict, out: dict) -> list[str]:
     for e164 in exp.get("eligible", []):
         if not by_number.get(e164, {}).get("eligible"):
             found.append(f"{e164} should stay eligible")
+    for e164, when in exp.get("first_seen_at", {}).items():
+        if e164 not in by_number or at(by_number[e164]["first_seen_at"]) != at(when):
+            found.append(f"{e164} first seen at a different time")
     poison = {p["e164"] for p in truth["planted"] if p["truth"] == "poison"}
     if truth["kind"] != "known_limit" and out.get("e164") in poison:
         found.append("a poisoned number was picked")
@@ -69,15 +78,16 @@ def result(path: Path) -> dict:
     by_number = {c["e164"]: c for c in out["candidates"]}
     planted = []
     for p in truth["planted"]:
-        seen = sorted(s["received_at"] for s in p["sightings"])
         c = by_number.get(p["e164"], {})
+        hidden = [s["visibility"] != "visible" for s in p["sightings"]]
         planted.append({"e164": p["e164"], "truth": p["truth"], "sightings": len(p["sightings"]),
                         "channels": sorted({s["channel"] for s in p["sightings"]}),
-                        "hidden": any(s["visibility"] != "visible" for s in p["sightings"]),
-                        "first_seen_at": seen[0] if seen else None,
+                        "hidden": "all" if hidden and all(hidden) else "some" if any(hidden) else "none",
+                        "first_seen_at": c.get("first_seen_at"),  # the rule's own, as the gate checks it
                         "eligible": c.get("eligible", False), "reasons": c.get("reasons", [])})
     found = problems(truth, out)
-    return {"id": truth["id"], "kind": truth["kind"], "title": truth["title"], "vendor": truth["vendor"]["name"],
+    return {"id": truth["id"], "kind": truth["kind"], "source": truth.get("source"), "title": truth["title"],
+            "vendor": truth["vendor"]["name"],
             "request": {"subject": w["request"].subject, "received_at": truth["request_received_at"]},
             "expected": {"outcome": truth["expected"]["outcome"], "pick": truth["expected"]["pick"]},
             "actual": {"outcome": out["outcome"], "pick": out.get("e164"), "reason": out.get("reason")},

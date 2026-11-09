@@ -8,7 +8,7 @@ export const metadata: Metadata = { title: "Dialback: the number-picking rule ag
 
 // The corpus page (spec 0038). Static: every verdict here was written by scripts/corpus/results.py
 // running the real rule; the page only lays it out.
-const year = (iso: string | null) => (iso ? iso.slice(0, 10) : "—");
+const day = (iso: string | null) => (iso ? iso.slice(0, 10) : "—");
 
 export default function CorpusPage() {
   const all = CORPUS.cases;
@@ -26,12 +26,12 @@ export default function CorpusPage() {
       </header>
       <main className="shell story">
         <section className="story-hero" aria-labelledby="corpus-h">
-          <p className="eyebrow">The number-picking rule against 20 planted cases</p>
+          <p className="eyebrow">The number-picking rule against {CORPUS.cases.length} frozen test cases</p>
           <h1 id="corpus-h">Which number would Dialback call?</h1>
           <p className="lead">
             Before any call, the Trust Ledger picks a number it can prove is the vendor&apos;s (R2). These are the frozen test cases
             for that one step: a fraudster plants a number in an email thread, a lookalike domain, hidden PDF text, a fake listing,
-            and the rule must not pick it. Each case&apos;s expected result is frozen and hashed in the repo, so it can&apos;t drift to match the code.
+            and the rule must not pick it. Each case&apos;s expected result is frozen and its hash pinned in the repo, so it can&apos;t drift to match the code without a reviewed change.
           </p>
           <p className="note">
             This is the selection rule only, run by <span className="mono">{CORPUS.generated_by}</span> with{" "}
@@ -60,24 +60,29 @@ export default function CorpusPage() {
 
 function Case({ c }: { c: CorpusCase }) {
   const planted = pickedPlanted(c);
+  const limit = c.kind === "known_limit";
   return (
     <article className={`card corpus-case ${planted ? "edge-bad lead-card" : ""}`} id={c.id} aria-labelledby={`${c.id}-h`}>
       <div className="corpus-head">
         <h3 id={`${c.id}-h`}><span className="mono muted">{c.id}</span> {c.title}</h3>
-        <span className={`badge ${c.matches ? "tone-ok" : "tone-bad"}`}>{c.matches ? "matches the truth" : "differs from the truth"}</span>
+        <span className="tags">
+          {c.source === "proposed" ? <span className="badge tone-muted" title="Spec 0020, Q42">proposed, awaiting team sign-off</span> : null}
+          <span className={`badge ${c.matches ? "tone-ok" : "tone-bad"}`}>{c.matches ? "matches the truth" : "differs from the truth"}</span>
+        </span>
       </div>
       <p className="muted sub">
         {c.vendor} · change request &ldquo;{c.request.subject}&rdquo; · expected:{" "}
         {c.expected.pick ? <span className="mono">{phone(c.expected.pick)}</span> : "no number (a person reviews)"} · the rule:{" "}
         {c.actual.pick ? <span className="mono">{phone(c.actual.pick)}</span> : "no provable number"}
       </p>
-      {planted ? (
+      {planted && limit ? (
         <p className="result error">
-          The rule picks the number the attacker planted. This is the stated limit: an attacker who has controlled the
-          vendor&apos;s mailbox and a public listing for months, with no stored contract to contradict them, looks like the vendor
-          to any rule that reads only those sources. The call&apos;s questions and the second approver are what stand behind it.
+          The rule picks the number the attacker planted, as the design says it will. The attacker has controlled the vendor&apos;s
+          mailbox and a public listing for months, which this rule counts as two independent sources; the vendor&apos;s real numbers
+          were only ever seen by email, which counts as one. With no stored contract to contradict them, the attacker answers the
+          call too, so the call isn&apos;t a backstop here. The second approver, reading the evidence, is.
         </p>
-      ) : null}
+      ) : planted ? <p className="result error">The rule picked a number the attacker planted.</p> : null}
       {c.problems.length ? <p className="result error">{c.problems.join("; ")}</p> : null}
       <div className="table-wrap">
         <table className="corpus-table">
@@ -98,15 +103,15 @@ function Case({ c }: { c: CorpusCase }) {
                     ) : <span className="muted">—</span>}
                   </td>
                   <td className="num">{p.sightings}</td>
-                  <td>{p.channels.map((ch) => CHANNEL[ch] ?? ch).join(", ")}{p.hidden ? <div className="cell-note muted sub">partly hidden text</div> : null}</td>
-                  <td className="nowrap">{year(p.first_seen_at)}</td>
+                  <td>{p.channels.map((ch) => CHANNEL[ch] ?? ch).join(", ")}{p.hidden !== "none" ? <div className="cell-note muted sub">{p.hidden === "all" ? "only in hidden text" : "partly in hidden text"}</div> : null}</td>
+                  <td className="nowrap">{day(p.first_seen_at)}</td>
                 </tr>
               );
             })}
           </tbody>
         </table>
       </div>
-      <p className="muted sub">The change request arrived {year(c.request.received_at)}. Hover a reason for the ledger&apos;s own sentence.</p>
+      <p className="muted sub">The change request arrived {day(c.request.received_at)}. &ldquo;First seen&rdquo; is the rule&apos;s own reading. Hover a reason for the ledger&apos;s own sentence.</p>
     </article>
   );
 }

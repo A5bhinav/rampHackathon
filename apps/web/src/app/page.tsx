@@ -42,7 +42,7 @@ export default function HowItWorks() {
             <Link className="brand" href="/"><BrandMark />Dialback</Link>
             <a href="#stations">The pipeline</a>
             <a href="#demo">Demo data</a>
-            <Link href="/corpus">Planted attacks</Link>
+            <Link href="/corpus">Frozen test cases</Link>
           </nav>
           <div className="who"><Link className="button-link primary" href="/app">Open the dashboard</Link></div>
         </div>

@@ -14,6 +14,13 @@ test("a number's verdict in words", () => {
   assert.equal(numberVerdict(p(true), "+14155550142").word, "picked");
   assert.equal(numberVerdict(p(true), "+14155550100").word, "eligible, not picked");
   assert.equal(numberVerdict(p(false, ["near_miss_of_older_number"]), null).word, "refused");
+  assert.deepEqual(numberVerdict({ ...(p(true) as object), truth: "poison" } as never, "+14155550142"), { word: "picked: the attacker's", tone: "bad" });
+});
+
+test("hidden text is all or some, and proposed cases are marked as such", () => {
+  const p04a = CORPUS.cases.find((c) => c.id === "P04a")!;
+  assert.ok(p04a.planted.some((p) => p.truth === "poison" && p.hidden === "all"));
+  assert.ok(CORPUS.cases.some((c) => c.source === "proposed") && CORPUS.cases.some((c) => c.source === "named"));
 });
 
 test("the known limit is the one case where the rule picks a planted number", () => {

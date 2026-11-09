@@ -3,9 +3,9 @@
 // match verdicts and reasons are the script's and the ledger's.
 import data from "../data/corpus-results.json" with { type: "json" };
 
-export type Planted = { e164: string; truth: string; sightings: number; channels: string[]; hidden: boolean;
+export type Planted = { e164: string; truth: string; sightings: number; channels: string[]; hidden: "all" | "some" | "none";
   first_seen_at: string | null; eligible: boolean; reasons: string[] };
-export type CorpusCase = { id: string; kind: string; title: string; vendor: string;
+export type CorpusCase = { id: string; kind: string; source: string | null; title: string; vendor: string;
   request: { subject: string; received_at: string };
   expected: { outcome: string; pick: string | null }; actual: { outcome: string; pick: string | null; reason: string | null };
   matches: boolean; problems: string[]; picked_planted: boolean; planted: Planted[] };
@@ -23,8 +23,8 @@ export function groups(cases: readonly CorpusCase[]) {
   return KINDS.map((k) => ({ ...k, cases: cases.filter((c) => c.kind === k.kind) })).filter((g) => g.cases.length);
 }
 
-export function numberVerdict(p: Pick<Planted, "e164" | "eligible" | "reasons">, pick: string | null): { word: string; tone: "ok" | "info" | "bad" } {
-  if (p.e164 === pick) return { word: "picked", tone: "ok" };
+export function numberVerdict(p: Pick<Planted, "e164" | "eligible" | "reasons"> & { truth?: string }, pick: string | null): { word: string; tone: "ok" | "info" | "bad" } {
+  if (p.e164 === pick) return p.truth === "poison" ? { word: "picked: the attacker's", tone: "bad" } : { word: "picked", tone: "ok" };
   return p.eligible ? { word: "eligible, not picked", tone: "info" } : { word: "refused", tone: "bad" };
 }
 
@@ -34,8 +34,8 @@ export function pickedPlanted(c: CorpusCase): boolean {
 }
 
 export const REASON_SHORT: Record<string, string> = {
-  first_seen_in_change_context: "first seen in the change request", too_few_source_types: "too few independent sources",
-  younger_than_minimum_age: "too new", near_miss_of_older_number: "one digit off a known number",
+  first_seen_in_change_context: "first seen in or after the request", too_few_source_types: "too few sources before the request",
+  younger_than_minimum_age: "too new", near_miss_of_older_number: "one digit off, or two swapped",
   hidden_text_only: "only in hidden text", not_vendor_party: "someone else's number", fax_line: "a fax line",
 };
 
