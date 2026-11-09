@@ -55,6 +55,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/datasets/{dataset_id}/evidence": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The dataset's evidence chain, row by row, with the live check and the last scheduled check (spec 0035)
+         * @description Every row's hashes, newest first, and two checks Postgres runs on each row: whether its content hash still matches its body, and whether it links to the row before. The chain status is audit.verify_chain, recomputed now. The page decides nothing.
+         */
+        get: operations["getEvidenceLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/datasets/{dataset_id}/alerts": {
         parameters: {
             query?: never;
@@ -313,6 +333,98 @@ export interface components {
             decided_at: components["schemas"]["Timestamp"];
             /** @description One templated sentence per rule that fired. */
             explanation: string[];
+            /** @description The rules that fired, each with its sentence and the block of the rule table it belongs to, in the order the engine recorded them (spec 0035). Optional: older cores don't send it. */
+            fired?: components["schemas"]["FiredRule"][];
+            /** @description The Verified conditions (V01 to V12, and S01 in strict mode), each passed, not met or not checked, read from the rules the engine recorded; the core never re-runs them. Not checked means an earlier block decided first. Optional. */
+            checklist?: components["schemas"]["ChecklistItem"][];
+            /** @description A templated sentence saying why the checklist reads as it does. Optional. */
+            checklist_note?: string;
+            /** @description A templated sentence saying what the outcome does to the hold and who acts next. Optional. */
+            effect?: string;
+        };
+        FiredRule: {
+            id: string;
+            sentence: string;
+            /** @enum {string} */
+            block: "earlier_call" | "input" | "not_verified" | "needs_review" | "verified" | "not_met" | "engine" | "retired";
+        };
+        ChecklistItem: {
+            /** @description The condition, e.g. V08_digits_match. */
+            id: string;
+            /** @description The condition's sentence when it holds, or its unmet sentence when it doesn't. */
+            sentence: string;
+            /** @enum {string} */
+            status: "passed" | "not_met" | "not_checked";
+        };
+        /** @description One answer the callee gave, as code recorded it. For account_last4 there is never a digit: value is null with digit_count, or dont_know / refused (ADR-8). */
+        CallAnswerView: {
+            slot: components["schemas"]["Slot"];
+            value: string | null;
+            digit_count: number | null;
+            /** @description The transcript turn the answer cites. */
+            turn_id: number;
+            /** @enum {string} */
+            capture_method: "speech" | "keypad";
+            captured_at: string;
+            /** @description The decision rules that read this answer. */
+            feeds: string[];
+        };
+        /** @description One call, from its call_started and call_ended evidence and, when the voice service stored it, voice.calls. No transcript is kept; the answers cite the turn they came from. */
+        CallAttempt: {
+            call_id: components["schemas"]["Uuid"];
+            attempt: number;
+            started_at: components["schemas"]["Timestamp"] | null;
+            ended_at: components["schemas"]["Timestamp"] | null;
+            /** @description Null while the call is still running. */
+            result: ("answers_recorded" | "no_answer" | "voicemail" | "busy" | "failed" | "machine" | "declined" | "callback_requested" | "timed_out") | null;
+            /** @description A templated sentence for how the call ended, or the voice service's reason code. */
+            reason: string | null;
+            answered_by: ("human" | "machine") | null;
+            direction: ("outbound" | "inbound") | null;
+            dialed_number_is_pick: boolean | null;
+            provider: string | null;
+            agent_version: string | null;
+            last_four_result: components["schemas"]["LastFourResult"] | null;
+            answers: components["schemas"]["CallAnswerView"][];
+            checks: components["schemas"]["CallChecks"] | null;
+        };
+        /** @description The call's fixed text from the call policy, with the customer's name and callback number left as labels. The agent words each question itself; the disclosure is always word for word. */
+        CallScript: {
+            disclosure: string;
+            questions: {
+                slot: string;
+                wording: string;
+            }[];
+            /** @description A templated sentence on what is and isn't kept from a call. */
+            note: string;
+        };
+        EvidenceRow: {
+            seq: number;
+            type: string;
+            case_id: components["schemas"]["Uuid"] | null;
+            /** @description The case's vendor's legal name, when the row belongs to a case. */
+            vendor: string | null;
+            occurred_at: components["schemas"]["Timestamp"];
+            /** @enum {string} */
+            actor_kind: "system" | "person";
+            prev_hash: components["schemas"]["Sha256Hex"];
+            content_hash: components["schemas"]["Sha256Hex"];
+            hash: components["schemas"]["Sha256Hex"];
+            /** @description Postgres recomputed the content hash from the stored body, and it matches. */
+            content_ok: boolean;
+            /** @description The row's prev_hash is the previous row's hash and its hash is sha256(prev_hash + content_hash). */
+            link_ok: boolean;
+        };
+        EvidenceLog: {
+            chain: components["schemas"]["ChainStatus"];
+            /** @description The scheduled verify job's last run on this dataset, or null if it hasn't run. */
+            last_check: {
+                finished_at: components["schemas"]["Timestamp"] | null;
+                ok: boolean | null;
+            } | null;
+            total: number;
+            /** @description Newest first, at most limit rows. */
+            events: components["schemas"]["EvidenceRow"][];
         };
         ReleaseRecord: {
             actor: components["schemas"]["Person"];
@@ -361,6 +473,10 @@ export interface components {
             timeline: components["schemas"]["TimelineEntry"][];
             chain: components["schemas"]["ChainStatus"];
             permissions: components["schemas"]["Permissions"];
+            /** @description Every call placed for this case, oldest first (spec 0035). Optional. */
+            calls?: components["schemas"]["CallAttempt"][];
+            /** @description The call's fixed text (spec 0035). Optional. */
+            call_script?: components["schemas"]["CallScript"];
         };
         ReleaseRequest: {
             /** @description The case version the person saw. */
@@ -444,6 +560,25 @@ export interface components {
         LastFourResult: "match" | "matches_old_account" | "near_miss" | "mismatch" | "not_provided" | "ambiguous" | "inconsistent";
         /** @enum {string} */
         EventType: "change_detected" | "hold_confirmed" | "hold_failed" | "number_resolved" | "no_provable_number" | "call_started" | "call_ended" | "call_timeout" | "retry_timer_fired" | "decision_made" | "review_cleared" | "review_blocked" | "release_co_approved" | "release_approved" | "release_rejected" | "hold_release_confirmed" | "deadline_reached" | "command_failed";
+        /**
+         * @description Fixed list. The agent cannot invent slots.
+         * @enum {string}
+         */
+        Slot: "recording_consent" | "company_named" | "department" | "speaker_name" | "speaker_role" | "change_requested" | "account_last4" | "offered_number" | "flag";
+        /** @description Computed by code in the voice service after the call, never by the model. Shared by the stored CallEndedBody and the core-voice report (openapi/internal.yaml). Checks that need case or ledger data (company match against the vendor's names, whether the speaker first appeared in the change thread) stay with the core. */
+        CallChecks: {
+            /** @description The fixed AI and recording disclosure played in full as the first turn. */
+            disclosure_first: boolean;
+            /** @description Every recorded answer appears in the transcript turn it cites. */
+            answers_grounded: boolean;
+            /** @description Must be false. True is a script violation. */
+            agent_spoke_account_digits: boolean;
+            /** @description Must be false. True is a script violation. */
+            new_number_accepted: boolean;
+            /** @description Unknown tools or invalid tool arguments. */
+            policy_violations: number;
+            speech_guard_trips: number;
+        };
         /**
          * @description How a value reached us, from custody metadata, never from a model (ADR-13). All email counts as one source type. The old vendor master's number on file is never a source type; see Candidate.on_file.
          * @enum {unknown}
@@ -749,6 +884,32 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ChainStatus"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getEvidenceLog: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                dataset_id: components["parameters"]["DatasetId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK, whether or not the chain is intact */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvidenceLog"];
                 };
             };
             401: components["responses"]["Unauthenticated"];
