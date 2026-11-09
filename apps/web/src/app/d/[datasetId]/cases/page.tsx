@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { OutcomeBadge, StateBadge } from "@/components/badges";
+import { PageHead, Stats } from "@/components/page-head";
 import type { CaseState, CaseSummary } from "@/lib/api-types";
 import { core } from "@/lib/core";
 import { ago, datasetNow, date, dueLabel, relative, when } from "@/lib/format";
@@ -27,16 +28,17 @@ export default async function CaseQueue({ params }: { params: Promise<{ datasetI
 
   return (
     <main>
-      <p className="eyebrow">Held payments</p>
-      <h1>Case queue</h1>
-      <p className="muted">Every vendor whose bank details changed. Payments stay on hold until a different person releases them.</p>
-      <div className="summary" role="group" aria-label="Summary">
-        <span className="badge tone-warn">{waiting.length} waiting on a person</span>
-        <span className="badge tone-info">{working.length} in progress</span>
-        {dueSoon > 0 ? <span className="badge tone-bad">{dueSoon} with a payment overdue or due within 3 days</span> : null}
-        {unconfirmed > 0 ? <span className="badge tone-bad">{unconfirmed} hold not confirmed</span> : null}
-      </div>
-      {cases.length === 0 ? <div className="card"><p className="muted">No open cases.</p></div> : null}
+      <PageHead
+        title="Case queue"
+        lead="Every vendor whose bank details changed. Payments stay on hold until a different person releases them."
+      />
+      <Stats label="Summary" items={[
+        { n: waiting.length, label: "Waiting on a person", tone: "tone-warn" },
+        { n: working.length, label: "In progress", tone: "tone-info" },
+        { n: dueSoon, label: "Payment due within 3 days or overdue", tone: "tone-bad" },
+        { n: unconfirmed, label: "Hold not confirmed", tone: "tone-bad" },
+      ]} />
+      {cases.length === 0 ? <div className="card empty"><p>No open cases. A case opens here when a vendor&apos;s bank details change in Ramp.</p></div> : null}
       {waiting.length > 0 ? <QueueTable title="Waiting on a person" cases={waiting} datasetId={datasetId} now={now} /> : null}
       {working.length > 0 ? <QueueTable title="In progress" cases={working} datasetId={datasetId} now={now} /> : null}
     </main>
@@ -46,10 +48,10 @@ export default async function CaseQueue({ params }: { params: Promise<{ datasetI
 function QueueTable({ title, cases, datasetId, now }: { title: string; cases: CaseSummary[]; datasetId: string; now: Date }) {
   return (
     <section className="card table-wrap queue-group" aria-label={title}>
-      <h2>{title} <span className="muted sub">{cases.length}</span></h2>
+      <h2>{title} <span className="count">{cases.length}</span></h2>
       <table>
         <thead>
-          <tr><th>Vendor</th><th>State</th><th>Decision</th><th>Held bills</th><th>Next payment date</th><th>Opened</th><th>Deadline</th></tr>
+          <tr><th className="w-vendor">Vendor</th><th>State</th><th>Decision</th><th className="num">Held bills</th><th>Next payment</th><th>Opened</th><th>Deadline</th></tr>
         </thead>
         <tbody>
           {cases.map((c) => {
@@ -58,14 +60,14 @@ function QueueTable({ title, cases, datasetId, now }: { title: string; cases: Ca
               <tr key={c.id}>
                 <td>
                   <Link href={`/d/${datasetId}/cases/${c.id}`}>{c.vendor.legal_name}</Link>
-                  {c.unknown_changer ? <div><span className="badge tone-warn">two approvers</span></div> : null}
+                  {c.unknown_changer ? <div className="cell-note"><span className="badge tone-warn">two approvers</span></div> : null}
                 </td>
                 <td><StateBadge state={c.state} />{c.version > 1 ? <div className="muted sub">change {c.version}</div> : null}</td>
                 <td><OutcomeBadge outcome={c.outcome} /></td>
-                <td>{c.hold_status === "failed" ? <span className="badge tone-bad">hold not confirmed</span> : c.bills_held}</td>
+                <td className="num">{c.hold_status === "failed" ? <span className="badge tone-bad">hold not confirmed</span> : c.bills_held}</td>
                 <td>
                   {date(c.next_payment_date)}
-                  {due ? <div><span className={`badge ${due.soon ? "tone-bad" : "tone-muted"}`}>{due.text}</span></div> : null}
+                  {due ? <div className="cell-note"><span className={`badge ${due.soon ? "tone-bad" : "tone-muted"}`}>{due.text}</span></div> : null}
                 </td>
                 <td>{when(c.opened_at)}<div className="muted sub">{ago(c.opened_at, now)}</div></td>
                 <td>

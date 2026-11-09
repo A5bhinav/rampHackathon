@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Candidate, SelectionView } from "@/lib/api-types";
+import { PageHead } from "@/components/page-head";
 import { CoreError, core } from "@/lib/core";
 import { when } from "@/lib/format";
 import { phone, seenBefore, sourceLabel, split } from "@/lib/lineage";
@@ -20,9 +20,11 @@ export default async function LineagePage({ params }: { params: Promise<{ datase
 
   return (
     <main>
-      <p className="back"><Link href={back}><span className="arrow" aria-hidden="true">←</span> {detail.case.vendor.legal_name}</Link></p>
-      <p className="eyebrow">Trust Ledger</p>
-      <h1>Number lineage</h1>
+      <PageHead
+        back={{ href: back, label: detail.case.vendor.legal_name }}
+        title="Number lineage"
+        lead="The number this case will call, where the Trust Ledger saw it, and every number it refused."
+      />
       {!s ? (
         <section className="card">
           <p>{view.notes.no_selection}</p>
@@ -34,29 +36,29 @@ export default async function LineagePage({ params }: { params: Promise<{ datase
             <h2 id="all-h">Every number considered</h2>
             <ul className="striped-list">
               {s.candidates.map((c) => (
-                <li key={c.contact_point_id} className={c.contact_point_id === chosen ? "is-ok" : c.eligible ? "is-info" : "is-bad"}>
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                    <span className="mono" style={{ whiteSpace: "nowrap", fontSize: "1.05rem" }}>{phone(c.e164)}</span>
+                <li key={c.contact_point_id} className={`candidate ${c.contact_point_id === chosen ? "is-ok" : c.eligible ? "is-info" : "is-bad"}`}>
+                  <span className="mono candidate-number">{phone(c.e164)}</span>
+                  <span>
                     {c.eligible
                       ? <span className={`badge ${c.contact_point_id === chosen ? "tone-ok" : "tone-info"}`}>
                           {c.contact_point_id === chosen ? "chosen" : `alternate ${(c.rank ?? 1) - 1}`}</span>
                       : <span className="badge tone-bad">refused</span>}
-                    {c.on_file ? <span className="muted">on the old vendor master</span> : null}
-                  </div>
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 6 }}>
-                    <Sources candidate={c} />
-                    <span className="muted" title={when(c.first_seen_at)}>First seen {seenBefore(c.first_seen_at, s.cutoff)}</span>
-                  </div>
-                  {c.reasons.length ? <Reasons candidate={c} text={view.reason_text} /> : null}
+                  </span>
+                  <span className="candidate-sources"><Sources candidate={c} /></span>
+                  <span className="muted sub candidate-seen" title={when(c.first_seen_at)}>
+                    First seen {seenBefore(c.first_seen_at, s.cutoff)}{c.on_file ? ", on the old vendor master" : ""}
+                  </span>
+                  {c.reasons.length ? <div className="candidate-reasons"><Reasons candidate={c} text={view.reason_text} /></div> : null}
                 </li>
               ))}
             </ul>
           </section>
-          <p className="muted">
-            Rule <span className="mono">{s.rule_version}</span> · cutoff {when(s.cutoff)} · minimum{" "}
-            {s.rule_settings.min_source_types} source types and {s.rule_settings.min_age_days} days · inputs{" "}
-            <span className="mono" title={s.inputs_sha256}>{s.inputs_sha256.slice(0, 12)}</span>
-          </p>
+          <dl className="rule-meta">
+            <div><dt>Rule</dt><dd className="mono">{s.rule_version}</dd></div>
+            <div><dt>Cutoff</dt><dd>{when(s.cutoff)}</dd></div>
+            <div><dt>Minimum</dt><dd>{s.rule_settings.min_source_types} source types, {s.rule_settings.min_age_days} days</dd></div>
+            <div><dt>Inputs</dt><dd className="mono" title={s.inputs_sha256}>{s.inputs_sha256.slice(0, 12)}</dd></div>
+          </dl>
         </>
       )}
     </main>
@@ -68,7 +70,7 @@ function Chosen({ view }: { view: SelectionView }) {
   const { pick, alternates } = split(s);
   if (!pick) {
     return (
-      <section className="card" aria-labelledby="pick-h">
+      <section className="card lead-card edge-bad" aria-labelledby="pick-h">
         <h2 id="pick-h">No provable number</h2>
         <p>{s.reason}</p>
         <p className="muted">{view.notes.no_provable_number}</p>
@@ -76,9 +78,11 @@ function Chosen({ view }: { view: SelectionView }) {
     );
   }
   return (
-    <section className="card" aria-labelledby="pick-h">
-      <h2 id="pick-h">The number Dialback will call</h2>
-      <p className="figure">{phone(pick.e164)}</p>
+    <section className="card lead-card edge-ok pick" aria-labelledby="pick-h">
+      <div>
+        <h2 id="pick-h">The number Dialback will call</h2>
+        <p className="figure">{phone(pick.e164)}</p>
+      </div>
       <dl className="facts">
         <dt>Seen in</dt><dd><Sources candidate={pick} /></dd>
         <dt>First seen</dt><dd>{seenBefore(pick.first_seen_at, s.cutoff)} ({when(pick.first_seen_at)})</dd>
@@ -93,7 +97,7 @@ function Chosen({ view }: { view: SelectionView }) {
 
 function Sources({ candidate }: { candidate: Candidate }) {
   if (candidate.source_types.length === 0) return <span className="muted">no independent source</span>;
-  return <>{candidate.source_types.map((t) => <span key={t} className="badge tone-muted" style={{ marginRight: 4 }}>{sourceLabel(t)}</span>)}</>;
+  return <>{candidate.source_types.map((t) => <span key={t} className="badge tone-muted">{sourceLabel(t)}</span>)}</>;
 }
 
 function Reasons({ candidate, text }: { candidate: Candidate; text: SelectionView["reason_text"] }) {
