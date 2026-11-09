@@ -196,6 +196,31 @@ These are not reachable today, but each is frozen as a regression.
 - **Common practice:** Amazon Lex defaults to `*` to clear and `#` to end, with an end timeout.
 - **Where to fix:** `relay.py` and the last-four wording in `packages/policy/.../script.py`.
 
+### A14. Spoken last-four digits are misread, and a misread blocks the change
+
+- **Status:** confirmed (ran `digit_runs` and both agents' last-four readings), Nov 9, origin/main
+  da057f8.
+- **What happens:** the question invites speech ("You can say them or enter them on your keypad").
+  Spoken digits go through speech-to-text, then `digit_runs`, then the agent:
+  - "zero zero zero one, those are the last four": the live agent records 0014 ("four" counts);
+    `docs/live-call.md` already warns about this one;
+  - "forty eight twenty one": the live agent records 8201 (`digit_runs` reads 408201); the double
+    proposes 408201, which the policy rejects as a violation;
+  - "it ends in 4821, my cell is 415 555 0123": the live agent records 0123 (the double, 4821);
+  - "for eight to one" (a mis-hearing): 81, so `not_provided`.
+- **Why it matters:** a misread four is NV02, not verified, on this call and every redial (A13).
+  The comment in `claude_agent.py` (`_value`) says a wrong four "routes to manual review, never a
+  false pass": the second half holds, the first does not.
+- **Exposure:** keypad digits never become text (`step` writes "[keypad]"). Spoken digits become
+  transcript text in memory, after a third-party speech-to-text service. Digits said at any other
+  question go to the model inside the caller's line: `ClaudeAgent` sends that line unredacted.
+  Nothing stores them (the voice DB keeps call status only; the core hashes the last four).
+- **Not a fraud defense either way:** whoever set up the new account knows its digits.
+- **Fix:** keypad only for the last four (with A13's `*` and `#`), spoken digits at that question
+  ignored and re-asked, and digit runs redacted from any caller line before it reaches the model.
+  `apps/voice` and `packages/policy`; revises spec 0015 D1's last-four path and spec 0012's
+  grounding of spoken digits.
+
 ### A8. The company-name check accepts names that contain the vendor's
 
 - **Status:** reported (voice-lab review); not yet evaluated.
