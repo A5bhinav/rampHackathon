@@ -121,6 +121,29 @@ async def test_an_unknown_changer_needs_two_approvers(world):
     assert second["to_state"] == "releasing"
 
 
+async def test_only_an_approver_reviews(world):
+    """Spec 0028: anyone can sign up (spec 0027), so clearing or blocking a review needs approver."""
+    world.voice.refuse = "outside_calling_window"
+    await import_all(world.pool, world.ramp, world.keys, world.dataset.id)
+    await change_and_detect(world)
+    cid = str((await case_of(world))["id"])
+    view = await get(world, f"/api/cases/{cid}", "clerk2", "/api/cases/{case_id}")
+    assert view["case"]["state"] == "needs_review"
+    assert view["permissions"]["can_review"] is False
+    assert any("approver role" in r for r in view["permissions"]["reasons"])
+    for action in ("clear", "block"):
+        body = {"expected_version": 1, "action": action, "reason": "I called them and they confirmed."}
+        refused = await post(world, f"/api/cases/{cid}/review", "clerk2", "/api/cases/{case_id}/review", body, status=403)
+        assert refused["code"] == "forbidden" and "approver role" in refused["message"]
+    assert (await case_of(world))["state"] == "needs_review", "nothing moved"
+    assert (await get(world, f"/api/cases/{cid}", "approver1", "/api/cases/{case_id}"))["permissions"]["can_review"] is True
+    clear = {"expected_version": 1, "action": "clear", "reason": "Reached the CFO on the 2023 contract number; confirmed."}
+    assert (await post(world, f"/api/cases/{cid}/review", "approver1", "/api/cases/{case_id}/review", clear))["to_state"] == "awaiting_release"
+    # Past review, an approver is told the state, never that they lack a role they have.
+    again = await post(world, f"/api/cases/{cid}/review", "approver2", "/api/cases/{case_id}/review", clear, status=409)
+    assert again["code"] == "transition_refused" and "approver role" not in again["message"]
+
+
 async def test_review_then_a_different_approver_releases(world):
     world.voice.refuse = "outside_calling_window"
     await import_all(world.pool, world.ramp, world.keys, world.dataset.id)

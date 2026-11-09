@@ -133,6 +133,8 @@ def permissions(case: dict[str, Any], user: UUID, roles: list[str], approved_thi
         reasons.append("You entered this change, so you cannot release, reject or clear it (R5).")
     if awaiting and not approver:
         reasons.append("Releasing needs the approver role.")
+    if case["state"] == "needs_review" and not approver:
+        reasons.append("Reviewing needs the approver role.")
     if awaiting and is_reviewer:
         reasons.append("You cleared this case's review, so a different approver must release it.")
     if awaiting and approved_this_version:
@@ -144,7 +146,7 @@ def permissions(case: dict[str, Any], user: UUID, roles: list[str], approved_thi
     return {
         "can_approve": awaiting and approver and not is_changer and not is_reviewer and not approved_this_version,
         "can_reject": awaiting and approver and not is_changer,
-        "can_review": case["state"] == "needs_review" and not is_changer,
+        "can_review": case["state"] == "needs_review" and approver and not is_changer,  # spec 0028
         "reasons": reasons,
     }
 
@@ -298,6 +300,8 @@ async def _refusal(conn: AsyncConnection, case_id: UUID, user: UUID, message: st
         return problem(403, "forbidden", "You entered this change, so you cannot release, reject or clear it (R5)."
                        if user in (case["changer_ids"] or []) else "The rules refuse this action for you (R5): "
                        "the person who cleared the review cannot also approve the release.")
+    if case["state"] == "needs_review" and "approver" not in await roles_of(conn):
+        return problem(403, "forbidden", "Reviewing needs the approver role.")  # spec 0028
     return problem(409, "transition_refused", f"This case is {case['state'].replace('_', ' ')}, so that action is not available.")
 
 

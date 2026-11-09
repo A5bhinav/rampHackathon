@@ -169,7 +169,8 @@ async def make_world(pool, kind: str = "dev", sim_now=None, settings: Settings |
 
     # Dialback users. The clerk is mapped to the mock user who makes bank changes.
     async with system_tx(pool) as conn:
-        for name, role, ramp_ref in (("clerk", "clerk", "clerk"), ("approver1", "approver", None), ("approver2", "approver", None)):
+        for name, role, ramp_ref in (("clerk", "clerk", "clerk"), ("approver1", "approver", None), ("approver2", "approver", None),
+                                     ("clerk2", "clerk", None)):  # a clerk who isn't the changer (spec 0028)
             uid = uuid.uuid4()
             await conn.execute("insert into app.user_profiles (user_id, display_name, ramp_user_id) values (%s, %s, %s)",
                                (uid, name.title(), w.refs.get(ramp_ref) if ramp_ref else None))
