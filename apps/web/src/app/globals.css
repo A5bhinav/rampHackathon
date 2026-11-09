@@ -551,3 +551,13 @@ table.compare td { vertical-align: top; }
   .story-hero { padding-top: 16px; }
   table.compare th[scope="row"] { width: auto; }
 }
+
+/* The corpus page (spec 0038). ---------------------------------------------------------------- */
+.corpus-case { margin-bottom: 16px; }
+.corpus-head { display: flex; gap: 12px; justify-content: space-between; align-items: baseline; flex-wrap: wrap; }
+.corpus-head h3 { font-size: 1rem; margin: 0 0 4px; }
+table.corpus-table tr.is-poison td { background: color-mix(in srgb, var(--bad-bg) 55%, transparent); }
+ul.reason-chips { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 4px; }
+ul.reason-chips li { font-size: 0.75rem; padding: 1px 8px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line); cursor: help; }
+ul.reason-chips li { white-space: nowrap; }
+table.corpus-table td:nth-child(6) { min-width: 170px; }
