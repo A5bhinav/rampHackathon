@@ -1,0 +1,32 @@
+name: lab-fuzz
+
+# The attack lab's generative gate on the number-selection rule (spec 0033). It re-runs every frozen
+# finding in evals/corpus-generated, then searches 2000 generated worlds at a pinned seed, and fails
+# on any frozen case that still fails or any new finding. It is red by design while select() has the
+# findings frozen there (decided Nov 8): the fix belongs in packages/ledger, not here.
+on:
+  pull_request:
+    paths:
+      - "packages/ledger/**"
+      - "evals/**"
+      - ".github/workflows/lab-fuzz.yml"
+  push:
+    branches: [main]
+
+jobs:
+  lab-fuzz:
+    name: attack lab, selection fuzz
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Install the Python workspace
+        run: uv sync --all-packages --locked
+      - name: Lab fuzz (frozen findings, then 2000 worlds at seed 0)
+        run: uv run lab fuzz --examples 2000 --seed 0 --out evals/corpus-generated
+      - name: Keep the findings for a local repro
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lab-fuzz-findings
+          path: evals/corpus-generated

@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 
 from dialback_evals.cli import main
+from dialback_evals.frontier import NOISE
 
 _LEGIT = """\
 id: legit-01
@@ -68,3 +69,39 @@ def test_lab_run_records_the_frozen_scenario_hashes(tmp_path):
     assert len(card["scenarios_hash"]) == 64
     line = json.loads((out / "results.jsonl").read_text().splitlines()[0])
     assert len(line["scenario_hash"]) == 64
+
+
+# Spec 0033, Task 5: lab fuzz, lab frontier and lab overblock. The fuzz tests check the command's
+# contract (exit codes, frozen cases re-run, the seed passed through) with the search and the re-run
+# substituted; the rule's own status is carried by the two selection_gate tests and the lab-fuzz job.
+
+def test_lab_fuzz_exits_zero_when_nothing_is_found(tmp_path, monkeypatch):
+    monkeypatch.setattr("dialback_evals.cli.rerun", lambda d: [])
+    monkeypatch.setattr("dialback_evals.cli.fuzz", lambda **k: [])
+    assert main(["fuzz", "--examples", "10", "--seed", "0", "--out", str(tmp_path)]) == 0
+
+
+def test_lab_fuzz_fails_on_a_violation(tmp_path, monkeypatch):
+    monkeypatch.setattr("dialback_evals.cli.rerun", lambda d: [])
+    monkeypatch.setattr("dialback_evals.cli.fuzz", lambda **k: ["I7_poison_pick_below_bar"])
+    assert main(["fuzz", "--examples", "10", "--seed", "0", "--out", str(tmp_path)]) == 1
+
+
+def test_lab_fuzz_fails_on_a_frozen_finding_and_passes_the_seed_through(tmp_path, monkeypatch):
+    seen = {}
+    monkeypatch.setattr("dialback_evals.cli.rerun", lambda d: [("near-miss-x", ["M_shared_id_helped"])])
+    monkeypatch.setattr("dialback_evals.cli.fuzz", lambda **k: seen.update(k) or [])
+    assert main(["fuzz", "--examples", "7", "--seed", "3", "--out", str(tmp_path)]) == 1
+    assert seen["examples"] == 7 and seen["seed"] == 3 and str(seen["out_dir"]) == str(tmp_path)
+
+
+def test_lab_frontier_writes_table(tmp_path):
+    out = tmp_path / "out" / "frontier.json"          # the parent directory does not exist yet
+    assert main(["frontier", "--out", str(out)]) == 0
+    assert "summary" in json.loads(out.read_text())["min_effort"]
+
+
+def test_lab_overblock_writes_table(tmp_path):
+    out = tmp_path / "overblock.json"
+    assert main(["overblock", "--out", str(out)]) == 0
+    assert set(json.loads(out.read_text())["summary"]) == set(NOISE)

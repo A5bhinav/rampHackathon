@@ -25,6 +25,7 @@ def _eligible_if(out: dict, e164: str, flag: bool) -> dict:
                                   for c in out["candidates"]]}
 
 
+@pytest.mark.selection_gate
 def test_all_invariants_hold_on_the_real_rule():
     @given(worlds())
     @settings(max_examples=2000, deadline=None, derandomize=True, database=None)

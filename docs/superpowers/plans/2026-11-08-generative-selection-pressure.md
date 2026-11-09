@@ -405,8 +405,12 @@ git commit  # "lab: the known-limit frontier and over-block sweeps (spec 0033, T
 - [ ] **Step 1: Write the failing tests** in `evals/tests/test_cli.py`
 
 ```python
-def test_lab_fuzz_is_clean_on_the_real_rule(tmp_path):
-    assert main(["fuzz", "--examples", "300", "--seed", "0", "--out", str(tmp_path)]) == 0
+def test_lab_fuzz_exits_zero_when_nothing_is_found(tmp_path, monkeypatch):
+    # Ruling: this was test_lab_fuzz_is_clean_on_the_real_rule, which asserted the rule is clean; the
+    # confirmed findings make that false, and a CLI test should check the command, not the rule's status.
+    monkeypatch.setattr("dialback_evals.cli.rerun", lambda d: [])
+    monkeypatch.setattr("dialback_evals.cli.fuzz", lambda **k: [])
+    assert main(["fuzz", "--examples", "10", "--seed", "0", "--out", str(tmp_path)]) == 0
 
 def test_lab_fuzz_fails_on_a_violation(tmp_path, monkeypatch):
     monkeypatch.setattr("dialback_evals.cli.fuzz",
@@ -428,7 +432,7 @@ def test_lab_overblock_writes_table(tmp_path):
 Run: `cd evals && uv run pytest tests/test_cli.py -v -k "fuzz or frontier or overblock"`
 Expected: FAIL (unknown subcommand `fuzz` -> `SystemExit(2)`).
 
-- [ ] **Step 3: Add the `fuzz`, `frontier` and `overblock` subparsers and dispatch** in `cli.py`, each wired to Task 3/4. Create `.github/workflows/lab-fuzz.yml`: on PR paths `packages/ledger/**`, `evals/**`, the workflow itself, and on push to `main`; steps `uv sync --all-packages --locked`, `cd evals && uv run pytest -q`, then `uv run lab fuzz --examples 2000 --seed 0 --out evals/corpus-generated`.
+- [ ] **Step 3: Add the `fuzz`, `frontier` and `overblock` subparsers and dispatch** in `cli.py`, each wired to Task 3/4. Create `.github/workflows/lab-fuzz.yml`: on PR paths `packages/ledger/**`, `evals/**`, the workflow itself, and on push to `main`; steps `uv sync --all-packages --locked`, `cd evals && uv run pytest -q`, then `uv run lab fuzz --examples 2000 --seed 0 --out evals/corpus-generated`. Tag the two gate tests `selection_gate` (registered in `evals/pyproject.toml`) and have `lab-smoke` run `pytest -m "not selection_gate"`, so the voice job does not carry the selection gate.
 
 - [ ] **Step 4: Run to verify they pass, and the whole suite is green**
 

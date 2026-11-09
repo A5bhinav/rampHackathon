@@ -1,9 +1,14 @@
-"""The lab run CLI (spec 0017, Task 6).
+"""The lab CLI (spec 0017, Task 6; spec 0033, Task 5).
 
 `lab run --split voice` loads the scenarios, runs each through the real call and the real decision,
 writes `results.jsonl` and `scorecard.json`, prints a one-line summary, and exits non-zero when any
 hard gate fails. Deterministic (ScriptedAgent via LabAgent, scripted callers), so CI is reproducible
-and needs no key. `--max-usd` is accepted for forward compatibility; the scripted slice never spends."""
+and needs no key. `--max-usd` is accepted for forward compatibility; the scripted slice never spends.
+
+`lab fuzz` re-runs every frozen finding under `--out`, then searches `--examples` generated worlds at
+`--seed`, freezing the first shrunk violation there; it exits non-zero on any frozen case that still
+fails or any new finding. `lab frontier` and `lab overblock` write the two measurement tables and exit
+non-zero only when their stated asserts fail."""
 from __future__ import annotations
 
 import argparse
@@ -15,10 +20,20 @@ from pathlib import Path
 
 from dialback_decision import decide
 
+from .frontier import (
+    frontier_table,
+    overblock_holds,
+    overblock_sweep,
+    overblock_table,
+    sweep,
+    threshold_holds,
+)
+from .gencorpus import fuzz, load_all, rerun
 from .lab_agent import LabAgent
 from .runner import build_facts, run_scenario
 from .scenario import Scenario, expected_hash, load_scenarios
 from .scorers import ScenarioResult, score, scorecard
+from .worldgen import DEFAULT
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -29,10 +44,62 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--scenarios-root", default="evals/scenarios")
     run.add_argument("--out", default="evals/out")
     run.add_argument("--max-usd", type=float, default=0.0)
+    fz = sub.add_parser("fuzz", help="re-run frozen findings, then search generated worlds (spec 0033)")
+    fz.add_argument("--examples", type=int, default=2000)
+    fz.add_argument("--seed", type=int, default=0)
+    fz.add_argument("--out", default="evals/corpus-generated")
+    fr = sub.add_parser("frontier", help="sweep the known-limit frontier (spec 0033)")
+    fr.add_argument("--out", default="evals/out/frontier.json")
+    ob = sub.add_parser("overblock", help="sweep single pieces of attacker noise (spec 0033)")
+    ob.add_argument("--out", default="evals/out/overblock.json")
     args = parser.parse_args(argv)
     if args.command == "run":
         return _run(Path(args.scenarios_root) / args.split, Path(args.out))
+    if args.command == "fuzz":
+        return _fuzz(args.examples, args.seed, Path(args.out))
+    if args.command == "frontier":
+        return _frontier(Path(args.out))
+    if args.command == "overblock":
+        return _overblock(Path(args.out))
     return 2
+
+
+def _fuzz(examples: int, seed: int, out_dir: Path) -> int:
+    before = {label for label, _ in load_all(out_dir)}
+    failing = rerun(out_dir)
+    for label, found in failing:
+        print(f"lab fuzz: frozen case {label} still fails: {', '.join(found)}")
+    new = fuzz(examples=examples, seed=seed, out_dir=out_dir)
+    fresh = sorted({label for label, _ in load_all(out_dir)} - before) if new else []
+    if new and fresh:
+        print(f"lab fuzz: new finding ({', '.join(new)}) frozen as {', '.join(fresh)} under {out_dir}")
+    elif new:
+        print(f"lab fuzz: the search re-found an already-frozen case ({', '.join(new)})")
+    print(f"lab fuzz: {len(failing)} frozen case(s) failing, {len(fresh)} new finding(s) "
+          f"(seed {seed}, {examples} examples)")
+    return 1 if failing or new else 0
+
+
+def _write(path: Path, body: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(body, indent=2) + "\n", encoding="utf-8")
+
+
+def _frontier(out: Path) -> int:
+    cells = sweep()
+    table = frontier_table(cells)
+    _write(out, table)
+    print(f"lab frontier: {table['min_effort']['summary']}")
+    return 0 if threshold_holds(cells, DEFAULT) else 1
+
+
+def _overblock(out: Path) -> int:
+    cells = overblock_sweep()
+    table = overblock_table(cells)
+    _write(out, table)
+    for entry in table["summary"].values():
+        print(f"lab overblock: {entry['line']}")
+    return 0 if overblock_holds(cells) else 1
 
 
 def _run(scenarios_dir: Path, out_dir: Path) -> int:

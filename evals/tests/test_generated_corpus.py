@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 from dialback_evals.gencorpus import freeze, fuzz, load_all, load_world, rerun
 from dialback_evals.worldgen import NumberSpec, SightingSpec, make_world, run
 
@@ -44,6 +45,7 @@ def test_rerun_reports_frozen_cases_the_rule_still_fails(tmp_path, monkeypatch):
     assert rerun(tmp_path) == [("plain", ["M_reorder"])]
 
 
+@pytest.mark.selection_gate
 def test_frozen_findings_rerun_against_the_rule():
     failing = rerun(GENERATED)
     assert failing == [], failing   # each frozen finding must pass on the rule; red until select() is fixed
