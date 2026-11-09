@@ -88,13 +88,21 @@ def test_create_asgi_app_wires_injected_factories():
     assert TestClient(app).get("/healthz").json() == {"ok": True}
 
 
-def test_the_ledger_seam_factories_raise_fail_closed():
-    # The default store and lookup factories are the ledger seam (Q40/Q50): they must raise, not hand
-    # back a broken default, so a deploy without the real store cannot boot (R7).
+def test_the_store_factory_still_fails_closed_until_the_ledger():
+    # PR2: the Postgres CallStore lands with the ledger; until then the default factory raises so a
+    # deploy without a real store cannot boot (R7).
     with pytest.raises(NotImplementedError):
-        _ledger_store()
-    with pytest.raises(NotImplementedError):
-        _ledger_lookup()
+        _ledger_store(Settings(voice_mode="live"))
+
+
+def test_the_lookup_factory_builds_from_database_url_and_fails_closed_without_it():
+    # PR1 (spec 0029): lookup_call is built from DATABASE_URL; with no URL the factory raises on boot
+    # rather than serve a lookup that resolves nothing (R7). Building it opens no connection.
+    with pytest.raises(RuntimeError):
+        _ledger_lookup(Settings(voice_mode="live"))
+    lookup = _ledger_lookup(Settings(voice_mode="live", database_url="postgresql://u:p@h/db",
+                                     customer_name="Northwind Traders", callback_number="(415) 555-0100"))
+    assert callable(lookup)
 
 
 def test_create_asgi_app_with_default_factories_raises_on_boot():

@@ -7,6 +7,7 @@ dependencies = [
   "fastapi>=0.115",
   "httpx>=0.28",
   "pydantic>=2.9",
+  "psycopg[binary]>=3.2",
 ]
 
 [dependency-groups]

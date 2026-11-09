@@ -421,6 +421,7 @@ dependencies = [
     { name = "dialback-policy" },
     { name = "fastapi" },
     { name = "httpx" },
+    { name = "psycopg", extra = ["binary"] },
     { name = "pydantic" },
 ]
 
@@ -437,6 +438,7 @@ requires-dist = [
     { name = "dialback-policy", editable = "packages/policy" },
     { name = "fastapi", specifier = ">=0.115" },
     { name = "httpx", specifier = ">=0.28" },
+    { name = "psycopg", extras = ["binary"], specifier = ">=3.2" },
     { name = "pydantic", specifier = ">=2.9" },
 ]
 

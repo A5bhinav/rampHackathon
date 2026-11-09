@@ -79,3 +79,31 @@ def test_internal_token_is_read_in_both_modes():
     assert load_settings(LIVE_ENV).internal_api_token == b"internal-service-token-test-value"
     assert load_settings({"DIALBACK_VOICE": "text", "DIALBACK_INTERNAL_TOKEN": "t"}).internal_api_token == b"t"
     assert load_settings({}).internal_api_token == b""   # unset: empty, so create_app rejects every call
+
+
+def test_live_reads_database_url_and_the_disclosure_names():
+    # The live lookup needs the database and the fixed disclosure context (spec 0029, decision 3, 4):
+    # the DB connection string, the customer whose AP team is calling, and the callback number.
+    s = load_settings(LIVE_ENV | {
+        "DATABASE_URL": "postgresql://u:p@h:5432/db",
+        "DIALBACK_CUSTOMER_NAME": "Northwind Traders",
+        "DIALBACK_AP_CALLBACK_NUMBER": "(415) 555-0100",
+    })
+    assert s.database_url == "postgresql://u:p@h:5432/db"
+    assert s.customer_name == "Northwind Traders"
+    assert s.callback_number == "(415) 555-0100"
+
+
+def test_database_url_and_names_are_not_read_in_text_mode():
+    # Text mode runs no DB lookup, so these are left at their safe defaults even when present.
+    env = {k: v for k, v in LIVE_ENV.items() if k != "DIALBACK_VOICE"}
+    s = load_settings(env | {"DATABASE_URL": "postgresql://x", "DIALBACK_CUSTOMER_NAME": "X",
+                             "DIALBACK_AP_CALLBACK_NUMBER": "Y"})
+    assert s.database_url is None and s.customer_name == "" and s.callback_number == ""
+
+
+def test_live_without_database_url_or_names_keeps_safe_defaults():
+    # Live, Twilio complete, but no DB or names set: the fields default, so the lookup factory and
+    # dial_from_row fail closed rather than dialing a half-known call (R7).
+    s = load_settings(LIVE_ENV)
+    assert s.database_url is None and s.customer_name == "" and s.callback_number == ""
