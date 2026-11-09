@@ -1,4 +1,4 @@
-# 0030: The attack lab, generative selection pressure
+# 0033: The attack lab, generative selection pressure
 
 **Owner:** Sami  **Slice:** call and adversary  **Target day:** after the voice slice (0017); the first generative cut, grown before the full lab's statistics.
 

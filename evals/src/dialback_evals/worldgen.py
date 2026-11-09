@@ -1,4 +1,4 @@
-"""Spec 0030, Task 1: generate select() input worlds, parametric over what an attacker controls.
+"""Spec 0033, Task 1: generate select() input worlds, parametric over what an attacker controls.
 
 A `World` holds the full `select()` keyword inputs plus the set of e164s the generator seeded as
 attacker-controlled (`poison`). `make_world` is the deterministic builder (tests and the frontier

@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python 3.13, Hypothesis (already a dev dependency), jsonschema, argparse CLI, pytest.
 
-**Spec:** `specs/0030-generative-selection-pressure.md`
+**Spec:** `specs/0033-generative-selection-pressure.md`
 
 **Prerequisite / base branch:** This plan extends the `evals` lab package and its `lab` CLI (`dialback_evals.cli:main`), which are delivered by spec 0017 and are **not** on `origin/main` (main has only the `evals` skeleton). Implement this on a branch based on `sami/attack-lab-voice` (which carries 0017), or on `main` once 0017 merges. The spec-only branch `sami/attack-lab-generative` is cut from `origin/main` and must be rebased onto that base before Task 1. Every "Modify" path below (`cli.py`, `pyproject.toml`) refers to the 0017 version of that file.
 
@@ -85,7 +85,7 @@ Expected: PASS (both tests).
 
 ```bash
 git add evals/src/dialback_evals/worldgen.py evals/tests/test_worldgen.py evals/pyproject.toml uv.lock
-git commit  # "lab: the select() world generator (spec 0030, Task 1)"
+git commit  # "lab: the select() world generator (spec 0033, Task 1)"
 ```
 
 ---
@@ -152,7 +152,7 @@ Expected: PASS (all four). The 2000-example property run finds zero violations.
 
 ```bash
 git add evals/src/dialback_evals/invariants.py evals/tests/test_invariants.py
-git commit  # "lab: the selection invariant oracle (spec 0030, Task 2)"
+git commit  # "lab: the selection invariant oracle (spec 0033, Task 2)"
 ```
 
 ---
@@ -207,7 +207,7 @@ Expected: PASS. `evals/corpus-generated/` holds only `.gitkeep` (no real finding
 
 ```bash
 git add evals/src/dialback_evals/gencorpus.py evals/tests/test_generated_corpus.py evals/corpus-generated/.gitkeep
-git commit  # "lab: freeze counterexamples and the fuzz driver (spec 0030, Task 3)"
+git commit  # "lab: freeze counterexamples and the fuzz driver (spec 0033, Task 3)"
 ```
 
 ---
@@ -264,7 +264,7 @@ Expected: PASS (all three).
 
 ```bash
 git add evals/src/dialback_evals/frontier.py evals/tests/test_frontier.py
-git commit  # "lab: the known-limit frontier sweep (spec 0030, Task 4)"
+git commit  # "lab: the known-limit frontier sweep (spec 0033, Task 4)"
 ```
 
 ---
@@ -316,5 +316,5 @@ Expected: no errors.
 
 ```bash
 git add evals/src/dialback_evals/cli.py .github/workflows/lab-fuzz.yml evals/tests/test_cli.py
-git commit  # "lab: lab fuzz and frontier CLI plus the lab-fuzz CI gate (spec 0030, Task 5)"
+git commit  # "lab: lab fuzz and frontier CLI plus the lab-fuzz CI gate (spec 0033, Task 5)"
 ```

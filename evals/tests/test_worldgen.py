@@ -1,4 +1,4 @@
-"""Spec 0030, Task 1: the generator emits valid select() inputs, and make_world is deterministic."""
+"""Spec 0033, Task 1: the generator emits valid select() inputs, and make_world is deterministic."""
 from __future__ import annotations
 
 import json
