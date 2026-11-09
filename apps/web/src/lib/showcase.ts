@@ -12,7 +12,7 @@ export type Picture =
   | { kind: "change"; vendor: string; by: string; from: string; to: string; subject: string; sender: string }
   | { kind: "detect"; signals: { name: string; does: string }[]; result: string }
   | { kind: "hold"; vendor: string; bills: { invoice: string; amount: string; due: string }[]; readback: string }
-  | { kind: "number"; picked: string; sources: string[]; checks: string[]; refused: { what: string; why: string } }
+  | { kind: "number"; picked: string; sources: string[]; checks: string[]; refused: { vendor: string; number: string; why: string } }
   | { kind: "call"; disclosure: string; turns: Turn[] }
   | { kind: "decide"; outcome: string; effect: string; rows: { id: string; sentence: string }[]; more: string }
   | { kind: "release"; enteredBy: string; approver: string; reason: string; refusal: string };
@@ -22,7 +22,7 @@ const CUSTOMER = "Fictional Co (demo)";
 export const SHOWCASE: Record<StoryKey, Picture> = {
   change: {
     kind: "change", vendor: "Acme Fasteners LLC", by: "Pat Clerk",
-    from: "Routing 021000021 · ending 2222", to: "Routing 026009593 · ending 0001",
+    from: "Routing 121000248 · ending 4444", to: "Routing 026009593 · ending 0001",
     subject: "Re: Invoice 1638", sender: "ar@acme.example",
   },
   detect: {
@@ -43,10 +43,10 @@ export const SHOWCASE: Record<StoryKey, Picture> = {
     readback: "Hold read back from Ramp: confirmed",
   },
   number: {
-    kind: "number", picked: "(206) 555-0117",
-    sources: ["contract", "vendor master record", "listing", "email"],
-    checks: ["Seen in two or more kinds of source", "Seen before the request arrived", "Not one digit off another number"],
-    refused: { what: "A number first seen in the request's thread", why: "it may be the fraudster's" },
+    kind: "number", picked: "(206) 555-0142",
+    sources: ["contract", "vendor portal", "email"],
+    checks: ["Seen in two or more kinds of source", "First seen 90 days or more before the request", "Not one digit off another number"],
+    refused: { vendor: "Cobalt Freight's request", number: "(617) 555-0143", why: "first seen in the change request, so never called" },
   },
   call: {
     kind: "call",
@@ -54,6 +54,8 @@ export const SHOWCASE: Record<StoryKey, Picture> = {
     turns: [
       { slot: "recording_consent", ask: "Is it okay to continue on this recorded line?", answer: "Yes" },
       { slot: "company_named", ask: "Could you tell me the name of the company I've reached?", answer: "Acme Fasteners" },
+      { slot: "department", ask: "Which department or team am I speaking with?", answer: "Accounts receivable" },
+      { slot: "speaker_name", ask: "May I have your name and your role there?", answer: "Jordan Lee, accounts receivable" },
       { slot: "change_requested", ask: `Has your company recently asked ${CUSTOMER} to change how you get paid?`, answer: "Yes" },
       { slot: "account_last4", ask: "For the account you'd like to be paid into, what are the last four digits?", answer: "4 digits given" },
     ],
@@ -70,7 +72,7 @@ export const SHOWCASE: Record<StoryKey, Picture> = {
     more: "and the other eight conditions",
   },
   release: {
-    kind: "release", enteredBy: "Pat Clerk", approver: "Demo Approver",
+    kind: "release", enteredBy: "Pat Clerk", approver: "an approver",
     reason: "Acme confirmed the change on the ledger's number; the digits match.",
     refusal: "Pat Clerk entered this change, so Postgres refuses their release.",
   },

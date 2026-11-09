@@ -70,8 +70,11 @@
 .shot-field { display: grid; gap: 4px; margin: 12px 0 !important; padding: 10px; border: 1px solid var(--line-strong);
   border-radius: var(--radius-sm); color: var(--text); }
 .shot-field .muted { font-size: 0.75rem; }
-.shot-button { display: flex; justify-content: flex-end; }
-.shot-button span { padding: 7px 14px; border-radius: var(--radius-sm); background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.shot-button { display: flex; justify-content: flex-end; gap: 8px; }
+.shot-button span { padding: 7px 14px; border-radius: var(--radius-sm); background: var(--accent); color: var(--accent-ink); font-weight: 600;
+  border: 1px solid var(--accent); }
+.shot-button span.ghost { background: var(--surface); color: var(--text); border-color: var(--line-strong); }
+.shot-note { margin: 12px 2px 0; font-size: 0.75rem; color: var(--muted); }
 
 /* The hero's queue. */
 .hero-shot { padding: 34px 28px 28px; }
@@ -85,6 +88,7 @@
 .mini-rail { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
 .mini-rail li { font-size: 0.6875rem; color: var(--muted); padding-top: 6px; border-top: 3px solid var(--line); background: none; }
 .mini-rail li.done { border-top-color: var(--accent); color: var(--text-2); }
+.mini-rail li.done::before { content: "✓ "; color: var(--accent); }
 .mini-rail li.skipped { border-top-style: dotted; }
 .mini-rail li.now { font-weight: 600; }
 .mini-rail li.now.tone-ok { border-top-color: var(--fill-ok); color: var(--ok); }
