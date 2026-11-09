@@ -154,6 +154,7 @@ call is refused `number_not_selected`.
 
 For a demo call to ring a team phone, the ledger's pick for the vendor must be that phone, and the
 phone must be on the allowlist: `dialback-ledger demo load --phone acme=+1...` after `demo reset`.
+The whole first call, step by step, is `docs/live-call.md`.
 
 ## 3. Vercel (once)
 
