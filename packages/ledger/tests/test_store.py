@@ -223,3 +223,39 @@ def test_an_unnamed_sender_in_the_change_context_leaves_the_speaker_unknown(data
     ctx = _speaker_world(database_url, "Dana Whitfield <ar@acme.example>", "ar@acme.example")
     assert ctx("Jordan Lee") == {}                     # the earlier thread message could be anyone's
     assert ctx("Dana Whitfield") == {"speaker_in_change_thread": True}
+
+
+def test_a_display_name_with_no_comparable_words_is_unnamed(database_url):
+    # A name the check can't compare (another script, punctuation) must not read as "someone else".
+    for name in ("张伟", "—", "."):
+        ctx = _speaker_world(database_url, f"{name} <ar@acme.example>", "Acme AR <ar@acme.example>")
+        assert ctx("Jordan Lee") == {}, name
+
+
+def test_selecting_again_rewrites_no_contact_points(database_url):
+    truth = truth_of("P01")
+    v = new_vendor(database_url, "P01 again")
+    load(database_url, v, truth)
+    case = open_case(database_url, v)
+    pick(database_url, v, case, truth)
+    count = "select count(*) from ledger.contact_points where vendor_id = %s"
+    with psycopg.connect(database_url) as c:
+        before = c.execute(count, (v["vendor_id"],)).fetchone()[0]
+    pick(database_url, v, case, truth)
+    with psycopg.connect(database_url) as c:
+        assert c.execute(count, (v["vendor_id"],)).fetchone()[0] == before == len(truth["planted"])
+
+
+def test_a_change_request_recorded_after_the_case_opened_is_ignored(database_url):
+    truth = truth_of("C01")
+    v = new_vendor(database_url, "C01 late request")
+    load(database_url, v, truth, request=False)
+    case = open_case(database_url, v)
+
+    async def late():
+        async with await psycopg.AsyncConnection.connect(database_url) as conn, conn.transaction():
+            await mark_change_request(conn, dataset_id=v["dataset_id"], vendor_id=v["vendor_id"],
+                                      document_id=truth["request_document_id"])
+    run(late())
+    out = pick(database_url, v, case, truth)
+    assert out.get("contact_point_id") is None and "change request" in out["reason"]

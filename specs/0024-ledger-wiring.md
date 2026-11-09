@@ -84,6 +84,17 @@ detection, entity resolution.
 ## Open questions
 
 - **Q45, Q46 (Abhi):** confirm decisions 1 and 2, or say what you'd prefer.
+- **Q53 (Abhi and Inesh, a risk to accept or refuse):** `speaker_in_change_thread` = False is
+  what makes V07, and so Verified, reachable at all; before this spec it was always unknown. It
+  rests on names: the request's sender display name and the name the person gives on the call,
+  both of which an attacker can choose. What bounds the risk is that the call goes only to a number
+  the ledger proved (R2), so an attacker would first have to control the vendor's established line.
+  A name the check can't compare (another script, punctuation) counts as unnamed, so the answer
+  stays unknown. If that isn't enough, the alternative is to leave it unknown and accept that
+  nothing verifies without a person.
+- **Known limit, replay:** `recorded_at` is the database's clock at insert, so a ledger load whose
+  transaction is still open when a case opens, and commits after, counts as recorded before it.
+  The demo runs loads before changes; production ingestion should commit before detection runs.
 - **Q51 (Abhi):** `DIALBACK_RESOLVER` should switch to `ledger` on the deployed core once the demo
   data is loaded (spec 0025). Until then, `stub` keeps today's behavior.
 
