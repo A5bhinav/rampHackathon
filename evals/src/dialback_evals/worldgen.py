@@ -56,6 +56,7 @@ class SightingSpec:
     recorded_late: bool = False      # recorded into the ledger after the case opened
     shared_id: bool = False          # a second, different document is filed under the same id
     twin_first: bool = False         # that second document sorts first, so select() reads it instead
+    on_request: bool = False         # in the change request email's own body, not a document of its own
 
 
 @dataclass(frozen=True)
@@ -127,6 +128,10 @@ def make_world(*, numbers: list[NumberSpec], vendor_domains: tuple[str, ...] = (
         request = ChangeRequest("req", request_at, "req", REQUEST_SUBJECT, f"ar@{domain}")
     for i, spec in enumerate(numbers):
         for j, sp in enumerate(spec.expand()):
+            if sp.on_request and request is not None:   # the attacker's words in the request email itself
+                sightings.append(Sighting(spec.e164, request.document_id, "email", request_at, sp.visibility,
+                                          sp.role, sp.party, request_at))
+                continue
             label = f"{i}-{j}"
             doc_id = f"d{label}"
             received = request_at - dt.timedelta(days=sp.lead_days)
@@ -176,6 +181,10 @@ def profile(world: World) -> Counter[str]:
     p["mixed_timing"] = int(any(len({s.received_at for s in v}) > 1 for v in by_number.values()))
     p["non_default_settings"] = int(world.settings != DEFAULT)
     p["twin_first"] = int(any(d.sender == "" for d in docs))
+    request = kw["request"]
+    p["request_label"] = int(request is not None and any(   # the attacker's words in the request email itself
+        s.document_id == request.document_id and s.visibility == "visible"
+        and (s.party != "vendor" or str(s.role).strip().lower() == "fax") for s in rows))
     return p
 
 
@@ -270,12 +279,18 @@ def worlds(draw, settings: Settings | None = None) -> World:
         planted = _fictional_e164(draw(st.sampled_from(free)), draw(st.integers(0, 99)))
         specs.append(NumberSpec(planted, ["contract", "listing"], draw(st.integers(0, 700)), is_poison=True))
         targets.append(planted)
-    # In half the worlds with a planted number, the attacker's own email in the request's thread names
-    # one of the two: as a bank line, a fax line, or a bare mention the reader can't place (party
-    # "unknown"). Only there does a label have a second number to hand the call to.
+    # In half the worlds with a planted number, the attacker's own words name one of the two, in the
+    # shapes ingestion emits: a bank's line, a fax line, a bare mention the reader can't place (party
+    # "unknown") or a customer's line. They sit in the request email itself (where real ingestion puts
+    # them), in a reply in its thread from another domain, or in one from the vendor's own domain (a
+    # hijacked mailbox). Only with a planted number does a label have a second number to hand the call to.
     if len(targets) > 1 and draw(st.booleans()):
-        role, party = draw(st.sampled_from([("ar", "bank"), ("fax", "vendor"), ("unknown", "unknown")]))
-        label = SightingSpec("email", draw(st.integers(0, 30)), role=role, party=party, sender="other", in_thread=True)
+        role, party = draw(st.sampled_from([("unknown", "bank"), ("fax", "vendor"), ("unknown", "unknown"),
+                                            ("unknown", "customer")]))
+        where = draw(st.sampled_from(["request", "thread", "thread_own"]))
+        label = SightingSpec("email", 0 if where == "request" else draw(st.integers(0, 30)), role=role, party=party,
+                             sender="own" if where == "thread_own" else "other", in_thread=where != "request",
+                             on_request=where == "request")
         specs.append(NumberSpec(draw(st.sampled_from(targets)), [], 0, sightings=(label,)))
     request_present = draw(st.sampled_from([True] * 9 + [False]))
     return make_world(numbers=specs, settings=chosen, request_present=request_present)
