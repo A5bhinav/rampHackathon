@@ -4,7 +4,7 @@
     "M_lookalike_helped",
     "M_shared_id_helped"
   ],
-  "why": "min_source_types 1, min_age_days 30, same_subject_window_days 90. The real number is picked; its only clean evidence is a same-subject message. A lookalike email 100 days back pulls that message into change context, the real number stops anchoring, and the pick moves to the near-miss sibling.",
+  "why": "min_source_types 1, min_age_days 30, same_subject_window_days 90. The real number is picked; its only clean evidence is a same-subject message. A lookalike email 100 days back pulls that message into change context, the real number stops anchoring, and the pick moves to the near-miss sibling. Possible only when same_subject_window_days > min_age_days, so never under the v1 settings select_number uses: an ablation-settings case.",
   "case_id": "00000000-0000-0000-0000-000000000001",
   "dataset_id": "00000000-0000-0000-0000-000000000002",
   "vendor_id": "00000000-0000-0000-0000-000000000003",

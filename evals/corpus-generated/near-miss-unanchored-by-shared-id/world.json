@@ -3,7 +3,7 @@
   "labels": [
     "M_shared_id_helped"
   ],
-  "why": "Default settings. The near-miss sibling +14155550143 is blocked only by near_miss_of_older_number. A second document under the real number's only document id puts that document in change context, so the real number stops anchoring the near-miss check; the sibling becomes eligible and is picked.",
+  "why": "v1 settings. The near-miss sibling +14155550143 is blocked only by near_miss_of_older_number. A second document under the real number's only document id puts that document in change context, so the real number stops anchoring the near-miss check (select() anchors only on clean evidence); the sibling becomes eligible and is picked. Latent in production: ledger.documents.id is the primary key and write_ingest skips an id it already holds, so select_number never passes select() two documents under one id; live only for a caller that passes duplicate ids directly (replay or ablation tooling, a future ingestion path).",
   "case_id": "00000000-0000-0000-0000-000000000001",
   "dataset_id": "00000000-0000-0000-0000-000000000002",
   "vendor_id": "00000000-0000-0000-0000-000000000003",
