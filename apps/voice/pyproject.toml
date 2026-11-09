@@ -8,6 +8,8 @@ dependencies = [
   "httpx>=0.28",
   "pydantic>=2.9",
   "psycopg[binary]>=3.2",
+  "uvicorn>=0.30",
+  "tzdata>=2024.1",
 ]
 
 [dependency-groups]
@@ -19,3 +21,6 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/dialback_voice"]
+
+[project.scripts]
+dialback-voice = "dialback_voice.entrypoint:main"

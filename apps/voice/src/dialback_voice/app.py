@@ -12,6 +12,7 @@ for calls that never reach a live conversation. They are off by default, so the 
 unaffected (DIALBACK_VOICE=text)."""
 from __future__ import annotations
 
+import asyncio
 import datetime as dt
 import hmac
 import logging
@@ -108,6 +109,7 @@ def _report_body(result: CallResult, call_id: UUID, dial: CallDial) -> dict[str,
     callback, or a dropped call to redial)."""
     body: dict[str, Any] = {"call_id": str(call_id), "case_id": str(dial.case_id),
                             "result": result.result, "attempt": dial.attempt}
+    _with_pick(body, dial.contact_point_id)
     if result.result == "answers_recorded":
         body["answers"] = result.answers
     if result.end.retry_at is not None:
@@ -115,7 +117,43 @@ def _report_body(result: CallResult, call_id: UUID, dial: CallDial) -> dict[str,
     return body
 
 
-async def _dial(twilio: TwilioDeps, store: CallStore, placed: PlacedCall, number_e164: str | None) -> None:
+def _answered_by(detected: str) -> str | None:
+    """Twilio's machine detection, as the call report's answered_by: "human" only when it said so."""
+    if detected == "human":
+        return "human"
+    if detected.startswith("machine") or detected == "fax":
+        return "machine"
+    return None  # unknown or absent: nothing is claimed, so decide() can't count a live person (V03)
+
+
+def _with_connect_facts(body: dict[str, Any], setup: dict[str, Any], result: CallResult) -> None:
+    """The facts decide() reads, from code (spec 0030). The setup passed verify_setup, which checks the
+    one-time token and that Twilio dialed the pick, so dialed_number_is_pick is that check's result.
+    The direction is Twilio's own; answered_by is the machine detection our TwiML carried; the checks
+    are the policy's, computed from the transcript, never by the model."""
+    body["dialed_number_is_pick"] = True
+    direction = str(setup.get("direction") or "")
+    if direction.startswith("outbound"):
+        body["direction"] = "outbound"
+    elif direction.startswith("inbound"):
+        body["direction"] = "inbound"
+    answered = (setup.get("customParameters") or {}).get("answered_by")
+    if answered in ("human", "machine"):
+        body["answered_by"] = answered
+    if result.checks:
+        body["checks"] = result.checks
+
+
+def _with_pick(body: dict[str, Any], contact_point_id: UUID | None) -> dict[str, Any]:
+    """Name the Trust Ledger pick the call dialed (internal.yaml's optional contact_point_id). The
+    core's decide() counts a call as reaching the pick only when the report names it (spec 0030)."""
+    if contact_point_id is not None:
+        body["contact_point_id"] = str(contact_point_id)
+    return body
+
+
+async def _dial(twilio: TwilioDeps, store: CallStore, placed: PlacedCall, number_e164: str | None,
+                contact_point_id: UUID | None = None) -> None:
     """Originate the Twilio call for a freshly placed call, then record the outcome (spec 0014).
     Fails closed (R7): a missing number or a Twilio rejection records the call `failed` and reports
     `failed` to the core, and POST /calls still returns the call_id with 202 even when that report or
@@ -124,7 +162,7 @@ async def _dial(twilio: TwilioDeps, store: CallStore, placed: PlacedCall, number
     the caller id and our own URLs reach Twilio; never the case id."""
     call_id = placed.call_id
     if not number_e164:  # past pre_dial this should hold, but never dial a number we do not have (R2)
-        await _dial_failed(twilio, store, placed, "no_number")
+        await _dial_failed(twilio, store, placed, "no_number", contact_point_id)
         return
     try:
         sid = await twilio.originator.originate(
@@ -133,7 +171,7 @@ async def _dial(twilio: TwilioDeps, store: CallStore, placed: PlacedCall, number
             status_url=f"{twilio.public_base_url}/twilio/status/{call_id}")
     except Exception:  # noqa: BLE001  any REST error means no live call was placed: fail closed
         log.warning("origination failed for call %s", call_id)
-        await _dial_failed(twilio, store, placed, "originate_failed")
+        await _dial_failed(twilio, store, placed, "originate_failed", contact_point_id)
         return
     try:
         await store.mark_dialed(call_id, provider_call_id=sid)
@@ -141,7 +179,8 @@ async def _dial(twilio: TwilioDeps, store: CallStore, placed: PlacedCall, number
         log.warning("could not record the dialed SID for call %s", call_id)
 
 
-async def _dial_failed(twilio: TwilioDeps, store: CallStore, placed: PlacedCall, reason: str) -> None:
+async def _dial_failed(twilio: TwilioDeps, store: CallStore, placed: PlacedCall, reason: str,
+                       contact_point_id: UUID | None = None) -> None:
     """Record and report a call that never reached a live conversation, best effort. Neither the store
     write nor the core report may 500 the placement (R7, decision 3): on any failure the case stays
     `calling` and the core's `call_timeout` sweeps it to a person. In the synchronous-dial path the
@@ -152,8 +191,8 @@ async def _dial_failed(twilio: TwilioDeps, store: CallStore, placed: PlacedCall,
     except Exception:  # noqa: BLE001  a store blip must not 500 the placement; the core timeout backstops it
         log.warning("could not mark call %s failed (%s)", placed.call_id, reason)
     try:
-        await twilio.report_ended({"call_id": str(placed.call_id), "case_id": str(placed.case_id),
-                                   "result": "failed", "attempt": placed.attempt})
+        await twilio.report_ended(_with_pick({"call_id": str(placed.call_id), "case_id": str(placed.case_id),
+                                              "result": "failed", "attempt": placed.attempt}, contact_point_id))
     except (CoreUnavailable, CoreRejectedReport):
         log.warning("the failed report for call %s did not land; the core timeout will sweep it",
                     placed.call_id)
@@ -162,20 +201,28 @@ async def _dial_failed(twilio: TwilioDeps, store: CallStore, placed: PlacedCall,
 async def run_relay_call(twilio: TwilioDeps, call_id: UUID, ws: Any) -> None:
     """Run one ConversationRelay call on an already-accepted socket, then report its end. This is the
     whole body of the WebSocket route, apart from accepting the socket, so it is tested directly."""
-    dial = twilio.lookup_call(call_id)
+    dial = await asyncio.to_thread(twilio.lookup_call, call_id)
     if dial is None:
         await ws.close()                                     # an unknown call_id: nothing to run
         return
     ctx = CallContext(call_id=str(call_id), script=Script(dial.customer_name, dial.callback_number),
                       vendor_names=dial.vendor_names)
 
+    verified: dict[str, Any] = {}
+
     def verify(setup: dict[str, Any]) -> bool:
-        return verify_setup(setup, key=twilio.call_token_key, case_id=dial.case_id,
-                            attempt=dial.attempt, number_e164=dial.number_e164)
+        ok = verify_setup(setup, key=twilio.call_token_key, case_id=dial.case_id,
+                          attempt=dial.attempt, number_e164=dial.number_e164)
+        if ok:
+            verified.update(setup)
+        return ok
 
     result = await run_relay(ctx, twilio.agent_for(), ws, verify=verify, clock=twilio.clock,
                              greeting=ctx.script.disclosure())  # welcomeGreeting spoke it; don't repeat (R8)
-    await twilio.report_ended(_report_body(result, call_id, dial))
+    body = _report_body(result, call_id, dial)
+    if verified:  # only a socket we placed and verified vouches for these (spec 0030; V02, V03, V10, V11)
+        _with_connect_facts(body, verified, result)
+    await twilio.report_ended(body)
 
 
 def create_app(*, store: CallStore, internal_api_token: bytes, agent_version: str,
@@ -215,7 +262,7 @@ def create_app(*, store: CallStore, internal_api_token: bytes, agent_version: st
             agent_version=request.app.state.agent_version)
         log.info("call %s accepted for case %s attempt %s", placed.call_id, placed.case_id, placed.attempt)
         if twilio is not None and created:  # live mode dials the pick; a replay (created=False) never redials
-            await _dial(twilio, store, placed, pre.number_e164)
+            await _dial(twilio, store, placed, pre.number_e164, pre.contact_point_id)
         return JSONResponse(PlaceCallAccepted(**placed.__dict__).model_dump(mode="json"),
                             status_code=202 if created else 200)
 
@@ -228,16 +275,18 @@ def create_app(*, store: CallStore, internal_api_token: bytes, agent_version: st
         async def twiml(call_id: UUID, request: Request):
             # Twilio fetches a call's instructions here; the fetch is signature-verified so a forged
             # request mints no token (R9, and Q46 on whether the WS handshake is signed too).
-            if await _verified_twilio_params(twilio, request) is None:
+            params = await _verified_twilio_params(twilio, request)
+            if params is None:
                 return _error(401, "unauthorized", "A valid Twilio signature is required.")
-            dial = twilio.lookup_call(call_id)
+            dial = await asyncio.to_thread(twilio.lookup_call, call_id)  # a DB read: off the event loop
             if dial is None:
                 return _error(404, "unknown_call", "No such call.")
             token = mint(twilio.call_token_key, case_id=dial.case_id, attempt=dial.attempt,
                          number_e164=dial.number_e164)
             disclosure = Script(dial.customer_name, dial.callback_number).disclosure()
             xml = build_connect_twiml(ws_url=f"{twilio.ws_base_url}/twilio/relay/{call_id}",
-                                      call_token=token, disclosure=disclosure)
+                                      call_token=token, disclosure=disclosure,
+                                      answered_by=_answered_by(params.get("AnsweredBy", "")))
             return Response(content=xml, media_type="application/xml")
 
         @app.post("/twilio/status/{call_id}")
@@ -249,11 +298,12 @@ def create_app(*, store: CallStore, internal_api_token: bytes, agent_version: st
             if mapped is None:
                 return Response(status_code=204)  # a human answered: the WebSocket owns that report
             result, answered_by = mapped
-            dial = twilio.lookup_call(call_id)
+            dial = await asyncio.to_thread(twilio.lookup_call, call_id)
             if dial is None:
                 return _error(409, "not_current_call", "No such call.")
             body: dict[str, Any] = {"call_id": str(call_id), "case_id": str(dial.case_id),
                                     "result": result, "attempt": dial.attempt}
+            _with_pick(body, dial.contact_point_id)
             if answered_by is not None:
                 body["answered_by"] = answered_by
             await twilio.report_ended(body)

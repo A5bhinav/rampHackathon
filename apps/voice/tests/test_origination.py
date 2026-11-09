@@ -144,6 +144,7 @@ def test_originate_failure_reports_failed():
     call_id = r.json()["call_id"]
     assert body["call_id"] == call_id
     assert body["attempt"] == 1
+    assert body["contact_point_id"] == str(PICK)  # spec 0030: the pick, even on a failed dial
     assert store.failed[uuid.UUID(call_id)] == "originate_failed"
     assert store.dialed == {}            # never recorded as dialed
 
