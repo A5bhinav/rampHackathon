@@ -115,3 +115,21 @@ def test_refusals_write_nothing(database_url, problem):
         run(request(database_url, vendor="zenith"))
     with psycopg.connect(database_url) as c:
         assert c.execute("select count(*) from ledger.documents where dataset_id = %s", (d["dataset_id"],)).fetchone()[0] == 0
+
+
+def test_whoever_answers_the_team_phone_is_not_from_the_request(database_url):
+    from dialback_ledger import change_context
+    d = demo_dataset(database_url)
+    run(load(database_url, phones={}, with_requests=True))
+
+    def speaker(ref, name):
+        case = case_for(database_url, d, ref) if ref not in opened else opened[ref]
+        opened[ref] = case
+        return run(change_context(case_id=case, dataset_id=d["dataset_id"], vendor_id=d["vendors"][ref],
+                                  cutoff=dt.datetime.now(dt.UTC), speaker_names=(name,), offered_numbers=(),
+                                  database_url=database_url)).get("speaker_in_change_thread")
+
+    opened = {}
+    assert speaker("acme", "Jordan Lee") is False          # Verified becomes possible (V07)
+    assert speaker("acme", "Dana Whitfield") is True       # the requester on the line is caught
+    assert speaker("cobalt", "Morgan Pryce") is True

@@ -40,6 +40,14 @@ def _vendor(ref: str, base: str, name: str, area: str) -> dict:
             offered = v.phone(43, role="ar", truth="poison", label="AR direct")
             phones["offered"] = offered.e164
             v.request(thread=thread, subject=subject, extra=["Questions? Call me directly.", offered])
+    # Display names on every email, so the ledger can tell whether the person on the call wrote
+    # in the change context (spec 0024, speaker_in_change_thread); unnamed senders leave it unknown.
+    requester = {"acme": "Dana Whitfield", "brightline": "Sam Ortiz", "cobalt": "Morgan Pryce"}[ref]
+    for d in v.docs:
+        sender = d["custody"]["sender"]
+        if sender:
+            who = requester if d["id"] == v.request_id else f"{name} Accounts Receivable"
+            d["custody"]["sender"] = f"{who} <{sender}>"
     request = next(d for d in v.docs if d["id"] == v.request_id)
     return {"name": name, "domain": v.domain, "phones": phones, "request": request,
             "documents": [d for d in v.docs if d["id"] != v.request_id]}

@@ -180,7 +180,7 @@
       "channel": "email",
       "parent_document_id": null,
       "received_at": "2023-04-10T16:00:00Z",
-      "sender": "ar@acme.example",
+      "sender": "Acme Fasteners LLC Accounts Receivable <ar@acme.example>",
       "subject": "Invoice 1633",
       "thread_id": "thr-demo-acme-5"
      },
@@ -231,7 +231,7 @@
       "channel": "email",
       "parent_document_id": "803b2dac-bf9a-5626-8987-645a617bb765",
       "received_at": "2023-04-10T16:00:00Z",
-      "sender": "ar@acme.example",
+      "sender": "Acme Fasteners LLC Accounts Receivable <ar@acme.example>",
       "subject": "Invoice 1633",
       "thread_id": "thr-demo-acme-5"
      },
@@ -282,7 +282,7 @@
       "channel": "email",
       "parent_document_id": null,
       "received_at": "2023-11-03T08:00:00Z",
-      "sender": "ar@acme.example",
+      "sender": "Acme Fasteners LLC Accounts Receivable <ar@acme.example>",
       "subject": "Invoice 1634",
       "thread_id": "thr-demo-acme-7"
      },
@@ -333,7 +333,7 @@
       "channel": "email",
       "parent_document_id": "4e979656-9cc5-566b-aa58-a5d8b0805f8f",
       "received_at": "2023-11-03T08:00:00Z",
-      "sender": "ar@acme.example",
+      "sender": "Acme Fasteners LLC Accounts Receivable <ar@acme.example>",
       "subject": "Invoice 1634",
       "thread_id": "thr-demo-acme-7"
      },
@@ -384,7 +384,7 @@
       "channel": "email",
       "parent_document_id": null,
       "received_at": "2024-05-28T00:00:00Z",
-      "sender": "ar@acme.example",
+      "sender": "Acme Fasteners LLC Accounts Receivable <ar@acme.example>",
       "subject": "Invoice 1635",
       "thread_id": "thr-demo-acme-9"
      },
@@ -435,7 +435,7 @@
       "channel": "email",
       "parent_document_id": "f8b0dd13-f96a-5b65-bb56-0cf5ee7b6429",
       "received_at": "2024-05-28T00:00:00Z",
-      "sender": "ar@acme.example",
+      "sender": "Acme Fasteners LLC Accounts Receivable <ar@acme.example>",
       "subject": "Invoice 1635",
       "thread_id": "thr-demo-acme-9"
      },
@@ -486,7 +486,7 @@
       "channel": "email",
       "parent_document_id": null,
       "received_at": "2024-12-20T16:00:00Z",
-      "sender": "ar@acme.example",
+      "sender": "Acme Fasteners LLC Accounts Receivable <ar@acme.example>",
       "subject": "Invoice 1636",
       "thread_id": "thr-demo-acme-11"
      },
@@ -537,7 +537,7 @@
       "channel": "email",
       "parent_document_id": "4b0cb216-6c8f-53d3-8d59-b1c8ab36ba48",
       "received_at": "2024-12-20T16:00:00Z",
-      "sender": "ar@acme.example",
+      "sender": "Acme Fasteners LLC Accounts Receivable <ar@acme.example>",
       "subject": "Invoice 1636",
       "thread_id": "thr-demo-acme-11"
      },
@@ -588,7 +588,7 @@
       "channel": "email",
       "parent_document_id": null,
       "received_at": "2025-07-15T08:00:00Z",
-      "sender": "ar@acme.example",
+      "sender": "Acme Fasteners LLC Accounts Receivable <ar@acme.example>",
       "subject": "Invoice 1637",
       "thread_id": "thr-demo-acme-13"
      },
@@ -639,7 +639,7 @@
       "channel": "email",
       "parent_document_id": "09cbf376-a874-5eeb-8e26-1c3c188f04b4",
       "received_at": "2025-07-15T08:00:00Z",
-      "sender": "ar@acme.example",
+      "sender": "Acme Fasteners LLC Accounts Receivable <ar@acme.example>",
       "subject": "Invoice 1637",
       "thread_id": "thr-demo-acme-13"
      },
@@ -690,7 +690,7 @@
       "channel": "email",
       "parent_document_id": null,
       "received_at": "2026-02-07T00:00:00Z",
-      "sender": "ar@acme.example",
+      "sender": "Acme Fasteners LLC Accounts Receivable <ar@acme.example>",
       "subject": "Invoice 1638",
       "thread_id": "thr-demo-acme-15"
      },
@@ -741,7 +741,7 @@
       "channel": "email",
       "parent_document_id": "499a36b3-d829-52c8-82f9-63070bb22b45",
       "received_at": "2026-02-07T00:00:00Z",
-      "sender": "ar@acme.example",
+      "sender": "Acme Fasteners LLC Accounts Receivable <ar@acme.example>",
       "subject": "Invoice 1638",
       "thread_id": "thr-demo-acme-15"
      },
@@ -799,7 +799,7 @@
      "channel": "email",
      "parent_document_id": null,
      "received_at": "2026-10-01T16:00:00Z",
-     "sender": "ar@acme.example",
+     "sender": "Dana Whitfield <ar@acme.example>",
      "subject": "Re: Invoice 1638",
      "thread_id": "thr-demo-acme-15"
     },
@@ -839,7 +839,7 @@
       "channel": "email",
       "parent_document_id": null,
       "received_at": "2023-04-10T16:00:00Z",
-      "sender": "ar@brightline.example",
+      "sender": "Brightline Office Supply Inc Accounts Receivable <ar@brightline.example>",
       "subject": "Invoice 1669",
       "thread_id": "thr-demo-brightline-1"
      },
@@ -890,7 +890,7 @@
       "channel": "email",
       "parent_document_id": "5a305b28-0bd8-5bc4-aff2-fc31ce3a876a",
       "received_at": "2023-04-10T16:00:00Z",
-      "sender": "ar@brightline.example",
+      "sender": "Brightline Office Supply Inc Accounts Receivable <ar@brightline.example>",
       "subject": "Invoice 1669",
       "thread_id": "thr-demo-brightline-1"
      },
@@ -941,7 +941,7 @@
       "channel": "email",
       "parent_document_id": null,
       "received_at": "2023-11-03T08:00:00Z",
-      "sender": "ar@brightline.example",
+      "sender": "Brightline Office Supply Inc Accounts Receivable <ar@brightline.example>",
       "subject": "Invoice 1670",
       "thread_id": "thr-demo-brightline-3"
      },
@@ -992,7 +992,7 @@
       "channel": "email",
       "parent_document_id": "d711fcb5-c7f0-5fc2-9db0-c959268e48e4",
       "received_at": "2023-11-03T08:00:00Z",
-      "sender": "ar@brightline.example",
+      "sender": "Brightline Office Supply Inc Accounts Receivable <ar@brightline.example>",
       "subject": "Invoice 1670",
       "thread_id": "thr-demo-brightline-3"
      },
@@ -1043,7 +1043,7 @@
       "channel": "email",
       "parent_document_id": null,
       "received_at": "2024-05-28T00:00:00Z",
-      "sender": "ar@brightline.example",
+      "sender": "Brightline Office Supply Inc Accounts Receivable <ar@brightline.example>",
       "subject": "Invoice 1671",
       "thread_id": "thr-demo-brightline-5"
      },
@@ -1094,7 +1094,7 @@
       "channel": "email",
       "parent_document_id": "a3712638-47b6-53cc-86cf-df60ecec4325",
       "received_at": "2024-05-28T00:00:00Z",
-      "sender": "ar@brightline.example",
+      "sender": "Brightline Office Supply Inc Accounts Receivable <ar@brightline.example>",
       "subject": "Invoice 1671",
       "thread_id": "thr-demo-brightline-5"
      },
@@ -1145,7 +1145,7 @@
       "channel": "email",
       "parent_document_id": null,
       "received_at": "2024-12-20T16:00:00Z",
-      "sender": "ar@brightline.example",
+      "sender": "Brightline Office Supply Inc Accounts Receivable <ar@brightline.example>",
       "subject": "Invoice 1672",
       "thread_id": "thr-demo-brightline-7"
      },
@@ -1196,7 +1196,7 @@
       "channel": "email",
       "parent_document_id": "3a5049c4-f03c-5c7d-80e6-dd9ffe7d6f2c",
       "received_at": "2024-12-20T16:00:00Z",
-      "sender": "ar@brightline.example",
+      "sender": "Brightline Office Supply Inc Accounts Receivable <ar@brightline.example>",
       "subject": "Invoice 1672",
       "thread_id": "thr-demo-brightline-7"
      },
@@ -1247,7 +1247,7 @@
       "channel": "email",
       "parent_document_id": null,
       "received_at": "2025-07-15T08:00:00Z",
-      "sender": "ar@brightline.example",
+      "sender": "Brightline Office Supply Inc Accounts Receivable <ar@brightline.example>",
       "subject": "Invoice 1673",
       "thread_id": "thr-demo-brightline-9"
      },
@@ -1298,7 +1298,7 @@
       "channel": "email",
       "parent_document_id": "cd34dc2a-672d-53b0-895f-39410f7c5e35",
       "received_at": "2025-07-15T08:00:00Z",
-      "sender": "ar@brightline.example",
+      "sender": "Brightline Office Supply Inc Accounts Receivable <ar@brightline.example>",
       "subject": "Invoice 1673",
       "thread_id": "thr-demo-brightline-9"
      },
@@ -1349,7 +1349,7 @@
       "channel": "email",
       "parent_document_id": null,
       "received_at": "2026-02-07T00:00:00Z",
-      "sender": "ar@brightline.example",
+      "sender": "Brightline Office Supply Inc Accounts Receivable <ar@brightline.example>",
       "subject": "Invoice 1674",
       "thread_id": "thr-demo-brightline-11"
      },
@@ -1400,7 +1400,7 @@
       "channel": "email",
       "parent_document_id": "8e6fc389-a24e-5a55-97fd-0045a023581d",
       "received_at": "2026-02-07T00:00:00Z",
-      "sender": "ar@brightline.example",
+      "sender": "Brightline Office Supply Inc Accounts Receivable <ar@brightline.example>",
       "subject": "Invoice 1674",
       "thread_id": "thr-demo-brightline-11"
      },
@@ -1458,7 +1458,7 @@
      "channel": "email",
      "parent_document_id": null,
      "received_at": "2026-10-01T16:00:00Z",
-     "sender": "ar@brightline.example",
+     "sender": "Sam Ortiz <ar@brightline.example>",
      "subject": "Updated banking details",
      "thread_id": "thr-demo-brightline-13"
     },
@@ -1667,7 +1667,7 @@
       "channel": "email",
       "parent_document_id": null,
       "received_at": "2023-04-10T16:00:00Z",
-      "sender": "ar@cobalt.example",
+      "sender": "Cobalt Freight LLC Accounts Receivable <ar@cobalt.example>",
       "subject": "Invoice 1321",
       "thread_id": "thr-demo-cobalt-5"
      },
@@ -1718,7 +1718,7 @@
       "channel": "email",
       "parent_document_id": "f6ecd898-f5fe-5efc-b296-4a947d6cc2e6",
       "received_at": "2023-04-10T16:00:00Z",
-      "sender": "ar@cobalt.example",
+      "sender": "Cobalt Freight LLC Accounts Receivable <ar@cobalt.example>",
       "subject": "Invoice 1321",
       "thread_id": "thr-demo-cobalt-5"
      },
@@ -1769,7 +1769,7 @@
       "channel": "email",
       "parent_document_id": null,
       "received_at": "2023-11-03T08:00:00Z",
-      "sender": "ar@cobalt.example",
+      "sender": "Cobalt Freight LLC Accounts Receivable <ar@cobalt.example>",
       "subject": "Invoice 1322",
       "thread_id": "thr-demo-cobalt-7"
      },
@@ -1820,7 +1820,7 @@
       "channel": "email",
       "parent_document_id": "b5808638-b94d-551a-b228-d7d402cf72af",
       "received_at": "2023-11-03T08:00:00Z",
-      "sender": "ar@cobalt.example",
+      "sender": "Cobalt Freight LLC Accounts Receivable <ar@cobalt.example>",
       "subject": "Invoice 1322",
       "thread_id": "thr-demo-cobalt-7"
      },
@@ -1871,7 +1871,7 @@
       "channel": "email",
       "parent_document_id": null,
       "received_at": "2024-05-28T00:00:00Z",
-      "sender": "ar@cobalt.example",
+      "sender": "Cobalt Freight LLC Accounts Receivable <ar@cobalt.example>",
       "subject": "Invoice 1323",
       "thread_id": "thr-demo-cobalt-9"
      },
@@ -1922,7 +1922,7 @@
       "channel": "email",
       "parent_document_id": "7d138d61-cb63-5fac-97f3-5250050f20f8",
       "received_at": "2024-05-28T00:00:00Z",
-      "sender": "ar@cobalt.example",
+      "sender": "Cobalt Freight LLC Accounts Receivable <ar@cobalt.example>",
       "subject": "Invoice 1323",
       "thread_id": "thr-demo-cobalt-9"
      },
@@ -1973,7 +1973,7 @@
       "channel": "email",
       "parent_document_id": null,
       "received_at": "2024-12-20T16:00:00Z",
-      "sender": "ar@cobalt.example",
+      "sender": "Cobalt Freight LLC Accounts Receivable <ar@cobalt.example>",
       "subject": "Invoice 1324",
       "thread_id": "thr-demo-cobalt-11"
      },
@@ -2024,7 +2024,7 @@
       "channel": "email",
       "parent_document_id": "08d6e118-2e4d-55af-a9d8-ad7ab3d4d96c",
       "received_at": "2024-12-20T16:00:00Z",
-      "sender": "ar@cobalt.example",
+      "sender": "Cobalt Freight LLC Accounts Receivable <ar@cobalt.example>",
       "subject": "Invoice 1324",
       "thread_id": "thr-demo-cobalt-11"
      },
@@ -2075,7 +2075,7 @@
       "channel": "email",
       "parent_document_id": null,
       "received_at": "2025-07-15T08:00:00Z",
-      "sender": "ar@cobalt.example",
+      "sender": "Cobalt Freight LLC Accounts Receivable <ar@cobalt.example>",
       "subject": "Invoice 1325",
       "thread_id": "thr-demo-cobalt-13"
      },
@@ -2126,7 +2126,7 @@
       "channel": "email",
       "parent_document_id": "e5741f3f-3b0e-5c66-a2d8-88fe247dc1be",
       "received_at": "2025-07-15T08:00:00Z",
-      "sender": "ar@cobalt.example",
+      "sender": "Cobalt Freight LLC Accounts Receivable <ar@cobalt.example>",
       "subject": "Invoice 1325",
       "thread_id": "thr-demo-cobalt-13"
      },
@@ -2177,7 +2177,7 @@
       "channel": "email",
       "parent_document_id": null,
       "received_at": "2026-02-07T00:00:00Z",
-      "sender": "ar@cobalt.example",
+      "sender": "Cobalt Freight LLC Accounts Receivable <ar@cobalt.example>",
       "subject": "Invoice 1326",
       "thread_id": "thr-demo-cobalt-15"
      },
@@ -2228,7 +2228,7 @@
       "channel": "email",
       "parent_document_id": "b57a9fb6-aaad-5eff-9a11-4b027f5ab044",
       "received_at": "2026-02-07T00:00:00Z",
-      "sender": "ar@cobalt.example",
+      "sender": "Cobalt Freight LLC Accounts Receivable <ar@cobalt.example>",
       "subject": "Invoice 1326",
       "thread_id": "thr-demo-cobalt-15"
      },
@@ -2287,7 +2287,7 @@
      "channel": "email",
      "parent_document_id": null,
      "received_at": "2026-10-01T16:00:00Z",
-     "sender": "ar@cobalt.example",
+     "sender": "Morgan Pryce <ar@cobalt.example>",
      "subject": "Re: Invoice 1326",
      "thread_id": "thr-demo-cobalt-15"
     },

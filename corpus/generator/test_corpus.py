@@ -136,7 +136,8 @@ def test_the_demo_seed_is_fictional_and_tells_its_three_stories():
         for e164 in v["phones"].values():
             assert FICTIONAL_PHONE.match(e164), (ref, e164)
         for d in v["documents"] + [v["request"]]:
-            assert (d["custody"]["sender"] or "x@x.example").endswith(".example")
+            sender = d["custody"]["sender"] or "x <x@x.example>"
+            assert sender.endswith(".example>") and "<" in sender, sender      # every email has a display name
             for span in d["pages"][0]["spans"]:
                 assert not long_digits(span["text"])
                 for m in ANY_PHONE_TEXT.finditer(span["text"]):
