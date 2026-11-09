@@ -20,7 +20,7 @@ export default async function SignIn({ searchParams }: { searchParams: Promise<N
     <main className="shell">
       <div className="card signin">
         <p className="brand"><BrandMark />Dialback</p>
-        <h1>Sign in to Dialback</h1>
+        <h1>Sign in</h1>
         {NOTICES.filter(([key]) => params[key]).map(([key, text]) => (
           <p key={key} className="result error" role="alert">{text}</p>
         ))}

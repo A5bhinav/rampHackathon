@@ -9,7 +9,11 @@ export function DecisionDetail({ decision }: { decision: DecisionInfo }) {
   const groups = groupRules(decision.rules_fired, decision.explanation);
   return (
     <>
-      <p><OutcomeBadge outcome={decision.outcome} /> <span className="muted">{when(decision.decided_at)} · {decision.engine_version}</span></p>
+      <div className="tags">
+        <OutcomeBadge outcome={decision.outcome} />
+        <span className="muted sub">{when(decision.decided_at)}</span>
+        <span className="muted sub">Engine <span className="mono">{decision.engine_version}</span></span>
+      </div>
       {groups ? groups.map((g) => (
         <div key={g.key} className="rule-group">
           <h3 className={`tone-text-${g.tone}`}>{g.title}</h3>
