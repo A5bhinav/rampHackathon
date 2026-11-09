@@ -1,0 +1,43 @@
+// The public "How it works" page's stations and the demo links (spec 0033). `pnpm test`.
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import { DEMO_STORIES, STORY_STATIONS, caseFor, demoStory, newestDemo } from "../src/lib/story.ts";
+
+test("seven stations in pipeline order, each saying what it stops and the rule it rests on", () => {
+  assert.deepEqual(STORY_STATIONS.map((s) => s.key),
+    ["change", "detect", "hold", "number", "call", "decide", "release"]);
+  for (const s of STORY_STATIONS) {
+    assert.ok(s.does.length > 20, s.key);
+    assert.ok(s.stops.length > 20, s.key);
+  }
+  for (const s of STORY_STATIONS.slice(2)) assert.match(s.rules, /^R\d( and R\d)?$/, s.key);
+});
+
+test("three demo stories, one per seeded vendor, each with a ref and a legal name", () => {
+  assert.deepEqual(DEMO_STORIES.map((s) => s.ref), ["acme", "brightline", "cobalt"]);
+  assert.equal(demoStory("acme")?.legal_name, "Acme Fasteners LLC");
+  assert.equal(demoStory("nope"), undefined);
+  assert.equal(demoStory("constructor"), undefined);
+});
+
+const ds = (id: string, kind: string) => ({ id, kind, label: id, chain_id: "c", created_at: "2026-11-08T00:00:00Z", sim_now: null });
+
+test("the newest demo dataset is the first demo one the core lists (newest first)", () => {
+  assert.equal(newestDemo([ds("dev1", "dev"), ds("demo2", "demo"), ds("demo1", "demo")] as never)?.id, "demo2");
+  assert.equal(newestDemo([ds("dev1", "dev"), ds("lab1", "lab")] as never), undefined);
+  assert.equal(newestDemo([]), undefined);
+});
+
+type Row = { id: string; vendor: { id: string; legal_name: string }; opened_at: string };
+const kase = (id: string, name: string, opened: string): Row => ({ id, vendor: { id: `v-${name}`, legal_name: name }, opened_at: opened });
+
+test("the vendor's newest case, matched on its exact legal name", () => {
+  const cases = [
+    kase("old", "Acme Fasteners LLC", "2026-11-07T10:00:00Z"),
+    kase("new", "Acme Fasteners LLC", "2026-11-08T10:00:00Z"),
+    kase("other", "Acme Fasteners LLC (copy)", "2026-11-09T10:00:00Z"),
+  ];
+  assert.equal(caseFor(cases, "Acme Fasteners LLC")?.id, "new");
+  assert.equal(caseFor(cases, "Cobalt Freight LLC"), undefined);
+  assert.equal(caseFor([], "Acme Fasteners LLC"), undefined);
+});

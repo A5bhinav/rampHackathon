@@ -2,7 +2,7 @@ import "server-only";
 import { redirect } from "next/navigation";
 import { sessionToken } from "./session";
 import type {
-  ActionResult, Alert, ApiError, CaseDetail, CaseSummary, ChainStatus, Dataset, Me, SelectionView, VendorRisk,
+  ActionResult, Alert, ApiError, CaseDetail, CaseState, CaseSummary, ChainStatus, Dataset, Me, SelectionView, VendorRisk,
 } from "./api-types";
 
 // The only way the dashboard talks to the core: server-side, with the signed-in user's
@@ -30,6 +30,9 @@ async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
   return body as T;
 }
 
+const ALL_STATES = (["open", "held", "calling", "retry_wait", "deciding", "awaiting_release", "needs_review", "blocked",
+  "releasing", "released"] satisfies CaseState[]).map((s) => `state=${s}`).join("&");
+
 export const core = {
   me: () => call<Me>("/api/me"),
   datasets: () => call<{ datasets: Dataset[] }>("/api/datasets").then((r) => r.datasets),
@@ -39,6 +42,9 @@ export const core = {
     call<{ vendors: VendorRisk[] }>(`/api/datasets/${datasetId}/vendor-risk`).then((r) => r.vendors),
   cases: (datasetId: string) =>
     call<{ cases: CaseSummary[] }>(`/api/cases?dataset_id=${encodeURIComponent(datasetId)}`).then((r) => r.cases),
+  /** Every case on the dataset, released ones included (the demo links, spec 0033). */
+  allCases: (datasetId: string) =>
+    call<{ cases: CaseSummary[] }>(`/api/cases?dataset_id=${encodeURIComponent(datasetId)}&limit=200&${ALL_STATES}`).then((r) => r.cases),
   case: (caseId: string) => call<CaseDetail>(`/api/cases/${caseId}`),
   selection: (caseId: string) => call<SelectionView>(`/api/cases/${caseId}/selection`),
   release: (caseId: string, body: { expected_version: number; action: "approve" | "reject"; reason: string }) =>

@@ -17,6 +17,7 @@ export default async function DatasetShell({ children, params }: { children: Rea
         <nav className="nav" aria-label="Main">
           <Link className="brand" href={`/d/${datasetId}/cases`}><BrandMark />Dialback</Link>
           <NavLinks links={[{ href: `/d/${datasetId}/cases`, label: "Case queue" }, { href: `/d/${datasetId}/risk`, label: "Vendor risk" }]} />
+          <Link href="/">How it works</Link>
         </nav>
         <div className="who">
           <span className="chip" title={current?.sim_now ? "This dataset runs on simulated time" : undefined}>

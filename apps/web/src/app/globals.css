@@ -497,3 +497,57 @@ body:has(.signin) {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; animation: none !important; }
 }
+
+/* The public "How it works" page (spec 0033). ------------------------------------------- */
+a.button-link.primary, main a.button-link.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+a.button-link.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+.who a.button-link { box-shadow: none; }
+.eyebrow { color: var(--accent); font-weight: 600; font-size: 0.8125rem; margin: 0 0 8px; }
+.story { max-width: 1080px; }
+.story-hero { padding: 40px 0 16px; max-width: 62rem; }
+.story-hero h1 { font-size: clamp(1.9rem, 4.2vw, 2.9rem); line-height: 1.1; letter-spacing: -0.025em; max-width: 22ch; }
+.story-hero .lead { font-size: 1.125rem; margin-top: 16px; color: var(--text-2); }
+.story-cta { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 24px; }
+.story-section { margin-top: 56px; }
+.story-section > h2 { font-size: 1.5rem; letter-spacing: -0.015em; margin-bottom: 8px; }
+.story-intro { max-width: 70ch; margin-bottom: 20px; }
+.story-sub { font-size: 1rem; margin: 32px 0 12px; }
+.scam { list-style: none; padding: 0; margin: 0 0 16px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+.scam-step { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; }
+.scam-step:last-child { border-color: color-mix(in srgb, var(--bad) 35%, var(--line)); background: var(--bad-bg); }
+.scam-step p { margin: 0; color: var(--text-2); font-size: 0.875rem; }
+.scam-step h3 { font-size: 0.9375rem; margin: 10px 0 6px; }
+.scam-n { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--surface-2);
+  border: 1px solid var(--line-strong); font-weight: 600; font-size: 0.8125rem; }
+table.compare th[scope="row"] { font-weight: 600; width: 22%; vertical-align: top; }
+table.compare td { vertical-align: top; }
+.pipeline { list-style: none; padding: 0; margin: 0; display: grid; gap: 0; }
+.pipe-stop { position: relative; display: grid; grid-template-columns: 44px 1fr; gap: 16px; padding-bottom: 22px; }
+.pipe-stop:not(:last-child)::before { content: ""; position: absolute; left: 21px; top: 44px; bottom: 0; width: 2px; background: var(--line-strong); }
+.pipe-node { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; background: var(--accent-soft);
+  border: 1px solid color-mix(in srgb, var(--accent) 25%, var(--line)); color: var(--accent); }
+.pipe-stop:first-child .pipe-node { background: var(--bad-bg); border-color: color-mix(in srgb, var(--bad) 30%, var(--line)); color: var(--bad); }
+.pipe-text { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 20px; }
+.pipe-text h3 { font-size: 1rem; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 6px; }
+.pipe-text p { margin: 0 0 6px; color: var(--text-2); }
+.pipe-text p.pipe-stops { margin: 0; color: var(--text); }
+.pipe-n { color: var(--muted); font-variant-numeric: tabular-nums; }
+.across { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.across .panel { margin: 0; }
+.across h3 { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.across p { margin: 0; }
+.real { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.real ul { margin: 0; padding-left: 18px; color: var(--text-2); }
+.real li + li { margin-top: 6px; }
+.demo-stories { list-style: none; padding: 0; margin: 0 0 12px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.demo-stories .card { margin: 0; display: flex; flex-direction: column; }
+.demo-stories .card p.muted { flex: 1; }
+@media (max-width: 860px) {
+  .scam { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .demo-stories, .across, .real { grid-template-columns: 1fr; }
+}
+@media (max-width: 520px) {
+  .scam { grid-template-columns: 1fr; }
+  .story-hero { padding-top: 16px; }
+  table.compare th[scope="row"] { width: auto; }
+}

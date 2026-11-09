@@ -11,7 +11,7 @@ export async function signInAsDevUser(formData: FormData): Promise<void> {
   if (!devAuthEnabled()) redirect("/sign-in");
   const userId = String(formData.get("user_id") ?? "");
   await setSession(await mintDevToken(userId), DEV_TOKEN_SECONDS);
-  redirect("/");
+  redirect("/app");
 }
 
 // Ten tries per client per five minutes (spec 0010, decision 8). The client is the address
@@ -36,5 +36,5 @@ export async function signIn(formData: FormData): Promise<void> {
     redirect("/sign-in?failed=1");
   }
   await markSignedIn();
-  redirect("/");
+  redirect("/app");
 }

@@ -5,6 +5,7 @@ import { PageHead, Stats } from "@/components/page";
 import type { CaseState, CaseSummary } from "@/lib/api-types";
 import { core } from "@/lib/core";
 import { stationCounts } from "@/lib/flow";
+import { demoStory } from "@/lib/story";
 import { ago, brief, datasetNow, date, dueLabel, relative, when } from "@/lib/format";
 
 // Case queue: unfinished cases by state and age, and held bills near their due date (design,
@@ -19,8 +20,12 @@ function bySoonestPayment(a: CaseSummary, b: CaseSummary): number {
   return ka === kb ? a.opened_at.localeCompare(b.opened_at) : ka.localeCompare(kb);
 }
 
-export default async function CaseQueue({ params }: { params: Promise<{ datasetId: string }> }) {
+export default async function CaseQueue({ params, searchParams }: {
+  params: Promise<{ datasetId: string }>;
+  searchParams: Promise<{ missing?: string }>;
+}) {
   const { datasetId } = await params;
+  const missing = demoStory((await searchParams).missing ?? "");
   const [cases, datasets] = await Promise.all([core.cases(datasetId), core.datasets()]);
   const now = datasetNow(datasets.find((d) => d.id === datasetId)?.sim_now);
   const waiting = cases.filter((c) => NEEDS_A_PERSON.includes(c.state)).sort(bySoonestPayment);
@@ -31,6 +36,12 @@ export default async function CaseQueue({ params }: { params: Promise<{ datasetI
   return (
     <main>
       <PageHead title="Case queue" lead="Every vendor whose bank details changed in Ramp, and where each change stands. Dialback holds their payments, calls the vendor on a number it can prove, and a different person signs off." />
+      {missing ? (
+        <p className="note" role="status">
+          {missing.legal_name} has no case on this dataset yet. Its case opens when the team makes the demo&apos;s bank change for it
+          (<span className="mono">dialback-core demo change --vendor {missing.ref}</span>).
+        </p>
+      ) : null}
       <QueueRail counts={stationCounts(cases)} />
       <Stats label="Held payments" items={[
         { label: "Bills on hold", value: cases.filter((c) => c.hold_status === "confirmed" || c.hold_status === "releasing").reduce((n, c) => n + c.bills_held, 0) },
