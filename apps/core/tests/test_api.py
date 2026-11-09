@@ -379,8 +379,13 @@ async def test_the_evidence_log_points_at_a_hand_edited_row(world, database_url)
                                 "where chain_id = %s and seq = 1", (world.dataset.chain_id,))
         finally:
             await owner.execute("alter table audit.evidence_events enable trigger evidence_events_no_update")
+    assert log["last_check"] is None, "the verify job hasn't run on this dataset"
+    await world.worker.jobs.run(world.dataset.id, "verify_chain", force=True)
     log = await get(world, f"/api/datasets/{ds}/evidence", "approver1", spec, limit=2)
     assert (log["chain"]["ok"], log["chain"]["first_bad_seq"], len(log["events"])) == (False, 1, 2)
+    check = log["last_check"]
+    assert (check["ok"], check["first_bad_seq"]) == (False, 1), "what the job found, not whether the job ran"
+    assert check["finished_at"] and "body edited" in check["detail"]
     full = await get(world, f"/api/datasets/{ds}/evidence", "approver1", spec)
     bad = [e["seq"] for e in full["events"] if not e["content_ok"]]
     assert bad == [1] and all(e["link_ok"] for e in full["events"]), "only the edited row's body fails; the links still hold"

@@ -196,6 +196,16 @@ select e.seq, e.type, e.case_id, e.occurred_at, e.actor_kind, e.prev_hash, e.con
 """
 
 
+def _last_check(job: dict[str, Any]) -> dict[str, Any]:
+    """What the verify job found (its last_result), not whether the job itself ran without error."""
+    found = job["last_result"] or {}
+    seq, detail = found.get("first_bad_seq"), found.get("detail")
+    return {"finished_at": ts(job["last_finished_at"]),
+            "ok": found["ok"] if isinstance(found.get("ok"), bool) else None,
+            "first_bad_seq": seq if isinstance(seq, int) and not isinstance(seq, bool) and seq >= 1 else None,
+            "detail": detail if isinstance(detail, str) else None}
+
+
 @router.get("/datasets/{dataset_id}/evidence")
 async def evidence_log(dataset_id: UUID, request: Request, user: UserDep, limit: Annotated[int, Query(ge=1, le=1000)] = 500):
     """The evidence chain row by row (spec 0035). Postgres checks each row with the chain's own
@@ -208,10 +218,10 @@ async def evidence_log(dataset_id: UUID, request: Request, user: UserDep, limit:
         rows = await (await conn.execute(EVIDENCE, (d["chain_id"], limit))).fetchall()
         total = (await (await conn.execute("select count(*) as n from audit.evidence_events where chain_id = %s",
                                            (d["chain_id"],))).fetchone())["n"]
-        job = await (await conn.execute("select last_finished_at, last_ok from app.job_runs "
+        job = await (await conn.execute("select last_finished_at, last_result from app.job_runs "
                                         "where dataset_id = %s and job = 'verify_chain'", (dataset_id,))).fetchone()
     return {"chain": chain, "total": total,
-            "last_check": None if job is None else {"finished_at": ts(job["last_finished_at"]), "ok": job["last_ok"]},
+            "last_check": None if job is None else _last_check(job),
             "events": [{"seq": r["seq"], "type": r["type"], "case_id": str(r["case_id"]) if r["case_id"] else None,
                         "vendor": r["vendor"], "occurred_at": ts(r["occurred_at"]), "actor_kind": r["actor_kind"],
                         "prev_hash": r["prev_hash"], "content_hash": r["content_hash"], "hash": r["hash"],
