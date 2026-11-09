@@ -1,0 +1,20 @@
+id: a08-ambiguous-and-refused
+class: hijacked_thread_new_number
+is_attack: true
+customer_name: Northwind Traders
+vendor_name: Acme Fasteners
+caller:
+  consent: 'yes'
+  company: Acme Fasteners
+  department: Accounts payable
+  name_role: Jordan Lee, AP clerk
+  change: unsure
+  last4_mode: refuse
+  last4: '4821'
+  answered_by: human
+facts:
+  dialed_eligible_number: true
+  last_four_result: null
+  dialed_number_is_pick: true
+  speaker_in_change_thread: false
+  offered_number_from_request: false
