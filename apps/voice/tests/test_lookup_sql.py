@@ -1,4 +1,4 @@
-"""lookup_call against a real migrated Postgres (spec 0027, decision 6).
+"""lookup_call against a real migrated Postgres (spec 0029, decision 6).
 
 Seeds a dataset, a vendor, a case (through app.apply_case_event, the money-path door; app.cases is
 never written directly) and a pinned ledger contact point, then asserts the CallDial the Twilio

@@ -51,7 +51,7 @@ class Settings:
     # POST /calls auth (create_app): the shared internal token, read in both modes, since the core
     # authenticates to the text line too. Empty when unset, so create_app rejects every call (R7).
     internal_api_token: bytes = b""
-    # The live read path (spec 0027): the database the lookup queries, and the fixed disclosure
+    # The live read path (spec 0029): the database the lookup queries, and the fixed disclosure
     # context (one customer per deployment). Read only in live mode; None/empty in text mode and when
     # unset, so the lookup factory and dial_from_row fail closed rather than dial a half-known call (R7).
     database_url: str | None = None

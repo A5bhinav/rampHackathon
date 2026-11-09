@@ -6,7 +6,7 @@ Text mode mounts no Twilio routes; live mode mounts them and wires the agent (sp
 
 `create_asgi_app` reads the environment and assembles the app. With no factory injected, the store
 and `lookup_call` default to the ledger seam: `lookup_call` is the live psycopg query built from
-`DATABASE_URL` (spec 0027), and the Postgres store still lands with the ledger (PR2), so the store
+`DATABASE_URL` (spec 0029), and the Postgres store still lands with the ledger (PR2), so the store
 factory raises a clear pointer until then. `build_app` is tested against the in-memory store.
 """
 from __future__ import annotations
@@ -41,15 +41,15 @@ def build_app(settings: Settings, *, store: CallStore, http: httpx.AsyncClient, 
 
 def _ledger_store(settings: Settings) -> CallStore:
     raise NotImplementedError(
-        "the Postgres CallStore lands with the ledger (spec 0027, PR2): its SQL reads the pick and "
+        "the Postgres CallStore lands with the ledger (spec 0029, PR2): its SQL reads the pick and "
         "joins app.cases. Pass a store_for factory until then.")
 
 
 def _ledger_lookup(settings: Settings) -> Lookup:
-    """The live lookup_call from settings (spec 0027): a psycopg query by call_id. With no
+    """The live lookup_call from settings (spec 0029): a psycopg query by call_id. With no
     DATABASE_URL it fails closed on boot (R7) rather than serve a lookup that resolves nothing."""
     if not settings.database_url:
-        raise RuntimeError("lookup_call needs DATABASE_URL in live mode (spec 0027); set it, or pass "
+        raise RuntimeError("lookup_call needs DATABASE_URL in live mode (spec 0029); set it, or pass "
                            "a lookup_for factory in a test.")
     return make_lookup(settings.database_url, customer_name=settings.customer_name,
                        callback_number=settings.callback_number)

@@ -82,7 +82,7 @@ def test_internal_token_is_read_in_both_modes():
 
 
 def test_live_reads_database_url_and_the_disclosure_names():
-    # The live lookup needs the database and the fixed disclosure context (spec 0027, decision 3, 4):
+    # The live lookup needs the database and the fixed disclosure context (spec 0029, decision 3, 4):
     # the DB connection string, the customer whose AP team is calling, and the callback number.
     s = load_settings(LIVE_ENV | {
         "DATABASE_URL": "postgresql://u:p@h:5432/db",

@@ -1,10 +1,10 @@
-"""The real psycopg adapter behind the voice store seam (spec 0027). PR1: the synchronous lookup.
+"""The real psycopg adapter behind the voice store seam (spec 0029). PR1: the synchronous lookup.
 
 `make_lookup` builds the `lookup_call` the Twilio routes read: given a call_id, one query by that id
 joins voice.calls to the case's vendor and the pinned ledger pick, and `dial_from_row` maps the row
 to a CallDial, failing closed to None on anything missing (R2, R7). The customer and callback come
 from settings, never the callee (R8). Synchronous, because app.py calls the lookup without await
-(spec 0027, decision 1); the Twilio-callback volume makes the brief blocking query acceptable. A
+(spec 0029, decision 1); the Twilio-callback volume makes the brief blocking query acceptable. A
 short-lived connection per call keeps PR1 thin; a shared pool can come with the async store (PR2)."""
 from __future__ import annotations
 

@@ -96,7 +96,7 @@ def test_the_store_factory_still_fails_closed_until_the_ledger():
 
 
 def test_the_lookup_factory_builds_from_database_url_and_fails_closed_without_it():
-    # PR1 (spec 0027): lookup_call is built from DATABASE_URL; with no URL the factory raises on boot
+    # PR1 (spec 0029): lookup_call is built from DATABASE_URL; with no URL the factory raises on boot
     # rather than serve a lookup that resolves nothing (R7). Building it opens no connection.
     with pytest.raises(RuntimeError):
         _ledger_lookup(Settings(voice_mode="live"))

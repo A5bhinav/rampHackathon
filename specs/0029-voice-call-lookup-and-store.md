@@ -1,4 +1,4 @@
-# 0027: The voice service reads the database: lookup_call and the call store
+# 0029: The voice service reads the database: lookup_call and the call store
 
 **Owner:** Sami  **Partner:** Inesh  **Slice:** call-and-adversary (voice)  **Target day:** Sun Nov 8
 

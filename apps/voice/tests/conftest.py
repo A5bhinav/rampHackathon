@@ -17,7 +17,7 @@ from dialback_policy.step import CallContext
 
 CALLBACK = "(415) 555-0100"
 
-# scripts/db holds migrate.py, reused to migrate the throwaway test database (spec 0027, decision 6).
+# scripts/db holds migrate.py, reused to migrate the throwaway test database (spec 0029, decision 6).
 _REPO = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(_REPO / "scripts" / "db"))
 
@@ -49,13 +49,13 @@ def _with_db(url: str, name: str) -> str:
 
 @pytest.fixture(scope="session")
 def database_url():
-    """A fresh, migrated Postgres for the DB-backed voice tests (spec 0027, decision 6). Creates a
+    """A fresh, migrated Postgres for the DB-backed voice tests (spec 0029, decision 6). Creates a
     throwaway database on the DATABASE_URL server (CI's service container or a local Docker Postgres),
     applies the local auth stub and every migration with psycopg (no psql), and drops it after. Skips
     when DATABASE_URL is unset."""
     base = os.environ.get("DATABASE_URL")
     if not base:
-        pytest.skip("DATABASE_URL unset; the voice DB tests need a throwaway Postgres (spec 0027)")
+        pytest.skip("DATABASE_URL unset; the voice DB tests need a throwaway Postgres (spec 0029)")
     import migrate  # scripts/db/migrate.py, via sys.path above
     import psycopg
 
