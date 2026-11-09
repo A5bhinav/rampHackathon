@@ -15,11 +15,14 @@ engine recorded, and the per-row chain checks are Postgres's own hash functions.
 
 1. **Calls come from the evidence chain**, the record every environment has: each
    `call_started` opens an attempt, its `call_ended` (or `call_timeout`) closes it.
-   `voice.calls` adds the provider and the voice service's reason when that row exists.
+   `voice.calls` adds the provider when that row exists. How a call ended is a templated sentence
+   per result; the voice service's reason codes are for logs, not people.
    - **Answers** are the stored `call_ended` answers. `account_last4` is sent as a digit count
      or `dont_know` / `refused`: the keyed hash is never sent, and there are no digits to send.
-   - **Feeds:** each answer names the rules that read it, from a table in the decision package
-     (`rules.SLOT_RULES`), so the page links answers to rules without knowing the rules.
+   - **Feeds:** each answer names the rules that read it, from tables in the decision package
+     (`rules.SLOT_RULES`; `EARLIER_SLOT_RULES` for an earlier attempt, whose answers count only
+     against the change), so the page links answers to rules without knowing the rules.
+   - **An offered number is not shown** ("A phone number (not shown)"): it could be anyone's.
 2. **No transcript is stored** anywhere (`voice.calls.transcript_ref` is a key the voice
    service doesn't fill). Storing redacted turns is the voice slice's call and would need its
    own spec; this one sends the answers with the turn each cites, and a `call_script.note` that
