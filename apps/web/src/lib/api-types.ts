@@ -13,6 +13,7 @@ export type TimelineEntry = S["TimelineEntry"];
 export type ActionResult = S["ActionResult"];
 export type ApiError = S["Error"];
 export type CaseState = S["CaseState"];
+export type HoldStatus = S["HoldStatus"];
 export type DecisionInfo = S["DecisionInfo"];
 export type SelectionView = S["SelectionView"];
 export type Selection = S["selection.schema"];

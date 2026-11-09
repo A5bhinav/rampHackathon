@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { PageHead, Stats } from "@/components/page";
 import { CoreError, core } from "@/lib/core";
 import { phone } from "@/lib/lineage";
 import { counts, statusLabel, statusTone } from "@/lib/risk";
@@ -14,36 +15,39 @@ export default async function RiskPage({ params }: { params: Promise<{ datasetId
     throw e;
   });
 
+  const tones = { near_miss: "bad", unproven: "warn", missing: undefined, provable: "ok" } as const;
+
   return (
     <main>
-      <p className="eyebrow">Trust Ledger</p>
-      <h1>Vendor risk</h1>
-      <p style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        {counts(vendors).map(([status, n]) => (
-          <span key={status} className={`badge ${n ? statusTone(status) : "tone-muted"}`}>{n} {statusLabel(status)}</span>
-        ))}
-      </p>
+      <PageHead title="Vendor risk" lead="Is each vendor's number on file one the Trust Ledger can prove? Each row says why, in the ledger's own words." />
+      <Stats label="Vendors by status" items={counts(vendors).map(([status, n]) => ({ label: cap(statusLabel(status)), value: n, tone: tones[status] }))} />
       {vendors.length === 0 ? (
-        <section className="card"><p className="muted">The Trust Ledger has no documents for this dataset&apos;s vendors yet.</p></section>
+        <section className="card empty"><p>The Trust Ledger has no documents for this dataset&apos;s vendors yet.</p></section>
       ) : (
-        <section className="card" aria-label="Vendors">
-          <ul className="striped-list">
-            {vendors.map((v) => (
-              <li key={v.vendor_id} className={STRIPE[v.status]}>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                  <strong>{v.legal_name}</strong>
-                  <span className={`badge ${statusTone(v.status)}`}>{statusLabel(v.status)}</span>
-                </div>
-                <dl className="facts" style={{ marginTop: 6 }}>
-                  <dt>On file</dt><dd className="mono">{v.number_on_file ? phone(v.number_on_file) : "—"}</dd>
-                  <dt>Provable</dt><dd className="mono">{v.provable_number ? phone(v.provable_number) : "—"}</dd>
-                </dl>
-                <p className="muted" style={{ margin: "4px 0 0" }}>{v.status_text}</p>
-              </li>
-            ))}
-          </ul>
+        <section className="card flush" aria-label="Vendors">
+          <div className="table-wrap">
+            <table className="risk">
+              <thead>
+                <tr><th className="w-vendor">Vendor</th><th>Status</th><th>On file</th><th>Provable</th></tr>
+              </thead>
+              <tbody>
+                {vendors.map((v) => (
+                  <tr key={v.vendor_id} className={STRIPE[v.status]}>
+                    <td><strong>{v.legal_name}</strong><div className="muted sub cell-note">{v.status_text}</div></td>
+                    <td><span className={`badge ${statusTone(v.status)}`}>{statusLabel(v.status)}</span></td>
+                    <td className="mono nowrap">{v.number_on_file ? phone(v.number_on_file) : "—"}</td>
+                    <td className="mono nowrap">{v.provable_number ? phone(v.provable_number) : "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </section>
       )}
     </main>
   );
+}
+
+function cap(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }

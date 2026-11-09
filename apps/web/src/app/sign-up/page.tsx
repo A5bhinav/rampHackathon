@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { MIN_NEW_PASSWORD, authMode, type SignUpNotice } from "@/lib/auth-mode";
 import { signUp } from "./actions";
+import { BrandMark } from "@/components/nav";
 
 type Params = Partial<Record<SignUpNotice, string>>;
 
@@ -22,7 +23,8 @@ export default async function SignUp({ searchParams }: { searchParams: Promise<P
   return (
     <main className="shell">
       <div className="card signin">
-        <h1>Create your Dialback account</h1>
+        <p className="brand"><BrandMark />Dialback</p>
+        <h1>Create your account</h1>
         {NOTICES.filter(([key]) => params[key]).map(([key, text]) => (
           <p key={key} className="result error" role="alert">{text}</p>
         ))}
@@ -34,7 +36,7 @@ export default async function SignUp({ searchParams }: { searchParams: Promise<P
           <label htmlFor="password">Password</label>
           <input id="password" name="password" type="password" autoComplete="new-password"
                  minLength={MIN_NEW_PASSWORD} maxLength={72} required />
-          <p className="muted">At least {MIN_NEW_PASSWORD} characters.</p>
+          <p className="muted sub field-hint">At least {MIN_NEW_PASSWORD} characters.</p>
           <button className="primary" type="submit">Create account</button>
         </form>
         <p className="muted">Already have an account? <Link href="/sign-in">Sign in</Link></p>
