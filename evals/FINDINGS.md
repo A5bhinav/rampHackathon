@@ -154,8 +154,9 @@ These are not reachable today, but each is frozen as a regression.
 - **Status:** reported (voice re-review), low severity: the scripted agent is the test and dev-stack
   double, not the live agent.
 - **What happens:** "We did." to the change question is recorded "no" (ungrounded), so NV01 decides
-  not_verified (the not-verified rules run before NR14), and as an earlier call it would block every
-  redial; "Yes, I think so." is recorded "yes" but the policy treats it as ungrounded.
+  not_verified (the not-verified rules run before NR14) and the case is blocked; "Yes, I think so."
+  is recorded "yes" but the policy treats it as ungrounded. (An earlier version of this entry said
+  the "no" would also block every redial; it cannot, see A16.)
 - **Live calls:** `ClaudeAgent` asks the model for the yes/no value and the policy's regex then
   grounds it, so what live calls record for "We did." depends on the model and is untested by the
   lab (see C10). The double still runs live when `ANTHROPIC_API_KEY` is unset (`wire.py` logs a
@@ -180,6 +181,7 @@ These are not reachable today, but each is frozen as a regression.
   the core after the call. Only "could not tell" should earn one more try.
 - **Where to fix:** the agent would need an `unclear` value and `policy.step` a one-time re-ask;
   `apps/voice` and `packages/policy`.
+- **Spec:** 0043 on `sami/keypad-only-digits` (draft, covers A11's yes/no part, A12, A13, A14).
 
 ### A13. The keypad has no reset, and a slip cannot be corrected
 
@@ -191,8 +193,10 @@ These are not reachable today, but each is frozen as a regression.
   - `#` submits whatever is in hand: 1 to 3 digits are recorded and become `not_provided` (NR06)
     with no re-ask; only an empty `#` is re-asked.
   - The question never mentions `#` or `*`.
-- **Why it matters:** a wrong four is NV02 (not verified), and NV02 also fires on every redial of
-  the same generation (its `earlier` test), so one slip blocks an honest vendor's change for good.
+- **Why it matters:** a wrong four is NV02 (not verified), so the case is blocked, and only a new
+  change request reopens it (`blocked --> held: change_detected` in `docs/state-machine.md`; no
+  person can clear a blocked case). An earlier version said NV02 also fires on every redial; it
+  cannot, because a call with answers ends the generation's calling (A16).
 - **Common practice:** Amazon Lex defaults to `*` to clear and `#` to end, with an end timeout.
 - **Where to fix:** `relay.py` and the last-four wording in `packages/policy/.../script.py`.
 
@@ -208,7 +212,7 @@ These are not reachable today, but each is frozen as a regression.
     proposes 408201, which the policy rejects as a violation;
   - "it ends in 4821, my cell is 415 555 0123": the live agent records 0123 (the double, 4821);
   - "for eight to one" (a mis-hearing): 81, so `not_provided`.
-- **Why it matters:** a misread four is NV02, not verified, on this call and every redial (A13).
+- **Why it matters:** a misread four is NV02, not verified, so the case is blocked (A13).
   The comment in `claude_agent.py` (`_value`) says a wrong four "routes to manual review, never a
   false pass": the second half holds, the first does not.
 - **Exposure:** keypad digits never become text (`step` writes "[keypad]"). Spoken digits become
@@ -254,6 +258,24 @@ These are not reachable today, but each is frozen as a regression.
 - **Proposed:** specs 0041 and 0042 (PR #91, Sami). They find a new vendor's number in sources the
   vendor did not supply (a business registry, its website), then call that number once to confirm.
   Shadow mode first: a report nothing else reads, with no change to the pipeline.
+
+### A16. Earlier-call evidence never reaches the decision
+
+- **Status:** confirmed (read), Nov 9, origin/main da057f8; raised by spec 0043's builder check.
+- **What happens:**
+  - The voice service sends `answers` only when a call ends `answers_recorded`
+    (`apps/voice/src/dialback_voice/app.py`, the report body).
+  - An `answers_recorded` call moves the case to deciding, which ends that generation's calling
+    (`docs/state-machine.md`).
+  - So every earlier call `decide()` sees (`worker.py`, `earlier_call`) is a no-answer, failed or
+    callback call with no answers. `_earlier_concern` and `_denied` never fire, so NR19 and the
+    `earlier` halves of NV01 and NV02 cannot fire in production.
+- **Why it matters:** spec 0005 D2 says an earlier call can count against a change. For example, a
+  vendor says "No, we never asked for that", then asks to be called back: the call ends
+  `callback_requested`, its "no" is never sent, and the redial decides without it.
+- **Where to fix:** send consented answers on every report, not only `answers_recorded` (the
+  contract already allows `answers` on any `CallEndedBody`). That is `apps/voice` (Sami) and the
+  core's reading of them (`apps/core`, Abhi). Not evaluated beyond reading.
 
 ## B. The fuzz lab (spec 0033)
 
