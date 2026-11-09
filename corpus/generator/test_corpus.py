@@ -143,3 +143,5 @@ def test_the_demo_seed_is_fictional_and_tells_its_three_stories():
                     assert m.group(2) == "555" and m.group(3).startswith("01"), span["text"]
     assert near_miss(seed["vendors"]["cobalt"]["phones"]["offered"], seed["vendors"]["cobalt"]["phones"]["ar"])
     assert seed["vendors"]["acme"]["phones"]["ar"] not in json.dumps(seed["vendors"]["acme"]["request"])
+    assert near_miss(seed["vendors"]["cobalt"]["phones"]["on_file"], seed["vendors"]["cobalt"]["phones"]["ar"])
+    assert seed["vendors"]["acme"]["phones"]["on_file"] == seed["vendors"]["acme"]["phones"]["main"]
