@@ -120,11 +120,12 @@ def _user_prompt(goal: str, allowed: tuple[str, ...], callee_text: str) -> str:
 
 
 def _answer(data: dict) -> str:
-    """The model's one-word answer, lowered and stripped. Raises when the response carries no text,
-    so ClaudeAgent catches it and fails closed."""
+    """The model's one-word answer, lowered, with surrounding spaces, punctuation and quotes stripped
+    ("Yes." is "yes"; spec 0034, D5). The caller still checks it against the allowed set, so a sentence
+    never passes. Raises when the response carries no text, so ClaudeAgent catches it and fails closed."""
     for block in data.get("content", []):
         if block.get("type") == "text":
-            return block.get("text", "").strip().lower()
+            return block.get("text", "").strip().lower().strip(" \t\n.,!?;:\"'")
     raise ValueError("the model response carried no text to read")
 
 

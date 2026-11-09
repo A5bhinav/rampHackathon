@@ -217,6 +217,21 @@ def test_a_thinking_block_before_the_text_still_yields_the_answer():
     assert value == "no"
 
 
+@pytest.mark.parametrize("reply, expected", [("Yes.", "yes"), (" no! ", "no"), ("Unsure.", "unsure"),
+                                             ('"refused"', "refused")])
+def test_a_punctuated_one_word_answer_is_still_read(reply, expected):
+    # A live model may punctuate its one-word answer; "yes." is not in the allowed set, so without this
+    # every consent would fail closed to "no" and end the call (spec 0034, D5).
+    value, _ = _classify_against({"content": [{"type": "text", "text": reply}]})
+    assert value == expected
+
+
+def test_an_answer_that_is_more_than_one_word_still_fails_closed():
+    # Normalizing punctuation must not turn a sentence into a pass: it is still outside the set.
+    agent = ClaudeAgent(model=FakeModel(value="yes, but no"))
+    assert _record(agent.reply(_req(Phase.CONSENT, "yes, but no")))["value"] == "no"
+
+
 def test_anthropic_model_raises_when_there_is_no_text_to_read():
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, json={"content": [{"type": "tool_use", "name": "x", "input": {}}]})
