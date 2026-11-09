@@ -51,6 +51,12 @@ class Settings:
     # POST /calls auth (create_app): the shared internal token, read in both modes, since the core
     # authenticates to the text line too. Empty when unset, so create_app rejects every call (R7).
     internal_api_token: bytes = b""
+    # The live read path (spec 0027): the database the lookup queries, and the fixed disclosure
+    # context (one customer per deployment). Read only in live mode; None/empty in text mode and when
+    # unset, so the lookup factory and dial_from_row fail closed rather than dial a half-known call (R7).
+    database_url: str | None = None
+    customer_name: str = ""
+    callback_number: str = ""
 
 
 def load_settings(env: Mapping[str, str] | None = None) -> Settings:
@@ -58,10 +64,14 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
     mode = env.get("DIALBACK_VOICE", "text")
     if mode not in ("text", "live"):
         mode = "text"  # any unknown value takes the safe default
-    key = env.get("ANTHROPIC_API_KEY") if mode == "live" else None
-    return Settings(voice_mode=mode, twilio=_load_twilio(env) if mode == "live" else None,
+    live = mode == "live"
+    key = env.get("ANTHROPIC_API_KEY") if live else None
+    return Settings(voice_mode=mode, twilio=_load_twilio(env) if live else None,
                     anthropic_api_key=key.encode() if key else None,
-                    internal_api_token=env.get("DIALBACK_INTERNAL_TOKEN", "").encode())
+                    internal_api_token=env.get("DIALBACK_INTERNAL_TOKEN", "").encode(),
+                    database_url=env.get("DATABASE_URL") if live else None,
+                    customer_name=env.get("DIALBACK_CUSTOMER_NAME", "") if live else "",
+                    callback_number=env.get("DIALBACK_AP_CALLBACK_NUMBER", "") if live else "")
 
 
 def _load_twilio(env: Mapping[str, str]) -> TwilioConfig | None:
