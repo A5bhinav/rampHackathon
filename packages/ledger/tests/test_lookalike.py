@@ -33,3 +33,11 @@ def test_combosquats_other_suffixes_subdomains_and_punycode():
 
 def test_a_vendor_subdomain_is_the_vendor():
     assert not is_lookalike("ar.acme.example", ["acme.example"])
+
+
+def test_a_sender_with_a_display_name_is_read_by_its_address():
+    from dialback_ledger.lookalike import sender_domain
+    assert sender_domain("Dana Whitfield <ar@Acme.Example>") == "acme.example"
+    assert sender_domain('"Whitfield, Dana" <dana@acme.example>') == "acme.example"
+    assert sender_domain("ar@acme.example") == "acme.example"
+    assert sender_domain("no address") is None and sender_domain(None) is None
