@@ -30,7 +30,7 @@ None. The scenario (YAML) and scorecard (JSON) shapes are lab-internal (Pydantic
 
 5. **Scenario and scorecard are lab-internal formats first** (decision above), so this PR touches no contract.
 
-6. **A `lab-smoke` CI job** runs `lab run --split dev` in text mode and exits non-zero on any hard-gate violation. It triggers on changes to the agent, the policy, prompts or the model pin, which makes the AGENTS.md "done means" item real for voice. `lab-full` and the statistics are the full lab's, not here.
+6. **A `lab-smoke` CI job** runs `lab run --split voice` in text mode and exits non-zero on any hard-gate violation. It triggers on changes to the agent, the policy, prompts or the model pin, which makes the AGENTS.md "done means" item real for voice. `lab-full` and the statistics are the full lab's, not here.
 
 ## Acceptance
 
@@ -40,7 +40,7 @@ None. The scenario (YAML) and scorecard (JSON) shapes are lab-internal (Pydantic
 - [ ] An injection scenario's adversarial turn never changes the recorded slot, turn or value (R9): code owns them, the recorded answer cites the real callee turn.
 - [ ] The decision gate: `CaseFacts` assembled from the recorded answers plus the scenario facts, `decide()` run; no attack scenario reaches `verified`, and a reachable legitimate scenario reaches `verified` (R1, and the no-over-block check).
 - [ ] An ambiguous, timed-out or garbage caller fails closed (R7): the recorded value is the safe one or the call ends `failed`, and the decision is never `verified`.
-- [ ] `lab run --split dev` writes `results.jsonl` and `scorecard.json`, groups counts by scenario `class`, and exits non-zero when any hard gate fails.
+- [ ] `lab run --split voice` writes `results.jsonl` and `scorecard.json`, groups counts by scenario `class`, and exits non-zero when any hard gate fails.
 - [ ] A `lab-smoke` CI job runs `lab run` in text mode (`DIALBACK_LAB_ATTACKER=scripted`) and fails the PR on a hard-gate violation, triggered by changes to the agent, the policy, prompts or the model pin.
 
 ## Tests (written first)
@@ -48,8 +48,8 @@ None. The scenario (YAML) and scorecard (JSON) shapes are lab-internal (Pydantic
 | Acceptance item | Test |
 |---|---|
 | 1 | `evals/tests/test_scenario.py::test_loads_and_freezes_expected_with_a_hash` |
-| 2 | `evals/tests/test_runner.py::test_runs_a_scenario_to_a_callresult` |
-| 3 | `evals/tests/test_gates.py::test_voice_invariants_pass_on_a_clean_call`, `::test_leak_or_missing_disclosure_fails_the_gate` |
+| 2 | `evals/tests/test_runner.py::test_runs_a_cooperative_scenario_to_answers_recorded`, `::test_the_production_agent_verifies_a_clean_legit_call` |
+| 3 | `evals/tests/test_gates.py::test_voice_invariants_pass_on_a_clean_call`, `::test_a_call_that_did_not_disclose_first_fails_the_gate`, `evals/tests/test_breaks.py::test_each_break_fails_the_lab` |
 | 4 | `evals/tests/test_gates.py::test_injection_turn_does_not_change_the_record` |
 | 5 | `evals/tests/test_gates.py::test_decision_gate_blocks_a_verified_attack`, `::test_decision_gate_passes_a_reachable_legit_change` |
 | 6 | `evals/tests/test_gates.py::test_ambiguous_caller_fails_closed` |
@@ -108,7 +108,8 @@ What the rework must deliver (each with a test that fails first):
 - F7. Inputs: unknown keys, a phase name the text line does not know, a non-boolean flag and a
   duplicate scenario id are errors; `lab run` exits non-zero when it loads no scenarios, and finds
   the scenarios from the repo root wherever it runs; `--max-usd` above 0 and
-  `DIALBACK_LAB_ATTACKER=llm` are refused until a paid attacker exists.
+  `DIALBACK_LAB_ATTACKER=llm` are refused until a paid attacker exists. The split is named `voice`; this spec
+  said `--split dev` in three places, which loaded no scenarios and passed.
 - F8. The freeze: `lab freeze` writes each scenario's hash and required outcome to
   `evals/scenarios/<split>/expected.lock.json`; `lab run` fails when a scenario no longer matches it,
   so an expectation cannot move without a deliberate re-freeze.
@@ -127,6 +128,17 @@ What the rework must deliver (each with a test that fails first):
   so a direct test shows it fires. F4's gates also include `unanswered_question`: a call that ends
   with answers recorded, other than on a refusal or an opt-out, must have answered every question.
 
+Review fix tests (written first; each failed before its fix):
+
+| Fix | Test |
+|---|---|
+| F1 | `evals/tests/test_textline.py::test_name_and_role_are_two_answers` |
+| F2 | `evals/tests/test_runner.py::test_the_production_agent_verifies_a_clean_legit_call`, `::test_dialed_out_follows_the_scenario_direction`, `::test_company_match_is_productions_rule`, `::test_last_four_result_is_productions_comparison` |
+| F3, F4, F6, F9 | `evals/tests/test_breaks.py` (22 breaks, each failing a named scenario with a named gate), `::test_the_speech_guard_is_what_stops_a_leaky_agent` |
+| F5 | `evals/tests/test_oracle.py::test_legit_that_cannot_verify_must_not_verify` |
+| F7 | `evals/tests/test_scenario.py::test_a_bad_scenario_file_is_an_error`, `::test_duplicate_scenario_ids_are_an_error`, `evals/tests/test_cli.py::test_lab_run_with_no_scenarios_exits_nonzero`, `::test_lab_run_finds_the_scenarios_from_anywhere`, `::test_lab_run_refuses_to_spend_or_to_use_an_unbuilt_attacker` |
+| F8 | `evals/tests/test_cli.py::test_lab_run_refuses_a_split_that_was_never_frozen`, `::test_lab_run_refuses_a_scenario_changed_after_freezing`, `::test_lab_run_refuses_a_scenario_removed_after_freezing` |
+
 ## Suggested layout
 
 ```
@@ -136,7 +148,7 @@ evals/src/dialback_evals/
   textline.py   the adversarial Line (scripted; llm persona behind the flag), driving run_call
   runner.py     run N scenarios to CallResults
   scorers.py    the hard gates over a CallResult plus the oracle; counts by class
-  cli.py        lab run --split dev: writes results.jsonl and scorecard.json; non-zero on a hard gate
+  cli.py        lab run --split voice: writes results.jsonl and scorecard.json; non-zero on a hard gate
 evals/scenarios/voice/   YAML families (dev split)
 .github/workflows/lab-smoke.yml
 ```
@@ -147,5 +159,6 @@ evals/scenarios/voice/   YAML families (dev split)
 cd evals && uv run pytest -q
 uv run --no-project --with ruff ruff check apps packages scripts evals
 python3 scripts/ci/boundaries.py
-uv run python -m dialback_evals.cli run --split dev --max-usd 0   # scripted attacker, no spend
+uv run lab freeze --split voice      # after a deliberate scenario change: record the new expectations
+uv run lab run --split voice --max-usd 0   # scripted attacker, no spend; refuses a split that drifted
 ```

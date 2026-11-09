@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from dialback_policy.script import Phase
 
 # The nine scenario classes (evals/README.md). The list lives here, not in a schema, so a new
 # class needs no contract change.
@@ -78,8 +79,25 @@ class Scenario:
 
 
 def load_scenarios(directory: str | Path) -> list[Scenario]:
-    """Every `*.yaml` in `directory` except names starting with `_` (templates), validated."""
-    return [_parse(path) for path in sorted(Path(directory).glob("*.yaml")) if not path.name.startswith("_")]
+    """Every `*.yaml` in `directory` except names starting with `_` (templates), validated. Two
+    scenarios under one id are an error (review fix F7)."""
+    scenarios = [_parse(path) for path in sorted(Path(directory).glob("*.yaml")) if not path.name.startswith("_")]
+    seen: set[str] = set()
+    for s in scenarios:
+        if s.id in seen:
+            raise ValueError(f"two scenarios share the id '{s.id}'")
+        seen.add(s.id)
+    return scenarios
+
+
+# The keys a scenario may use: anything else (a typo such as `injct`) is an error, not ignored (F7).
+_KEYS = frozenset({"id", "class", "is_attack", "customer_name", "vendor_name", "caller", "facts", "expect_rule",
+                   "expect_end"})
+_CALLER_KEYS = frozenset({"consent", "company", "department", "name", "role", "change", "last4_mode", "last4",
+                          "answered_by", "inject", "inject_phase", "offer_other_number", "hang_up_at", "silent"})
+_FACT_KEYS = frozenset({"dialed_eligible_number", "new_last4", "old_last4", "dialed_number_is_pick",
+                        "speaker_in_change_thread", "offered_number_from_request", "line_risk", "direction"})
+_PHASES = frozenset(p.name for p in Phase)
 
 
 def _parse(path: Path) -> Scenario:
@@ -100,7 +118,23 @@ def _parse(path: Path) -> Scenario:
             raise ValueError(f"{path.name}: {what} '{value}' is not one of {sorted(allowed)}")
         return value
 
-    c = need("caller", raw)
+    def only(where: Any, allowed: frozenset[str], what: str) -> dict[str, Any]:
+        if not isinstance(where, dict):
+            raise ValueError(f"{path.name}: {what} must be a mapping")  # noqa: TRY004  one error type for all bad files
+        if extra := sorted(set(where) - allowed):
+            raise ValueError(f"{path.name}: unknown {what} key(s) {extra}")
+        return where
+
+    def flag(value: Any, what: str) -> bool:
+        if not isinstance(value, bool):
+            raise ValueError(f"{path.name}: {what} must be true or false, not {value!r}")  # noqa: TRY004
+        return value
+
+    def phase(value: Any, what: str) -> str | None:
+        return None if value is None else one_of(value, _PHASES, what)
+
+    only(raw, _KEYS, "scenario")
+    c = only(need("caller", raw), _CALLER_KEYS, "caller")
     caller = CallerBehavior(
         consent=one_of(need("consent", c), _CONSENT, "consent"),
         company=str(need("company", c)),
@@ -112,18 +146,18 @@ def _parse(path: Path) -> Scenario:
         last4=str(c.get("last4", "")),
         answered_by=one_of(c.get("answered_by", "human"), _ANSWERED_BY, "answered_by"),
         inject=c.get("inject"),
-        inject_phase=c.get("inject_phase"),
-        offer_other_number=bool(c.get("offer_other_number", False)),
-        hang_up_at=c.get("hang_up_at"),
-        silent=bool(c.get("silent", False)),
+        inject_phase=phase(c.get("inject_phase"), "inject_phase"),
+        offer_other_number=flag(c.get("offer_other_number", False), "offer_other_number"),
+        hang_up_at=phase(c.get("hang_up_at"), "hang_up_at"),
+        silent=flag(c.get("silent", False), "silent"),
     )
-    f = need("facts", raw)
+    f = only(need("facts", raw), _FACT_KEYS, "facts")
     new_last4, old_last4 = str(need("new_last4", f)), f.get("old_last4")
     for what, digits in (("new_last4", new_last4), ("old_last4", old_last4)):
         if digits is not None and not _FOUR_DIGITS.fullmatch(str(digits)):
             raise ValueError(f"{path.name}: {what} must be four digits, not {digits!r}")
     facts = DeclaredFacts(
-        dialed_eligible_number=bool(need("dialed_eligible_number", f)),
+        dialed_eligible_number=flag(need("dialed_eligible_number", f), "dialed_eligible_number"),
         new_last4=new_last4,
         old_last4=None if old_last4 is None else str(old_last4),
         dialed_number_is_pick=_tri(path, f.get("dialed_number_is_pick")),
@@ -133,7 +167,7 @@ def _parse(path: Path) -> Scenario:
         direction=one_of(f.get("direction", "outbound"), _DIRECTIONS, "direction"),
     )
     scenario_class = one_of(need("class", raw), CLASSES, "class")
-    is_attack = bool(need("is_attack", raw))
+    is_attack = flag(need("is_attack", raw), "is_attack")
     if is_attack == (scenario_class in LEGIT_CLASSES):
         raise ValueError(f"{path.name}: is_attack {is_attack} disagrees with class '{scenario_class}'")
     expect_rule = raw.get("expect_rule")

@@ -58,3 +58,29 @@ def test_a_bad_last4_mode_raises(tmp_path):
     (tmp_path / "bad.yaml").write_text(_VALID_YAML.replace("last4_mode: keypad", "last4_mode: telepathy"))
     with pytest.raises(ValueError, match="telepathy|last4_mode"):
         load_scenarios(tmp_path)
+
+
+# Review fix F7: a bad scenario file fails loudly instead of silently testing something else.
+
+@pytest.mark.parametrize(("old", "new", "why"), [
+    ("caller:\n", "injct: oops\ncaller:\n", "injct"),                               # unknown top-level key
+    ("  answered_by: human\n", "  answered_by: human\n  inject_phse: CHANGE\n", "inject_phse"),   # unknown caller key
+    ("  new_last4:", "  new_lst4: 1\n  new_last4:", "new_lst4"),                       # unknown fact key
+    ("  answered_by: human\n", "  answered_by: human\n  inject: hi\n  inject_phase: change\n", "inject_phase"),
+    ("  answered_by: human\n", "  answered_by: human\n  hang_up_at: LAST_FOUR\n", "hang_up_at"),
+    ("  dialed_eligible_number: true", "  dialed_eligible_number: 'false'", "dialed_eligible_number"),
+    ("is_attack: true", "is_attack: 'yes'", "is_attack"),
+    ("  answered_by: human\n", "  answered_by: human\n  silent: 'no'\n", "silent"),
+])
+def test_a_bad_scenario_file_is_an_error(tmp_path, old, new, why):
+    assert old in _VALID_YAML
+    (tmp_path / "bad.yaml").write_text(_VALID_YAML.replace(old, new, 1))
+    with pytest.raises(ValueError, match=why):
+        load_scenarios(tmp_path)
+
+
+def test_duplicate_scenario_ids_are_an_error(tmp_path):
+    (tmp_path / "a.yaml").write_text(_VALID_YAML)
+    (tmp_path / "b.yaml").write_text(_VALID_YAML)
+    with pytest.raises(ValueError, match="hijack-01"):
+        load_scenarios(tmp_path)

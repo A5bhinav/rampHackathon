@@ -10,7 +10,11 @@ on:
       - "apps/voice/**"
       - "packages/policy/**"
       - "packages/decision/**"
+      - "apps/core/src/dialback_core/company.py"   # the lab reuses production's company check
+      - "apps/core/src/dialback_core/answers.py"   # and the digits it reads from a call report
       - "evals/**"
+      - "pyproject.toml"
+      - "uv.lock"
       - ".github/workflows/lab-smoke.yml"
   push:
     branches: [main]
