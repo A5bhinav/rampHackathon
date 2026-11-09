@@ -58,3 +58,18 @@ def test_status_text_never_says_safe():
     assert set(STATUS_TEXT) == {"near_miss", "unproven", "missing", "provable"}
     assert all("safe" not in t.lower() for t in STATUS_TEXT.values())
     assert STATUS_TEXT["provable"].startswith("Provable") and STATUS_TEXT["unproven"].startswith("Not provable")
+
+
+def _c(e164, eligible, on_file):
+    return {"e164": e164, "eligible": eligible, "on_file": on_file}
+
+
+def test_status_edge_cases():
+    from dialback_ledger.risk import _status
+    ar, main, near, far = "+14155550142", "+14155550117", "+14155550143", "+14155550169"
+    assert _status([_c(ar, True, True)], ar) == ("provable", ar)                       # the pick is on file
+    assert _status([_c(ar, True, False), _c(far, False, True)], ar) == ("unproven", far)
+    assert _status([_c(ar, False, False), _c(near, False, True)], None) == ("unproven", near)  # near an unprovable number
+    assert _status([_c(ar, True, False)], ar) == ("missing", None)
+    # Two numbers on file: the worse one shows, so a near miss is never hidden behind a provable line.
+    assert _status([_c(main, True, True), _c(ar, True, False), _c(near, False, True)], ar) == ("near_miss", near)

@@ -31,7 +31,8 @@ with `vendor_id`, `legal_name`, `status`, `number_on_file`, `provable_number` an
 - [ ] `dialback_ledger.risk.risk_list(conn, dataset_id)` reads under the caller's connection (the
       person's token) and returns one row per vendor with ledger documents, ordered worst first
       (near miss, unproven, missing, provable), then by name.
-- [ ] Each status is decided by code from the rule's candidates, as in the table.
+- [ ] Each status is decided by code from the rule's candidates, as in the table. With several
+      numbers on file, the worst one shows, so a near miss is never hidden behind a provable line.
 - [ ] The demo seed gives one of each kind besides `missing`: acme `provable`, brightline
       `unproven`, cobalt `near_miss`; its three selections don't change (on-file records never count).
 - [ ] The endpoint returns 404 for a dataset the person can't see, and is checked against the contract.
@@ -49,6 +50,11 @@ with `vendor_id`, `legal_name`, `status`, `number_on_file`, `provable_number` an
 ## Out of scope
 
 Links from a vendor to its cases, refreshing on a schedule, vendors with no ledger documents.
+
+## Known limits
+
+- A vendor-master record whose number is in hidden text reads as `missing`: the rule only counts a
+  number as on file where a person could see it.
 
 ## Open questions
 

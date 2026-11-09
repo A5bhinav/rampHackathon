@@ -18,8 +18,8 @@ ORDER = ("near_miss", "unproven", "missing", "provable")  # worst first
 STATUS_TEXT = {
     "near_miss": "Not provable, and a warning: the number on file is one digit off, or two swapped digits away from, "
                  "a number the Trust Ledger can prove for this vendor.",
-    "unproven": "Not provable: the Trust Ledger can't prove the number on file (too few independent sources, too "
-                "recent, or seen only where a person couldn't see it).",
+    "unproven": "Not provable: the number on file fails at least one part of the rule, such as two independent "
+                "sources, months of history, or being the vendor's own line where a person could see it.",
     "missing": "No number on file: the vendor master has no phone number for this vendor.",
     "provable": "Provable: the number on file meets every part of the rule.",
 }
@@ -27,17 +27,20 @@ _NIL = UUID(int=0)
 
 
 def _status(candidates: list[dict], pick: str | None) -> tuple[str, str | None]:
+    """The worst status among the numbers on file, so a near miss is never hidden behind a
+    provable line (spec 0026)."""
     on_file = [c for c in candidates if c["on_file"]]
     if not on_file:
         return "missing", None
     provable = {c["e164"] for c in candidates if c["eligible"]}
-    for c in on_file:
+
+    def one(c: dict) -> str:
         if c["eligible"]:
-            return "provable", c["e164"]
-    for c in on_file:
-        if any(near_miss(c["e164"], p) for p in provable):
-            return "near_miss", c["e164"]
-    return "unproven", on_file[0]["e164"]
+            return "provable"
+        return "near_miss" if any(near_miss(c["e164"], p) for p in provable) else "unproven"
+
+    worst = min(on_file, key=lambda c: ORDER.index(one(c)))
+    return one(worst), worst["e164"]
 
 
 async def risk_list(conn: psycopg.AsyncConnection, dataset_id: UUID, *, now: dt.datetime | None = None) -> list[dict]:
@@ -51,6 +54,8 @@ async def risk_list(conn: psycopg.AsyncConnection, dataset_id: UUID, *, now: dt.
     out = []
     for v in vendors:
         rows = await vendor_rows(conn, dataset_id=dataset_id, vendor_id=v["id"], before=now)
+        # A placeholder request that matches nothing: with none at all, the rule would count every
+        # document as change context (R7) and nothing would be provable.
         doc = select(case_id=_NIL, dataset_id=dataset_id, vendor_id=v["id"], requested_cutoff=now, case_opened_at=now,
                      request=ChangeRequest("", now, None, None, None), **rows)
         status, on_file = _status(doc["candidates"], doc.get("e164"))
