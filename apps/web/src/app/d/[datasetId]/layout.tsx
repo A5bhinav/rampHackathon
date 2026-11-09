@@ -11,8 +11,9 @@ export default async function DatasetShell({ children, params }: { children: Rea
   const [me, datasets, alerts] = await Promise.all([core.me(), core.datasets(), core.alerts(datasetId)]);
   const current = datasets.find((d) => d.id === datasetId);
   return (
-    <div className="shell">
+    <>
       <header className="topbar">
+        <div className="topbar-inner">
         <nav className="nav" aria-label="Main">
           <Link className="brand" href={`/d/${datasetId}/cases`}><BrandMark />Dialback</Link>
           <NavLinks links={[{ href: `/d/${datasetId}/cases`, label: "Case queue" }, { href: `/d/${datasetId}/risk`, label: "Vendor risk" }]} />
@@ -40,10 +41,13 @@ export default async function DatasetShell({ children, params }: { children: Rea
           </span>
           <form action="/sign-out" method="post"><button type="submit" className="quiet">Sign out</button></form>
         </div>
+        </div>
       </header>
-      <AlertBanners alerts={alerts} datasetId={datasetId} />
-      {children}
-    </div>
+      <div className="shell">
+        <AlertBanners alerts={alerts} datasetId={datasetId} />
+        {children}
+      </div>
+    </>
   );
 }
 
