@@ -290,6 +290,17 @@ These are not reachable today, but each is frozen as a regression.
 - **Where to fix:** decide whether to record (consent law, storage, the private bucket) or say
   "this call may be recorded". `apps/voice` (Sami).
 
+### A18. The calling window uses one time zone for every vendor
+
+- **Status:** confirmed (read), Nov 9, origin/main da057f8.
+- **What happens:** `apps/core/src/dialback_core/calling_window.py` says calls happen "weekdays
+  9:00 to 16:30 in the vendor's time zone", but the worker builds the window from one setting,
+  `settings.calling_tz` (`worker.py`, `CallingWindow.parse`). A vendor in another time zone is
+  called in the core's hours: 9:00 Pacific is 6:00 for a Hawaii vendor, and 16:30 Eastern is
+  13:30 for a California one.
+- **Where to fix:** take the vendor's time zone from the vendor record (the voice side already
+  carries a `vendor_tz`, default `America/Los_Angeles`). `apps/core` (Abhi).
+
 ## B. The fuzz lab (spec 0033)
 
 ### B1. I12 never probes the change-request email itself
@@ -580,9 +591,9 @@ not absent.
 | Who talks | code's fixed words; the model only classifies | AI on a fixed procedure | AI asks, code scores | a person | a person |
 | What is asked | company, name, role, "did you ask for this", last four (caller gives them) | identity, data points such as the last digits of a known account | identity, "did you ask", 2 invoice totals and a payment date, then reads the new account back | reads 3 digits, caller gives the rest, plus branch, name and business number | none |
 | Wrong answer | never re-asked; the voice side never knows it | strict retry limits, then ends | not stated | a person judges | none |
-| Account ownership by data | none | bank-network checks, a certificate, sometimes a test transfer | none | bank link plus business-register match, shared database | Trustpair: yes, the core product |
+| Account ownership by data | none built; the design lists "Account-name match" and "Ramp-signed identity" as future plug-ins | bank-network checks, a certificate, sometimes a test transfer | none | bank link plus business-register match, shared database | Trustpair: yes, the core product |
 | Who decides | code; a block is automatic, a release needs two people | not stated; the summary goes to the AP team | code; a pass releases | a person | Trustpair: the API result; Spendflo: a person |
-| Shared across customers | no | in-network database | no | about 4 million verified suppliers | Trustpair: data network |
+| Shared across customers | none built: the Trust Ledger reads one customer's documents; the design lists "Network alarm" (warn other Ramp customers who pay the same vendor) as a future plug-in | in-network database | no | about 4 million verified suppliers | Trustpair: data network |
 | Line takeover | `line_risk` reserved, never computed (A7) | not stated | not stated | not stated | not stated |
 
 Sources: nsknox.net/ai-agent-caller, github.com/mystiquemide/kovrell, eftsure.com supplier pages and
@@ -594,15 +605,17 @@ keypad only); no live feedback on a wrong answer; code owns the words; an automa
 two-person release; the attack lab (none of them publishes one).
 
 **Add, in order (proposals, not decided):**
-1. An account-ownership fact from a data provider. It answers "is the account the vendor's", which
-   a call cannot, and it gives young vendors with no provable number (A15) a path.
+1. An account-ownership fact from a data provider: the design's "Account-name match" plug-in,
+   which feeds the decision engine. It answers "is the account the vendor's", which a call cannot,
+   and it gives young vendors with no provable number (A15) a path. The Trust Ledger and specs
+   0041/0042 prove the phone number is the vendor's, not the bank account.
 2. A real `line_risk`. Twilio Lookup's line type (mobile, landline, VoIP) is widely available; its
    SIM-swap date needs carrier approval and covers some regions; call forwarding is a private beta
    on major UK carriers only, unconditional forwarding only.
-3. Evidence across Ramp customers: the same vendor's number seen by many customers, or a new
-   account added for only one of them. A data-sharing policy question for Ramp first.
-4. Call in the vendor's local hours and language. The calling window exists; the script is
-   English only.
+3. Evidence across Ramp customers: the design's "Network alarm" plug-in, and beyond it, the same
+   vendor's number seen by many customers, or a new account added for only one of them. A
+   data-sharing policy question for Ramp first.
+4. Call in the vendor's local hours (A18) and language. The script is English only.
 
 **Do not add:** invoice questions (a mailbox attacker has the invoices, and a clerk may not know
 the totals); reading digits to the caller (people confirm what they hear, and it tells whoever
