@@ -2,7 +2,7 @@ import "server-only";
 import { redirect } from "next/navigation";
 import { sessionToken } from "./session";
 import type {
-  ActionResult, Alert, ApiError, CaseDetail, CaseSummary, ChainStatus, Dataset, Me, SelectionView,
+  ActionResult, Alert, ApiError, CaseDetail, CaseSummary, ChainStatus, Dataset, Me, SelectionView, VendorRisk,
 } from "./api-types";
 
 // The only way the dashboard talks to the core: server-side, with the signed-in user's
@@ -35,6 +35,8 @@ export const core = {
   datasets: () => call<{ datasets: Dataset[] }>("/api/datasets").then((r) => r.datasets),
   chain: (datasetId: string) => call<ChainStatus>(`/api/datasets/${datasetId}/chain`),
   alerts: (datasetId: string) => call<{ alerts: Alert[] }>(`/api/datasets/${datasetId}/alerts`).then((r) => r.alerts),
+  vendorRisk: (datasetId: string) =>
+    call<{ vendors: VendorRisk[] }>(`/api/datasets/${datasetId}/vendor-risk`).then((r) => r.vendors),
   cases: (datasetId: string) =>
     call<{ cases: CaseSummary[] }>(`/api/cases?dataset_id=${encodeURIComponent(datasetId)}`).then((r) => r.cases),
   case: (caseId: string) => call<CaseDetail>(`/api/cases/${caseId}`),

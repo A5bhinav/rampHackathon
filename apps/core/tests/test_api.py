@@ -232,3 +232,29 @@ async def test_an_unavailable_ledger_is_null_with_its_note(world):
 
 async def test_the_selection_of_an_unknown_case_is_not_found(world):
     await get(world, f"/api/cases/{uuid.uuid4()}/selection", "clerk", "/api/cases/{case_id}/selection", status=404)
+
+
+# The vendor risk list (spec 0026) ------------------------------------------------------------------
+
+RISK = "/api/datasets/{dataset_id}/vendor-risk"
+
+
+async def test_the_vendor_risk_list_reads_the_ledger(world):
+    from dialback_ledger.ingest import ingest_all
+    from dialback_ledger.store import add_vendor_domain, write_ingest
+    await import_all(world.pool, world.ramp, world.keys, world.dataset.id)
+    truth = json.loads((Path(__file__).resolve().parents[3] / "corpus/truth/C01.json").read_text())
+    docs = json.loads((Path(__file__).resolve().parents[3] / "corpus" / truth["documents"]).read_text())
+    async with world.pool.connection() as conn, conn.transaction():
+        vendor = (await (await conn.execute("select id from app.vendors where dataset_id = %s order by legal_name limit 1",
+                                            (world.dataset.id,))).fetchone())["id"]
+        await write_ingest(conn, dataset_id=world.dataset.id, vendor_id=vendor, result=ingest_all(docs, extractor_version="t"))
+        await add_vendor_domain(conn, dataset_id=world.dataset.id, vendor_id=vendor, domain=truth["vendor"]["domain"])
+    body = await get(world, f"/api/datasets/{world.dataset.id}/vendor-risk", "clerk", RISK)
+    (row,) = body["vendors"]                      # only vendors the ledger has documents for
+    assert row["vendor_id"] == str(vendor) and row["status"] == "missing" and row["number_on_file"] is None
+    assert row["provable_number"] == truth["expected"]["pick"] and row["status_text"]
+
+
+async def test_the_vendor_risk_list_of_an_unknown_dataset_is_not_found(world):
+    await get(world, f"/api/datasets/{uuid.uuid4()}/vendor-risk", "clerk", RISK, status=404)

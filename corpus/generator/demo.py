@@ -7,6 +7,10 @@ ends just before the demo. Not part of the frozen truth: the demo can change wit
   acme        an ordinary history; the request replies on a real invoice thread   -> its AR line
   brightline  known only by email                                                  -> no provable number
   cobalt      the request hijacks an invoice thread and offers a one-digit-off line -> its real AR line
+
+Each also has an old vendor-master record (the number on file), for the risk list: acme's is its
+provable main line, brightline's is email-only (unproven), cobalt's is two swapped digits away
+from its real AR line (a near miss).
 """
 from __future__ import annotations
 
@@ -27,6 +31,12 @@ def _vendor(ref: str, base: str, name: str, area: str) -> dict:
     main = v.phone(17, role="main", label="Main")
     ar = v.phone(42, role="ar", label="Accounts receivable")
     phones = {"main": main.e164, "ar": ar.e164}
+    # The old vendor master's "number on file" (spec 0026): never counted as a source, so the
+    # selections don't change; it's what the risk list checks.
+    on_file = v.phone(24, role="ar", truth="poison", label="Phone on file") if ref == "cobalt" else \
+        v.phone(17, role="main", label="Phone on file")
+    phones["on_file"] = on_file.e164
+    v.doc("vendor_master_record", "vendor_master", START - days(200), [f"Vendor master: {name}", on_file])
     if ref == "brightline":
         v.history(main, ar, start=START, contract=False, listing=False, portal=False)
         v.request()

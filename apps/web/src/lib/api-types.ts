@@ -17,3 +17,4 @@ export type DecisionInfo = S["DecisionInfo"];
 export type SelectionView = S["SelectionView"];
 export type Selection = S["selection.schema"];
 export type Candidate = Selection["candidates"][number];
+export type VendorRisk = S["VendorRisk"];
