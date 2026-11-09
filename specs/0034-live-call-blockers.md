@@ -67,6 +67,13 @@ phase. The phase rename (`name_role` becomes `name` and `role`) is internal to `
 - [ ] **B4.** `dialback-voice` declares `uvicorn[standard]`, and uvicorn in the voice environment
   loads a WebSocket protocol for `ws="auto"`. A build of `apps/voice/Dockerfile` answers a WebSocket
   upgrade with `101 Switching Protocols` (checked by hand; the output goes in the PR).
+- [ ] **B4 in CI.** The `images` check starts the voice image in live mode with dummy settings and
+  runs `scripts/ci/ws_probe.py`, which fails unless (1) an unsigned POST to `/twilio/status/{id}`
+  gets a 401, proving the live routes are mounted (a live config with any key missing quietly runs
+  the text line, whose 404 would otherwise look like the B4 failure), and (2) an RFC 6455 upgrade
+  to `/twilio/relay/{id}` gets `101` with the `Sec-WebSocket-Accept` the key requires. The probe
+  fails against an image of `main` and passes against this branch (checked by hand; output in the
+  PR).
 - [ ] **B5.** The script asks, in order: consent, company, department, name, role, change, last four.
   Both agents record the name answer as `speaker_name` and the role answer as `speaker_role`, each
   citing its own turn and grounded. A recorded `speaker_changed` flag re-asks both name and role. A
@@ -86,6 +93,7 @@ phase. The phase rename (`name_role` becomes `name` and `role`) is internal to `
 | B2 | `apps/voice/tests/test_entrypoint.py::test_the_default_clock_is_the_utc_wall_clock` |
 | B3 | `apps/voice/tests/test_twilio_signature.py` (Twilio's vectors, blank fields, query string, rejections) |
 | B4 | `apps/voice/tests/test_entrypoint.py::test_uvicorn_has_a_websocket_backend` |
+| B4 in CI | `scripts/ci/ws_probe.py`, run by the `images` workflow against the built voice image |
 | B5 | `packages/policy/tests/test_script.py` (order and slots), `packages/policy/tests/test_step.py::test_a_new_speaker_is_asked_name_and_role_again` |
 | B5 | `apps/voice/tests/test_transport.py::test_a_clean_call_records_name_and_role_separately` |
 | B5 | `apps/voice/tests/test_claude_agent.py` (name and role as free-text phases) |
@@ -126,5 +134,6 @@ DATABASE_URL=postgresql://... uv run --directory apps/voice pytest -q   # the Po
 uv run --no-project --with ruff ruff check apps packages scripts corpus
 python3 scripts/ci/boundaries.py
 scripts/db/test.sh
-docker build -f apps/voice/Dockerfile -t dialback-voice:0034 .   # then a WebSocket upgrade probe: 101
+docker build -f apps/voice/Dockerfile -t dialback-voice:0034 .   # run it live, then the probe below
+python3 scripts/ci/ws_probe.py http://localhost:8081                # exit 0 only on 401 then 101
 ```
