@@ -7,6 +7,25 @@ A Python package that runs inside the core service, so the attack lab imports an
 the exact same code. Models do one job here, labeling; code does everything else,
 including the decision of which number to call.
 
+## What's built (Nov 9)
+
+| Piece | Where | Spec |
+|---|---|---|
+| Selection contract and the `stub` resolver | `stub.py`, `packages/contracts/schemas/selection.schema.json` | 0018 |
+| The `ledger` schema | `supabase/migrations/ledger/` | 0019, 0024 |
+| Frozen corpus: 12 patterns, 5 controls, the known limit | `corpus/` | 0020 |
+| `ledger-select-v1` | `select.py`, `lookalike.py` | 0021 |
+| Ingestion: custody, text, visibility, candidates, stub reader, grounding | `custody.py` … `ingest.py` | 0022 |
+| Lineage panel | `apps/web/…/cases/[caseId]/lineage`, `reasons.py` | 0023 |
+| In the database: `select_number`, `change_context`, writing ingestion | `store.py` | 0024 |
+| The demo's ledger and `dialback-ledger demo` | `demo.py`, `demo_seed.json` | 0025 |
+| Vendor risk list | `risk.py`, `apps/web/…/risk` | 0026 |
+
+Not built yet: the LLM reader (`DIALBACK_READER=llm`), reading real PDFs and scans, entity
+resolution, `lineage()` as its own call (the panel reads the stored selection), the ledger's
+nightly evals and ablations, and the 100 hand-checked documents. Open questions for the team are
+in specs 0024 to 0026 (Q45, Q46, Q51 to Q53).
+
 ## Job
 
 Record where every phone number in a vendor's history came from, then pick the number to
