@@ -3,6 +3,9 @@
     reset   a fresh demo company: a new dataset and chain, seeded, imported and linked; earlier
             demo datasets are hidden, nothing is deleted
     change  beat 2: a vendor's seeded bank change in the Ramp mock, by the linked clerk or nobody
+    tamper  beat 6: one evidence row edited by hand, then the verify job names it
+    status  a pre-flight check: the current demo, its cases, the chain and open alerts
+    chaos   spec 0008's chaos mode on the current demo business, on or off
 
 Every command refuses Ramp's sandbox (it can't be reset) and any dataset that isn't kind `demo`.
 The mock is reached over its HTTP API only; nothing here imports another app.
@@ -27,13 +30,16 @@ from .datasets import Dataset, create_dataset, retire_dataset
 from .db import system_tx
 from .detection import Keys, import_all
 from .flags import RampMode
+from .jobs import Jobs
 from .ramp import RampConnector
 from .ramp.connector import mock_token
 from .settings import Settings
 
 DEFAULT_SEED = Path("scripts/demo/seed.json")
+CHAOS = {"chaos_error_permille": 300, "chaos_drop_permille": 0}  # seeded, 300‰ errors, no dropped webhooks (D7)
 DATE_FIELDS = ("issued_at", "due_at", "payment_date")
 RELATIVE = re.compile(r"^([+-])(\d+)d$")
+OUTCOME = re.compile(r'"outcome":"[a-z_]+"')
 
 
 class DemoError(RuntimeError):
@@ -46,7 +52,7 @@ class DemoEnv:
     settings: Settings
     mock: httpx.AsyncClient            # the Ramp mock's base URL
     connector: RampConnector
-    owner_url: str                     # DATABASE_URL: the table owner's connection (links)
+    owner_url: str                     # DATABASE_URL: the table owner's connection (links, tamper)
 
 
 @dataclass(frozen=True)
@@ -55,6 +61,13 @@ class ResetResult:
     refs: dict[str, str]
     linked: dict[str, UUID]
     warnings: list[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class TamperResult:
+    dataset_id: UUID
+    seq: int
+    alert: str | None  # the open chain_broken alert; an earlier one, if this demo was already broken
 
 
 def load_seed(path: Path | str = DEFAULT_SEED) -> dict[str, Any]:
@@ -188,3 +201,68 @@ async def change(env: DemoEnv, seed: dict[str, Any], vendor_ref: str, by: str = 
     made = await _mock(env, "POST", f"/_mock/vendors/{vendor}/bank-change", ds["id"], body)
     await _mock(env, "POST", "/_mock/webhooks/deliver", ds["id"])  # send now; the sender loop would within seconds
     return made["account_id"]
+
+
+async def tamper(env: DemoEnv, *, confirmed: bool, seq: int | None = None, dataset_id: UUID | None = None) -> TamperResult:
+    """Beat 6: as the table's owner, in one transaction, turn the update trigger off, edit one row
+    of the demo's chain, and turn it back on. Other sessions wait on the lock and never see it off.
+    By default the row is the latest decision that isn't `verified`, rewritten to `verified`."""
+    _guard(env.settings)
+    ds = await _current(env.pool, dataset_id)
+    if not confirmed:
+        raise DemoError("tamper edits an evidence row by hand and can't be undone: pass --yes-break-the-chain")
+    async with await psycopg.AsyncConnection.connect(env.owner_url) as owner:
+        if seq is None:
+            row = await (await owner.execute(
+                "select seq, body_jcs from audit.evidence_events where chain_id = %s and type = 'decision_made' "
+                "and body_jcs like '%%\"outcome\":\"%%' and body_jcs not like '%%\"outcome\":\"verified\"%%' "
+                "order by seq desc limit 1", (ds["chain_id"],))).fetchone()
+            if row is None:
+                raise DemoError("this demo has no decision to flip yet: pass --seq N to edit another row")
+        else:
+            row = await (await owner.execute("select seq, body_jcs from audit.evidence_events where chain_id = %s and seq = %s",
+                                             (ds["chain_id"], seq))).fetchone()
+            if row is None:
+                raise DemoError(f"this demo's chain has no event #{seq}")
+        seq, body = row[0], row[1]
+        edited = OUTCOME.sub('"outcome":"verified"', body, count=1)
+        if edited == body:
+            edited = body[:-1] + ',"edited_by_hand":true}'
+        await owner.execute("alter table audit.evidence_events disable trigger evidence_events_no_update")
+        await owner.execute("update audit.evidence_events set body_jcs = %s where chain_id = %s and seq = %s",
+                            (edited, ds["chain_id"], seq))
+        await owner.execute("alter table audit.evidence_events enable trigger evidence_events_no_update")
+    jobs = Jobs(env.pool, env.settings, env.connector, Keys(env.settings.fingerprint_key, env.settings.fingerprint_key_version),
+                "demo-tamper")
+    await jobs.run(ds["id"], "verify_chain", force=True)
+    async with system_tx(env.pool) as conn:
+        alert = await (await conn.execute("select message from app.alerts where dataset_id = %s and kind = 'chain_broken' "
+                                          "and resolved_at is null order by raised_at desc limit 1", (ds["id"],))).fetchone()
+    # The row is edited by now, so no refusal from here on. With no alert yet (the worker holds the
+    # verify job's lease), the scheduled check raises it within DIALBACK_VERIFY_SECONDS.
+    return TamperResult(ds["id"], seq, alert["message"] if alert else None)
+
+
+async def status(env: DemoEnv) -> dict[str, Any]:
+    """The pre-flight check before going on stage."""
+    _guard(env.settings)
+    ds = await _current(env.pool)
+    async with system_tx(env.pool) as conn:
+        cases = await (await conn.execute(
+            "select c.id, v.legal_name as vendor, c.state::text as state, c.outcome::text as outcome from app.cases c "
+            "join app.vendors v on v.id = c.vendor_id where c.dataset_id = %s order by c.opened_at", (ds["id"],))).fetchall()
+        chain = await (await conn.execute("select ok, checked, first_bad_seq, detail from audit.verify_chain(%s)",
+                                          (ds["chain_id"],))).fetchone()
+        alerts = await (await conn.execute("select kind, severity::text as severity, message from app.alerts "
+                                           "where dataset_id = %s and resolved_at is null order by raised_at", (ds["id"],))).fetchall()
+    mock = await _mock(env, "PATCH", "/_mock/settings", ds["id"], {})  # an empty patch reads the settings
+    return {"dataset": {"id": str(ds["id"]), "label": ds["label"], "created_at": ds["created_at"].isoformat()},
+            "cases": [{**c, "id": str(c["id"])} for c in cases], "chain": dict(chain), "alerts": [dict(a) for a in alerts],
+            "chaos": mock.get("chaos_seed") is not None}
+
+
+async def chaos(env: DemoEnv, on: bool, seed: int = 11) -> dict[str, Any]:
+    """Spec 0008's chaos mode on the current demo business only. Returns the mock's settings."""
+    _guard(env.settings)
+    ds = await _current(env.pool)
+    return await _mock(env, "PATCH", "/_mock/settings", ds["id"], {"chaos_seed": seed, **CHAOS} if on else {"chaos_seed": None})
