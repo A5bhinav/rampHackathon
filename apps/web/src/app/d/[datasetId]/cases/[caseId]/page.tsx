@@ -66,7 +66,9 @@ export default async function CaseDetailPage({ params, searchParams }: {
       >
         <div className="tags">
           <StateBadge state={c.state} />
-          <ChainBadge chain={detail.chain} />
+          <Link className="badge-link" href={`/d/${datasetId}/evidence${detail.chain.ok ? "" : `#row-${detail.chain.first_bad_seq}`}`}>
+            <ChainBadge chain={detail.chain} />
+          </Link>
           {c.unknown_changer ? <span className="badge tone-warn">Unknown changer: two approvers</span> : null}
           {c.deadline_at && !["released", "releasing"].includes(c.state) ? (
             <span className={`badge ${deadlinePassed ? "tone-bad" : "tone-muted"}`} title={when(c.deadline_at)}>
@@ -94,7 +96,7 @@ export default async function CaseDetailPage({ params, searchParams }: {
               <p className="muted">
                 {["needs_review", "blocked"].includes(c.state) && lastStep
                   ? <>Code made no decision for this version. The last step: {lastStep.summary}</>
-                  : "No decision yet for this version."}
+                  : "No decision yet for this version. Code decides once the call's answers are in; until then the hold stays on."}
               </p>
             )}
           </section>
@@ -204,7 +206,12 @@ export default async function CaseDetailPage({ params, searchParams }: {
                 ) : null}
                 {hold.last_error ? <p className="result error">{hold.last_error}</p> : null}
               </>
-            ) : <p className="muted">Being placed.</p>}
+            ) : (
+              <p className="muted">
+                Dialback is placing the hold in Ramp and will read it back before doing anything else. If Ramp won&apos;t confirm
+                it, the case goes to a person and an alert is raised.
+              </p>
+            )}
           </section>
 
           {detail.releases.length > 0 ? (

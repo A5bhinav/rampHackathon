@@ -121,6 +121,26 @@ export function signUpNotice(error: { status?: number; code?: string } | null, h
   return hasSession ? null : "confirm";
 }
 
+// One-click demo accounts (spec 0034) ----------------------------------------------------------
+
+export type DemoRole = "clerk" | "approver";
+export type DemoAccounts = Record<DemoRole, { email: string; password: string }>;
+
+/** The shared demo accounts, only when DIALBACK_DEMO_SIGN_IN=on, in Supabase mode, and both are
+ *  fully set; anything else is null and no button is shown. The passwords stay on the server. The
+ *  database lets these accounts act only on demo datasets, whatever this returns. */
+export function demoAccounts(env: Env): DemoAccounts | null {
+  if (env.DIALBACK_DEMO_SIGN_IN !== "on" || authMode(env) !== "supabase") return null;
+  const one = (role: string) => {
+    const email = cleanEmail(env[`DIALBACK_DEMO_${role}_EMAIL`]);
+    const password = cleanPassword(env[`DIALBACK_DEMO_${role}_PASSWORD`]);
+    return email && password ? { email, password } : null;
+  };
+  const clerk = one("CLERK");
+  const approver = one("APPROVER");
+  return clerk && approver ? { clerk, approver } : null;
+}
+
 export function cleanEmail(raw: unknown): string | null {
   if (typeof raw !== "string") return null;
   const email = raw.trim().toLowerCase();

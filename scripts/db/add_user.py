@@ -32,7 +32,8 @@ class UserError(RuntimeError):
 
 
 def apply(conn: psycopg.Connection, email: str, name: str | None = None, add: tuple[str, ...] = (),
-          remove: tuple[str, ...] = (), ramp_user_id: str | None = None, user_id: str | None = None) -> dict:
+          remove: tuple[str, ...] = (), ramp_user_id: str | None = None, user_id: str | None = None,
+          demo_only: bool = False) -> dict:
     """Upserts the profile, adds and removes roles, and returns the result. One transaction."""
     if conn.execute("select to_regclass('auth.users') is not null").fetchone()[0] is False:
         raise UserError("this database has no auth.users: it isn't a Supabase project (local dev uses seeded users)")
@@ -55,13 +56,17 @@ def apply(conn: psycopg.Connection, email: str, name: str | None = None, add: tu
             "on conflict (user_id) do update set display_name = coalesce(%s, app.user_profiles.display_name), "
             "ramp_user_id = coalesce(%s, app.user_profiles.ramp_user_id)",
             (user_id, name, ramp_user_id, name, ramp_user_id))
+    if demo_only:  # spec 0034: this account can act only on demo datasets, and sees only those
+        conn.execute("insert into app.demo_accounts (user_id) values (%s) on conflict do nothing", (user_id,))
     for role in add:
         conn.execute("insert into app.user_roles (user_id, role) values (%s, %s) on conflict do nothing", (user_id, role))
     for role in remove:
         conn.execute("delete from app.user_roles where user_id = %s and role = %s", (user_id, role))
     profile = conn.execute("select display_name, ramp_user_id from app.user_profiles where user_id = %s", (user_id,)).fetchone()
     roles = [r[0] for r in conn.execute("select role::text from app.user_roles where user_id = %s order by role", (user_id,))]
-    return {"user_id": str(user_id), "display_name": profile[0], "ramp_user_id": profile[1], "roles": roles}
+    demo = conn.execute("select 1 from app.demo_accounts where user_id = %s", (user_id,)).fetchone() is not None
+    return {"user_id": str(user_id), "display_name": profile[0], "ramp_user_id": profile[1], "roles": roles,
+            "demo_only": demo}
 
 
 def main() -> int:
@@ -71,6 +76,8 @@ def main() -> int:
     parser.add_argument("--role", action="append", default=[], choices=ROLES, help="add a role (repeatable)")
     parser.add_argument("--remove-role", action="append", default=[], choices=ROLES, help="remove a role (repeatable)")
     parser.add_argument("--user-id", help="the person's Dialback user id, from the dashboard; required for approver and auditor")
+    parser.add_argument("--demo-only", action="store_true",
+                        help="a shared one-click demo account: it can act only on demo datasets (spec 0034)")
     parser.add_argument("--ramp-user-id", help="the person's Ramp user id, for anyone who can change bank details in Ramp")
     args = parser.parse_args()
     url = os.environ.get("DATABASE_URL")
@@ -80,7 +87,7 @@ def main() -> int:
     try:
         with psycopg.connect(url) as conn:
             result = apply(conn, args.email, args.name, tuple(args.role), tuple(args.remove_role), args.ramp_user_id,
-                           args.user_id)
+                           args.user_id, args.demo_only)
     except UserError as exc:
         print(f"refused: {exc}", file=sys.stderr)
         return 1

@@ -30,7 +30,8 @@ def existing(conn, email: str) -> uuid.UUID:
 def test_a_created_person_gets_a_profile_and_roles_and_loses_them_again(conn):
     user_id = existing(conn, "riley@example.test")
     result = apply(conn, "Riley@Example.TEST", name="Riley Approver", add=("approver", "auditor"), user_id=str(user_id))
-    assert result == {"user_id": str(user_id), "display_name": "Riley Approver", "ramp_user_id": None, "roles": ["approver", "auditor"]}
+    assert result == {"user_id": str(user_id), "display_name": "Riley Approver", "ramp_user_id": None, "roles": ["approver", "auditor"],
+                      "demo_only": False}
     again = apply(conn, "riley@example.test", add=("approver",), user_id=str(user_id).upper())  # idempotent, and the name stays
     assert again["roles"] == ["approver", "auditor"] and again["display_name"] == "Riley Approver"
     assert apply(conn, "riley@example.test", remove=("approver",))["roles"] == ["auditor"]
@@ -40,6 +41,15 @@ def test_a_clerk_is_matched_to_their_ramp_user(conn):
     existing(conn, "pat@example.test")
     result = apply(conn, "pat@example.test", name="Pat Clerk", add=("clerk",), ramp_user_id="ramp-user-123")
     assert result["ramp_user_id"] == "ramp-user-123" and result["roles"] == ["clerk"]
+
+
+def test_a_demo_account_is_marked_and_stays_marked(conn):
+    """Spec 0034: --demo-only puts the account in app.demo_accounts, once."""
+    user_id = existing(conn, "demo.approver@example.test")
+    result = apply(conn, "demo.approver@example.test", name="Demo Approver", add=("approver",), user_id=str(user_id), demo_only=True)
+    assert result["demo_only"] is True and result["roles"] == ["approver"]
+    assert apply(conn, "demo.approver@example.test", demo_only=True)["demo_only"] is True
+    assert conn.execute("select count(*) from app.demo_accounts where user_id = %s", (user_id,)).fetchone()[0] == 1
 
 
 @pytest.mark.parametrize(("email", "name", "message"), [

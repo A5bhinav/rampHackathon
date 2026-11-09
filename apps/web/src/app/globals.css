@@ -561,3 +561,81 @@ ul.reason-chips { list-style: none; padding: 0; margin: 0; display: flex; flex-w
 ul.reason-chips li { font-size: 0.75rem; padding: 1px 8px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line); cursor: help; }
 ul.reason-chips li { white-space: nowrap; }
 table.corpus-table th, table.corpus-table td { padding-left: 10px; padding-right: 10px; }
+/* The decision's effect and checklist, and the call as a conversation (spec 0036). ---------- */
+.effect { font-weight: 500; margin: 12px 0 0; padding: 10px 14px; border-radius: var(--radius-sm); background: var(--surface-2);
+  border: 1px solid var(--line); }
+ul.checklist { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+ul.checklist li { display: grid; grid-template-columns: 96px 1fr auto; gap: 10px; align-items: baseline; padding: 6px 8px;
+  border-radius: 6px; scroll-margin-top: 90px; }
+ul.checklist li:target, .rule-group li:target { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
+ul.checklist .badge { justify-self: start; }
+.call-card { border-top: 3px solid var(--line-strong); }
+.call-head { display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-bottom: 10px; }
+.call-head h2 { margin: 0; align-items: center; }
+.call-meta { display: flex; flex-wrap: wrap; gap: 6px 24px; margin: 0 0 14px; font-size: 0.8125rem; }
+.call-meta dt { color: var(--muted); }
+.call-meta dd { margin: 0; font-weight: 500; }
+.convo { list-style: none; padding: 0; margin: 0 0 8px; display: grid; gap: 10px; }
+.say-pair { display: grid; gap: 6px; }
+.say { max-width: 82%; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--line); }
+.say p { margin: 0; }
+.say-who { display: block; font-size: 0.75rem; color: var(--muted); margin-bottom: 3px; }
+.say-agent { background: var(--surface-2); border-top-left-radius: 4px; }
+.say-callee { justify-self: end; background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 22%, var(--line));
+  border-top-right-radius: 4px; }
+.say-callee p { font-weight: 600; }
+.say-callee.is-none { background: var(--surface); border-style: dashed; }
+.say-callee.is-none p { font-weight: 400; color: var(--muted); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+main a.rule-chip { font-size: 0.75rem; font-weight: 600; padding: 2px 8px; border-radius: 999px; box-shadow: none; background-image: none; }
+main a.rule-chip:hover { text-decoration: underline; }
+ul.checks { list-style: none; padding: 0; margin: 0 0 10px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 20px; }
+ul.checks li { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; padding: 4px 0;
+  border-bottom: 1px solid var(--line); font-size: 0.875rem; }
+.call-note { margin: 4px 0 0; }
+@media (max-width: 640px) {
+  .say { max-width: 100%; }
+  ul.checks { grid-template-columns: 1fr; }
+  ul.checklist li { grid-template-columns: 1fr auto; }
+  ul.checklist li > span:nth-child(2) { grid-column: 1 / -1; grid-row: 2; }
+details.fold summary { cursor: pointer; color: var(--accent); font-weight: 500; font-size: 0.875rem; margin-bottom: 8px; }
+.rule-group li { scroll-margin-top: 90px; }
+
+/* The evidence chain (spec 0037). ----------------------------------------------------------- */
+.chain-alarm { background: var(--bad-bg); border-color: color-mix(in srgb, var(--bad) 40%, var(--line)); }
+.chain-alarm h2 { color: var(--bad); font-size: 1.375rem; }
+.lead-card h2 .badge { font-size: 0.8125rem; }
+main a.badge-link { box-shadow: none; background-image: none; }
+.chain-how { display: grid; grid-template-columns: minmax(0, 360px) 1fr; gap: 24px; align-items: center; }
+.chain-how figcaption { margin: 0; }
+.links { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.links li { position: relative; }
+.links li:not(:last-child)::after { content: ""; position: absolute; left: 22px; bottom: -9px; width: 2px; height: 10px; background: var(--accent); }
+.link-row { display: grid; grid-template-columns: 34px 1fr; gap: 0 10px; padding: 8px 12px; border: 1px solid var(--line);
+  border-radius: var(--radius-sm); background: var(--surface-2); font-size: 0.75rem; }
+.link-row b { grid-row: span 2; align-self: center; font-size: 0.875rem; }
+table.chain-table tr.is-bad td { background: var(--bad-bg); }
+table.chain-table tr.is-first-bad td:first-child { box-shadow: inset 4px 0 0 var(--bad); }
+table.chain-table tr:target td { outline: 2px solid var(--bad); outline-offset: -2px; }
+table.chain-table tr { scroll-margin-top: 100px; }
+.bad-note { color: var(--bad); font-weight: 600; font-size: 0.75rem; }
+@media (max-width: 720px) { .chain-how { grid-template-columns: 1fr; } }
+figure.card { margin: 0 0 20px; }
+/* One-click demo accounts (spec 0034). */
+.demo-sign-in { padding: 16px; margin-bottom: 18px; border: 1px solid color-mix(in srgb, var(--accent) 25%, var(--line));
+  border-radius: var(--radius-sm); background: var(--accent-soft); }
+.demo-sign-in h2 { font-size: 0.9375rem; margin-bottom: 6px; }
+.demo-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* The guided demo and the released list (spec 0039). ------------------------------------------- */
+.tour { position: fixed; right: 20px; bottom: 20px; z-index: 30; width: min(380px, calc(100vw - 32px)); background: var(--text);
+  color: #fff; border-radius: var(--radius); padding: 16px 18px; box-shadow: var(--shadow-lift); }
+.tour-count { font-size: 0.75rem; color: color-mix(in srgb, #fff 70%, transparent); margin: 0 0 4px; }
+.tour-title { color: #fff; font-size: 1rem; margin: 0 0 6px; }
+.tour-caption { font-size: 0.875rem; color: color-mix(in srgb, #fff 88%, transparent); margin: 0 0 12px; }
+.tour-nav { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.tour a.button-link { box-shadow: none; background-image: none; }
+.tour a.tour-end { color: color-mix(in srgb, #fff 75%, transparent); font-size: 0.8125rem; margin-left: auto; box-shadow: none; }
+@media (max-width: 520px) { .tour { right: 16px; bottom: 16px; } }
+ul.released { list-style: none; padding: 0 20px 16px; margin: 0; display: grid; gap: 8px; }
+ul.released li { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }

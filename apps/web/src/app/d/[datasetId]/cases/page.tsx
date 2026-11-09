@@ -26,7 +26,8 @@ export default async function CaseQueue({ params, searchParams }: {
 }) {
   const { datasetId } = await params;
   const asked = demoStory((await searchParams).missing ?? "");
-  const [cases, datasets] = await Promise.all([core.cases(datasetId), core.datasets()]);
+  const [cases, datasets, all] = await Promise.all([core.cases(datasetId), core.datasets(), core.allCases(datasetId)]);
+  const released = all.filter((c) => c.state === "released").sort((a, b) => b.updated_at.localeCompare(a.updated_at));
   const now = datasetNow(datasets.find((d) => d.id === datasetId)?.sim_now);
   const waiting = cases.filter((c) => NEEDS_A_PERSON.includes(c.state)).sort(bySoonestPayment);
   const working = cases.filter((c) => !NEEDS_A_PERSON.includes(c.state)).sort(bySoonestPayment);
@@ -51,9 +52,23 @@ export default async function CaseQueue({ params, searchParams }: {
         { label: "Hold not confirmed", value: unconfirmed, tone: "bad" },
       ]} />
       <PaymentLanes cases={cases} now={now} datasetId={datasetId} />
-      {cases.length === 0 ? <div className="card empty"><p>No open cases. A case opens here when a vendor&apos;s bank details change in Ramp.</p></div> : null}
+      {cases.length === 0 ? <div className="card empty"><p>No open cases. A case opens here when a vendor&apos;s bank details change in Ramp.{released.length ? " Released changes are listed below." : ""}</p></div> : null}
       {waiting.length > 0 ? <QueueTable title="Waiting on a person" cases={waiting} datasetId={datasetId} now={now} /> : null}
       {working.length > 0 ? <QueueTable title="In progress" cases={working} datasetId={datasetId} now={now} /> : null}
+      {released.length > 0 ? (
+        <section className="card queue-group" aria-label="Released">
+          <h2>Released <span className="count">{released.length}</span> <span className="h-note">the hold is off; nothing is left to decide</span></h2>
+          <ul className="released">
+            {released.map((c) => (
+              <li key={c.id}>
+                <Link href={`/d/${datasetId}/cases/${c.id}`}>{c.vendor.legal_name}</Link>
+                <OutcomeBadge outcome={c.outcome} />
+                <span className="muted sub" title={when(c.updated_at)}>released {ago(c.updated_at, now)}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
     </main>
   );
 }
