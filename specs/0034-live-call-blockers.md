@@ -39,6 +39,12 @@ from the recorded answers), R7 and R8.
   divergence from Twilio fails a test.
 - **D4. `uvicorn[standard]` (B4).** The extra brings `websockets`, the backend uvicorn picks for
   `--ws auto`, and the rest of uvicorn's recommended production set.
+- **D5. A punctuated one-word answer is read (B1, added after the branch review).** With the request
+  fixed, the next live failure would be a model that answers `Yes.`: that is not in the allowed set,
+  so consent would fail closed to `no` and end the call. The answer is lowered and stripped of
+  surrounding spaces, punctuation and quotes before the allowed-set check, which still rejects
+  anything that is not exactly one allowed word. Cost if wrong: none found, since a sentence still
+  fails closed.
 
 ## Contract touched
 
@@ -49,8 +55,9 @@ phase. The phase rename (`name_role` becomes `name` and `role`) is internal to `
 
 - [ ] **B1.** The Anthropic request carries no `temperature`, `top_p` or `top_k`; it sends
   `thinking: {"type": "between_tools"}`, `output_config: {"effort": "low"}` and `max_tokens: 256`. A
-  response whose first block is a `thinking` block still yields the text answer. An API error, or a
-  response with no text block, still records the phase's safe value.
+  response whose first block is a `thinking` block still yields the text answer. A punctuated
+  one-word answer (`Yes.`) is read as `yes`, and anything outside the allowed set still fails closed
+  (D5). An API error, or a response with no text block, still records the phase's safe value.
 - [ ] **B2.** `create_asgi_app`'s default clock returns a timezone-aware UTC `datetime`, and a relay
   call on the default clock records the callee's consent instead of ending `internal_error`.
 - [ ] **B3.** Twilio's published vectors validate (a single-valued POST to a URL with a query string,
@@ -75,6 +82,7 @@ phase. The phase rename (`name_role` becomes `name` and `role`) is internal to `
 |---|---|
 | B1 | `apps/voice/tests/test_claude_agent.py::test_the_request_sends_no_sampling_params_and_turns_thinking_off` |
 | B1 | `apps/voice/tests/test_claude_agent.py::test_a_thinking_block_before_the_text_still_yields_the_answer` |
+| B1, D5 | `apps/voice/tests/test_claude_agent.py::test_a_punctuated_one_word_answer_is_still_read`, `::test_an_answer_that_is_more_than_one_word_still_fails_closed` |
 | B2 | `apps/voice/tests/test_entrypoint.py::test_the_default_clock_is_the_utc_wall_clock` |
 | B3 | `apps/voice/tests/test_twilio_signature.py` (Twilio's vectors, blank fields, query string, rejections) |
 | B4 | `apps/voice/tests/test_entrypoint.py::test_uvicorn_has_a_websocket_backend` |
@@ -100,6 +108,12 @@ lets their `LabAgent` role workaround be removed; that happens when those branch
 - **Q66. Free-text answers record any words.** A role answer of "I'd rather not say" is recorded as a
   role and satisfies V06, exactly as a name answer does today. This pairs with the review finding
   about whole utterances (and digits) in free-text slots.
+- **Q68. A speaker change on the same turn as an answer.** The re-ask rule counts an answer at or
+  after the `speaker_changed` flag's turn. If one turn carries both the old speaker's role and the
+  flag ("I'm the AR clerk, let me get my manager"), the name is asked again but the role is not, which
+  misses B5's "re-asks both" in that one case. It cannot release anything: NR17 sends any call with a
+  `speaker_changed` flag to review. Found by the branch review; left as is because a same-turn answer
+  can belong to either speaker.
 - **Q67. GET TwiML fetches.** We never ask Twilio for GET, so only POST is live; the signing now
   matches Twilio's scheme for both.
 
