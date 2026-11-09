@@ -277,6 +277,19 @@ These are not reachable today, but each is frozen as a regression.
   contract already allows `answers` on any `CallEndedBody`). That is `apps/voice` (Sami) and the
   core's reading of them (`apps/core`, Abhi). Not evaluated beyond reading.
 
+### A17. The call says it is recorded, but nothing records it
+
+- **Status:** confirmed (read), Nov 9, origin/main da057f8.
+- **What happens:** the disclosure says "on a recorded line" (R8), and `docs/threat-model.md` says
+  recordings live in a private bucket with each recording's SHA-256 in the chain. But the TwiML
+  (`origination.py`) sets no recording, nothing in `apps/voice` or `apps/core` stores one, and
+  `recording_sha256` is never set.
+- **Why it matters:** a reviewer of a `needs_review` case has the structured answers but no
+  recording or transcript to check them against. The disclosure itself over-promises, which is
+  the safe direction.
+- **Where to fix:** decide whether to record (consent law, storage, the private bucket) or say
+  "this call may be recorded". `apps/voice` (Sami).
+
 ## B. The fuzz lab (spec 0033)
 
 ### B1. I12 never probes the change-request email itself
@@ -551,5 +564,46 @@ F1 to F9 hold as built (verified). But the lab still claims more than it shows:
   - The lab spec's open questions Q60, Q61 and Q65 are already used on main: Q60 and Q61 in
     `0029-voice-call-lookup-and-store.md`, Q65 in `0034-live-call-blockers.md`. A4 above cites
     "spec 0033, Q65", meaning the lab's.
-  - Main uses up to Q68. PR #91 takes Q69 to Q75, and the `sami/onboarding-anchors` branch takes
-    Q76 and Q77, so the next free number is Q78. Renumber before this branch merges.
+  - Main uses up to Q68. PR #91 takes Q69 to Q75, the `sami/onboarding-anchors` branch takes
+    Q76 and Q77, and spec 0043 (`sami/keypad-only-digits`) takes Q78 to Q82, so the next free
+    number is Q83. Renumber before this branch merges.
+
+## F. How other services verify a bank change (Nov 9)
+
+From public pages only (mostly vendor marketing), so the cells marked "not stated" are unknown,
+not absent.
+
+| Step | Dialback | nsKnox AI Agent Caller | Kovrell (open source) | Eftsure | Trustpair, Spendflo |
+|---|---|---|---|---|---|
+| When it calls | every bank change, after a hold | risk rules (geography, value) or by hand | before a changed account is paid | onboarding and changes | Trustpair: no call; Spendflo: a person calls |
+| Which number | the ledger's provable number (2 sources, 90 days, never from the change) | not stated | contact of record; no call if it changed in 30 days | staff find an independent number | Spendflo: a known number |
+| Who talks | code's fixed words; the model only classifies | AI on a fixed procedure | AI asks, code scores | a person | a person |
+| What is asked | company, name, role, "did you ask for this", last four (caller gives them) | identity, data points such as the last digits of a known account | identity, "did you ask", 2 invoice totals and a payment date, then reads the new account back | reads 3 digits, caller gives the rest, plus branch, name and business number | none |
+| Wrong answer | never re-asked; the voice side never knows it | strict retry limits, then ends | not stated | a person judges | none |
+| Account ownership by data | none | bank-network checks, a certificate, sometimes a test transfer | none | bank link plus business-register match, shared database | Trustpair: yes, the core product |
+| Who decides | code; a block is automatic, a release needs two people | not stated; the summary goes to the AP team | code; a pass releases | a person | Trustpair: the API result; Spendflo: a person |
+| Shared across customers | no | in-network database | no | about 4 million verified suppliers | Trustpair: data network |
+| Line takeover | `line_risk` reserved, never computed (A7) | not stated | not stated | not stated | not stated |
+
+Sources: nsknox.net/ai-agent-caller, github.com/mystiquemide/kovrell, eftsure.com supplier pages and
+FAQ, trustpair.com/connect/api, spendflo.com bank-detail agents.
+
+**Keep (others agree or ours is stronger):** a hold on every change; a number the request could not
+have planted; the caller produces the digits and the agent never says them (spec 0043 makes it
+keypad only); no live feedback on a wrong answer; code owns the words; an automatic block but a
+two-person release; the attack lab (none of them publishes one).
+
+**Add, in order (proposals, not decided):**
+1. An account-ownership fact from a data provider. It answers "is the account the vendor's", which
+   a call cannot, and it gives young vendors with no provable number (A15) a path.
+2. A real `line_risk`. Twilio Lookup's line type (mobile, landline, VoIP) is widely available; its
+   SIM-swap date needs carrier approval and covers some regions; call forwarding is a private beta
+   on major UK carriers only, unconditional forwarding only.
+3. Evidence across Ramp customers: the same vendor's number seen by many customers, or a new
+   account added for only one of them. A data-sharing policy question for Ramp first.
+4. Call in the vendor's local hours and language. The calling window exists; the script is
+   English only.
+
+**Do not add:** invoice questions (a mailbox attacker has the invoices, and a clerk may not know
+the totals); reading digits to the caller (people confirm what they hear, and it tells whoever
+answers); live retries on a mismatch (each try is a guess); releasing on a pass alone.
