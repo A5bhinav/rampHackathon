@@ -2,6 +2,7 @@
 and every case the lab has frozen is re-run against the real rule (a found case stays found)."""
 from __future__ import annotations
 
+import dataclasses
 import re
 from pathlib import Path
 
@@ -19,14 +20,48 @@ HARD = NumberSpec("+14695550199", [], 0, is_poison=True, sightings=(
     SightingSpec("email", 90, sender="subdomain", subject="re")))
 
 
+def _round_trips(back, w) -> bool:
+    """Did a reload give back the same world? Compared field for field on the inputs, not on the rule's
+    output, which drops late records before it hashes (review finding I3)."""
+    return back.kwargs == w.kwargs and back.poison == w.poison and back.settings == w.settings
+
+
 def test_frozen_world_round_trips(tmp_path):
     for i, present in enumerate((True, False)):   # with and without a change request
         w = make_world(numbers=[NumberSpec("+14695550142", ["contract", "listing"], 500), HARD],
                        request_present=present)
         case = freeze(w, f"round-trip-{i}", tmp_path, labels=["example"], why="a round trip")
-        back = load_world(case)
-        assert back.poison == w.poison and back.settings == w.settings
-        assert run(back) == run(w)                 # identical output, so identical inputs_sha256
+        assert _round_trips(load_world(case), w)
+
+
+def test_round_trip_check_sees_a_lost_late_record():
+    # Review finding I3: the rule drops late records before it hashes, so comparing outputs cannot see
+    # a reload that lost one, which is the very field world.json exists to keep.
+    w = make_world(numbers=[NumberSpec("+14695550142", ["contract", "listing"], 500), HARD])
+    opened = w.kwargs["case_opened_at"]
+    lossy = dataclasses.replace(w, kwargs={**w.kwargs, "documents": [d for d in w.kwargs["documents"]
+                                                                     if d.recorded_at < opened]})
+    assert run(lossy) == run(w)                    # the rule itself cannot tell the two apart
+    assert not _round_trips(lossy, w)              # the round-trip check must
+
+
+def test_freeze_never_replaces_a_different_world(tmp_path):
+    # Review finding I2: a frozen case is evidence; nothing may overwrite it with another world.
+    a = make_world(numbers=[NumberSpec("+14695550142", ["contract", "listing"], 500)])
+    b = make_world(numbers=[NumberSpec("+14695550142", ["contract", "listing"], 400)])
+    freeze(a, "case", tmp_path, labels=["first"])
+    freeze(a, "case", tmp_path, labels=["refreshed"])        # the same world again only refreshes its notes
+    with pytest.raises(FileExistsError):
+        freeze(b, "case", tmp_path)
+    assert load_world(tmp_path / "case").kwargs == a.kwargs
+
+
+def test_fuzz_names_a_case_by_its_content(tmp_path, monkeypatch):
+    from dialback_evals.gencorpus import world_digest
+    monkeypatch.setattr("dialback_evals.gencorpus.all_violations", lambda w: ["M_reorder"])
+    fuzz(examples=25, seed=0, out_dir=tmp_path)
+    [(label, world)] = load_all(tmp_path)
+    assert label == f"fuzz-seed0-m-reorder-{world_digest(world)[:8]}"
 
 
 def test_freeze_refuses_a_real_looking_number(tmp_path):

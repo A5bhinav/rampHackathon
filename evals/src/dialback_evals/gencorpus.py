@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import dataclasses
 import datetime as dt
+import hashlib
 import json
 import uuid
 from pathlib import Path
@@ -62,15 +63,28 @@ def _load(data: dict) -> World:
     return World(kwargs=kwargs, poison=frozenset(data["poison"]), settings=chosen)
 
 
+def world_digest(world: World) -> str:
+    """A content hash of the world's select() inputs (not its notes), for naming and comparing cases."""
+    return hashlib.sha256(json.dumps(_dump(world), sort_keys=True).encode()).hexdigest()
+
+
 def freeze(world: World, label: str, out_dir: Path, *, labels: list[str] | tuple[str, ...] = (), why: str = "") -> Path:
-    """Write `world` as `<out_dir>/<label>/world.json` and return the case directory. Refuses a world
-    holding any real-looking number: the lab writes only the fictional NPA-555-0100 to 0199 block."""
+    """Write `world` as `<out_dir>/<label>/world.json` and return the case directory.
+
+    Refuses a world holding any real-looking number (the lab writes only the fictional NPA-555-0100 to
+    0199 block), and never replaces a frozen case with a different world: freezing the same world again
+    only refreshes its notes (`labels`, `why`)."""
     numbers = {s.e164 for s in world.kwargs["sightings"]} | set(world.poison)
     if bad := sorted(n for n in numbers if not fictional(n)):
         raise ValueError(f"refusing to freeze real-looking numbers {bad}: the lab writes only NPA-555-0100 to 0199")
     case = Path(out_dir) / label
+    dumped = _dump(world)
+    if (case / FILE).is_file():
+        existing = json.loads((case / FILE).read_text(encoding="utf-8"))
+        if {k: existing.get(k) for k in dumped} != dumped:
+            raise FileExistsError(f"{case} already holds a different world; a frozen case is never replaced")
     case.mkdir(parents=True, exist_ok=True)
-    body = {"label": label, "labels": list(labels), "why": why, **_dump(world)}
+    body = {"label": label, "labels": list(labels), "why": why, **dumped}
     (case / FILE).write_text(json.dumps(body, indent=2) + "\n", encoding="utf-8")
     return case
 
@@ -114,7 +128,8 @@ def fuzz(strategy=None, *, examples: int, seed: int, out_dir: Path) -> list[str]
     try:
         search()
     except _Found as hit:
-        label = f"fuzz-seed{seed}-{hit.labels[0].lower().replace('_', '-')}"
+        # Named by content: re-finding the same world lands on the same case, a new world never collides.
+        label = f"fuzz-seed{seed}-{hit.labels[0].lower().replace('_', '-')}-{world_digest(hit.world)[:8]}"
         freeze(hit.world, label, out_dir, labels=hit.labels,
                why=f"found by lab fuzz at seed {seed} within {examples} examples, shrunk by Hypothesis")
         return hit.labels
