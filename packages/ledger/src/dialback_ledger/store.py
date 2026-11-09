@@ -92,13 +92,10 @@ async def mark_change_request(conn: psycopg.AsyncConnection, *, dataset_id: UUID
 
 # Reading the vendor's ledger, as of the case ---------------------------------------------------------
 
-async def _inputs(conn: psycopg.AsyncConnection, *, case_id: UUID, dataset_id: UUID, vendor_id: UUID,
-                  cutoff: dt.datetime) -> dict[str, Any] | None:
-    case = await (await conn.execute("select opened_at from app.cases where id = %s and dataset_id = %s and vendor_id = %s",
-                                      (case_id, dataset_id, vendor_id))).fetchone()
-    if case is None:
-        return None
-    opened = case["opened_at"]
+async def vendor_rows(conn: psycopg.AsyncConnection, *, dataset_id: UUID, vendor_id: UUID,
+                      before: dt.datetime) -> dict[str, Any]:
+    """The vendor's own domains, documents and phone sightings, as `select()` takes them. Reads
+    with whatever role the connection has (a person's token is enough: the ledger is readable)."""
     docs = await (await conn.execute(
         "select id, custody_channel, received_at, sender, thread_id, subject, recorded_at from ledger.documents "
         "where dataset_id = %s and vendor_id = %s", (dataset_id, vendor_id))).fetchall()
@@ -107,7 +104,23 @@ async def _inputs(conn: psycopg.AsyncConnection, *, case_id: UUID, dataset_id: U
         "where dataset_id = %s and vendor_id = %s and kind = 'phone'", (dataset_id, vendor_id))).fetchall()
     domains = await (await conn.execute(
         "select domain from ledger.vendor_domains where dataset_id = %s and vendor_id = %s and recorded_at < %s",
-        (dataset_id, vendor_id, opened))).fetchall()
+        (dataset_id, vendor_id, before))).fetchall()
+    return {
+        "vendor_domains": tuple(r["domain"] for r in domains),
+        "documents": [DocumentRef(str(d["id"]), d["custody_channel"], d["received_at"], d["sender"], d["thread_id"],
+                                  d["subject"], d["recorded_at"]) for d in docs],
+        "sightings": [Sighting(r["value_normalized"], str(r["document_id"]), r["source_type"], r["seen_at"], r["visibility"],
+                               r["role"], r["party"], r["recorded_at"]) for r in rows],
+    }
+
+
+async def _inputs(conn: psycopg.AsyncConnection, *, case_id: UUID, dataset_id: UUID, vendor_id: UUID,
+                  cutoff: dt.datetime) -> dict[str, Any] | None:
+    case = await (await conn.execute("select opened_at from app.cases where id = %s and dataset_id = %s and vendor_id = %s",
+                                      (case_id, dataset_id, vendor_id))).fetchone()
+    if case is None:
+        return None
+    opened = case["opened_at"]
     req = await (await conn.execute(
         """select d.id, d.received_at, d.thread_id, d.subject, d.sender from ledger.change_requests r
              join ledger.documents d on d.id = r.document_id
@@ -115,12 +128,9 @@ async def _inputs(conn: psycopg.AsyncConnection, *, case_id: UUID, dataset_id: U
             order by r.recorded_at desc, r.id desc limit 1""", (dataset_id, vendor_id, opened))).fetchone()
     return {
         "case_id": case_id, "dataset_id": dataset_id, "vendor_id": vendor_id, "requested_cutoff": cutoff,
-        "case_opened_at": opened, "vendor_domains": tuple(r["domain"] for r in domains),
+        "case_opened_at": opened,
         "request": ChangeRequest(str(req["id"]), req["received_at"], req["thread_id"], req["subject"], req["sender"]) if req else None,
-        "documents": [DocumentRef(str(d["id"]), d["custody_channel"], d["received_at"], d["sender"], d["thread_id"],
-                                  d["subject"], d["recorded_at"]) for d in docs],
-        "sightings": [Sighting(r["value_normalized"], str(r["document_id"]), r["source_type"], r["seen_at"], r["visibility"],
-                               r["role"], r["party"], r["recorded_at"]) for r in rows],
+        **await vendor_rows(conn, dataset_id=dataset_id, vendor_id=vendor_id, before=opened),
     }
 
 

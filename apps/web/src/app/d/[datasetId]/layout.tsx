@@ -15,6 +15,7 @@ export default async function DatasetShell({ children, params }: { children: Rea
         <nav className="nav" aria-label="Main">
           <Link className="brand" href={`/d/${datasetId}/cases`}>Dialback</Link>
           <Link href={`/d/${datasetId}/cases`}>Case queue</Link>
+          <Link href={`/d/${datasetId}/risk`}>Vendor risk</Link>
         </nav>
         <div className="who">
           <span>

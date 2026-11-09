@@ -46,7 +46,8 @@ def test_the_truth_is_frozen():
         digest, name = line.split("  ")
         names.add(name)
         assert hashlib.sha256((CORPUS / name).read_bytes()).hexdigest() == digest, name
-    assert {p for p in build.build() if p != "truth/manifest.sha256"} == names, "the manifest covers every file"
+    assert {p for p in build.build() if p != "truth/manifest.sha256" and not p.startswith("../")} == names, \
+        "the manifest covers every corpus file"
 
 
 def test_twelve_patterns_five_controls_and_the_known_limit():
@@ -124,3 +125,24 @@ def test_attachments_have_their_emails_custody():
             if parent:
                 p = by_id[parent]["custody"]
                 assert (d["custody"]["channel"], d["custody"]["received_at"]) == (p["channel"], p["received_at"])
+
+
+def test_the_demo_seed_is_fictional_and_tells_its_three_stories():
+    import demo
+    seed = json.loads(build.build()[demo.PATH])
+    assert set(seed["vendors"]) == {"acme", "brightline", "cobalt"}
+    for ref, v in seed["vendors"].items():
+        assert v["domain"].endswith(".example")
+        for e164 in v["phones"].values():
+            assert FICTIONAL_PHONE.match(e164), (ref, e164)
+        for d in v["documents"] + [v["request"]]:
+            sender = d["custody"]["sender"] or "x <x@x.example>"
+            assert sender.endswith(".example>") and "<" in sender, sender      # every email has a display name
+            for span in d["pages"][0]["spans"]:
+                assert not long_digits(span["text"])
+                for m in ANY_PHONE_TEXT.finditer(span["text"]):
+                    assert m.group(2) == "555" and m.group(3).startswith("01"), span["text"]
+    assert near_miss(seed["vendors"]["cobalt"]["phones"]["offered"], seed["vendors"]["cobalt"]["phones"]["ar"])
+    assert seed["vendors"]["acme"]["phones"]["ar"] not in json.dumps(seed["vendors"]["acme"]["request"])
+    assert near_miss(seed["vendors"]["cobalt"]["phones"]["on_file"], seed["vendors"]["cobalt"]["phones"]["ar"])
+    assert seed["vendors"]["acme"]["phones"]["on_file"] == seed["vendors"]["acme"]["phones"]["main"]

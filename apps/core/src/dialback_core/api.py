@@ -15,6 +15,7 @@ from uuid import UUID
 
 from dialback_decision.engine import TEMPLATES
 from dialback_ledger.reasons import NOTES, REASON_TEXT
+from dialback_ledger.risk import risk_list
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import JSONResponse
 from psycopg import AsyncConnection, errors
@@ -176,6 +177,16 @@ async def dataset_chain(dataset_id: UUID, request: Request, user: UserDep):
         if d is None:
             return problem(404, "not_found", "No such dataset.")
         return await chain_status(conn, d["chain_id"])
+
+
+@router.get("/datasets/{dataset_id}/vendor-risk")
+async def vendor_risk(dataset_id: UUID, request: Request, user: UserDep):
+    """The vendor risk list (spec 0026): the ledger decides each status, read under the person's token."""
+    async with person_tx(request.app.state.pool, user.user_id, user.claims) as conn:
+        if await (await conn.execute("select 1 from app.datasets where id = %s", (dataset_id,))).fetchone() is None:
+            return problem(404, "not_found", "No such dataset.")
+        rows = await risk_list(conn, dataset_id)
+    return {"vendors": rows}
 
 
 @router.get("/datasets/{dataset_id}/alerts")
