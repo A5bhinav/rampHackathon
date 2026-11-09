@@ -3,8 +3,8 @@
 A `World` holds the full `select()` keyword inputs plus the set of e164s the generator seeded as
 attacker-controlled (`poison`). `make_world` is the deterministic builder (tests and the sweeps use
 it); `worlds()` draws an adversarial world and `clean_worlds()` a world with no attacker knob set.
-Every knob is per sighting (one document per sighting), so one number can be visible in one
-document and hidden in another. The lab imports only the pure `dialback_ledger` selection rule and
+Every knob is per sighting (one document per sighting, except a sighting in the request email
+itself), so one number can be visible in one document and hidden in another. The lab imports only the pure `dialback_ledger` selection rule and
 its helpers; it never touches the rule's behavior.
 """
 from __future__ import annotations

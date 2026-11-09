@@ -283,10 +283,16 @@ def _context_labels_removed(world: World) -> World:
                                    for s in kw["sightings"]])
 
 
+def _calls(out: dict) -> list[str]:
+    """The numbers an output would call, in order: the pick, then its alternates."""
+    return ([out["e164"]] if out.get("e164") else []) + [a["e164"] for a in out.get("alternates", [])]
+
+
 def _label_probe(world: World, base: dict) -> str | None:
-    """I12: a label in the change context never moves the call to a different number; refusing the
-    case is allowed. Two halves. Removal: with the labels already in the context made neutral, the
-    rule's pick must be the same number, or there must be no pick with them. Addition: the attacker's
+    """I12: a label in the change context never moves a call to a different number; refusing the case,
+    or calling fewer backups, is allowed. Two halves. Removal: with the labels already in the context
+    made neutral, what the rule calls (the pick, then its alternates) must be the start of what it
+    would call then, so a label may trim the list but never change it (re-review K2). Addition: the attacker's
     own text names the picked number, one label kind on one context path at a time, so no probe can
     hide another: the request email itself; a reply in its thread from another domain and from the
     vendor's own; an email under its subject, and under a forwarded copy of it, in another thread; a
@@ -297,7 +303,8 @@ def _label_probe(world: World, base: dict) -> str | None:
     kw, request, pick = world.kwargs, world.kwargs["request"], base.get("e164")
     if pick is None:
         return None
-    if run(_context_labels_removed(world)).get("e164") != pick:
+    calls, without = _calls(base), _calls(run(_context_labels_removed(world)))
+    if calls != without[:len(calls)]:
         return "M_incontext_label_moved_pick"
     if request is None or request.received_at >= kw["case_opened_at"]:
         return None

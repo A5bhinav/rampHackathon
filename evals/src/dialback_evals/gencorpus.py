@@ -68,12 +68,14 @@ def world_digest(world: World) -> str:
     return hashlib.sha256(json.dumps(_dump(world), sort_keys=True).encode()).hexdigest()
 
 
-def freeze(world: World, label: str, out_dir: Path, *, labels: list[str] | tuple[str, ...] = (), why: str = "") -> Path:
+def freeze(world: World, label: str, out_dir: Path, *, labels: list[str] | tuple[str, ...] = (), why: str = "",
+           replace_why: bool = False) -> Path:
     """Write `world` as `<out_dir>/<label>/world.json` and return the case directory.
 
     Refuses a world holding any real-looking number (the lab writes only the fictional NPA-555-0100 to
-    0199 block), and never replaces a frozen case with a different world: freezing the same world again
-    only refreshes its notes (`labels`, `why`)."""
+    0199 block), and never replaces a frozen case with a different world. Freezing the same world again
+    (lab fuzz does, whenever it re-finds a case) leaves the case as it is: its `labels` record the check
+    that failed when it was frozen and are never rewritten; `replace_why` updates only `why`."""
     numbers = {s.e164 for s in world.kwargs["sightings"]} | set(world.poison)
     if bad := sorted(n for n in numbers if not fictional(n)):
         raise ValueError(f"refusing to freeze real-looking numbers {bad}: the lab writes only NPA-555-0100 to 0199")
@@ -83,6 +85,9 @@ def freeze(world: World, label: str, out_dir: Path, *, labels: list[str] | tuple
         existing = json.loads((case / FILE).read_text(encoding="utf-8"))
         if {k: existing.get(k) for k in dumped} != dumped:
             raise FileExistsError(f"{case} already holds a different world; a frozen case is never replaced")
+        if replace_why and existing.get("why") != why:
+            (case / FILE).write_text(json.dumps({**existing, "why": why}, indent=2) + "\n", encoding="utf-8")
+        return case
     case.mkdir(parents=True, exist_ok=True)
     body = {"label": label, "labels": list(labels), "why": why, **dumped}
     (case / FILE).write_text(json.dumps(body, indent=2) + "\n", encoding="utf-8")

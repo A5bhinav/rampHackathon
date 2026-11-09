@@ -104,6 +104,9 @@ These are not reachable today, but each is frozen as a regression.
     - Open: whether to bump `ledger-select-v1`. It is hard-coded in web data, contract examples
       and voice tests.
 - **Prototype:** `select_D3.py` in the session scratchpad (temporary).
+- **Note on its output:** a refusal keeps the per-number `eligible: true` and `rank` fields with
+  outcome `no_provable_number`. The schema allows it, but its text says rank 1 is the pick, and
+  `store.py` would record those numbers as eligible. Decide this before adopting the shape.
 
 ### A7. Line takeover is defended only by a fact nothing produces
 
@@ -111,6 +114,15 @@ These are not reachable today, but each is frozen as a regression.
 - **What happens:** only `packages/decision` defines and reads `line_risk`; no production code sets
   it. So a real line takeover can verify. The voice lab's a07 scenario passes only because it
   declares `line_risk: true`.
+
+### A9. A caller who refuses to give a role can still be verified
+
+- **Status:** confirmed (ran), found by the voice-lab rework (Nov 9).
+- **What happens:** the production `ScriptedAgent` (`apps/voice/src/dialback_voice/agent.py`) records
+  whatever the person says at the role question as `speaker_role`, so "I'd rather not say" becomes a
+  role. Rule V06 (`packages/decision`) accepts any non-empty role, so the call can verify.
+- **Where to fix:** the agent (record no role on a refusal) or V06 (reject a refusal), in the voice
+  and decision slices. The voice lab has no scenario for it yet, because it would fail today.
 
 ### A8. The company-name check accepts names that contain the vendor's
 
@@ -127,6 +139,12 @@ These are not reachable today, but each is frozen as a regression.
 - **Status:** confirmed (ran). **Fixed Nov 9** (b5da22e, d54397c): the probe covers the request email,
   own-domain thread replies and ingestion's label shapes; the generator puts labels in the request
   email; `planted-number-picked-after-bare-mention-in-request` is frozen from real ingestion.
+- **Re-review K1, fixed Nov 9 (3562c01):** the same problem remained on the after-the-cutoff path, a
+  forwarded subject, a combosquat sender and the role-bearing bank shape. I12 now probes nine paths
+  and five label kinds; the generator draws follow-ups and an earlier cutoff;
+  `planted-number-picked-after-follow-up-email` is frozen from real ingestion.
+- **Re-review K2 and K3, fixed Nov 9:** I12 compares the whole call list (pick and backups), and
+  re-freezing a case no longer rewrites its notes.
 - **What is wrong:**
   - Real ingestion puts the attacker's label in the request email's own body.
   - The generator never puts a sighting on the request document, and I12's addition half probes
@@ -210,7 +228,13 @@ These are not reachable today, but each is frozen as a regression.
 
 ## C. The voice lab (spec 0017)
 
-From the fresh review on Nov 9. C1 to C3 are blocking.
+From the fresh review on Nov 9. C1 to C3 were blocking. **All of C1 to C8 were fixed on Nov 9** on
+branch `sami/attack-lab-voice` (2bd74ad to 23e8315; spec 0017, "Review fixes" F1 to F9): main merged
+in, the production agent and production's company and digit checks, the missing gates, an expected
+rule and ending per scenario, the oracle fixes, five new scenarios, strict scenario files and CLI, a
+real freeze, and a break suite of 22 deliberate breaks that all fail the lab. 75 tests; lab run 16/16.
+Limits stated in the spec: V06, V10 and V11 cannot be seen by an honest call, V08 is redundant, and
+the R8 disclosure gate gets a direct test. The entries below are kept as the record.
 
 ### C1. Most of the spec's hard gates are not implemented
 

@@ -411,3 +411,34 @@ def test_context_blind_rule_never_trips_i3_or_i12(monkeypatch):
         assert "I3_nonvendor_or_fax_eligible" not in violations(world, out)
         assert not [m for m in metamorphic(world, out) if m.startswith(LABEL_PREFIX)]
     check()
+
+
+
+# Re-review K2: a backup number (alternate) is a call too. A label in the change context may trim the
+# call list, never change it: what is called must be a prefix of what would be called without it.
+
+def _three_numbers_label_on_the_backup():
+    """Three provable numbers (A oldest, then B, then C) and the attacker's bare mention of B in the
+    request email: B is refused, so today the backups shift from [B, C] to [C]."""
+    a, b, c = "+12015550111", "+13125550122", "+14235550133"
+    base = make_world(numbers=[NumberSpec(a, ["contract", "listing"], 600), NumberSpec(b, ["contract", "listing"], 500),
+                               NumberSpec(c, ["contract", "listing"], 400),
+                               NumberSpec(b, [], 0, sightings=(SightingSpec("email", 0, role="unknown", party="unknown",
+                                                                            on_request=True),))])
+    return base, a, b, c
+
+
+def test_fail_closed_trims_backups_and_a_version_that_does_not_is_caught(monkeypatch):
+    # never_trims calls the same pick as the fail-closed shape, so I12's pick checks cannot see it; only
+    # comparing the whole call list can (the backups shift from [B, C] to [C]).
+    world, a, _b, _c = _three_numbers_label_on_the_backup()
+    out = _fail_closed(world)
+    assert out["e164"] == a and out["alternates"] == []          # only the agreed prefix is called
+    monkeypatch.setattr("dialback_evals.invariants.run", _fail_closed)
+    assert _label_hits(world) == []
+
+    def never_trims(w):
+        o = _fail_closed(w)
+        return select(**w.kwargs) if o.get("e164") else o           # keeps today's shifted backups
+    monkeypatch.setattr("dialback_evals.invariants.run", never_trims)
+    assert _label_hits(world) == [CONTEXT_LABEL]

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import dataclasses
 import datetime as dt
+import json
 import re
 import uuid
 from pathlib import Path
@@ -54,7 +55,7 @@ def test_freeze_never_replaces_a_different_world(tmp_path):
     a = make_world(numbers=[NumberSpec("+14695550142", ["contract", "listing"], 500)])
     b = make_world(numbers=[NumberSpec("+14695550142", ["contract", "listing"], 400)])
     freeze(a, "case", tmp_path, labels=["first"])
-    freeze(a, "case", tmp_path, labels=["refreshed"])        # the same world again only refreshes its notes
+    freeze(a, "case", tmp_path, labels=["refreshed"])        # the same world again changes nothing (K3)
     with pytest.raises(FileExistsError):
         freeze(b, "case", tmp_path)
     assert load_world(tmp_path / "case").kwargs == a.kwargs
@@ -185,3 +186,23 @@ def test_ingested_follow_up_case_is_still_what_real_ingestion_produces():
     world = _ingested_follow_up_world()
     assert [(s.e164, s.party) for s in world.kwargs["sightings"] if s.document_id == "f1"] == [(REAL_LINE, "bank")]
     assert world_digest(world) == world_digest(load_world(GENERATED / INGESTED_FOLLOW_UP))
+
+
+
+# Re-review K3: a frozen case's notes are its history. Freezing the same world again (which lab fuzz does
+# whenever it re-finds a case) leaves them alone; `why` changes only when asked, and `labels` never.
+
+def test_refreezing_the_same_world_keeps_its_notes(tmp_path):
+    w = make_world(numbers=[NumberSpec("+14695550142", ["contract", "listing"], 500)])
+    case = freeze(w, "kept", tmp_path, labels=["M_first"], why="first")
+    freeze(w, "kept", tmp_path, labels=["M_second"], why="second")
+    data = json.loads((case / "world.json").read_text())
+    assert data["labels"] == ["M_first"] and data["why"] == "first"
+
+
+def test_replace_why_changes_only_why(tmp_path):
+    w = make_world(numbers=[NumberSpec("+14695550142", ["contract", "listing"], 500)])
+    case = freeze(w, "kept", tmp_path, labels=["M_first"], why="first")
+    freeze(w, "kept", tmp_path, labels=["M_second"], why="later context", replace_why=True)
+    data = json.loads((case / "world.json").read_text())
+    assert data["labels"] == ["M_first"] and data["why"] == "later context"
