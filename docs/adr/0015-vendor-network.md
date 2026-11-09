@@ -1,196 +1,237 @@
 # 0015: A vendor network beside each customer's Trust Ledger
 
-**Status:** Proposed, Nov 9, 2026. Nothing is built. ADR-8's current wording stays in force until a
-spec implements this record.
-**Needs sign-off from:** Inesh (Trust Ledger), Abhi (core, evidence, ADR-8).
+**Status:** Proposed, Nov 9, 2026. Nothing is built. It changes ADR-8 in one way: one fingerprint
+key for every customer, held in a key-management service, and the fingerprint computed inside Ramp
+over the full number. Until a spec implements that, today's fingerprint stays (spec 0002, D4).
+**Needs sign-off from:** Inesh (Trust Ledger), Abhi (core, evidence, ADR-8, decision engine), and
+every contract owner (decision item 3 adds a `network` facts block).
 
 ## Context
 
 Inside Ramp, Dialback could know a vendor across every customer that pays it. Today it knows each
-vendor once per customer, and cannot connect the copies.
+vendor once per customer and cannot connect the copies.
 
-**Each customer is on its own.** Every Trust Ledger table carries `dataset_id`, and a number
-selection replays from that one customer's observations
-(`packages/ledger/src/dialback_ledger/select.py`). A number can be called only if it was seen in at
-least two independent source types at least 90 days before the change request (spec 0021,
-`min_age_days = 90`).
+**Each customer is computed on its own.** Every Trust Ledger table carries `dataset_id`, and a
+number selection replays from that one customer's observations
+(`packages/ledger/src/dialback_ledger/select.py`). A number can be called only if its first clean
+sighting reached this customer at least 90 days before the cutoff, and it has been seen in at least
+two independent source types (spec 0021). The cutoff is the earliest of the change in Ramp, the
+change request and the first message from a lookalike domain.
 
-**So new relationships start cold.** A customer that joined Ramp last month, or a vendor it has paid
-for under 90 days, has no provable number. No call is placed and a person decides (R7). Spec 0041
-(PR #91) attacks the same gap for a vendor's first sight, with outside anchors.
+**But access is not separated yet.** Every `app` and `ledger` read policy is `using (true)` for any
+signed-in user (`supabase/migrations/app/0001_app_schema.sql`, the RLS block). There is no tenant
+model. Anything below that promises customers privacy depends on building one first.
 
-**Dialback cannot link a vendor across customers.**
+**New relationships start cold.** A customer that joined Ramp last month, or a vendor it has paid for
+under 90 days, has no provable number. No call is placed and a person decides (R7). Spec 0041
+(proposed in PR #91, shadow mode only) works on the same gap for a vendor's first sight, with
+outside anchors.
 
-- Ramp's API returns the routing number and last four digits, never the full account number, and
-  no tax ID.
+**Dialback cannot link a vendor or an account across customers.**
+
+- Ramp's API, as mocked, returns the routing number and last four digits, never the full account
+  number, and no tax ID. Whether real Ramp can return a full number is spec 0002's open Q1.
 - So the bank fingerprint is `HMAC(key, routing|last4|ramp_account_id)`
-  (`apps/core/src/dialback_core/detection.py`). Ramp's account ID is the record in one customer's
-  Ramp, so the same real account at two customers gets two fingerprints.
-- Routing number plus last four alone is not an identity: at one bank, about one account in 10,000
-  shares any given last four.
+  (`apps/core/src/dialback_core/detection.py`). Ramp's account ID belongs to one record in one
+  customer's Ramp. The same real account gets a different fingerprint at each customer, and even
+  for two vendors at the same customer (spec 0002, D4).
+- Routing number plus last four is not an identity. It narrows an account to about one in 10,000
+  of that bank's accounts, which at a large bank is thousands of accounts.
 - `app.vendors.tin_hash` exists, but nothing fills it.
-- The core never reads a vendor's Ramp contacts, on purpose: the person changing the bank details
-  could edit them too (R2).
 
 **Ramp itself has what linking needs:** the full account number, the tax ID, and every customer's
 payment history.
 
-**Fraud often hits many customers at once.** When a vendor's mailbox is taken over (the threat
-ADR-13 assumes), the same new bank details go to every customer of that vendor in the same week.
+**Assumed threat: one takeover, many customers.** When a vendor's mailbox is taken over (the threat
+ADR-13 assumes), the attacker can send new bank details to every customer of that vendor at about
+the same time. This record assumes that pattern; the repo has no data on how often it happens.
 
-**The design doc already points this way.** Its later-features table (page 45) lists a *network
-alarm* (a Not verified decision warns other Ramp customers who pay the same vendor) and *Ramp-signed
-identity* (a vendor already on Ramp proves its bank account with a Ramp-signed statement).
+**The design doc points this way.** Its "Future plug-ins" table (pages 45 and 46) lists a *network alarm*
+(warn other Ramp customers who pay the same vendor when its mailbox looks compromised) and
+*Ramp-signed identity* (a vendor already on Ramp proves its bank account with a Ramp-signed
+statement instead of a call). This record adopts the first. It does not adopt the second, because
+skipping the call is exactly what item 4 defers.
 
 The question: with Ramp's internal data, should Dialback combine what it knows about a vendor
 across customers, and how, without weakening R1 to R9?
 
 ## Decision
 
-### 1. Link on fingerprints computed where the plaintext lives
+In short: Ramp links vendors and accounts on keyed fingerprints. A separate network layer shares
+**warnings** between customers, which can only send a case to a person. Sharing **trust**, which
+could make a case easier, is deferred until the problems in item 4 have answers.
 
-Dialback never stores a full account number or tax ID. It stores keyed fingerprints that match
-across customers.
+### 1. Link on fingerprints computed inside Ramp
 
-- **Bank account:** `HMAC-SHA256(network_key, routing || full account number)`, computed inside
-  Ramp, or at the moment Dialback receives the number, which it then discards. This is ADR-8 as
-  first written, with one key for every customer, so one account gives one value everywhere.
+Dialback never receives or stores a full account number or tax ID for the network. Ramp computes
+the fingerprints where the plaintext already lives and hands over only the fingerprints.
+
+- **Bank account:** `HMAC-SHA256(network_key, routing || full account number)`.
 - **Tax ID:** `HMAC-SHA256(network_key, normalized tax ID)`, into `app.vendors.tin_hash`.
-- **The key:** held in a key-management service and versioned, as `fingerprint_key_version` is
-  today. Never in the database, and never in an env file next to it. Account numbers are short (an
-  ACH entry allows at most 17 characters), so whoever holds both the key and the table can test
-  guesses until one matches.
+- **One key for every customer**, so one account gives one value everywhere. The key lives in a
+  key-management service and is versioned, as `fingerprint_key_version` is today. Only a Ramp-side
+  computation can re-fingerprint when the key rotates; Dialback never holds the numbers to redo it.
+- **The network stores fingerprints alone.** No routing number or last four sits next to them.
+  Today's tables keep routing and last four beside the fingerprint, so a leaked key would leave a
+  10 to 12 digit account number only 10^6 to 10^8 guesses away. A tax ID is 9 digits, about 10^9
+  guesses, and for a sole proprietor it is a Social Security number.
 
-Example: Customers A and B both pay Acme into routing `021000021`, account `123456780001`. Both
-records get the same fingerprint, and neither stores `123456780001`.
+Example: Customers A and B both pay Acme into routing `021000021`, account `000011112222`. Ramp
+gives both records the same fingerprint, and Dialback never sees `000011112222`.
 
-Why not the full numbers:
+Why Dialback should not hold the full numbers:
 
 - A routing number plus an account number is enough to debit an account or forge a check. A table
   of every vendor's numbers across every customer would be the most valuable thing in the system to
   steal.
-- Dialback feeds text to models: the document reader and the voice agent. With no full number in
-  the system, no prompt, log or call can leak one (R4, R9).
+- Dialback already handles documents that can carry full numbers. Change requests and invoices are
+  stored as documents, and their visible text goes to the document reader. The network should not
+  add a second, structured copy of every number, in the same database the models' inputs come from.
 
 ### 2. The network is a layer beside each ledger, never merged into it
 
-- **The ledger keeps its guarantee.** A number is callable because it reached this customer
-  through the customer's own channels, by our own clock, before the request (R2). The network never
-  adds sightings to a customer's ledger, and never changes which number the ledger picks.
-- **The network answers its own questions.** It hands the decision engine labeled inputs (a
-  `network` block beside the call answers), and code decides from them (R3).
-- **Combine evidence, never trust.** This is the same rule as the shared-vendor-profile design
-  under discussion: pooling sightings is fine; pooling "this number is trusted" is the attack.
+- **The ledger keeps its rule.** A number is callable because it reached this customer through the
+  customer's own channels, by our own clock, before the cutoff (spec 0021). The network never adds
+  sightings to a customer's ledger, and never changes which number the ledger picks.
+- **The network gives the decision labeled inputs:** a `network` facts block, read by code (R3).
+- **Combine evidence, never trust.** Pooling "this account was seen at another customer" is
+  evidence. Pooling "another customer trusted this" is the attack.
 
 Merged profiles are rejected because a document at one customer would quietly change what another
 customer calls. The attack: a sham business on Ramp adds "Acme Fasteners" with the fraudster's
 phone on its invoices and waits 90 days. In a merged profile, that number is now old enough for
 every customer of the real Acme.
 
-### 3. Network signals can raise risk freely, lower friction only under strict corroboration, and never skip the call or the release
+### 3. Warning signals, and what each one does
+
+Every signal has one defined effect. Three send the case to review through a new Needs review rule
+in `decide()`; none can produce Verified or Not verified. One is shown to the approver and changes
+nothing.
 
 | Signal | Example | Effect |
 |---|---|---|
-| The new account belongs to a different vendor elsewhere | B's new "Acme" account is Brightline's account at Customer C | Hold stays, case goes to review: a strong sign of a mule account |
-| Another customer's case for this vendor ended Not verified recently | Customer C's call to Acme ended NV02 last week | Review. This is the design doc's network alarm |
-| Many customers entered the same new account in a short window | 12 of Acme's customers entered an account ending 0001 within 48 hours | Review. This is the mailbox-takeover pattern, not agreement |
-| The account is new to the network, or seen only at young customers | First sighting anywhere, or only at customers under 180 days old | Raises risk, nothing else |
-| Long-standing, independent customers have paid into it for months with no returns | 5 customers, each over a year on Ramp, have paid Acme into it for 6 months | May lower friction (below) |
-| A phone number is proven for this vendor at long-standing, independent customers | Acme's number seen 90+ days before the request at 4 such customers | May be offered as a candidate to a customer with no provable number |
+| **Account linked to another vendor.** The new account is on file for a different vendor (by tax ID fingerprint) at a long-standing customer | B's new "Acme" account is another vendor's account at some other customer | Review |
+| **Network alarm.** A case for the same vendor ended without verification at a long-standing customer in the last 30 days | Another customer's call to Acme ended Not verified last week | Review |
+| **Burst of bank changes.** Several customers of one vendor changed that vendor's bank details within 72 hours, to any account | 5 of Acme's customers changed Acme's account within two days | Review. Keyed on the vendor, not the account, so a separate mule account per victim doesn't evade it |
+| **New to the network.** The account has never been seen at any other customer | A first sighting anywhere | Shown to the approver; no effect on the outcome |
 
-Rules for the table:
+Rules for every signal:
 
-- **"On file at N customers" is never evidence.** Entering an account costs an attacker nothing,
-  and a takeover makes many customers enter the same one. Only money paid in over time counts.
-- **Payments count only from long-standing, independent customers.** A sham customer can pay its
-  own mule account for months. A customer counts only if it has been on Ramp for a long time with
-  real spend, shares no admins, users, email domains or bank accounts with the other customers
-  counted, and was not created near the vendor's first sighting. Thresholds are open question 1.
-- **"Lower friction" has a ceiling.** At most, a customer with no provable number gets a candidate
-  number to call. That number is labeled network evidence in the selection and still has to pass
-  R2: a number seen in this change request or its thread is never called. Nothing auto-verifies.
-  The hold stays until a person releases (R1, R5).
-- **Without the network, a case is decided exactly as today.** If the network can't be read, the
-  case gets no network input. No friction is lowered, and the per-customer rules still apply (R7).
+- **Only long-standing customers count.** A customer counts toward a signal if it has been on Ramp
+  for at least a year with real spend, shares no admins, users, email domains or bank accounts with
+  the customer receiving the signal or with the other customers counted, and was not created
+  within 90 days of the vendor's first sighting on the network. This applies to every signal, so a
+  sham customer cannot trigger any of them. The exact thresholds are open question 1.
+- **Signals are computed only on a real bank-change case.** No API lets anyone ask the network
+  about an account. Otherwise a customer, or a Ramp account a fraudster controls, could enter
+  guessed account numbers and read which ones are real and whose they are.
+- **Approvers see signals; the person who entered the change does not.** An insider who sees which
+  signal fired learns how to avoid it next time. This needs the tenant and role model from the
+  context section.
+- **When the network is on but can't be read, the case goes to review (R7).** The evidence records
+  "network unavailable" separately from "no network facts". With the flag `off`, a case is decided
+  exactly as today.
+- **A signal never places a hold on its own.** R1 already holds every changed account. A network
+  alarm affects the next case for that vendor at each customer; it never holds a customer that has
+  no case, because there would be nothing to release through `release_case()`.
 
-### 4. Customers see derived facts, never another customer's data
+### 4. Deferred: signals that would make a case easier
 
-- The network shares counts, ages and outcomes, for example: "paid into by 5 long-standing
-  customers since March 2025". It never shares which customers they are, their documents,
-  recordings or amounts.
-- Joining the network is opt-in, in the customer terms.
-- A vendor agreed to a recorded call for one customer. So call recordings and answers never leave
-  that customer; only the outcome code does.
+These would solve cold start, which is the main reason to share at all. Each has a problem with no
+answer yet, so none is part of this decision. Each needs its own record.
 
-### 5. Evidence
+- **"Paid into for months with no returns."** An earlier fraud looks exactly like this. Customers
+  fooled months ago are still paying the mule account, and mule accounts rarely produce returns.
+  It also pools other customers' decisions to trust the account, which item 2 calls the attack.
+- **"Phone number proven at long-standing customers", offered to a cold-start customer.**
+  - Independent customers do not mean independent sources. The design doc's known limit (page 21)
+    is that someone who has controlled a vendor's mailbox and a public listing for 90 days gets
+    their number picked. Every customer of that vendor sees those same channels, so "proven at 4
+    customers" can be one compromise seen 4 times.
+  - Today those customers go straight to a person; this would call instead.
+  - It also can't be dialed without changing V01 ("We dialed the number the Trust Ledger chose")
+    and the voice service's dial guard, which dials only the ledger's pick.
+- **Ramp-signed identity** instead of a call (the design doc's plug-in), for the same reasons.
 
-- Each case's evidence envelope records the network inputs it used: the signal, counts, ages, the
-  network rule version and a hash of the network snapshot. It never records another customer's
-  identity.
-- The network keeps its own hash-chained log (ADR-7) of each snapshot, so Ramp can prove what the
-  network said when a case was decided.
+### 5. Customers see derived facts, never another customer's data
 
-### 6. Order of work
+- **Signals are shown coarsely.** No counts below 5 (shown as "fewer than 5"), dates by month,
+  never another vendor's or customer's name.
+- **Only "ended without verification" is shared.** Never which rule fired: NV01, for example,
+  would reveal that the vendor denied the change.
+- **Call recordings and answers never leave the customer.** The vendor agreed to a recorded call
+  for one customer.
+- **Joining the network is opt-in** in the customer terms. Whether vendors must also be told or
+  agree is open question 5.
 
-1. **Signals that only add holds:** the network alarm, and "this account belongs to another
-   vendor". They can only send cases to review.
-2. **Fingerprint linking inside Ramp**, with the Ramp-side computation in item 1 of this decision.
-3. **Signals that lower friction, last.** Behind a flag (`DIALBACK_NETWORK`: `off`, `warn`,
-   `full`; safe default `off`), and run through the attack lab with sham-customer scenarios before
-   they ship.
+### 6. Evidence
+
+- **Each case's evidence envelope records the network inputs it used:** the signal, counts, ages in
+  whole days, the network rule version and a hash of the network snapshot. All are integers or
+  strings, since the evidence chain refuses floats. It never records another customer's identity.
+- **The network keeps its own hash-chained log (ADR-7) of each snapshot,** so Ramp can prove what
+  the network said when a case was decided.
+
+### 7. Order of work
+
+1. **Prerequisites:** a tenant model with per-customer access, and Ramp-side fingerprints (item 1).
+2. **The warning signals in item 3,** behind a new flag `DIALBACK_NETWORK` with values `off` and
+   `warn`, safe default `off`. They need the `network` facts block in the contracts and the new
+   Needs review rule in the decision engine.
+3. **Anything from item 4** only through its own record, after attack-lab scenarios with sham
+   customers.
 
 ## Consequences
 
 Good:
 
-- Cold start shrinks for any vendor that other customers already know.
-- One customer's catch protects the vendor's other customers, which is how mailbox-takeover
-  campaigns actually spread.
+- One customer's catch protects the vendor's other customers when one takeover hits many of them.
 - A mule account reused across vendors is caught the second time it appears.
-- Dialback still holds no full account numbers.
+- A burst of bank changes for one vendor is caught even when each victim gets its own account.
+- Dialback still holds no full account numbers, and the network adds none.
 
 Costs and risks:
 
-- **Sham customers.** The thresholds for "long-standing, independent" set what an attacker must
-  spend to fake corroboration. They need the attack lab before step 3 ships.
-- **False alarms used as a weapon.** A false fraud report could hold a vendor's payments at every
-  customer. Network alarms send cases to review and never block, and they count independent
-  reporters.
-- **Honest bank moves look like the attack.** A vendor that moves banks and tells all its customers
-  the same day matches the takeover pattern, so those cases go to review. Accepted: this fails
-  closed (R7).
+- **Cold start stays.** This record shares warnings only. Spec 0041's anchors remain the path for a
+  vendor's first sight.
+- **Honest shared accounts look like mule accounts.** Factoring companies, lockboxes, payment
+  processors and parent companies all collect for more than one vendor. They trip the linked-account
+  signal and go to review. A reviewed list of known shared-account holders is open question 6.
+- **Honest bank moves look like the attack.** A vendor that tells all its customers about a new
+  bank on the same day trips the burst signal and goes to review. Accepted: this fails closed (R7).
+- **False alarms can be used as a weapon.** A long-standing customer, or an attacker inside one,
+  could cause reviews at a vendor's other customers. The cost is extra reviews, never a block or a
+  release.
 - **Audits get harder.** B's evidence cites network facts that B's auditor cannot inspect. The
   network-side log covers this, but only Ramp can open it.
-- **Facts go stale.** Carriers reassign phone numbers and vendors change banks, so network facts
-  need an expiry.
-- **The key becomes critical.** If it leaks with the table, account numbers can be guessed. It
-  lives in a key-management service and rotates by version.
-- **It needs Ramp's internals.** Dialback on Ramp's public API cannot build item 1. This is a
-  feature for inside Ramp.
-- **It needs customer terms.** Opt-in wording needs legal review.
+- **Facts go stale.** Vendors change banks, so network facts need an expiry (open question 7).
+- **The key becomes critical.** It lives in a key-management service and rotates by version.
+- **It needs Ramp's internals and a tenant model.** Dialback on Ramp's public API cannot build
+  item 1, and today's read-everything access rules cannot keep item 5's promises.
 
 ## Alternatives considered
 
 | Alternative | Why not |
 |---|---|
-| Store full account numbers and tax IDs in Dialback and merge profiles in the Trust Ledger | Item 1 gives the same linking without readable numbers; item 2 explains why merging breaks R2 |
-| Link vendors by name, email domain and phone with today's data | Weak, and the easiest identifiers to fake. Domain and phone stay as signals, not as the link |
-| Share only warnings (step 1 of item 6, and stop) | Viable, and the first step here. It leaves cold start unsolved |
-| Do nothing | Cold start stays, and every customer has to catch a multi-customer campaign on its own. Spec 0041's anchors cover a vendor's first sight separately |
+| Give Dialback full account numbers and tax IDs, and merge profiles in the Trust Ledger | Item 1 gives the same linking without readable numbers; item 2 explains why merging breaks the selection rule |
+| Fingerprint inside Dialback as each number arrives, then discard it | The full number still passes through Dialback's memory, logs and traces, and Dialback can't re-fingerprint after a key rotation |
+| Link vendors by name, email domain and phone with today's data | Weak, and the easiest identifiers to fake |
+| Share trust as well as warnings now | Item 4: each friction-lowering signal has a known way to fail |
+| Do nothing | Every customer has to catch a takeover that hits many customers on its own |
 
 ## Open questions
 
-1. **Thresholds:** how many independent customers, how long on Ramp, and how many months of
-   payments without returns.
+1. **Thresholds:** how long on Ramp and how much spend make a customer long-standing; the burst
+   window and count; the alarm window.
 2. **Independence:** which links between customers disqualify them from counting together (shared
    users, admins, email domains, bank accounts, owners).
 3. **Where fingerprints come from:** a Ramp-side source that returns network fingerprints only.
    Ramp's public API has none today.
 4. **Rules on stored account data:** whether payment-industry rules on storing account numbers
    (Nacha's) treat keyed fingerprints as unreadable, to be confirmed.
-5. **Customer terms:** the opt-in wording, and which derived facts may be shown.
-6. **Expiry:** how long a network fact lasts (number recycling, bank changes).
-7. **One model for the first trusted number:** how this meets spec 0041's anchors and the shared
-   vendor profile and portal under discussion.
-8. **Alarm delivery:** whether the network alarm alerts other customers at once, or only affects
-   their next case for that vendor.
+5. **Consent:** the customer opt-in wording, and whether vendors must be told or agree.
+6. **Shared-account holders:** how factoring companies, lockboxes and processors are recognized,
+   and who maintains that list.
+7. **Expiry:** how long a network fact lasts.
+8. **One model for the first trusted number:** how item 4, if it ever ships, meets spec 0041's
+   anchors and any shared vendor profile or portal (none is in the repo yet).

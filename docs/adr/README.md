@@ -1,8 +1,9 @@
 # Architecture decision records
 
 Nygard format: `NNNN-title.md` with Title, Status, Context, Decision, Consequences. Numbered
-once and never reused. A reversed decision is marked superseded rather than deleted. The
-short versions from the design doc follow; each gets its own file as it is written up.
+once and never reused. A reversed decision is marked superseded rather than deleted. Rows 1 to
+14 are the short versions from the design doc; each gets its own file as it is written up. Later
+rows were written after the design doc and link to their file.
 
 | ADR | Decision | Rejected |
 |---|---|---|
@@ -20,4 +21,4 @@ short versions from the design doc follow; each gets its own file as it is writt
 | 12 | **Contracts first.** OpenAPI 3.1 and JSON Schema in `packages/contracts`, frozen on day 1, generated types, a Prism mock. A contract change takes its own PR approved by every affected owner. | |
 | 13 | **Sources are counted by how they reached us, and all email counts once.** A mailbox takeover controls every address on a domain and any lookalike. The scorecard shows the looser variants side by side. | |
 | 14 | **PDFs are read locally, with per-character checks.** pdfplumber's color, size and position data caught hidden white, tiny and off-page text that every text extractor passed through. Scans go to Claude's vision input and stay about 5% of the corpus. | AI OCR services as the text layer. |
-| 15 | **Proposed: a vendor network beside each customer's Trust Ledger** ([0015](0015-vendor-network.md)). Inside Ramp, link a vendor across customers on keyed fingerprints of the full account number and tax ID, computed where the plaintext lives. The network gives the decision labeled inputs; it never merges into a customer's ledger. Its signals raise risk freely, lower friction only under strict corroboration, and never skip the call or the release. | Full numbers in Dialback; merged profiles in the Trust Ledger; linking on name, domain and phone. |
+| 15 | **Proposed: a vendor network beside each customer's Trust Ledger** ([0015](0015-vendor-network.md)). Inside Ramp, link vendors and accounts across customers on keyed fingerprints of the full account number and tax ID, computed by Ramp. A separate network layer shares warnings, which can only send a case to review; it never merges into a customer's ledger. Sharing trust, which would make a case easier, is deferred. | Full numbers in Dialback; merged profiles in the Trust Ledger; linking on name, domain and phone; sharing trust now. |
