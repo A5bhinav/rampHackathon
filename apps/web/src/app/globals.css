@@ -561,3 +561,26 @@ ul.reason-chips { list-style: none; padding: 0; margin: 0; display: flex; flex-w
 ul.reason-chips li { font-size: 0.75rem; padding: 1px 8px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line); cursor: help; }
 ul.reason-chips li { white-space: nowrap; }
 table.corpus-table th, table.corpus-table td { padding-left: 10px; padding-right: 10px; }
+details.fold summary { cursor: pointer; color: var(--accent); font-weight: 500; font-size: 0.875rem; margin-bottom: 8px; }
+.rule-group li { scroll-margin-top: 90px; }
+
+/* The evidence chain (spec 0037). ----------------------------------------------------------- */
+.chain-alarm { background: var(--bad-bg); border-color: color-mix(in srgb, var(--bad) 40%, var(--line)); }
+.chain-alarm h2 { color: var(--bad); font-size: 1.375rem; }
+.lead-card h2 .badge { font-size: 0.8125rem; }
+main a.badge-link { box-shadow: none; background-image: none; }
+.chain-how { display: grid; grid-template-columns: minmax(0, 360px) 1fr; gap: 24px; align-items: center; }
+.chain-how figcaption { margin: 0; }
+.links { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.links li { position: relative; }
+.links li:not(:last-child)::after { content: ""; position: absolute; left: 22px; bottom: -9px; width: 2px; height: 10px; background: var(--accent); }
+.link-row { display: grid; grid-template-columns: 34px 1fr; gap: 0 10px; padding: 8px 12px; border: 1px solid var(--line);
+  border-radius: var(--radius-sm); background: var(--surface-2); font-size: 0.75rem; }
+.link-row b { grid-row: span 2; align-self: center; font-size: 0.875rem; }
+table.chain-table tr.is-bad td { background: var(--bad-bg); }
+table.chain-table tr.is-first-bad td:first-child { box-shadow: inset 4px 0 0 var(--bad); }
+table.chain-table tr:target td { outline: 2px solid var(--bad); outline-offset: -2px; }
+table.chain-table tr { scroll-margin-top: 100px; }
+.bad-note { color: var(--bad); font-weight: 600; font-size: 0.75rem; }
+@media (max-width: 720px) { .chain-how { grid-template-columns: 1fr; } }
+figure.card { margin: 0 0 20px; }
