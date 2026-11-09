@@ -90,7 +90,7 @@ def test_clean_world_picks_a_provable_number():
     held = [0, 0]
 
     @given(clean_worlds())
-    @settings(max_examples=500, deadline=None, derandomize=True, database=None)
+    @settings(max_examples=2000, deadline=None, derandomize=True, database=None)   # spec Decision 6 floor
     def check(world):
         held[0] += 1
         held[1] += l1_premise(world)

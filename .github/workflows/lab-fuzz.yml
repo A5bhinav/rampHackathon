@@ -22,7 +22,10 @@ jobs:
       - uses: astral-sh/setup-uv@v5
       - name: Install the Python workspace
         run: uv sync --all-packages --locked
+      - name: Lab checks that must stay green (L1 floor, oracle self-tests, coverage floor)
+        run: cd evals && uv run pytest -q -m "not selection_gate"
       - name: Lab fuzz (frozen findings, then 2000 worlds at seed 0)
+        if: always()
         run: uv run lab fuzz --examples 2000 --seed 0 --out evals/corpus-generated
       - name: Keep the findings for a local repro
         if: failure()
