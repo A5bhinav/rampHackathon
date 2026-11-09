@@ -133,3 +133,26 @@ def test_whoever_answers_the_team_phone_is_not_from_the_request(database_url):
     assert speaker("acme", "Jordan Lee") is False          # Verified becomes possible (V07)
     assert speaker("acme", "Dana Whitfield") is True       # the requester on the line is caught
     assert speaker("cobalt", "Morgan Pryce") is True
+
+
+def test_cobalts_ar_line_swaps_too_and_a_reload_reports_it_changed_nothing(database_url):
+    d = demo_dataset(database_url)
+    def counts():
+        with psycopg.connect(database_url) as c:
+            return tuple(c.execute(f"select count(*) from ledger.{t} where dataset_id = %s", (d["dataset_id"],)).fetchone()[0]
+                         for t in ("observations", "vendor_domains", "documents"))
+
+    first = run(load(database_url, phones={"cobalt": "+12025550100"}, with_requests=True))
+    assert first["vendors"]["cobalt"]["phone"] == "team"
+    before = counts()
+    again = run(load(database_url, phones={"cobalt": "+12025550111"}))       # a different phone, too late
+    assert again["vendors"]["cobalt"]["phone"] == "already loaded: unchanged"
+    assert counts() == before and before[1] == 3
+    assert selection(database_url, d, "cobalt")["e164"] == "+12025550100"
+
+
+def test_a_retired_demo_dataset_is_refused(database_url):
+    old = demo_dataset(database_url)
+    demo_dataset(database_url)                                                  # a newer reset retires it
+    with pytest.raises(DemoError):
+        run(load(database_url, phones={}, dataset_id=old["dataset_id"]))
