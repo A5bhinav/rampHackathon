@@ -58,7 +58,7 @@ function Body({ p }: { p: Picture }) {
           <p className="shot-big mono">{p.picked}</p>
           <p className="shot-chips">{p.sources.map((s) => <span key={s} className="shot-chip">{s}</span>)}</p>
           <ul className="shot-checks">{p.checks.map((c) => <li key={c}>{c}</li>)}</ul>
-          <p className="shot-refused"><span className="badge tone-bad">refused</span><span>{p.refused.what}: {p.refused.why}</span></p>
+          <p className="shot-refused"><span className="badge tone-bad">refused</span><span>{p.refused.vendor} offered <span className="mono nowrap">{p.refused.number}</span>: {p.refused.why}</span></p>
         </Frame>
       );
     case "call":
@@ -87,7 +87,7 @@ function Body({ p }: { p: Picture }) {
         <Frame title="Release" badge={{ text: "awaiting approver", tone: "ok" }}>
           <p className="shot-refused"><span className="badge tone-bad">refused</span><span>{p.refusal}</span></p>
           <p className="shot-field"><span className="muted">Reason, written by {p.approver}</span>{p.reason}</p>
-          <p className="shot-button"><span>Release payments</span></p>
+          <p className="shot-button"><span className="ghost">Reject</span><span>Approve release</span></p>
         </Frame>
       );
   }
@@ -121,6 +121,7 @@ export function HeroShot() {
           ))}
         </ul>
       </div>
+      <p className="shot-note">A drawing of the demo data, not a live queue</p>
     </div>
   );
 }
