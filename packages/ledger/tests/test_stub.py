@@ -56,8 +56,6 @@ def test_a_naive_cutoff_is_refused():
     raise AssertionError("a cutoff without a time zone must be refused, not guessed")
 
 
-
-
 def test_each_case_gets_its_own_selection_id():
     case = uuid4()
     assert call(case_id=case)[1]["number_selection_id"] == call(case_id=case)[1]["number_selection_id"]

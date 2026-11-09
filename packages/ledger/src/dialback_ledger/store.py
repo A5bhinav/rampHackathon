@@ -15,6 +15,7 @@ import datetime as dt
 import logging
 import os
 import re
+import unicodedata
 from email.utils import parseaddr
 from typing import Any
 from uuid import UUID, uuid5
@@ -224,7 +225,9 @@ async def change_context(*, case_id: UUID, dataset_id: UUID, vendor_id: UUID, cu
 
 
 def _tokens(text: str) -> set[str]:
-    return set(re.findall(r"[a-z]+", text.casefold()))
+    """The Latin words of a name, accents folded (José -> jose). Another script yields none."""
+    folded = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode().casefold()
+    return set(re.findall(r"[a-z]+", folded))
 
 
 def _speaker_in(context: list[DocumentRef], speaker_names: tuple[str, ...]) -> bool | None:
@@ -238,8 +241,8 @@ def _speaker_in(context: list[DocumentRef], speaker_names: tuple[str, ...]) -> b
     unnamed = False
     for d in context:
         name, address = parseaddr(d.sender or "")
-        if not name.strip():
-            unnamed = True
+        if not _tokens(name):
+            unnamed = True  # no name, or none this check can compare: could be anyone (R7)
         sender = _tokens(name) | _tokens(address.split("@")[0])
         if any(s <= sender for s in speakers):
             return True
