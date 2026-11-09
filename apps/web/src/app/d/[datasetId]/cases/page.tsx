@@ -30,10 +30,10 @@ export default async function CaseQueue({ params }: { params: Promise<{ datasetI
 
   return (
     <main>
-      <PageHead title="Case queue" lead="Every vendor whose bank details changed in Ramp. Their payments stay on hold until the vendor confirms on a number Dialback can prove, and a different person releases them." />
+      <PageHead title="Case queue" lead="Every vendor whose bank details changed in Ramp, and where each change stands. Dialback holds their payments, calls the vendor on a number it can prove, and a different person signs off." />
       <QueueRail counts={stationCounts(cases)} />
       <Stats label="Held payments" items={[
-        { label: "Bills on hold", value: cases.reduce((n, c) => n + c.bills_held, 0), tone: "info" },
+        { label: "Bills on hold", value: cases.filter((c) => c.hold_status === "confirmed" || c.hold_status === "releasing").reduce((n, c) => n + c.bills_held, 0) },
         { label: "Waiting on a person", value: waiting.length, tone: "warn" },
         { label: "Payment overdue or due within 3 days", value: dueSoon, tone: "bad" },
         { label: "Hold not confirmed", value: unconfirmed, tone: "bad" },

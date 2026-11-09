@@ -65,7 +65,7 @@ function RiskMix({ vendors }: { vendors: { status: RiskStatus }[] }) {
       </div>
       <div className="segbar" role="img" aria-label={`Vendors by status: ${label}`}>
         {rows.map(([status, n], i) => n ? (
-          <span key={status} className={`seg seg-${KEY[status]}`} style={{ flexGrow: n }} title={`${cap(statusLabel(status))}: ${n} (${pct[i]}%)`}>
+          <span key={status} className={`seg seg-${KEY[status]}`} style={{ flex: `${n} 1 0px` }} title={`${cap(statusLabel(status))}: ${n} (${pct[i]}%)`}>
             {pct[i] >= 10 ? `${pct[i]}%` : ""}
           </span>
         ) : null)}

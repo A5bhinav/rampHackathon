@@ -22,13 +22,19 @@ export function counts(rows: { status: RiskStatus }[]): [RiskStatus, number][] {
 }
 
 /** The number on file, character by character, each digit marked where it differs from the
- *  provable number (a near miss: one digit off, or two swapped). Display only; compared on the
- *  same formatting, and nothing is marked when the two don't share a shape. */
+ *  provable number. Display only, and only when the two are a near miss of each other (one digit
+ *  off, or two adjacent digits swapped, the ledger's own test): a vendor can be a near miss of a
+ *  provable line other than the one shown, and then nothing is marked rather than the wrong digits. */
 export function digitMarks(onFile: string, provable: string | null): { ch: string; differs: boolean }[] {
   const a = phone(onFile);
+  const chars = [...a].map((ch) => ({ ch, differs: false }));
   const b = provable ? phone(provable) : null;
-  const comparable = b !== null && a.length === b.length && a.replace(/\d/g, "0") === b.replace(/\d/g, "0");
-  return [...a].map((ch, i) => ({ ch, differs: comparable && /\d/.test(ch) && ch !== b![i] }));
+  if (b === null || a.length !== b.length || a.replace(/\d/g, "0") !== b.replace(/\d/g, "0")) return chars;
+  const at = [...a].flatMap((ch, i) => (/\d/.test(ch) ? [i] : []));  // where each digit sits
+  const off = at.flatMap((pos, k) => (a[pos] !== b[pos] ? [k] : []));  // which digits differ
+  const swapped = off.length === 2 && off[1] === off[0] + 1 && a[at[off[0]]] === b[at[off[1]]] && a[at[off[1]]] === b[at[off[0]]];
+  if (off.length === 1 || swapped) for (const k of off) chars[at[k]].differs = true;
+  return chars;
 }
 
 /** Whole percents that add up to 100 (largest remainder); all zeros stay zeros. */

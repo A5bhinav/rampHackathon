@@ -32,15 +32,21 @@ None.
 
 - [ ] The queue opens with the rail: five stations, each with an icon, a one-line meaning and
       the number of open changes there; sign-off splits into review, approval and blocked.
-- [ ] The queue shows held payments by due date: a lane per change with its next saved payment
-      date, a today line, overdue shaded, the change's deadline marked; dates outside the window
-      pin to its edge with an arrow. Every mark has a text equivalent (the table below it).
+- [ ] The queue shows held payments by due date: a lane per change whose hold is in place
+      (confirmed or releasing; a failed or still-placing hold is left out and counted in the
+      caption), soonest first, at most 12, with its next saved payment date, a today line,
+      overdue shaded, the change's deadline marked; dates outside the window pin to its edge with
+      an arrow. Every mark has a text equivalent (the table below it). "Bills on hold" counts only
+      holds in place.
 - [ ] The case page's progress is the same rail, with this change's status at each station
       (from spec 0031's progress rules, unchanged).
-- [ ] The case's change panel draws the payment path: Ramp, the held bills, the new account,
-      and the old account it replaces. Only routing numbers and last four digits (ADR-8).
+- [ ] The case's change panel draws the payment path: Ramp, the bills, the hold, the new
+      account, and the old account it replaces. The hold says what its status says: held
+      (confirmed, releasing), placing, lifted (released); only failed, or an unknown status, is
+      "not confirmed" in red. Only routing numbers and last four digits (ADR-8).
 - [ ] The risk list leads with one segmented bar of vendors by status, with a legend; a near
-      miss row marks the digits where the number on file differs from the provable one.
+      miss row marks the digits where the number on file differs from the provable one, only
+      when the two are a near miss of each other (one digit off, or two adjacent swapped).
 - [ ] Light only: the page no longer switches to dark with the system setting.
 - [ ] Works at 390px; focus rings show; nothing moves under reduced motion.
 
@@ -48,8 +54,9 @@ None.
 
 | Acceptance item | Test |
 |---|---|
-| 1 | `apps/web/tests/flow.test.ts` (station counts) |
-| 2 | `apps/web/tests/flow.test.ts` (day window and positions) |
+| 1 | `apps/web/tests/flow.test.ts` (station counts, the split) |
+| 2 | `apps/web/tests/flow.test.ts` (which changes are drawn, the day window, positions) |
+| 4 | `apps/web/tests/flow.test.ts` (the hold gate, per status) |
 | 5 | `apps/web/tests/risk.test.ts` (digit marks, shares) |
 | 3, 4, 6, 7 | Checked by eye at 1440 and 390 on the local stack with the demo ledger loaded |
 

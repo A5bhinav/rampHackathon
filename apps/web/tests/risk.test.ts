@@ -27,7 +27,8 @@ test("a near miss marks the digits that differ, on the same formatting", async (
   assert.deepEqual(marks.filter((m) => m.differs).map((m) => m.ch), ["4", "2"]);
   assert.deepEqual(digitMarks("+14155550142", "+14155550142").filter((m) => m.differs), [], "same number: nothing marked");
   assert.deepEqual(digitMarks("+14155550142", null).filter((m) => m.differs), [], "nothing to compare with");
-  assert.deepEqual(digitMarks("+442071234567", "+14155550142").filter((m) => m.differs), [], "different shapes: nothing marked");
+  assert.deepEqual(digitMarks("+442079460000", "+14155550142").filter((m) => m.differs), [], "different shapes: nothing marked");
+  assert.deepEqual(digitMarks("+14155550142", "+14155550143").filter((m) => m.differs).map((m) => m.ch), ["2"], "one digit off");
 });
 
 test("shares are whole percents that add up to 100, zeros stay zero", async () => {
@@ -35,4 +36,12 @@ test("shares are whole percents that add up to 100, zeros stay zero", async () =
   assert.deepEqual(shares([1, 1, 1]), [34, 33, 33]);
   assert.deepEqual(shares([0, 3, 0, 1]), [0, 75, 0, 25]);
   assert.deepEqual(shares([0, 0]), [0, 0]);
+});
+
+test("digits are marked only when the two numbers are a near miss of each other", async () => {
+  const { digitMarks } = await import("../src/lib/risk.ts");
+  // A vendor can be a near miss of another provable line than the one shown: then nothing is marked.
+  assert.deepEqual(digitMarks("+14155550142", "+14155550199").filter((m) => m.differs), [], "two digits off, not swapped");
+  assert.deepEqual(digitMarks("+14155550142", "+14155559876").filter((m) => m.differs), [], "a different number");
+  assert.deepEqual(digitMarks("+14155550142", "+14155550214").filter((m) => m.differs), [], "a swap that isn't adjacent");
 });

@@ -154,8 +154,7 @@ export default async function CaseDetailPage({ params, searchParams }: {
             <PaymentPath
               bills={c.bills_held}
               nextPayment={c.next_payment_date}
-              held={hold?.status === "confirmed" || hold?.status === "releasing"}
-              released={hold?.status === "released"}
+              holdStatus={hold?.status ?? null}
               newAccount={`${change.new_account.routing_number} ···${change.new_account.last4}`}
               oldAccount={change.old_account ? `${change.old_account.routing_number} ···${change.old_account.last4}` : null}
             />

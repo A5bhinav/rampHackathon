@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { CaseSummary } from "@/lib/api-types";
-import { STATIONS, dayWindow, place, type StationCount } from "@/lib/flow";
+import { STATIONS, dayWindow, heldLanes, place, type StationCount } from "@/lib/flow";
 import { date, dueLabel, when } from "@/lib/format";
 import type { Stage } from "@/lib/progress";
 import { Icon } from "./icons";
@@ -25,6 +25,7 @@ export function QueueRail({ counts }: { counts: StationCount[] }) {
                 {s.split.needs_review ? <span className="badge tone-warn">{s.split.needs_review} needs review</span> : null}
                 {s.split.awaiting_release ? <span className="badge tone-ok">{s.split.awaiting_release} awaiting approver</span> : null}
                 {s.split.blocked ? <span className="badge tone-bad">{s.split.blocked} blocked</span> : null}
+                {s.split.other ? <span className="badge tone-warn">{s.split.other} needs a person</span> : null}
               </span>
             ) : null}
           </li>
@@ -48,7 +49,7 @@ export function CaseRail({ steps }: { steps: Stage[] }) {
               {MARK[s.status] ? <span className="station-mark" aria-hidden="true">{MARK[s.status]}</span> : null}
             </span>
             <span className="station-label">{s.label}<span className="sr-only">: {s.status === "todo" ? "not reached" : s.status}</span></span>
-            <span className="station-meaning">{STATIONS[i].meaning}</span>
+            <span className="station-meaning">{s.status === "failed" ? "A person must review this before anything else" : STATIONS[i].meaning}</span>
             <span className="station-note">{s.note}</span>
           </li>
         ))}
@@ -58,13 +59,14 @@ export function CaseRail({ steps }: { steps: Stage[] }) {
 }
 
 const DAY_MS = 86_400_000;
+const LANES = 12;
 const tick = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 
 /** Held payments by due date: a lane per change, its next saved payment date and its deadline,
  *  with today marked and the overdue side shaded. The table below says the same in words. */
 export function PaymentLanes({ cases, now, datasetId }: { cases: CaseSummary[]; now: Date; datasetId: string }) {
-  const rows = cases.filter((c) => c.next_payment_date).sort((a, b) => a.next_payment_date!.localeCompare(b.next_payment_date!));
-  if (rows.length === 0) return null;
+  const { shown: rows, more, notHeld } = heldLanes(cases, LANES);
+  if (rows.length === 0 && notHeld === 0) return null;
   const w = dayWindow(now, rows.flatMap((c) => [c.next_payment_date!, ...(c.deadline_at ? [c.deadline_at] : [])]));
   const today = place(now.toISOString(), w)!.pct;
   const start = Date.parse(`${w.start}T00:00:00Z`);
@@ -96,7 +98,7 @@ export function PaymentLanes({ cases, now, datasetId }: { cases: CaseSummary[]; 
           const words = `${c.vendor.legal_name}: ${c.bills_held} held bill${c.bills_held === 1 ? "" : "s"}, next payment ${date(c.next_payment_date)}${due ? ` (${due.text})` : ""}`;
           return (
             <div key={c.id} className="lane">
-              <Link className="lane-name" href={`/d/${datasetId}/cases/${c.id}`}>{c.vendor.legal_name}</Link>
+              <Link className="lane-name" href={`/d/${datasetId}/cases/${c.id}`} title={c.vendor.legal_name}>{c.vendor.legal_name}</Link>
               <span className="track">
                 <span className="today-line" aria-hidden="true" />
                 {dl ? (
@@ -112,7 +114,11 @@ export function PaymentLanes({ cases, now, datasetId }: { cases: CaseSummary[]; 
           );
         })}
       </div>
-      <figcaption className="muted sub">Times in UTC. Each change&apos;s full row, in words, is in the table below.</figcaption>
+      <figcaption className="muted sub">
+        Times in UTC. Only changes whose hold is in place are drawn{more ? `; showing the ${LANES} soonest, ${more} more in the table` : ""}.
+        {notHeld ? ` ${notHeld} ${notHeld === 1 ? "change has" : "changes have"} no confirmed hold yet and ${notHeld === 1 ? "is" : "are"} not drawn.` : ""}
+        {" "}Each change&apos;s full row, in words, is in the table below.
+      </figcaption>
     </figure>
   );
 }

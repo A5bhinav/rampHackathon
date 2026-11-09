@@ -1,20 +1,19 @@
+import type { HoldStatus } from "@/lib/api-types";
+import { holdGate } from "@/lib/flow";
 import { date } from "@/lib/format";
 import { Icon } from "./icons";
 
 /** The payment's path on a case (spec 0032): from the company's Ramp account, through the hold,
  *  to the vendor's new account, with the old one it replaces. Routing numbers and last four
  *  digits only (ADR-8); the hold's state is the core's, shown, never inferred. */
-export function PaymentPath({ bills, nextPayment, held, released, newAccount, oldAccount }: {
+export function PaymentPath({ bills, nextPayment, holdStatus, newAccount, oldAccount }: {
   bills: number;
   nextPayment: string | null;
-  held: boolean;
-  released: boolean;
+  holdStatus: HoldStatus | null;
   newAccount: string;
   oldAccount: string | null;
 }) {
-  const gate = released ? { cls: "is-open", icon: "release" as const, text: "Hold lifted" }
-    : held ? { cls: "is-held", icon: "hold" as const, text: "Held in Ramp" }
-    : { cls: "is-pending", icon: "hold" as const, text: "Hold not confirmed" };
+  const gate = holdGate(holdStatus);
   return (
     <ol className="path" aria-label="Where the payments go">
       <li className="path-stop">
@@ -24,8 +23,8 @@ export function PaymentPath({ bills, nextPayment, held, released, newAccount, ol
           <span className="muted sub">{bills} unpaid bill{bills === 1 ? "" : "s"}{nextPayment ? `, next due ${date(nextPayment)}` : ""}</span>
         </span>
       </li>
-      <li className={`path-gate ${gate.cls}`}>
-        <span className="path-node"><Icon name={gate.icon} size={16} /></span>
+      <li className={`path-gate is-${gate.kind}`}>
+        <span className="path-node"><Icon name={gate.kind === "lifted" ? "release" : "hold"} size={16} /></span>
         <span className="path-gate-text">{gate.text}</span>
       </li>
       <li className="path-stop is-new">

@@ -225,10 +225,12 @@ main a:focus-visible { box-shadow: var(--ring); }
 .path-gate-text { font-size: 0.8125rem; font-weight: 600; }
 .path-gate.is-held .path-node { background: var(--warn-bg); border-color: var(--fill-warn); color: var(--warn); }
 .path-gate.is-held .path-gate-text { color: var(--warn); }
-.path-gate.is-pending .path-node { background: var(--bad-bg); border-color: var(--bad); color: var(--bad); }
-.path-gate.is-pending .path-gate-text { color: var(--bad); }
-.path-gate.is-open .path-node { background: var(--ok-bg); border-color: var(--ok); color: var(--ok); }
-.path-gate.is-open .path-gate-text { color: var(--ok); }
+.path-gate.is-failed .path-node { background: var(--bad-bg); border-color: var(--bad); color: var(--bad); }
+.path-gate.is-failed .path-gate-text { color: var(--bad); }
+.path-gate.is-placing .path-node { background: var(--surface); border-style: dashed; color: var(--muted); }
+.path-gate.is-placing .path-gate-text { color: var(--muted); }
+.path-gate.is-lifted .path-node { background: var(--ok-bg); border-color: var(--ok); color: var(--ok); }
+.path-gate.is-lifted .path-gate-text { color: var(--ok); }
 .schedule { list-style: none; margin: 0; padding: 0; }
 .schedule li { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; padding: 7px 0; border-top: 1px solid var(--line); }
 .schedule li:first-child { border-top: 0; }
@@ -271,13 +273,17 @@ figure.chart { margin: 0 0 20px; }
 .mark-count { position: absolute; left: 18px; font-size: 0.75rem; font-weight: 600; color: var(--text-2); }
 .mark-pay.is-off-before::before, .mark-pay.is-off-after::before { position: absolute; font-size: 0.75rem; font-weight: 700; color: var(--muted); }
 .mark-pay.is-off-before::before { content: "‹"; right: 18px; }
-.mark-pay.is-off-after::before { content: "›"; left: 18px; }
-.mark-pay.is-off-after .mark-count { left: 28px; }
+.mark-pay.is-off-after::before { content: "›"; left: auto; right: -12px; }
+.mark-pay.is-off-after .mark-count { left: auto; right: 18px; }
 .mark-deadline { width: 3px; height: 18px; border-radius: 2px; background: var(--muted); }
+.mark-deadline.is-off-before::before, .mark-deadline.is-off-after::before { position: absolute; top: 0; font-size: 0.75rem; font-weight: 700; color: var(--muted); }
+.mark-deadline.is-off-before::before { content: "‹"; left: 6px; }
+.mark-deadline.is-off-after::before { content: "›"; right: 6px; }
 
 /* Vendors by status: one segmented bar, shares inside the blocks that fit them. */
 .segbar { display: flex; gap: 2px; height: 28px; border-radius: 6px; overflow: hidden; }
-.seg { display: flex; align-items: center; padding: 0 8px; min-width: 6px; font-size: 0.75rem; font-weight: 600; color: #fff; border-radius: 4px; }
+.seg { display: flex; align-items: center; min-width: 6px; overflow: hidden; text-indent: 8px; white-space: nowrap; font-size: 0.75rem;
+  font-weight: 600; color: #fff; border-radius: 4px; }
 .seg-bad { background: var(--fill-bad); }
 .seg-warn { background: var(--fill-warn); color: #2b1d00; }
 .seg-muted { background: var(--fill-muted); }
@@ -417,6 +423,7 @@ main a.button-link:focus-visible { box-shadow: var(--ring); }
 button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 button.danger { color: var(--bad); }
 button.quiet { border-color: transparent; background: transparent; color: var(--muted); padding: 6px 10px; font-weight: 500; box-shadow: none; }
+button:focus-visible, button.quiet:focus-visible { box-shadow: var(--ring); }
 button:disabled { opacity: 0.55; cursor: not-allowed; }
 @media (hover: hover) and (pointer: fine) {
   button:not(:disabled):hover, .button-link:hover { transform: translateY(-1px); transition-duration: var(--in); border-color: var(--text); }
@@ -482,6 +489,7 @@ body:has(.signin) {
   .stat { padding: 12px 14px; border-top: 1px solid var(--line); margin-top: -1px; }
   .stat dd { font-size: 1.375rem; }
   .lanes { --name: 92px; }
+  .tick:not(:first-child):not(.is-end) { display: none; }
   .lane-name { font-size: 0.8125rem; }
   .candidate { grid-template-columns: minmax(0, 1fr) auto; }
   .candidate-sources, .candidate-seen { grid-column: 1 / -1; text-align: left; }

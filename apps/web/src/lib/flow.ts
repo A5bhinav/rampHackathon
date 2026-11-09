@@ -1,6 +1,6 @@
 // The money path drawn as a rail, and the held-payments chart's day axis (spec 0032).
 // Display only: these count and place what the core sends; nothing here decides anything.
-import type { CaseState } from "./api-types";
+import type { CaseState, HoldStatus } from "./api-types";
 import { stationOf, type StageKey } from "./progress.ts";
 
 export type Station = { key: StageKey; label: string; meaning: string };
@@ -14,19 +14,48 @@ export const STATIONS: Station[] = [
   { key: "release", label: "Release", meaning: "The hold lifts and saved dates come back" },
 ];
 
-export type SignOffSplit = { needs_review: number; awaiting_release: number; blocked: number };
+export type SignOffSplit = { needs_review: number; awaiting_release: number; blocked: number; other: number };
 export type StationCount = Station & { count: number; split?: SignOffSplit };
 
 /** How many changes sit at each station; released ones count at release. Sign-off is split
  *  by what it waits for. An unknown state counts at sign-off, like the case page shows it. */
 export function stationCounts(cases: readonly { state: CaseState }[]): StationCount[] {
   const counts = [0, 0, 0, 0, 0];
-  const split: SignOffSplit = { needs_review: 0, awaiting_release: 0, blocked: 0 };
+  const split: SignOffSplit = { needs_review: 0, awaiting_release: 0, blocked: 0, other: 0 };
+  const named = ["needs_review", "awaiting_release", "blocked"] as const;
   for (const c of cases) {
-    counts[Math.min(stationOf(c.state).index, 4)] += 1;
-    if (Object.hasOwn(split, c.state)) split[c.state as keyof SignOffSplit] += 1;
+    const index = Math.min(stationOf(c.state).index, 4);
+    counts[index] += 1;
+    if (index !== 3) continue;
+    const key = named.find((k) => k === c.state);
+    split[key ?? "other"] += 1;  // a state the dashboard doesn't know still says it needs a person
   }
   return STATIONS.map((s, i) => ({ ...s, count: counts[i], ...(s.key === "person" ? { split } : {}) }));
+}
+
+export type HoldGate = { kind: "held" | "lifted" | "placing" | "failed"; text: string };
+
+/** What the payment path says about the hold, from the hold's own status. Only a failed hold is
+ *  the alarm; one still being placed says so; an unknown status fails closed to "not confirmed". */
+export function holdGate(status: HoldStatus | null): HoldGate {
+  switch (status) {
+    case "confirmed": return { kind: "held", text: "Held in Ramp" };
+    case "releasing": return { kind: "held", text: "Held in Ramp, release under way" };
+    case "released": return { kind: "lifted", text: "Hold lifted" };
+    case "placing": case null: return { kind: "placing", text: "Placing the hold" };
+    default: return { kind: "failed", text: "Hold not confirmed" };
+  }
+}
+
+const HELD: readonly (HoldStatus | null)[] = ["confirmed", "releasing"];
+
+/** The changes the held-payments chart draws: only those whose hold is in place (a failed or
+ *  still-placing hold is not "held", and is counted instead), soonest payment first, at most
+ *  `cap` of them. */
+export function heldLanes<T extends { hold_status: HoldStatus | null; next_payment_date: string | null }>(cases: readonly T[], cap: number) {
+  const held = cases.filter((c) => HELD.includes(c.hold_status) && c.next_payment_date)
+    .sort((a, b) => a.next_payment_date!.localeCompare(b.next_payment_date!));
+  return { shown: held.slice(0, cap), more: Math.max(0, held.length - cap), notHeld: cases.filter((c) => !HELD.includes(c.hold_status)).length };
 }
 
 const DAY_MS = 86_400_000;
