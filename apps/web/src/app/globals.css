@@ -398,3 +398,44 @@ body:has(.signin) {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; animation: none !important; }
 }
+
+/* The decision's effect and checklist, and the call as a conversation (spec 0036). ---------- */
+.effect { font-weight: 500; margin: 12px 0 0; padding: 10px 14px; border-radius: var(--radius-sm); background: var(--surface-2);
+  border: 1px solid var(--line); }
+ul.checklist { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+ul.checklist li { display: grid; grid-template-columns: 96px 1fr auto; gap: 10px; align-items: baseline; padding: 6px 8px;
+  border-radius: 6px; scroll-margin-top: 90px; }
+ul.checklist li:target, .rule-group li:target { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
+ul.checklist .badge { justify-self: start; }
+.call-card { border-top: 3px solid var(--line-strong); }
+.call-head { display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-bottom: 10px; }
+.call-head h2 { margin: 0; align-items: center; }
+.call-meta { display: flex; flex-wrap: wrap; gap: 6px 24px; margin: 0 0 14px; font-size: 0.8125rem; }
+.call-meta dt { color: var(--muted); }
+.call-meta dd { margin: 0; font-weight: 500; }
+.convo { list-style: none; padding: 0; margin: 0 0 8px; display: grid; gap: 10px; }
+.say-pair { display: grid; gap: 6px; }
+.say { max-width: 82%; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--line); }
+.say p { margin: 0; }
+.say-who { display: block; font-size: 0.75rem; color: var(--muted); margin-bottom: 3px; }
+.say-agent { background: var(--surface-2); border-top-left-radius: 4px; }
+.say-callee { justify-self: end; background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 22%, var(--line));
+  border-top-right-radius: 4px; }
+.say-callee p { font-weight: 600; }
+.say-callee.is-none { background: var(--surface); border-style: dashed; }
+.say-callee.is-none p { font-weight: 400; color: var(--muted); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+main a.rule-chip { font-size: 0.75rem; font-weight: 600; padding: 2px 8px; border-radius: 999px; box-shadow: none; background-image: none; }
+main a.rule-chip:hover { text-decoration: underline; }
+ul.checks { list-style: none; padding: 0; margin: 0 0 10px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 20px; }
+ul.checks li { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; padding: 4px 0;
+  border-bottom: 1px solid var(--line); font-size: 0.875rem; }
+.call-note { margin: 4px 0 0; }
+@media (max-width: 640px) {
+  .say { max-width: 100%; }
+  ul.checks { grid-template-columns: 1fr; }
+  ul.checklist li { grid-template-columns: 1fr auto; }
+  ul.checklist li > span:nth-child(2) { grid-column: 1 / -1; grid-row: 2; }
+}
+details.fold summary { cursor: pointer; color: var(--accent); font-weight: 500; font-size: 0.875rem; margin-bottom: 8px; }
+.rule-group li { scroll-margin-top: 90px; }

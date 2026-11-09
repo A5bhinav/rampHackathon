@@ -304,3 +304,89 @@ async def test_the_vendor_risk_list_reads_the_ledger(world):
 
 async def test_the_vendor_risk_list_of_an_unknown_dataset_is_not_found(world):
     await get(world, f"/api/datasets/{uuid.uuid4()}/vendor-risk", "clerk", RISK, status=404)
+
+
+async def test_the_case_shows_its_calls_answers_and_checks(world):
+    """Spec 0035: the call comes from the evidence chain; account_last4 is a digit count, never the digits."""
+    case = await verified_case(world)
+    detail = await get(world, f"/api/cases/{case['id']}", "approver1", "/api/cases/{case_id}")
+    [call] = detail["calls"]
+    assert (call["attempt"], call["result"], call["answered_by"], call["direction"], call["dialed_number_is_pick"]) \
+        == (1, "answers_recorded", "human", "outbound", True)
+    assert call["started_at"] and call["ended_at"] and call["last_four_result"] == "match"
+    assert call["checks"]["disclosure_first"] is True and call["checks"]["speech_guard_trips"] == 0
+    slots = {a["slot"]: a for a in call["answers"]}
+    assert slots["change_requested"]["value"] == "yes" and slots["change_requested"]["turn_id"] == 7
+    assert "V07_right_person_confirmed" in slots["change_requested"]["feeds"]
+    last4 = slots["account_last4"]
+    assert (last4["value"], last4["digit_count"], last4["capture_method"]) == (None, 4, "keypad")
+    assert "V08_digits_match" in last4["feeds"]
+    raw = json.dumps(detail)
+    assert "6666\"" not in raw.replace('"last4": "6666"', "") and "digits_hmac" not in raw, "no trace of the spoken digits"
+    script = detail["call_script"]
+    assert script["disclosure"].startswith("Hi, this is an AI assistant on a recorded line")
+    assert [q["slot"] for q in script["questions"]][:2] == ["recording_consent", "company_named"]
+    assert "transcript" in script["note"]
+
+    d = detail["decision"]
+    assert [c["status"] for c in d["checklist"]] == ["passed"] * 12
+    assert d["checklist"][7] == {"id": "V08_digits_match", "sentence": "The digits the person gave match the new account.",
+                                 "status": "passed"}
+    assert {f["block"] for f in d["fired"]} == {"verified"} and "approver" in d["effect"]
+
+
+async def test_a_refused_call_has_no_attempt(world):
+    world.voice.refuse = "not_on_dial_allowlist"
+    await import_all(world.pool, world.ramp, world.keys, world.dataset.id)
+    await change_and_detect(world)
+    detail = await get(world, f"/api/cases/{(await case_of(world))['id']}", "approver1", "/api/cases/{case_id}")
+    assert detail["calls"] == [] and detail["decision"] is None
+
+
+async def test_a_denial_is_not_verified_and_its_checklist_was_not_run(world):
+    await import_all(world.pool, world.ramp, world.keys, world.dataset.id)
+    await change_and_detect(world)
+    case = await case_of(world)
+    from flows import transit
+    call_id = world.voice.placed[-1]["call_id"]
+    await report(world, case["id"], call_id, answers=transit(call_id, change="no"))
+    await world.worker.drain(world.dataset.id)
+    d = (await get(world, f"/api/cases/{case['id']}", "approver1", "/api/cases/{case_id}"))["decision"]
+    assert d["outcome"] == "not_verified"
+    assert d["fired"] == [{"id": "NV01_vendor_denied_change", "block": "not_verified",
+                           "sentence": "The person said the vendor did not ask to change its bank details."}]
+    assert {c["status"] for c in d["checklist"]} == {"not_checked"} and "Not verified" in d["checklist_note"]
+    assert "blocked" in d["effect"]
+
+
+async def test_the_evidence_log_points_at_a_hand_edited_row(world, database_url):
+    world.voice.refuse = "not_on_dial_allowlist"
+    await import_all(world.pool, world.ramp, world.keys, world.dataset.id)
+    await change_and_detect(world)
+    ds = str(world.dataset.id)
+    spec = "/api/datasets/{dataset_id}/evidence"
+    log = await get(world, f"/api/datasets/{ds}/evidence", "approver1", spec)
+    assert log["chain"]["ok"] is True and log["total"] == len(log["events"]) >= 3
+    assert [e["seq"] for e in log["events"]] == sorted((e["seq"] for e in log["events"]), reverse=True)
+    assert all(e["content_ok"] and e["link_ok"] for e in log["events"])
+    first = log["events"][-1]
+    assert (first["seq"], first["prev_hash"], first["vendor"]) == (1, "0" * 64, "Acme Fasteners LLC")
+
+    async with await psycopg.AsyncConnection.connect(database_url, autocommit=True) as owner:
+        await owner.execute("alter table audit.evidence_events disable trigger evidence_events_no_update")
+        try:
+            await owner.execute("update audit.evidence_events set body_jcs = replace(body_jcs, 'webhook', 'manual') "
+                                "where chain_id = %s and seq = 1", (world.dataset.chain_id,))
+        finally:
+            await owner.execute("alter table audit.evidence_events enable trigger evidence_events_no_update")
+    assert log["last_check"] is None, "the verify job hasn't run on this dataset"
+    await world.worker.jobs.run(world.dataset.id, "verify_chain", force=True)
+    log = await get(world, f"/api/datasets/{ds}/evidence", "approver1", spec, limit=2)
+    assert (log["chain"]["ok"], log["chain"]["first_bad_seq"], len(log["events"])) == (False, 1, 2)
+    check = log["last_check"]
+    assert (check["ok"], check["first_bad_seq"]) == (False, 1), "what the job found, not whether the job ran"
+    assert check["finished_at"] and "body edited" in check["detail"]
+    full = await get(world, f"/api/datasets/{ds}/evidence", "approver1", spec)
+    bad = [e["seq"] for e in full["events"] if not e["content_ok"]]
+    assert bad == [1] and all(e["link_ok"] for e in full["events"]), "only the edited row's body fails; the links still hold"
+    await get(world, f"/api/datasets/{uuid.uuid4()}/evidence", "approver1", spec, status=404)
