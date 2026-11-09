@@ -18,7 +18,7 @@ the page.
    change) and on `app.releases` (every approval, including the first of two) raises
    `insufficient_privilege` when the signed-in person (`auth.uid()`) is a demo account and the
    dataset's kind isn't `demo`. System writes (no signed-in person) are untouched. The rule trusts
-   the kind, so a dataset's kind can't change after it is made (a trigger), and neither `demo
+   the kind, so none of the app's roles can change a dataset's kind after it is made (a trigger), and neither `demo
    reset` nor `new-dataset --kind demo` makes a demo dataset against Ramp's sandbox.
 3. **Demo accounts see only demo datasets and their cases** (restrictive row-level security
    policies on `app.datasets` and `app.cases`, so a permissive policy added later can't widen

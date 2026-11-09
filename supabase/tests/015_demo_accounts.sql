@@ -20,15 +20,9 @@ $$;
 create function pg_temp.body(p_case uuid) returns jsonb
 language sql as $$ select jsonb_build_object('reason', 'Checked.', 'expected_version', version) from app.cases where id = p_case $$;
 
--- The dataset's kind, set as the owner past the trigger that otherwise refuses it.
+-- The dataset's kind, set as the owner (the app's roles can't).
 create function pg_temp.set_kind(p_dataset uuid, p_kind app.dataset_kind) returns void
-language plpgsql as $$
-begin
-  alter table app.datasets disable trigger datasets_kind_is_fixed;
-  update app.datasets set kind = p_kind where id = p_dataset;
-  alter table app.datasets enable trigger datasets_kind_is_fixed;
-end
-$$;
+language sql as $$ update app.datasets set kind = p_kind where id = p_dataset $$;
 
 do $$
 declare
@@ -44,7 +38,9 @@ begin
   insert into app.demo_accounts (user_id) values (demo);
 
   -- Nothing can turn a dataset into a demo one, so the rule below can trust the kind.
+  set local role service_role;
   perform pg_temp.expect_error(format($q$ update app.datasets set kind = 'demo' where id = %L $q$, f.dataset), '42501', '%kind can''t change%');
+  reset role;
 
   -- Off demo data, the demo approver can neither clear nor block a review; nothing moves.
   c := pg_temp.case_needing_review('k1', f.clerk);

@@ -56,14 +56,15 @@ create policy cases_demo_accounts_see_demo on app.cases as restrictive for selec
   using (not (select app.is_demo_account(auth.uid()))
          or exists (select 1 from app.datasets d where d.id = app.cases.dataset_id and d.kind = 'demo'));
 
--- A dataset's kind is fixed when it is made: the rule above trusts it, so nothing may turn a
--- dataset into a demo one afterwards (or a demo one into anything else).
+-- A dataset's kind is fixed when it is made: the rule above trusts it, so none of the app's roles
+-- (the core and worker as service_role, a signed-in person) may change it afterwards. The owner
+-- could disable this trigger anyway, so it isn't refused (test fixtures set kinds that way).
 create function app.refuse_dataset_kind_change() returns trigger
 language plpgsql
 set search_path = pg_catalog, pg_temp
 as $$
 begin
-  if new.kind is distinct from old.kind then
+  if new.kind is distinct from old.kind and current_user in ('service_role', 'authenticated', 'anon') then
     raise exception 'app.datasets: a dataset''s kind can''t change (% to %)', old.kind, new.kind
       using errcode = 'insufficient_privilege';
   end if;
