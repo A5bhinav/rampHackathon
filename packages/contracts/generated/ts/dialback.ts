@@ -417,10 +417,13 @@ export interface components {
         };
         EvidenceLog: {
             chain: components["schemas"]["ChainStatus"];
-            /** @description The scheduled verify job's last run on this dataset, or null if it hasn't run. */
+            /** @description What the scheduled verify job found on its last run on this dataset, or null if it hasn't run. It also compares the tip with the one its previous run saw, so it can find deleted or rewritten newest rows that a recompute alone can't. */
             last_check: {
                 finished_at: components["schemas"]["Timestamp"] | null;
+                /** @description Whether that run found the chain intact; null if it recorded no result. */
                 ok: boolean | null;
+                first_bad_seq?: number | null;
+                detail?: string | null;
             } | null;
             total: number;
             /** @description Newest first, at most limit rows. */
