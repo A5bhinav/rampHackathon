@@ -165,8 +165,9 @@ def violations(world: World, out: dict) -> list[str]:
             found.append("I1_first_seen_in_context_eligible")
         if not n.visible:
             found.append("I2_hidden_only_eligible")
-        # Labels from outside the change context only: the attacker writes the context, and I12 requires
-        # that a label there not revoke a number (I1 still refuses one first seen in the context).
+        # Labels from outside the change context only: the attacker writes the context, so the oracle
+        # stays neutral on context labels and lets I12 judge what they may do (I1 still refuses a
+        # number first seen in the context).
         if any((r.party != "vendor" or _fax(r)) and r.document_id not in f.in_context_ids for r in n.visible):
             found.append("I3_nonvendor_or_fax_eligible")
         if len(n.channels) < s.min_source_types:
@@ -210,8 +211,8 @@ def _with(world: World, *, documents=None, sightings=None) -> World:
 def metamorphic(world: World, base: dict | None = None) -> list[str]:
     """Re-run the rule on mutated copies of the world. Attacker evidence (an in-context sighting, a
     lookalike email, a second document under an existing id) must never make a number eligible; hidden
-    text and late records must change nothing at all; and a party or fax label in the change context
-    must never revoke a number first seen outside it (I12, gated Nov 8)."""
+    text and late records must change nothing at all; and a label in the change context must never
+    move the call to a different number (I12, gated Nov 8)."""
     kw, found = world.kwargs, []
     base = run(world) if base is None else base
     if run(world) != base:
@@ -259,36 +260,43 @@ def metamorphic(world: World, base: dict | None = None) -> list[str]:
         if any(_eligible(run(_with(world, documents=[*kw["documents"], twin]))) - eligible for twin in _twins(doc)):
             found.append("M_shared_id_helped")
             break
-    if eligible and (blocked := _label_probe(world, eligible)):
-        found.append(blocked)
+    if moved := _label_probe(world, base):
+        found.append(moved)
     return found
 
 
-def _label_probe(world: World, eligible: frozenset[str]) -> str | None:
-    """I12: the attacker's own text in the change context names each eligible number as a bank line and
-    as a fax line, on every context path (the request's thread, its subject, a lookalike sender), at the
-    request's time. None of those labels may make the number ineligible. Only numbers already seen
-    outside the context before that time are probed, so R2's first-seen rule never comes into play."""
-    kw, request = world.kwargs, world.kwargs["request"]
-    if request is None or request.received_at >= kw["case_opened_at"]:
+# I12's attacker text, as ingestion labels it: a bank's line, a fax line, and a bare mention with no
+# label the reader can place (role and party "unknown"; spec 0022), which the rule also refuses.
+LABEL_KINDS = (("ar", "bank"), ("fax", "vendor"), ("unknown", "unknown"))
+
+
+def _label_probe(world: World, base: dict) -> str | None:
+    """I12: the attacker's own text in the change context names the picked number, at the request's
+    time, one label kind on one context path at a time (the request's thread, its subject, a lookalike
+    sender), so no probe can hide another. The call must stay on that number or go nowhere: refusing
+    the case is allowed, calling a different number is not. Probed only when the pick was seen outside
+    the context before that time, so R2's first-seen rule never comes into play."""
+    kw, request, pick = world.kwargs, world.kwargs["request"], base.get("e164")
+    if pick is None or request is None or request.received_at >= kw["case_opened_at"]:
         return None
-    when, base = request.received_at, _frame(world)
-    targets = sorted(e for e in eligible if e in base.numbers and any(
-        r.document_id not in base.in_context_ids and base.docs[r.document_id].received_at < when
-        for r in base.numbers[e].visible))
-    if not targets:
+    when, f = request.received_at, _frame(world)
+    number = f.numbers.get(pick)
+    if number is None or not any(r.document_id not in f.in_context_ids and f.docs[r.document_id].received_at < when
+                                 for r in number.visible):
         return None
     other, look = "ar@other.example", _address("lookalike", kw["vendor_domains"][0])
-    docs = [DocumentRef("m_lbl_thread", "email", when, other, request.thread_id, "Doc m_lbl_thread", when),
-            DocumentRef("m_lbl_subject", "email", when, other, "t_m_lbl_subject", request.subject, when),
-            DocumentRef("m_lbl_look", "email", when, look, "t_m_lbl_look", "Doc m_lbl_look", when)]
-    rows = [Sighting(e, d.id, "email", when, "visible", role, party, when)
-            for d in docs for e in targets for role, party in (("ar", "bank"), ("fax", "vendor"))]
-    probe = _with(world, documents=[*kw["documents"], *docs], sightings=[*kw["sightings"], *rows])
-    ctx = _frame(probe).in_context_ids                  # keep only the paths this world's request opens
-    probe = _with(world, documents=[*kw["documents"], *(d for d in docs if d.id in ctx)],
-                  sightings=[*kw["sightings"], *(r for r in rows if r.document_id in ctx)])
-    return "M_incontext_label_blocked" if set(targets) - _eligible(run(probe)) else None
+    for doc in (DocumentRef("m_lbl_thread", "email", when, other, request.thread_id, "Doc m_lbl_thread", when),
+                DocumentRef("m_lbl_subject", "email", when, other, "t_m_lbl_subject", request.subject, when),
+                DocumentRef("m_lbl_look", "email", when, look, "t_m_lbl_look", "Doc m_lbl_look", when)):
+        documents = [*kw["documents"], doc]
+        if doc.id not in _frame(_with(world, documents=documents)).in_context_ids:
+            continue                                   # a path this world's request does not open
+        for role, party in LABEL_KINDS:
+            row = Sighting(pick, doc.id, "email", when, "visible", role, party, when)
+            now = run(_with(world, documents=documents, sightings=[*kw["sightings"], row])).get("e164")
+            if now is not None and now != pick:
+                return "M_incontext_label_moved_pick"
+    return None
 
 
 def _clean(world: World) -> bool:

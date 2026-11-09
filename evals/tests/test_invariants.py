@@ -24,10 +24,10 @@ from hypothesis import given, settings
 REAL = "+14155550142"
 NUM = "+13035550169"
 X = "+13035550101"
-# Gated on Nov 8 ("Gate it too"): select() lets a change-context label revoke a number. The real rule
-# fails this check in every world with an eligible number until the rule changes, so the oracle's
-# self-tests below set it aside when they ask the real rule to pass everything else.
-CONTEXT_LABEL = "M_incontext_label_blocked"
+# I12, gated Nov 8 and narrowed the same day: a change-context label must never move the call to
+# another number. Matched by prefix in the tests below so the label's earlier name is caught too.
+CONTEXT_LABEL = "M_incontext_label_moved_pick"
+LABEL_PREFIX = "M_incontext_label"
 
 
 def _rewrite(out: dict, e164: str, **changes) -> dict:
@@ -118,7 +118,7 @@ def test_clean_world_picks_a_provable_number():
 def test_each_metamorphic_check_catches_a_broken_rule(label, monkeypatch):
     world = make_world(numbers=[NumberSpec(REAL, ["contract", "listing"], 500), NumberSpec(X, ["contract"], 400)])
     honest = run(world)
-    assert [m for m in metamorphic(world) if m != CONTEXT_LABEL] == []           # the real rule passes the rest
+    assert metamorphic(world) == []                                              # the real rule passes
     calls = itertools.count()
 
     def docs(w):
@@ -147,7 +147,7 @@ def test_new_invariants_catch_broken_rules(monkeypatch):
     assert liveness(make_world(numbers=[real]), empty) == ["L1_clean_world_no_pick"]
     late = make_world(numbers=[real, NumberSpec("+14155550199", [], 500,
                                                 sightings=(SightingSpec("listing", 500, recorded_late=True),))])
-    assert [m for m in metamorphic(late) if m != CONTEXT_LABEL] == []
+    assert metamorphic(late) == []
     monkeypatch.setattr("dialback_evals.invariants.run",           # a rule that reads late records trips I10
                         lambda w: picked | {"inputs_sha256": str(len(w.kwargs["documents"]))})
     assert "M_late_changed" in metamorphic(late)
@@ -234,17 +234,28 @@ def test_first_seen_probe_catches_a_rule_that_ignores_it(monkeypatch):
     assert "M_first_seen_ignored" in metamorphic(world)
 
 
-# The reachable finding, gated Nov 8 (I12): a party or fax label on a change-context sighting must not
-# revoke a number first seen outside the change context. The attacker writes the change context.
+# The reachable finding, gated Nov 8 (I12): a label in the change context (bank, fax, or none at all,
+# which ingestion records as party "unknown") must never move the call to another number. Refusing
+# the case is allowed. Two fix shapes stand in for the rule's owner's choice; both must pass.
 
 def _context_blind(world):
-    """select() with change-context labels ignored, the fix direction the gate asks for: a sighting on a
-    document in select()'s own change context keeps its timing and visibility but loses its party and
-    role. A number first seen in the context is still refused, by R2."""
+    """One fix shape: a sighting on a document in select()'s own change context keeps its timing and
+    visibility but loses its party and role. A number first seen in the context is still refused, by R2."""
     kw = world.kwargs
     ctx = {d.id for d in change_context_documents(**kw)}
     rows = [dataclasses.replace(s, party="vendor", role="main") if s.document_id in ctx else s for s in kw["sightings"]]
     return select(**{**kw, "sightings": rows})
+
+
+def _fail_closed(world):
+    """The other fix shape: today's checks, but when a number is refused only because of change-context
+    labels, the whole case is refused (no pick) instead of the call moving to the next number."""
+    out = select(**world.kwargs)
+    if {c["e164"] for c in _context_blind(world)["candidates"] if c["eligible"]} - {
+            c["e164"] for c in out["candidates"] if c["eligible"]}:
+        return {k: v for k, v in out.items() if k != "e164"} | {
+            "outcome": "no_provable_number", "candidates": [{**c, "eligible": False} for c in out["candidates"]]}
+    return out
 
 
 _PATHS = {   # each way a document lands in the change context, other than arriving after the cutoff
@@ -252,26 +263,50 @@ _PATHS = {   # each way a document lands in the change context, other than arriv
     "subject": lambda d, req: d.subject == req.subject and d.thread_id != req.thread_id,
     "lookalike": lambda d, req: bool((sd := sender_domain(d.sender)) and is_lookalike(sd, (VENDOR_DOMAIN,))),
 }
-_KINDS = {"bank": lambda s: s.party != "vendor", "fax": lambda s: s.role == "fax"}
+_KINDS = {"bank": lambda s: s.party == "bank", "fax": lambda s: s.role == "fax",
+          "unlabeled": lambda s: s.party == "unknown"}
+
+
+def _partial_fix(kind: str, path: str):
+    """The blind fix, except that one kind of label on one context path still counts: the real rule then
+    refuses the number and calls the next one."""
+    def rule(w):
+        kw, req = w.kwargs, w.kwargs["request"]
+        docs = {d.id: d for d in kw["documents"]}
+        ctx = {d.id for d in change_context_documents(**kw)}
+        rows = [s if s.document_id not in ctx or (_KINDS[kind](s) and _PATHS[path](docs[s.document_id], req))
+                else dataclasses.replace(s, party="vendor", role="main") for s in kw["sightings"]]
+        return select(**{**kw, "sightings": rows})
+    return rule
+
+
+def _two_numbers():
+    """The real number picked (500 days), and a second provable number below it (400 days)."""
+    return make_world(numbers=[NumberSpec(REAL, ["contract", "listing"], 500), NumberSpec(X, ["contract", "listing"], 400)])
+
+
+def _label_hits(world) -> list[str]:
+    return [m for m in metamorphic(world) if m.startswith(LABEL_PREFIX)]
 
 
 @pytest.mark.parametrize("path", sorted(_PATHS))
 @pytest.mark.parametrize("kind", sorted(_KINDS))
-def test_context_label_probe_catches_a_rule_that_lets_context_labels_revoke(kind, path, monkeypatch):
-    world = make_world(numbers=[NumberSpec(REAL, ["contract", "listing"], 500)])
+def test_context_label_probe_catches_a_rule_that_moves_the_call(kind, path, monkeypatch):
+    world = _two_numbers()
+    assert run(world)["e164"] == REAL
     monkeypatch.setattr("dialback_evals.invariants.run", _context_blind)
     assert metamorphic(world) == []                       # a rule that ignores change-context labels passes
-    req = world.kwargs["request"]
+    monkeypatch.setattr("dialback_evals.invariants.run", _partial_fix(kind, path))
+    assert _label_hits(world) == [CONTEXT_LABEL]          # one leaky kind on one path moves the call to X
 
-    def leaky(w):   # the fixed rule, except that one kind of label on one context path still revokes
-        docs = {d.id: d for d in w.kwargs["documents"]}
-        out = _context_blind(w)
-        hit = any(s.e164 == REAL and _KINDS[kind](s) and _PATHS[path](docs[s.document_id], req)
-                  for s in w.kwargs["sightings"])
-        return _rewrite(out, REAL, eligible=False, reasons=["not_vendor_party"]) if hit else out
 
-    monkeypatch.setattr("dialback_evals.invariants.run", leaky)
-    assert CONTEXT_LABEL in metamorphic(world)
+def test_a_rule_that_refuses_the_case_passes_i12(monkeypatch):
+    # Refusing the case when attacker text disputes a number is a valid fix: the call goes nowhere.
+    planted = overblock_world("bank_label_in_thread", 0, planted=True)
+    assert _fail_closed(planted).get("e164") is None
+    monkeypatch.setattr("dialback_evals.invariants.run", _fail_closed)
+    assert _label_hits(_two_numbers()) == []
+    assert _label_hits(planted) == []
 
 
 def test_context_blind_rule_passes_the_planted_bank_label_world(monkeypatch):
@@ -284,13 +319,14 @@ def test_context_blind_rule_passes_the_planted_bank_label_world(monkeypatch):
     assert all_violations(world) == []
 
 
-def test_context_blind_rule_never_trips_the_label_checks(monkeypatch):
-    monkeypatch.setattr("dialback_evals.invariants.run", _context_blind)
+@pytest.mark.parametrize("rule", [_context_blind, _fail_closed], ids=["context_blind", "fail_closed"])
+def test_neither_fix_shape_trips_the_label_checks(rule, monkeypatch):
+    monkeypatch.setattr("dialback_evals.invariants.run", rule)
 
     @given(worlds())
     @settings(max_examples=300, deadline=None, derandomize=True, database=None)
     def check(world):
-        out = _context_blind(world)
+        out = rule(world)
         assert "I3_nonvendor_or_fax_eligible" not in violations(world, out)
-        assert CONTEXT_LABEL not in metamorphic(world, out)
+        assert not [m for m in metamorphic(world, out) if m.startswith(LABEL_PREFIX)]
     check()
