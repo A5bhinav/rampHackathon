@@ -19,7 +19,7 @@ export default async function RiskPage({ params }: { params: Promise<{ datasetId
 
   return (
     <main>
-      <PageHead title="Vendor risk" lead="Is each vendor's number on file one the Trust Ledger can prove? A near miss is one digit off, or two digits swapped, from a number it can prove." />
+      <PageHead title="Vendor risk" lead="Is each vendor's number on file one the Trust Ledger can prove? Each row says why, in the ledger's own words." />
       <Stats label="Vendors by status" items={counts(vendors).map(([status, n]) => ({ label: cap(statusLabel(status)), value: n, tone: tones[status] }))} />
       {vendors.length === 0 ? (
         <section className="card empty"><p>The Trust Ledger has no documents for this dataset&apos;s vendors yet.</p></section>

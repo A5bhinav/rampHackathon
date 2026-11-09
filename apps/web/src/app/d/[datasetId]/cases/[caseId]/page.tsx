@@ -6,7 +6,7 @@ import { DecisionDetail } from "@/components/decision";
 import { PageHead } from "@/components/page";
 import { CoreError, core } from "@/lib/core";
 import { brief, datasetNow, date, dueLabel, relative, when, words } from "@/lib/format";
-import { progress } from "@/lib/progress";
+import { progress, visitedThisVersion } from "@/lib/progress";
 import { releaseAction, reviewAction } from "./actions";
 
 // Case detail and the release console: the timeline from the evidence log, the chain badge,
@@ -41,7 +41,7 @@ export default async function CaseDetailPage({ params, searchParams }: {
     ? detail.releases.find((r) => r.action === "approve" && r.case_version === c.version) : undefined;
   const lastStep = detail.timeline.at(-1);  // its summary is the core's template, so the reason is never guessed here
 
-  const visited = detail.timeline.filter((e) => e.version === c.version).map((e) => e.to_state);
+  const visited = visitedThisVersion(detail.timeline, c.version);
   const steps = progress({ state: c.state, visited, holdStatus: hold?.status ?? null, hasDecision: Boolean(decision) }).map((s) => {
     if (s.status !== "done") return s;
     if (s.key === "hold") return { ...s, note: brief(hold?.confirmed_at) };
@@ -77,7 +77,7 @@ export default async function CaseDetailPage({ params, searchParams }: {
       <ol className="progress" aria-label="Progress">
         {steps.map((s, i) => (
           <li key={s.key} className={`step is-${s.status} step-${s.tone}`} aria-current={s.status === "current" ? "step" : undefined}>
-            <span className="step-dot" aria-hidden="true">{s.status === "done" ? "✓" : s.status === "current" ? "" : i + 1}</span>
+            <span className="step-dot" aria-hidden="true">{s.status === "done" ? "✓" : s.status === "failed" ? "✕" : s.status === "current" ? "" : i + 1}</span>
             <span className="step-text">
               <span className="step-label">{s.label}</span>
               <span className="step-note">{s.note}</span>

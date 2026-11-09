@@ -20,7 +20,8 @@ Design plan:
 - **Layout:** a page head on every page (title, lead line, page actions on the right), then a
   count strip where there is something to count, then the content. The case page is two
   columns: the progress strip, the decision and the console on the left, the change, the hold
-  and the approvals as flatter panels on a sticky right rail.
+  and the approvals as flatter panels on the right (not sticky: a tall rail would hide its
+  own end). On one column the panels come before the timeline.
 - **The one bold thing:** the case's progress strip (hold, call, decision, person, release)
   fills in stage by stage on load. Nothing else moves unless a person acts.
 
@@ -33,10 +34,14 @@ None.
 - [ ] Every signed-in page opens with a page head; the queue and the risk list show a count strip.
 - [ ] The case page shows five stages: done ones ticked, a skipped one dashed (for example no
       call when no number is provable), the current one ringed in its state's tone.
-- [ ] A call counts as done only when it ended with answers recorded; one that reached calling
-      and went to a person without answers shows "not completed", dashed.
+- [ ] A stage is ticked only when the facts say it finished: the hold when it is confirmed, the
+      call when it ended with answers recorded, the decision when one exists. A stage reached
+      but not finished shows "not completed", dashed.
 - [ ] The progress strip reads only the case state, the hold, the decision and this version's
-      timeline. A failed hold shows the hold stage as current, in the bad tone.
+      timeline, and gates nothing. A failed hold is marked failed (a cross, bad tone, "not
+      confirmed"); the current stage still follows the case state, so the strip never
+      disagrees with the actions the page offers. An unknown state shows as waiting on a
+      person, never as released.
 - [ ] The decision card's top edge carries the outcome's colour; with no decision it is neutral.
 - [ ] The queue's vendor cell carries a stripe when a payment is due soon or the hold is unconfirmed.
 - [ ] The risk list is a table with a stripe by status; the lineage page lines every candidate
