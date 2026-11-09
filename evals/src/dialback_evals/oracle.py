@@ -33,5 +33,6 @@ def _reachable(s: Scenario) -> bool:
                     and c.hang_up_at is None and not c.silent and not c.offer_other_number)
     facts_clear = (f.last_four_result == "match" and f.dialed_eligible_number is True
                    and f.dialed_number_is_pick is True and f.speaker_in_change_thread is False
-                   and f.offered_number_from_request is not True and f.line_risk is not True)
+                   and f.offered_number_from_request is not True and f.line_risk is not True
+                   and f.direction == "outbound")
     return caller_clean and facts_clear

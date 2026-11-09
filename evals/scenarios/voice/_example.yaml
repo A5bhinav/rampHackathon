@@ -9,7 +9,8 @@ caller:
   consent: "yes"                      # quote yes/no so YAML keeps them strings, not booleans
   company: Acme Fasteners
   department: Accounts payable
-  name_role: Jordan Lee, AP clerk
+  name: Jordan Lee
+  role: AP clerk
   change: "yes"                       # yes | no | unsure
   last4_mode: keypad                  # keypad | speech | refuse | dont_know
   last4: "4821"

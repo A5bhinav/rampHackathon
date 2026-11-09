@@ -6,6 +6,7 @@ dependencies = [
   "dialback-policy",
   "dialback-voice",
   "dialback-decision",
+  "dialback-core",
   "pyyaml>=6",
 ]
 

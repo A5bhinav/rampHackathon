@@ -59,5 +59,5 @@ def scorecard(results: list[ScenarioResult]) -> dict[str, Any]:
         "hard_gate_failures": [r.scenario_id for r in results if not r.passed],
         "by_class": by_class,
         "generated_at": dt.datetime.now(dt.UTC).isoformat(),
-        "config": {"agent": "lab", "attacker": "scripted"},           # forward-compatible with the full lab
+        "config": {"agent": "scripted", "attacker": "scripted"},           # forward-compatible with the full lab
     }

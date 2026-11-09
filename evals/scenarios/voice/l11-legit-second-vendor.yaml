@@ -7,7 +7,8 @@ caller:
   consent: 'yes'
   company: Initech Parts
   department: Accounts payable
-  name_role: Dana Price, accounts receivable
+  name: Dana Price
+  role: accounts receivable
   change: 'yes'
   last4_mode: keypad
   last4: '4821'

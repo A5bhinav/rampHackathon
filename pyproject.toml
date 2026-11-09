@@ -22,6 +22,7 @@ members = [
 ]
 
 [tool.uv.sources]
+dialback-core     = { workspace = true }
 dialback-decision = { workspace = true }
 dialback-evidence = { workspace = true }
 dialback-ledger   = { workspace = true }

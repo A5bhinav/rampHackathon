@@ -13,7 +13,7 @@ _AT = dt.datetime(2026, 11, 1, 17, 0, tzinfo=dt.UTC)
 
 
 def _caller(**kw) -> CallerBehavior:
-    base = {"consent": "yes", "company": "Acme", "department": "AP", "name_role": "J Lee, AP",
+    base = {"consent": "yes", "company": "Acme", "department": "AP", "name": "J Lee", "role": "AP",
             "change": "yes", "last4_mode": "keypad", "last4": "4821"}
     base.update(kw)
     return CallerBehavior(**base)
@@ -44,3 +44,10 @@ def test_last4_refuse_and_speech_modes():
     assert "rather not" in AdversarialLine(_caller(last4_mode="refuse")).next(_AT, Phase.LAST4).text.lower()
     speech = AdversarialLine(_caller(last4_mode="speech", last4="4821")).next(_AT, Phase.LAST4)
     assert isinstance(speech, CalleeSaid) and "4 8 2 1" in speech.text
+
+
+def test_name_and_role_are_two_answers():
+    # Main's spec 0034 asks name and role as two questions (review fix F1).
+    line = AdversarialLine(_caller(name="Jordan Lee", role="AP clerk"))
+    assert line.next(_AT, Phase.NAME).text == "Jordan Lee"
+    assert line.next(_AT, Phase.ROLE).text == "AP clerk"

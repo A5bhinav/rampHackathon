@@ -2,13 +2,14 @@
 
 `run_scenario` drives the real voice call (`run_call` with the agent under test and the scenario's
 adversarial line) to a `CallResult`. `build_facts` turns that `CallResult` into the decision
-engine's `CaseFacts`: the recorded answers plus the scenario's declared facts, and the three facts
-the Ruling supplies here (the lab always dials outbound, the caller sets who answered, and
-`company_matches` is computed from the recorded company against the scenario's vendor)."""
+engine's `CaseFacts` the way production does (apps/core worker): the recorded answers, the call's
+checks, `dialed_out` from the call's direction, who answered, and `company_matches` by production's
+own `every_name_matches`. Only what the Trust Ledger would know is declared by the scenario (Q57)."""
 from __future__ import annotations
 
 import uuid
 
+from dialback_core.company import every_name_matches
 from dialback_decision.facts import CallChecks, CaseFacts, facts_from_answers, values
 from dialback_policy.script import Script
 from dialback_policy.step import CallContext
@@ -44,21 +45,7 @@ def build_facts(s: Scenario, r: CallResult) -> CaseFacts:
         speaker_in_change_thread=s.facts.speaker_in_change_thread,
         offered_number_from_request=s.facts.offered_number_from_request,
         line_risk=s.facts.line_risk,
-        dialed_out=True,                                    # the lab always dials outbound (Ruling T1/T3)
-        answered_by=s.caller.answered_by,                  # the caller set who picked up
-        company_matches=_company_matches(answers, s.vendor_name),
+        dialed_out=s.facts.direction == "outbound",          # production: the call's direction
+        answered_by=s.caller.answered_by,                  # who picked up, as the line reported it
+        company_matches=every_name_matches(values(answers, "company_named"), s.vendor_name),
     )
-
-
-def _company_matches(answers: list[dict], vendor_name: str) -> bool | None:
-    """Every recorded company name against the real vendor. None when none was recorded (R7)."""
-    said = values(answers, "company_named")
-    if not said:
-        return None
-    target = _norm(vendor_name)
-    return all(_norm(v) == target for v in said)
-
-
-def _norm(v: str) -> str:
-    """Casefold, drop punctuation and collapse spacing, like dialback_decision.facts._name."""
-    return " ".join("".join(c for c in v.casefold() if c.isalnum() or c.isspace()).split())

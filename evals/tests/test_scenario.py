@@ -16,7 +16,8 @@ caller:
   consent: "yes"
   company: Acme Fasteners
   department: Accounts payable
-  name_role: Jordan Lee, AP clerk
+  name: Jordan Lee
+  role: AP clerk
   change: "yes"
   last4_mode: keypad
   last4: "4821"

@@ -2,7 +2,7 @@
 
 `lab run --split voice` loads the scenarios, runs each through the real call and the real decision,
 writes `results.jsonl` and `scorecard.json`, prints a one-line summary, and exits non-zero when any
-hard gate fails. Deterministic (ScriptedAgent via LabAgent, scripted callers), so CI is reproducible
+hard gate fails. Deterministic (the production ScriptedAgent, scripted callers), so CI is reproducible
 and needs no key. `--max-usd` is accepted for forward compatibility; the scripted slice never spends."""
 from __future__ import annotations
 
@@ -14,8 +14,8 @@ from dataclasses import asdict
 from pathlib import Path
 
 from dialback_decision import decide
+from dialback_voice.agent import ScriptedAgent
 
-from .lab_agent import LabAgent
 from .runner import build_facts, run_scenario
 from .scenario import Scenario, expected_hash, load_scenarios
 from .scorers import ScenarioResult, score, scorecard
@@ -52,7 +52,7 @@ def _run(scenarios_dir: Path, out_dir: Path) -> int:
 
 
 def _score_one(s: Scenario) -> ScenarioResult:
-    r = run_scenario(s, LabAgent(), clock=_clock())
+    r = run_scenario(s, ScriptedAgent(), clock=_clock())
     return score(s, r, decide(build_facts(s, r)))
 
 

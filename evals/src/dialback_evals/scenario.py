@@ -23,6 +23,7 @@ LAST4_MODES = frozenset({"keypad", "speech", "refuse", "dont_know"})
 _CONSENT = frozenset({"yes", "no"})
 _CHANGE = frozenset({"yes", "no", "unsure"})
 _ANSWERED_BY = frozenset({"human", "machine"})
+_DIRECTIONS = frozenset({"outbound", "inbound"})
 # The last-four comparison results decide() understands (dialback_decision.last_four).
 _LAST_FOUR = frozenset({"match", "matches_old_account", "near_miss", "mismatch", "not_provided",
                         "ambiguous", "inconsistent"})
@@ -35,7 +36,8 @@ class CallerBehavior:
     consent: str
     company: str
     department: str
-    name_role: str
+    name: str                       # answers the NAME question (spec 0034 asks name and role apart)
+    role: str                       # answers the ROLE question
     change: str
     last4_mode: str
     last4: str = ""
@@ -56,6 +58,7 @@ class DeclaredFacts:
     speaker_in_change_thread: bool | None
     offered_number_from_request: bool | None
     line_risk: bool | None = None       # telephony signal (forwarding, SIM swap): a line-takeover tell
+    direction: str = "outbound"         # outbound (we dialed) | inbound (they called us); production reads the call's
 
 
 @dataclass(frozen=True)
@@ -97,7 +100,8 @@ def _parse(path: Path) -> Scenario:
         consent=one_of(need("consent", c), _CONSENT, "consent"),
         company=str(need("company", c)),
         department=str(need("department", c)),
-        name_role=str(need("name_role", c)),
+        name=str(need("name", c)),
+        role=str(need("role", c)),
         change=one_of(need("change", c), _CHANGE, "change"),
         last4_mode=one_of(need("last4_mode", c), LAST4_MODES, "last4_mode"),
         last4=str(c.get("last4", "")),
@@ -119,6 +123,7 @@ def _parse(path: Path) -> Scenario:
         speaker_in_change_thread=_tri(path, f.get("speaker_in_change_thread")),
         offered_number_from_request=_tri(path, f.get("offered_number_from_request")),
         line_risk=_tri(path, f.get("line_risk")),
+        direction=one_of(f.get("direction", "outbound"), _DIRECTIONS, "direction"),
     )
     return Scenario(
         id=str(need("id", raw)),
