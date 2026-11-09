@@ -19,6 +19,11 @@ from .agent import Agent
 Clock = Callable[[], dt.datetime]
 
 
+def wall_clock() -> dt.datetime:
+    """The live clock: an aware UTC datetime, which the policy stamps on every answer (spec 0034, B2)."""
+    return dt.datetime.now(dt.UTC)
+
+
 @dataclass(frozen=True)
 class CallResult:
     end: policy.End
