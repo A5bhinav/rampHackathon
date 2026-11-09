@@ -23,7 +23,7 @@ from functools import lru_cache
 from pathlib import Path
 
 from dialback_ledger.lookalike import is_lookalike, sender_domain
-from dialback_ledger.select import DocumentRef, Sighting
+from dialback_ledger.select import DocumentRef, Sighting, change_context_documents
 from jsonschema import Draft202012Validator
 
 from .worldgen import World, _address, run
@@ -270,14 +270,31 @@ def metamorphic(world: World, base: dict | None = None) -> list[str]:
 LABEL_KINDS = (("ar", "bank"), ("fax", "vendor"), ("unknown", "unknown"))
 
 
+def _context_labels_removed(world: World) -> World:
+    """The world with every sighting in the rule's own change context relabeled the vendor's and not a
+    fax: the same documents, times and visibility, without what the attacker's text says about them.
+    It uses select()'s change context, not this oracle's conservative one, so a shared id the rule
+    reads as clean keeps its labels and a fixed rule is never flagged for the frame's own defect."""
+    kw = world.kwargs
+    ctx = {d.id for d in change_context_documents(**kw)}
+    return _with(world, sightings=[dataclasses.replace(s, party="vendor", role="main") if s.document_id in ctx else s
+                                   for s in kw["sightings"]])
+
+
 def _label_probe(world: World, base: dict) -> str | None:
-    """I12: the attacker's own text in the change context names the picked number, at the request's
-    time, one label kind on one context path at a time (the request's thread, its subject, a lookalike
-    sender), so no probe can hide another. The call must stay on that number or go nowhere: refusing
-    the case is allowed, calling a different number is not. Probed only when the pick was seen outside
-    the context before that time, so R2's first-seen rule never comes into play."""
+    """I12: a label in the change context never moves the call to a different number; refusing the
+    case is allowed. Two halves. Removal: with the labels already in the context made neutral, the
+    rule's pick must be the same number, or there must be no pick with them. Addition: the attacker's
+    own text names the picked number at the request's time, one label kind on one context path at a
+    time (the request's thread, its subject, a lookalike sender), so no probe can hide another; the
+    call must stay on that number or go nowhere. The addition half runs only when the pick was seen
+    outside the context before that time, so R2's first-seen rule never comes into play."""
     kw, request, pick = world.kwargs, world.kwargs["request"], base.get("e164")
-    if pick is None or request is None or request.received_at >= kw["case_opened_at"]:
+    if pick is None:
+        return None
+    if run(_context_labels_removed(world)).get("e164") != pick:
+        return "M_incontext_label_moved_pick"
+    if request is None or request.received_at >= kw["case_opened_at"]:
         return None
     when, f = request.received_at, _frame(world)
     number = f.numbers.get(pick)

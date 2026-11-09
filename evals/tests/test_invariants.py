@@ -6,7 +6,7 @@ import dataclasses
 import itertools
 
 import pytest
-from dialback_evals.frontier import overblock_world
+from dialback_evals.frontier import PLANTED, overblock_world
 from dialback_evals.invariants import all_violations, l1_premise, liveness, metamorphic, violations
 from dialback_evals.worldgen import (
     VENDOR_DOMAIN,
@@ -298,6 +298,17 @@ def test_context_label_probe_catches_a_rule_that_moves_the_call(kind, path, monk
     assert metamorphic(world) == []                       # a rule that ignores change-context labels passes
     monkeypatch.setattr("dialback_evals.invariants.run", _partial_fix(kind, path))
     assert _label_hits(world) == [CONTEXT_LABEL]          # one leaky kind on one path moves the call to X
+
+
+def test_label_already_in_the_world_that_moved_the_call_is_caught(monkeypatch):
+    # The reachable finding as it arrives: the attacker's in-thread bank line is already there, the real
+    # number is refused, and the planted number is the pick. Adding more labels to that pick only
+    # refuses it too; the check must also see that the label already there moved the call.
+    planted = overblock_world("bank_label_in_thread", 0, planted=True)
+    leaky = _partial_fix("bank", "thread")
+    assert leaky(planted)["e164"] == PLANTED and _context_blind(planted)["e164"] == REAL
+    monkeypatch.setattr("dialback_evals.invariants.run", leaky)
+    assert _label_hits(planted) == [CONTEXT_LABEL]
 
 
 def test_a_rule_that_refuses_the_case_passes_i12(monkeypatch):
