@@ -551,5 +551,5 @@ F1 to F9 hold as built (verified). But the lab still claims more than it shows:
   - The lab spec's open questions Q60, Q61 and Q65 are already used on main: Q60 and Q61 in
     `0029-voice-call-lookup-and-store.md`, Q65 in `0034-live-call-blockers.md`. A4 above cites
     "spec 0033, Q65", meaning the lab's.
-  - Main uses up to Q68, and PR #91 takes Q69 to Q75, so the next free number is Q76. Renumber
-    before this branch merges.
+  - Main uses up to Q68. PR #91 takes Q69 to Q75, and the `sami/onboarding-anchors` branch takes
+    Q76 and Q77, so the next free number is Q78. Renumber before this branch merges.
