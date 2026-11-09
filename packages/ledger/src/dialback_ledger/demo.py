@@ -89,10 +89,10 @@ async def _dataset(conn: psycopg.AsyncConnection, dataset_id: UUID | None, seed:
         if row is None:
             raise DemoError("there is no current demo dataset: run `dialback-core demo reset` first")
     else:
-        row = await (await conn.execute("select id, demo_refs from app.datasets where id = %s and kind = 'demo'",
-                                        (dataset_id,))).fetchone()
+        row = await (await conn.execute("select id, demo_refs from app.datasets where id = %s and kind = 'demo' "
+                                        "and retired_at is null", (dataset_id,))).fetchone()
         if row is None:
-            raise DemoError(f"{dataset_id} is not a demo dataset")
+            raise DemoError(f"{dataset_id} is not a current demo dataset")
     refs = (row["demo_refs"] or {}).get("vendors") or {}
     if not refs:
         raise DemoError("this demo dataset has no vendor refs: was it made by `dialback-core demo reset`?")
@@ -142,12 +142,16 @@ async def load(database_url: str | None = None, *, phones: dict[str, str], datas
         for ref, vendor_id in vendors.items():
             v = seed["vendors"][ref]
             swap = (v["phones"]["ar"], swaps[ref]) if ref in swaps else None
+            loaded = await (await conn.execute("select 1 from ledger.documents where id = %s",
+                                               (stored_id(ds, v["documents"][0]["id"]),))).fetchone()
             docs = [_prepare(d, delta, swap) for d in v["documents"]]
             n = await write_ingest(conn, dataset_id=ds, vendor_id=vendor_id,
                                    result=ingest_all(docs, extractor_version=EXTRACTOR))
             await add_vendor_domain(conn, dataset_id=ds, vendor_id=vendor_id, domain=v["domain"])
             requested = with_requests and await _request(conn, seed, ds, ref, vendor_id, now)
-            summary[ref] = {"observations": n, "request": requested, "phone": "team" if swap else "fictional"}
+            # A reload adds nothing, so a different --phone can't take effect: say so (reset to change it).
+            phone = "already loaded: unchanged" if loaded else ("team" if swap else "fictional")
+            summary[ref] = {"observations": n, "request": requested, "phone": phone}
     return {"dataset_id": str(ds), "vendors": summary}
 
 
@@ -188,7 +192,7 @@ def main(argv: list[str] | None = None) -> int:
             out = asyncio.run(load(phones=dict(args.phone), dataset_id=args.dataset, with_requests=args.with_requests))
             print(f"loaded the demo ledger into {out['dataset_id']}")
             for ref, s in out["vendors"].items():
-                print(f"  {ref:<11} {s['observations']:>3} sightings, {s['phone']} AR line"
+                print(f"  {ref:<11} {s['observations']:>3} new sightings, AR line: {s['phone']}"
                       f"{', change request in' if s['request'] else ''}")
             print("next, at beat 2: dialback-ledger demo request --vendor REF, then dialback-core demo change --vendor REF")
         else:
