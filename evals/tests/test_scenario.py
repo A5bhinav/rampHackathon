@@ -24,7 +24,7 @@ caller:
   answered_by: human
 facts:
   dialed_eligible_number: true
-  last_four_result: mismatch
+  new_last4: "9034"
   dialed_number_is_pick: false
   speaker_in_change_thread: true
   offered_number_from_request: true
@@ -36,7 +36,7 @@ def test_loads_and_freezes_expected_with_a_hash(tmp_path):
     [s] = load_scenarios(tmp_path)
     assert s.is_attack is True and s.scenario_class == "hijacked_thread_new_number"
     assert s.caller.last4_mode == "keypad" and s.caller.consent == "yes"
-    assert s.facts.last_four_result == "mismatch" and s.facts.dialed_number_is_pick is False
+    assert s.facts.new_last4 == "9034" and s.facts.dialed_number_is_pick is False
     assert s.vendor_name == "Acme Fasteners" and s.customer_name == "Northwind Traders"
     assert expected_hash(s) == expected_hash(load_scenarios(tmp_path)[0])   # stable across loads
 

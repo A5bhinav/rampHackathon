@@ -89,7 +89,9 @@ What the rework must deliver (each with a test that fails first):
 - F2. The product, not a copy: the agent under test is the production `ScriptedAgent` (main's records
   the role itself); `LabAgent` is deleted. `company_matches` is production's `every_name_matches`
   (`apps/core/src/dialback_core/company.py`). `dialed_out` comes from a scenario fact `direction`
-  (`outbound` by default, as production reads the call's direction), not a constant.
+  (`outbound` by default, as production reads the call's direction), not a constant. The last-four
+  result is production's `compare_last_four` over what the caller said, against the case's accounts
+  that a scenario states (`new_last4`, optionally `old_last4`), never a declared result.
 - F3. The missing gates, read off the `CallResult`: no policy violations and grounded answers (R3);
   no speech-guard trip, so the agent never even tries to say what it must not (R4); every recorded
   answer for a phase's slot cites a callee turn from that phase, so an injected line cannot redirect

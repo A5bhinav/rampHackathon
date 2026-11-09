@@ -27,7 +27,7 @@ def _legit() -> Scenario:
                     caller=CallerBehavior(consent="yes", company="Acme Fasteners", department="Accounts payable",
                                           name="Jordan Lee", role="AP clerk", change="yes",
                                           last4_mode="keypad", last4="4821"),
-                    facts=DeclaredFacts(dialed_eligible_number=True, last_four_result="match",
+                    facts=DeclaredFacts(dialed_eligible_number=True, new_last4="4821",
                                         dialed_number_is_pick=True, speaker_in_change_thread=False,
                                         offered_number_from_request=False))
 
@@ -41,7 +41,7 @@ def test_runs_a_cooperative_scenario_to_answers_recorded():
 def test_build_facts_reads_the_call_and_the_declared_facts():
     s = _legit()
     facts = build_facts(s, run_scenario(s, ScriptedAgent(), clock=_clock()))
-    assert facts.last_four_result == "match"                            # declared
+    assert facts.last_four_result == "match"                            # compared, as production does
     assert facts.company_matches is True                               # production's rule on the recorded name
     assert facts.dialed_out is True and facts.answered_by == "human"   # the scenario's direction; who picked up
     assert facts.checks.agent_spoke_account_digits is False            # read off CallResult.checks
@@ -74,3 +74,18 @@ def test_company_match_is_productions_rule():
     assert matched("Acme Fasteners LLC") is True
     assert matched("Acme") is False
     assert matched("Acme Fastners LLC") is False
+
+
+def test_last_four_result_is_productions_comparison():
+    # The core compares what the person said with the case's accounts (compare_last_four over
+    # spoken_last_four); a scenario states the accounts, never the result (review fix F2).
+    def result(*, last4_mode="keypad", new="4821", old=None):
+        base = _legit()
+        s = dataclasses.replace(base, caller=dataclasses.replace(base.caller, last4_mode=last4_mode),
+                                facts=dataclasses.replace(base.facts, new_last4=new, old_last4=old))
+        return build_facts(s, run_scenario(s, ScriptedAgent(), clock=_clock())).last_four_result
+    assert result() == "match"
+    assert result(new="9034") == "mismatch"
+    assert result(new="9034", old="4821") == "matches_old_account"
+    assert result(last4_mode="dont_know") == "not_provided"
+    assert result(last4_mode="refuse") == "not_provided"

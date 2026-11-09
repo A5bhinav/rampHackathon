@@ -3,13 +3,15 @@
 `run_scenario` drives the real voice call (`run_call` with the agent under test and the scenario's
 adversarial line) to a `CallResult`. `build_facts` turns that `CallResult` into the decision
 engine's `CaseFacts` the way production does (apps/core worker): the recorded answers, the call's
-checks, `dialed_out` from the call's direction, who answered, and `company_matches` by production's
-own `every_name_matches`. Only what the Trust Ledger would know is declared by the scenario (Q57)."""
+checks, `dialed_out` from the call's direction, who answered, `company_matches` by production's own
+`every_name_matches`, and `last_four_result` by production's `compare_last_four` on what was said. Only what the Trust Ledger would know is declared by the scenario (Q57)."""
 from __future__ import annotations
 
 import uuid
 
+from dialback_core.answers import spoken_last_four
 from dialback_core.company import every_name_matches
+from dialback_decision import compare_last_four
 from dialback_decision.facts import CallChecks, CaseFacts, facts_from_answers, values
 from dialback_policy.script import Script
 from dialback_policy.step import CallContext
@@ -40,7 +42,8 @@ def build_facts(s: Scenario, r: CallResult) -> CaseFacts:
         call_result=r.end.result,
         checks=CallChecks(**r.checks),
         dialed_eligible_number=s.facts.dialed_eligible_number,
-        last_four_result=s.facts.last_four_result,
+        # production: the core compares what was said with the case's accounts (apps/core calls.py)
+        last_four_result=compare_last_four(spoken_last_four(r.answers), s.facts.new_last4, s.facts.old_last4),
         dialed_number_is_pick=s.facts.dialed_number_is_pick,
         speaker_in_change_thread=s.facts.speaker_in_change_thread,
         offered_number_from_request=s.facts.offered_number_from_request,

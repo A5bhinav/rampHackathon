@@ -18,7 +18,7 @@ facts:
   # is the one defense under test (V02: only a call we dialed can verify).
   direction: inbound
   dialed_eligible_number: true
-  last_four_result: match
+  new_last4: "4821"
   dialed_number_is_pick: true
   speaker_in_change_thread: false
   offered_number_from_request: false

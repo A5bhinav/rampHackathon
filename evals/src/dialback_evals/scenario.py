@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
@@ -24,9 +25,7 @@ _CONSENT = frozenset({"yes", "no"})
 _CHANGE = frozenset({"yes", "no", "unsure"})
 _ANSWERED_BY = frozenset({"human", "machine"})
 _DIRECTIONS = frozenset({"outbound", "inbound"})
-# The last-four comparison results decide() understands (dialback_decision.last_four).
-_LAST_FOUR = frozenset({"match", "matches_old_account", "near_miss", "mismatch", "not_provided",
-                        "ambiguous", "inconsistent"})
+_FOUR_DIGITS = re.compile(r"[0-9]{4}")
 
 
 @dataclass(frozen=True)
@@ -53,11 +52,12 @@ class CallerBehavior:
 class DeclaredFacts:
     """The ledger's view a scenario stands in for (Q57). `None` means not known (fail closed, R7)."""
     dialed_eligible_number: bool
-    last_four_result: str | None
+    new_last4: str                      # the new account's last four, as the case holds it
     dialed_number_is_pick: bool | None
     speaker_in_change_thread: bool | None
     offered_number_from_request: bool | None
     line_risk: bool | None = None       # telephony signal (forwarding, SIM swap): a line-takeover tell
+    old_last4: str | None = None        # the old account's last four, when the case knows it
     direction: str = "outbound"         # outbound (we dialed) | inbound (they called us); production reads the call's
 
 
@@ -113,12 +113,14 @@ def _parse(path: Path) -> Scenario:
         silent=bool(c.get("silent", False)),
     )
     f = need("facts", raw)
-    lfr = f.get("last_four_result")
-    if lfr is not None:
-        one_of(lfr, _LAST_FOUR, "last_four_result")
+    new_last4, old_last4 = str(need("new_last4", f)), f.get("old_last4")
+    for what, digits in (("new_last4", new_last4), ("old_last4", old_last4)):
+        if digits is not None and not _FOUR_DIGITS.fullmatch(str(digits)):
+            raise ValueError(f"{path.name}: {what} must be four digits, not {digits!r}")
     facts = DeclaredFacts(
         dialed_eligible_number=bool(need("dialed_eligible_number", f)),
-        last_four_result=lfr,
+        new_last4=new_last4,
+        old_last4=None if old_last4 is None else str(old_last4),
         dialed_number_is_pick=_tri(path, f.get("dialed_number_is_pick")),
         speaker_in_change_thread=_tri(path, f.get("speaker_in_change_thread")),
         offered_number_from_request=_tri(path, f.get("offered_number_from_request")),

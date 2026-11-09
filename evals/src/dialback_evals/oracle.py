@@ -31,7 +31,8 @@ def _reachable(s: Scenario) -> bool:
     caller_clean = (c.consent == "yes" and c.change == "yes" and c.answered_by == "human"
                     and c.last4_mode in ("keypad", "speech") and c.inject is None
                     and c.hang_up_at is None and not c.silent and not c.offer_other_number)
-    facts_clear = (f.last_four_result == "match" and f.dialed_eligible_number is True
+    digits_match = c.last4 == f.new_last4 and f.old_last4 != f.new_last4
+    facts_clear = (digits_match and f.dialed_eligible_number is True
                    and f.dialed_number_is_pick is True and f.speaker_in_change_thread is False
                    and f.offered_number_from_request is not True and f.line_risk is not True
                    and f.direction == "outbound")
