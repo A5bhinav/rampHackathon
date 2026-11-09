@@ -7,6 +7,7 @@ import itertools
 import pytest
 from dialback_evals.invariants import all_violations, l1_premise, liveness, metamorphic, violations
 from dialback_evals.worldgen import NumberSpec, SightingSpec, clean_worlds, make_world, run, worlds
+from dialback_ledger.select import Settings
 from hypothesis import given, settings
 
 REAL = "+14155550142"
@@ -139,3 +140,37 @@ def test_new_invariants_catch_broken_rules(monkeypatch):
                                                             "eligible": len({d.id for d in w.kwargs["documents"]})
                                                             < len(w.kwargs["documents"])}]})
     assert "M_shared_id_helped" in metamorphic(make_world(numbers=[real]))
+
+
+# The three confirmed ways attacker evidence makes a number eligible (ledger, Task 2 finding). Each
+# world is one the first-cut oracle missed; these pin that the widened oracle now reaches it.
+
+def test_oracle_finds_an_unanchored_near_miss_wherever_the_anchor_doc_sits():
+    # A second document under the anchor's id un-anchors the near miss. The anchor's document is not
+    # the world's first one, so a first-document-only probe never tries it.
+    world = make_world(numbers=[NumberSpec("+12065550100", ["contract", "listing"], 600),
+                                NumberSpec(REAL, ["contract"], 200),
+                                NumberSpec("+14155550143", ["listing", "vendor_portal"], 150,
+                                           near_miss_of=REAL, is_poison=True)])
+    assert "M_shared_id_helped" in metamorphic(world)
+
+
+def test_oracle_probes_lookalike_emails_at_several_ages():
+    # A lookalike email 30 days back pulls a same-subject anchor into context; a probe 100 days back
+    # would put the near miss itself in context too, and miss it.
+    s = Settings(min_source_types=1, min_age_days=0, near_miss_distance=1, same_subject_window_days=30)
+    world = make_world(numbers=[NumberSpec(REAL, ["contract"], 40, subject_in_context=True),
+                                NumberSpec("+14155550143", ["listing"], 35, near_miss_of=REAL, is_poison=True)],
+                       settings=s)
+    assert "M_lookalike_helped" in metamorphic(world)
+
+
+def test_oracle_tries_a_shared_id_twin_that_sorts_first():
+    # A second document under a lookalike email's id, sorting ahead of it, becomes the copy the rule
+    # reads: the lookalike stops pulling the cutoff back and the attacker's number becomes provable.
+    world = make_world(numbers=[
+        NumberSpec("+19995550000", [], 0, sightings=(SightingSpec("email", 300, visibility="white",
+                                                                  sender="lookalike"),)),
+        NumberSpec("+12065550169", ["contract", "listing"], 200, is_poison=True)])
+    assert run(world).get("e164") is None
+    assert "M_shared_id_helped" in metamorphic(world)

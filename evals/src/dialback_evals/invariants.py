@@ -26,6 +26,7 @@ from .worldgen import World, _address, run
 
 COUNTING = frozenset({"email", "contract", "vendor_portal", "listing", "paper_mail"})  # not vendor_master
 FRESH = "+19990000001"   # a number no generated world uses, for probes when a world has no candidate
+LOOKALIKE_PROBE_DAYS = (30, 100, 400)   # a lookalike email this many days before the request
 _SCHEMA = Path(__file__).resolve().parents[3] / "packages/contracts/schemas/selection.schema.json"
 _PREFIX = re.compile(r"^((re|fwd?|aw|sv)\s*:|\[[^\]]*\])\s*")
 
@@ -192,6 +193,15 @@ def _eligible(out: dict) -> frozenset[str]:
     return frozenset(c["e164"] for c in out.get("candidates", []) if c.get("eligible"))
 
 
+def _twins(doc: DocumentRef) -> tuple[DocumentRef, DocumentRef]:
+    """Two second documents an attacker could file under `doc`'s id. The rule keeps one copy per id,
+    the one whose repr sorts first, so one twin sorts after the original (the original stays the copy
+    the rule reads) and one sorts before it (the twin becomes that copy)."""
+    subject = f"{doc.subject} (shared id)"
+    return (dataclasses.replace(doc, sender="zz@other.example", subject=subject),
+            dataclasses.replace(doc, sender="", subject=subject))
+
+
 def _with(world: World, *, documents=None, sightings=None) -> World:
     kw = dict(world.kwargs)
     if documents is not None:
@@ -227,8 +237,11 @@ def metamorphic(world: World, base: dict | None = None) -> list[str]:
     hidden = run(plus("m_hidden", "contract", 400, f"ar@{domain}", "t_m_hidden", "white"))
     if _eligible(hidden) != eligible or hidden.get("e164") != base.get("e164"):
         found.append("M_hidden_helped")
-    if _eligible(run(plus("m_look", "email", 100, _address("lookalike", domain), "t_m_look", "visible"))) - eligible:
-        found.append("M_lookalike_helped")
+    for days in LOOKALIKE_PROBE_DAYS:
+        probe = plus(f"m_look{days}", "email", days, _address("lookalike", domain), f"t_m_look{days}", "visible")
+        if _eligible(run(probe)) - eligible:
+            found.append("M_lookalike_helped")
+            break
     opened = kw["case_opened_at"]
     if any(d.recorded_at >= opened for d in kw["documents"]) or any(r.recorded_at >= opened for r in kw["sightings"]):
         trimmed = _with(world, documents=[d for d in kw["documents"] if d.recorded_at < opened],
@@ -236,11 +249,14 @@ def metamorphic(world: World, base: dict | None = None) -> list[str]:
         if run(trimmed) != base:
             found.append("M_late_changed")
     req_id = kw["request"].document_id if kw["request"] is not None else None
-    first = next((d for d in kw["documents"] if d.id != req_id), None)
-    if first is not None:
-        twin = dataclasses.replace(first, subject=f"{first.subject} (shared id)", sender="ar@other.example")
-        if _eligible(run(_with(world, documents=[*kw["documents"], twin]))) - eligible:
+    tried: set[str] = set()
+    for doc in kw["documents"]:                    # every document, not only the first (I11 is universal)
+        if doc.id == req_id or doc.id in tried:
+            continue
+        tried.add(doc.id)
+        if any(_eligible(run(_with(world, documents=[*kw["documents"], twin]))) - eligible for twin in _twins(doc)):
             found.append("M_shared_id_helped")
+            break
     return found
 
 
