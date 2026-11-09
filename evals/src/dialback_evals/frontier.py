@@ -56,7 +56,8 @@ def min_effort(cells: list[dict]) -> dict:
     parts = [f"at least {c} counting channel{'s' if c != 1 else ''} and at least {d} days of lead" for c, d in front]
     summary = ("The poison number becomes the pick with " + " or ".join(parts) + ", against a vendor whose own "
                "number is seen only by email (K01 shape). Against a vendor with a provable number the poison must "
-               "also be seen before it to outrank it; the real number is held fixed (spec Q62).")
+               "also outrank it, or noise must block the vendor's number: the over-block sweep's planted rows show "
+               "which noise hands the pick to a planted number (review I6). The real number is held fixed (spec Q62).")
     return {"channels": front[0][0], "lead_days": front[0][1], "front": [list(p) for p in front], "summary": summary}
 
 
@@ -77,8 +78,10 @@ REAL = "+14155550142"
 SIBLING = "+14155550143"
 UNRELATED = "+18675550188"
 REAL_LEAD = 200
+PLANTED = "+16455550177"   # a provable number someone else planted, younger than the real one (another area code)
+PLANTED_LEAD = 150
 NOISE = ("lookalike_email", "in_thread_copy", "same_subject_copy", "near_miss_sibling", "hidden_copy",
-         "bank_label_copy", "fax_label_copy", "shared_id_duplicate", "late_copy")
+         "bank_label_copy", "bank_label_in_thread", "fax_label_copy", "shared_id_duplicate", "late_copy")
 NOISE_AGES = (0, 30, 90, 180, 365, 730)
 
 
@@ -87,8 +90,10 @@ def _copy(*sightings: SightingSpec) -> NumberSpec:
     return NumberSpec(REAL, [], 0, sightings=sightings)
 
 
-def overblock_world(noise: str | None, age_days: int, settings: Settings = DEFAULT) -> World:
-    """The real number (contract + listing, first seen REAL_LEAD days back) plus one piece of noise."""
+def overblock_world(noise: str | None, age_days: int, settings: Settings = DEFAULT, planted: bool = False) -> World:
+    """The real number (contract + listing, first seen REAL_LEAD days back) plus one piece of noise. With
+    `planted`, also a provable number someone else planted (contract + listing, PLANTED_LEAD days back),
+    which ranks below the real number on its own; the row shows whether the noise hands it the pick."""
     extra = {
         None: None,
         "lookalike_email": NumberSpec(UNRELATED, [], 0, sightings=(SightingSpec("email", age_days, sender="lookalike"),)),
@@ -97,11 +102,15 @@ def overblock_world(noise: str | None, age_days: int, settings: Settings = DEFAU
         "near_miss_sibling": NumberSpec(SIBLING, ["contract", "listing"], age_days, near_miss_of=REAL, is_poison=True),
         "hidden_copy": _copy(SightingSpec("contract", age_days, visibility="white")),
         "bank_label_copy": _copy(SightingSpec("listing", age_days, party="bank")),
+        # The attacker's own message in the change request's thread, naming the real number as a bank line.
+        "bank_label_in_thread": _copy(SightingSpec("email", age_days, party="bank", in_thread=True, sender="other")),
         "fax_label_copy": _copy(SightingSpec("listing", age_days, role="fax")),
         "shared_id_duplicate": None,
         "late_copy": _copy(SightingSpec("listing", age_days, recorded_late=True)),
     }[noise]
     numbers = [NumberSpec(REAL, ["contract", "listing"], REAL_LEAD)] + ([extra] if extra else [])
+    if planted:
+        numbers.append(NumberSpec(PLANTED, ["contract", "listing"], PLANTED_LEAD, is_poison=True))
     world = make_world(numbers=numbers, settings=settings)
     if noise != "shared_id_duplicate":
         return world
@@ -110,27 +119,42 @@ def overblock_world(noise: str | None, age_days: int, settings: Settings = DEFAU
     return dataclasses.replace(world, kwargs={**world.kwargs, "documents": [*world.kwargs["documents"], twin]})
 
 
-def _cell(noise: str | None, age_days: int | None, settings: Settings) -> dict:
-    out = run(overblock_world(noise, age_days or 0, settings))
+def _cell(noise: str | None, age_days: int | None, settings: Settings, planted: bool) -> dict:
+    out = run(overblock_world(noise, age_days or 0, settings, planted))
     real = next(c for c in out["candidates"] if c["e164"] == REAL)
-    return {"noise": noise, "age_days": age_days, "outcome": out["outcome"], "picked": out.get("e164"),
-            "real_picked": out.get("e164") == REAL, "real_reasons": list(real["reasons"])}
+    return {"noise": noise, "age_days": age_days, "planted": planted, "outcome": out["outcome"],
+            "picked": out.get("e164"), "real_picked": out.get("e164") == REAL, "real_reasons": list(real["reasons"])}
 
 
 def overblock_sweep(settings: Settings = DEFAULT) -> list[dict]:
-    return [_cell(None, None, settings)] + [_cell(n, a, settings) for n, a in itertools.product(NOISE, NOISE_AGES)]
+    """Both families: the real number alone with each noise, then again with a planted number present."""
+    return [cell for planted in (False, True)
+            for cell in [_cell(None, None, settings, planted)]
+            + [_cell(n, a, settings, planted) for n, a in itertools.product(NOISE, NOISE_AGES)]]
 
 
 def overblock_holds(cells: list[dict]) -> bool:
-    base = next(c for c in cells if c["noise"] is None)
-    inert = [c for c in cells if c["noise"] in ("hidden_copy", "late_copy")]
-    return base["real_picked"] and all(c["real_picked"] for c in inert)
+    """With or without a planted number: the baseline picks the real number, and hidden or late-recorded
+    noise never blocks it or moves the call."""
+    must_pick_real = [c for c in cells if c["noise"] in (None, "hidden_copy", "late_copy")]
+    return bool(must_pick_real) and all(c["real_picked"] for c in must_pick_real)
 
 
 def overblock_table(cells: list[dict]) -> dict:
-    summary = {}
+    summary, planted_summary = {}, {}
     for noise in NOISE:
-        mine = [c for c in cells if c["noise"] == noise]
+        rows = [c for c in cells if c["noise"] == noise and c["planted"]]
+        moves = [c["age_days"] for c in rows if c["picked"] == PLANTED]
+        if not moves:
+            hand = f"{noise} never hands the pick to the planted number"
+        elif len(moves) == len(rows):
+            hand = f"{noise} hands the pick to the planted number at every age"
+        else:
+            hand = f"{noise} hands the pick to the planted number at ages {', '.join(map(str, moves))} days"
+        planted_summary[noise] = {"moves_to_planted_at": moves,
+                                  "line": f"{hand} (real number {REAL_LEAD} days, planted number {PLANTED_LEAD} days)"}
+    for noise in NOISE:
+        mine = [c for c in cells if c["noise"] == noise and not c["planted"]]
         blocks = [c["age_days"] for c in mine if not c["real_picked"]]
         moved = sorted({c["picked"] for c in mine if not c["real_picked"] and c["picked"]})
         if not blocks:
@@ -143,6 +167,9 @@ def overblock_table(cells: list[dict]) -> dict:
             line += f"; the pick moves to {', '.join(moved)}"
         summary[noise] = {"blocks_at": blocks, "moved_to": moved,
                           "line": f"{line} (real number first seen {REAL_LEAD} days before the request; spec Q64)"}
-    base = next(c for c in cells if c["noise"] is None)
+    base = next(c for c in cells if c["noise"] is None and not c["planted"])
+    planted_base = next(c for c in cells if c["noise"] is None and c["planted"])
     return {"real": {"e164": REAL, "channels": ["contract", "listing"], "lead_days": REAL_LEAD},
-            "baseline_picked": base["real_picked"], "ages": list(NOISE_AGES), "cells": cells, "summary": summary}
+            "planted": {"e164": PLANTED, "channels": ["contract", "listing"], "lead_days": PLANTED_LEAD},
+            "baseline_picked": base["real_picked"], "planted_baseline_picked": planted_base["picked"],
+            "ages": list(NOISE_AGES), "cells": cells, "summary": summary, "planted_summary": planted_summary}

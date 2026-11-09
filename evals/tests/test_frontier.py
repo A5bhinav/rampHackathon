@@ -44,3 +44,28 @@ def test_overblock_sweep_baseline_and_inert_noise():
     assert base["real_picked"] is True and base["real_reasons"] == []
     table = overblock_table(cells)
     assert set(table["summary"]) == set(NOISE) and all(v["line"] for v in table["summary"].values())
+
+
+# Review finding I6: noise that blocks the real number can move the call to someone else's number.
+
+def test_overblock_records_when_noise_hands_the_pick_to_a_planted_number():
+    from dialback_evals.frontier import REAL
+    cells = overblock_sweep()
+    planted_base = next(c for c in cells if c["planted"] and c["noise"] is None)
+    assert planted_base["picked"] == REAL                  # alone, the planted number ranks below the real one
+    table = overblock_table(cells)
+    assert set(table["planted_summary"]) == set(NOISE)
+    assert all(v["line"] for v in table["planted_summary"].values())
+
+
+def test_overblock_holds_covers_the_planted_rows():
+    from dialback_evals.frontier import PLANTED
+    cells = overblock_sweep()
+    moved = [dict(c, picked=PLANTED, real_picked=False) if c["planted"] and c["noise"] == "hidden_copy" else c
+             for c in cells]
+    assert overblock_holds(cells) and not overblock_holds(moved)   # hidden text that moved the call must fail
+
+
+def test_frontier_summary_does_not_claim_the_poison_must_be_older():
+    summary = min_effort(sweep())["summary"]
+    assert "must also be seen before it" not in summary and "planted" in summary
