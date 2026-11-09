@@ -15,7 +15,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import hmac
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from typing import Protocol
 from xml.sax.saxutils import quoteattr
 
@@ -71,11 +71,15 @@ def build_connect_twiml(*, ws_url: str, call_token: str, disclosure: str, answer
             "</Connect></Response>")
 
 
-def valid_twilio_signature(auth_token: bytes, signature: str, url: str, params: Mapping[str, str]) -> bool:
+def valid_twilio_signature(auth_token: bytes, signature: str, url: str,
+                           params: Mapping[str, str] | Iterable[tuple[str, str]]) -> bool:
     """True if `signature` is Twilio's X-Twilio-Signature for this request: HMAC-SHA1, keyed by the
-    account's auth token, over the full URL followed by each POST field as key+value in key order,
-    base64-encoded (Twilio's published scheme). Constant-time, so a wrong signature leaks nothing."""
-    data = url + "".join(key + params[key] for key in sorted(params))
+    account's auth token, over the full URL Twilio requested (query string included) followed by
+    every POST field, blank values included, as key+value sorted by key then value with duplicates
+    removed, base64-encoded (Twilio's published scheme; spec 0034, D3). `params` is the form's
+    (key, value) pairs, or a mapping. Constant-time, so a wrong signature leaks nothing."""
+    pairs = params.items() if isinstance(params, Mapping) else params
+    data = url + "".join(key + value for key, value in sorted(set(pairs)))
     expected = base64.b64encode(hmac.new(auth_token, data.encode("utf-8"), hashlib.sha1).digest()).decode("ascii")
     return hmac.compare_digest(expected, signature or "")
 

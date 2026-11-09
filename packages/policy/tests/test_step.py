@@ -81,9 +81,11 @@ def to_last4(c: Call) -> None:
     t = c.callee("Acme Fasteners")
     c.agent(rec("company_named", "Acme Fasteners", t), text="And which department is this?")
     t = c.callee("Accounts receivable")
-    c.agent(rec("department", "Accounts receivable", t), text="May I have your name and role?")
-    t = c.callee("Dana Ruiz, I'm the AR manager")
-    c.agent(rec("speaker_name", "Dana Ruiz", t), rec("speaker_role", "AR manager", t),
+    c.agent(rec("department", "Accounts receivable", t), text="May I have your name?")
+    t = c.callee("Dana Ruiz")
+    c.agent(rec("speaker_name", "Dana Ruiz", t), text="And what's your role there?")
+    t = c.callee("I'm the AR manager")
+    c.agent(rec("speaker_role", "AR manager", t),
             text="Did your company recently ask Fictional Co to change how you get paid?")
     t = c.callee("Yes, we did, last week.")
     c.agent(rec("change_requested", "yes", t), text="What are the last four digits of the new account?")
@@ -209,6 +211,9 @@ def test_volunteered_answers_after_consent_count_and_the_order_skips_ahead() -> 
     t = c.callee("This is Dana in accounts receivable at Acme Fasteners.")
     c.agent(rec("company_named", "Acme Fasteners", t), rec("department", "accounts receivable", t),
             rec("speaker_name", "Dana", t))
+    assert c.state.phase == Phase.ROLE          # no role was volunteered, so it is asked (spec 0034)
+    t = c.callee("I'm the AR manager.")
+    c.agent(rec("speaker_role", "AR manager", t))
     assert c.state.phase == Phase.CHANGE
     assert checks(c.state)["answers_grounded"] is True
 
@@ -266,14 +271,37 @@ def test_the_next_business_morning_skips_the_weekend() -> None:
     assert c.end.retry_at == dt.datetime(2026, 11, 9, 18, 0, tzinfo=dt.UTC)  # Monday 10:00 Los Angeles
 
 
-def test_a_new_speaker_means_the_name_is_asked_again() -> None:
+def test_name_and_role_are_asked_as_two_questions() -> None:
+    # Spec 0034, B5: the role is its own question, so a clean call always records one (V06).
+    c = Call()
+    c.connect()
+    t = c.callee("Yes, that's fine.")
+    c.agent(rec("recording_consent", "yes", t))
+    t = c.callee("Acme Fasteners")
+    c.agent(rec("company_named", "Acme Fasteners", t))
+    t = c.callee("Accounts receivable")
+    c.agent(rec("department", "Accounts receivable", t))
+    assert c.state.phase == Phase.NAME and c.said[-1] == "May I have your name?"
+    t = c.callee("Dana Ruiz")
+    c.agent(rec("speaker_name", "Dana Ruiz", t))
+    assert c.state.phase == Phase.ROLE and c.said[-1] == "And what's your role there?"
+    t = c.callee("I'm the AR manager")
+    c.agent(rec("speaker_role", "AR manager", t))
+    assert c.state.phase == Phase.CHANGE
+    assert all(c.state.grounded)
+
+
+def test_a_new_speaker_is_asked_name_and_role_again() -> None:
     c = Call()
     to_last4(c)
     t = c.callee("Hang on, my manager Lee is taking over.")
-    c.agent(rec("flag", "speaker_changed", t), text="Hi! May I have your name and your role?")
-    assert c.state.phase == Phase.NAME_ROLE
-    t = c.callee("Lee Park, controller")
-    c.agent(rec("speaker_name", "Lee Park", t), rec("speaker_role", "controller", t))
+    c.agent(rec("flag", "speaker_changed", t), text="Hi! May I have your name?")
+    assert c.state.phase == Phase.NAME
+    t = c.callee("Lee Park")
+    c.agent(rec("speaker_name", "Lee Park", t))
+    assert c.state.phase == Phase.ROLE
+    t = c.callee("I'm the controller")
+    c.agent(rec("speaker_role", "controller", t))
     assert c.state.phase == Phase.LAST4
 
 
@@ -391,7 +419,9 @@ def test_the_yes_no_questions_are_always_code_s_wording() -> None:  # B1
     t = c.callee("Accounts receivable")
     c.agent(rec("department", "Accounts receivable", t))
     t = c.callee("Dana Ruiz")
-    c.agent(rec("speaker_name", "Dana Ruiz", t), text="Is it okay if I ask about something else?")
+    c.agent(rec("speaker_name", "Dana Ruiz", t))
+    t = c.callee("I'm the AR manager")                     # the role is its own question now (spec 0034)
+    c.agent(rec("speaker_role", "AR manager", t), text="Is it okay if I ask about something else?")
     assert c.said[-1] == f"Has your company recently asked {SCRIPT.customer_name} to change how you get paid?"
 
 

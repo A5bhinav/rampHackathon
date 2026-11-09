@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import logging
 import os
-import time
 from collections.abc import Callable
 from uuid import UUID
 
@@ -25,7 +24,7 @@ from .db import make_lookup
 from .pg_store import PgCallStore
 from .settings import Settings, load_settings
 from .store import CallDial, CallStore
-from .transport import Clock
+from .transport import Clock, wall_clock
 from .wire import build_twilio_deps
 
 log = logging.getLogger(__name__)
@@ -63,7 +62,7 @@ def _ledger_lookup(settings: Settings) -> Lookup:
 def create_asgi_app(settings: Settings | None = None, *,
                     store_for: Callable[[], CallStore] | None = None,
                     lookup_for: Callable[[], Lookup] | None = None,
-                    http: httpx.AsyncClient | None = None, clock: Clock = time.monotonic) -> FastAPI:
+                    http: httpx.AsyncClient | None = None, clock: Clock = wall_clock) -> FastAPI:
     """Read the environment and build the app. With no factory injected, the store and lookup are the
     Postgres ones built from DATABASE_URL (spec 0029); without it the service refuses to boot (R7).
     Tests pass fakes."""
