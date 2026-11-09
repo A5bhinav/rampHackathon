@@ -271,18 +271,30 @@ def _fail_closed(world):
         "reason": "The change request's own text would change which number is called, so none is."}
 
 
-_PATHS = {   # each way a document lands in the change context, other than arriving after the cutoff
+_PATHS = {   # each way a document lands in the change context
     # The request email itself: where real ingestion puts the attacker's own words (review 2, B1).
     "request": lambda d, req: d.id == req.document_id,
     "thread": lambda d, req: (d.thread_id == req.thread_id and d.id != req.document_id
-                              and sender_domain(d.sender) != VENDOR_DOMAIN),
+                              and sender_domain(d.sender) != VENDOR_DOMAIN and d.received_at <= req.received_at),
     # A reply in the thread from the vendor's own domain: a hijacked mailbox.
     "thread_own": lambda d, req: (d.thread_id == req.thread_id and d.id != req.document_id
-                                  and sender_domain(d.sender) == VENDOR_DOMAIN),
+                                  and sender_domain(d.sender) == VENDOR_DOMAIN and d.received_at <= req.received_at),
     "subject": lambda d, req: d.subject == req.subject and d.thread_id != req.thread_id,
-    "lookalike": lambda d, req: bool((sd := sender_domain(d.sender)) and is_lookalike(sd, (VENDOR_DOMAIN,))),
+    # A forwarded or replied copy of the subject in another thread (re-review K1).
+    "fwd_subject": lambda d, req: (d.subject != req.subject and (req.subject or "") in (d.subject or "")
+                                   and d.thread_id != req.thread_id),
+    # A homoglyph lookalike, and a hyphenated combosquat (re-review K1), are different paths.
+    "lookalike": lambda d, req: bool((sd := sender_domain(d.sender)) and is_lookalike(sd, (VENDOR_DOMAIN,))
+                                     and "-" not in sd),
+    "combosquat": lambda d, req: bool((sd := sender_domain(d.sender)) and is_lookalike(sd, (VENDOR_DOMAIN,))
+                                      and "-" in sd),
+    # A follow-up that arrives after the request, in a thread and under a subject of its own: in the
+    # change context only because it came after the cutoff (re-review K1).
+    "after": lambda d, req: d.received_at > req.received_at and d.thread_id != req.thread_id,
 }
-_KINDS = {"bank": lambda s: s.party == "bank", "fax": lambda s: s.role == "fax",
+_KINDS = {"bank": lambda s: s.party == "bank" and s.role != "ar",
+          "bank_ar": lambda s: s.party == "bank" and s.role == "ar",   # "Remit to our bank: ..." (re-review K4)
+          "fax": lambda s: s.role == "fax",
           "unlabeled": lambda s: s.party == "unknown", "customer": lambda s: s.party == "customer"}
 
 
@@ -324,7 +336,7 @@ def test_label_already_in_the_world_that_moved_the_call_is_caught(monkeypatch):
     # number is refused, and the planted number is the pick. Adding more labels to that pick only
     # refuses it too; the check must also see that the label already there moved the call.
     planted = overblock_world("bank_label_in_thread", 0, planted=True)
-    leaky = _partial_fix("bank", "thread")
+    leaky = _partial_fix("bank_ar", "thread")             # the world's label is (ar, bank): role-bearing
     assert leaky(planted)["e164"] == PLANTED and _context_blind(planted)["e164"] == REAL
     monkeypatch.setattr("dialback_evals.invariants.run", leaky)
     assert _label_hits(planted) == [CONTEXT_LABEL]

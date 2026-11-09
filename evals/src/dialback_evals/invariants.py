@@ -265,11 +265,11 @@ def metamorphic(world: World, base: dict | None = None) -> list[str]:
     return found
 
 
-# I12's attacker text, in the shapes ingestion emits (spec 0022's stub reader): a bank's line ("Bank
-# verification line: ..." gives role unknown, party bank), a fax line, a bare mention with no label
-# the reader can place (role and party "unknown"), which the rule also refuses, and a customer's line,
-# which a model reader may emit.
-LABEL_KINDS = (("unknown", "bank"), ("fax", "vendor"), ("unknown", "unknown"), ("unknown", "customer"))
+# I12's attacker text, in the shapes ingestion emits (spec 0022's stub reader): a bank's line, both
+# without a role ("Bank verification line: ...") and with one ("Remit to our bank: ..." gives role ar),
+# a fax line, a bare mention with no label the reader can place (role and party "unknown"), which the
+# rule also refuses, and a customer's line, which a model reader may emit.
+LABEL_KINDS = (("unknown", "bank"), ("ar", "bank"), ("fax", "vendor"), ("unknown", "unknown"), ("unknown", "customer"))
 
 
 def _context_labels_removed(world: World) -> World:
@@ -287,10 +287,13 @@ def _label_probe(world: World, base: dict) -> str | None:
     """I12: a label in the change context never moves the call to a different number; refusing the
     case is allowed. Two halves. Removal: with the labels already in the context made neutral, the
     rule's pick must be the same number, or there must be no pick with them. Addition: the attacker's
-    own text names the picked number at the request's time, one label kind on one context path at a
-    time (the request's thread, its subject, a lookalike sender), so no probe can hide another; the
-    call must stay on that number or go nowhere. The addition half runs only when the pick was seen
-    outside the context before that time, so R2's first-seen rule never comes into play."""
+    own text names the picked number, one label kind on one context path at a time, so no probe can
+    hide another: the request email itself; a reply in its thread from another domain and from the
+    vendor's own; an email under its subject, and under a forwarded copy of it, in another thread; a
+    homoglyph and a hyphenated lookalike sender; and a follow-up after the request, in a thread of its
+    own, from the vendor's own domain and from another (in the context only because it came after the
+    cutoff). The call must stay on that number or go nowhere. The addition half runs only when the
+    pick was seen outside the context before the request, so R2's first-seen rule never comes into play."""
     kw, request, pick = world.kwargs, world.kwargs["request"], base.get("e164")
     if pick is None:
         return None
@@ -304,23 +307,30 @@ def _label_probe(world: World, base: dict) -> str | None:
                                  for r in number.visible):
         return None
     domain = kw["vendor_domains"][0]
-    other, own, look = "ar@other.example", f"ar@{domain}", _address("lookalike", domain)
-    # The request email itself first: real ingestion puts the attacker's words in its body (review 2,
-    # B1). Then a reply in its thread from another domain and from the vendor's own (a hijacked
-    # mailbox), a same-subject email, and a lookalike sender.
-    paths: list[tuple[str, list[DocumentRef]]] = []
+    other, own = "ar@other.example", f"ar@{domain}"
+    after = when + (kw["case_opened_at"] - when) / 2      # a follow-up between the request and the case opening
+    # The request email itself first: real ingestion puts the attacker's words in its body (review 2, B1).
+    paths: list[tuple[str, list[DocumentRef], dt.datetime]] = []
     if request.document_id in f.docs:
-        paths.append((request.document_id, kw["documents"]))
-    for doc in (DocumentRef("m_lbl_thread", "email", when, other, request.thread_id, "Doc m_lbl_thread", when),
-                DocumentRef("m_lbl_thread_own", "email", when, own, request.thread_id, "Doc m_lbl_thread_own", when),
-                DocumentRef("m_lbl_subject", "email", when, other, "t_m_lbl_subject", request.subject, when),
-                DocumentRef("m_lbl_look", "email", when, look, "t_m_lbl_look", "Doc m_lbl_look", when)):
-        paths.append((doc.id, [*kw["documents"], doc]))
-    for doc_id, documents in paths:
+        paths.append((request.document_id, kw["documents"], when))
+    probes = [DocumentRef("m_lbl_thread", "email", when, other, request.thread_id, "Doc m_lbl_thread", when),
+              DocumentRef("m_lbl_thread_own", "email", when, own, request.thread_id, "Doc m_lbl_thread_own", when),
+              DocumentRef("m_lbl_subject", "email", when, other, "t_m_lbl_subject", request.subject, when),
+              DocumentRef("m_lbl_look", "email", when, _address("lookalike", domain), "t_m_lbl_look",
+                          "Doc m_lbl_look", when),
+              DocumentRef("m_lbl_combo", "email", when, _address("combosquat", domain), "t_m_lbl_combo",
+                          "Doc m_lbl_combo", when),
+              DocumentRef("m_lbl_after_own", "email", after, own, "t_m_lbl_after_own", "Doc m_lbl_after_own", after),
+              DocumentRef("m_lbl_after_other", "email", after, other, "t_m_lbl_after_other", "Doc m_lbl_after_other",
+                          after)]
+    if request.subject:
+        probes.append(DocumentRef("m_lbl_fwd", "email", when, other, "t_m_lbl_fwd", f"Fwd: {request.subject}", when))
+    paths += [(doc.id, [*kw["documents"], doc], doc.received_at) for doc in probes]
+    for doc_id, documents, at in paths:
         if doc_id not in _frame(_with(world, documents=documents)).in_context_ids:
             continue                                   # a path this world's request does not open
         for role, party in LABEL_KINDS:
-            row = Sighting(pick, doc_id, "email", when, "visible", role, party, when)
+            row = Sighting(pick, doc_id, "email", at, "visible", role, party, at)
             now = run(_with(world, documents=documents, sightings=[*kw["sightings"], row])).get("e164")
             if now is not None and now != pick:
                 return "M_incontext_label_moved_pick"

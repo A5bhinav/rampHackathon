@@ -57,6 +57,9 @@ class SightingSpec:
     shared_id: bool = False          # a second, different document is filed under the same id
     twin_first: bool = False         # that second document sorts first, so select() reads it instead
     on_request: bool = False         # in the change request email's own body, not a document of its own
+                                     # (it then takes the request's time, sender and thread; the other
+                                     # document knobs do not apply; with no request it is a normal sighting)
+    after_request: bool = False      # a follow-up received 30 minutes after the request, before the case opens
 
 
 @dataclass(frozen=True)
@@ -115,8 +118,11 @@ def _subject_line(kind: str, label: str) -> str:
 
 
 def make_world(*, numbers: list[NumberSpec], vendor_domains: tuple[str, ...] = (VENDOR_DOMAIN,),
-               request_at: dt.datetime = T0, settings: Settings = DEFAULT, request_present: bool = True) -> World:
-    """Build the select() inputs: one document (and one sighting) per sighting spec."""
+               request_at: dt.datetime = T0, settings: Settings = DEFAULT, request_present: bool = True,
+               cutoff_lead_days: int = 0) -> World:
+    """Build the select() inputs: one document (and one sighting) per sighting spec, except a sighting
+    in the request email itself. `cutoff_lead_days` puts the requested cutoff (the change in Ramp)
+    that many days before the request email, as when Ramp's change came first."""
     domain = vendor_domains[0]
     opened = request_at + dt.timedelta(hours=1)
     late_at = opened + dt.timedelta(days=1)
@@ -134,7 +140,8 @@ def make_world(*, numbers: list[NumberSpec], vendor_domains: tuple[str, ...] = (
                 continue
             label = f"{i}-{j}"
             doc_id = f"d{label}"
-            received = request_at - dt.timedelta(days=sp.lead_days)
+            received = (request_at + dt.timedelta(minutes=30) if sp.after_request
+                        else request_at - dt.timedelta(days=sp.lead_days))
             recorded = late_at if sp.recorded_late else received
             thread = "req" if sp.in_thread else f"t{label}"
             subject = _subject_line(sp.subject, label)
@@ -147,7 +154,8 @@ def make_world(*, numbers: list[NumberSpec], vendor_domains: tuple[str, ...] = (
             sightings.append(Sighting(spec.e164, doc_id, sp.channel, received, sp.visibility, sp.role,
                                       sp.party, recorded))
     kwargs = {"case_id": CASE, "dataset_id": DATASET, "vendor_id": VENDOR, "vendor_domains": tuple(vendor_domains),
-              "request": request, "requested_cutoff": request_at, "case_opened_at": opened,
+              "request": request, "requested_cutoff": request_at - dt.timedelta(days=cutoff_lead_days),
+              "case_opened_at": opened,
               "documents": documents, "sightings": sightings, "settings": settings}
     poison = frozenset(s.e164 for s in numbers if s.is_poison)
     return World(kwargs=kwargs, poison=poison, settings=settings)
@@ -182,6 +190,9 @@ def profile(world: World) -> Counter[str]:
     p["non_default_settings"] = int(world.settings != DEFAULT)
     p["twin_first"] = int(any(d.sender == "" for d in docs))
     request = kw["request"]
+    p["follow_up"] = int(request is not None and any(      # a document after the request, before the case opened
+        d.received_at > request.received_at and d.recorded_at < opened for d in docs))
+    p["early_cutoff"] = int(request is not None and kw["requested_cutoff"] < request.received_at)
     p["request_label"] = int(request is not None and any(   # the attacker's words in the request email itself
         s.document_id == request.document_id and s.visibility == "visible"
         and (s.party != "vendor" or str(s.role).strip().lower() == "fax") for s in rows))
@@ -253,7 +264,8 @@ def worlds(draw, settings: Settings | None = None) -> World:
     """Draw an adversarial world: settings (drawn when `settings` is None), 1 to 5 attacker-shaped
     numbers with independent per-sighting knobs, 0 to 2 deliberate near-miss siblings, one real,
     established vendor line, so the rule always has a legitimate pick to rank against, and sometimes
-    a planted provable number and an in-thread label naming one of the two."""
+    a planted provable number, an attacker's label naming one of the two (in the request email, a
+    thread reply, or a follow-up after the request), and a cutoff a day before the request."""
     chosen = settings if settings is not None else draw(SETTINGS)
     count = draw(st.integers(1, 5))
     npas = draw(st.lists(st.sampled_from(FAR_NPAS[:-1]), min_size=count, max_size=count, unique=True))
@@ -287,13 +299,18 @@ def worlds(draw, settings: Settings | None = None) -> World:
     if len(targets) > 1 and draw(st.booleans()):
         role, party = draw(st.sampled_from([("unknown", "bank"), ("fax", "vendor"), ("unknown", "unknown"),
                                             ("unknown", "customer")]))
-        where = draw(st.sampled_from(["request", "thread", "thread_own"]))
-        label = SightingSpec("email", 0 if where == "request" else draw(st.integers(0, 30)), role=role, party=party,
-                             sender="own" if where == "thread_own" else "other", in_thread=where != "request",
-                             on_request=where == "request")
+        # The request email counts twice: it is where real ingestion puts the attacker's words.
+        where = draw(st.sampled_from(["request", "request", "thread", "thread_own", "after_own", "after_other"]))
+        label = SightingSpec("email", 0 if where in ("request", "after_own", "after_other") else draw(st.integers(0, 30)),
+                             role=role, party=party, sender="own" if where.endswith("own") else "other",
+                             in_thread=where in ("thread", "thread_own"), on_request=where == "request",
+                             after_request=where.startswith("after"))
         specs.append(NumberSpec(draw(st.sampled_from(targets)), [], 0, sightings=(label,)))
     request_present = draw(st.sampled_from([True] * 9 + [False]))
-    return make_world(numbers=specs, settings=chosen, request_present=request_present)
+    # In one world in eight, Ramp's change came before the request email, so the cutoff is earlier and
+    # anything received between the two is in the change context (re-review K1).
+    cutoff_lead = draw(st.sampled_from([0] * 7 + [1]))
+    return make_world(numbers=specs, settings=chosen, request_present=request_present, cutoff_lead_days=cutoff_lead)
 
 
 _CLEAN_SIGHTING = st.builds(SightingSpec, channel=st.sampled_from(CHANNELS), lead_days=st.integers(0, 800),

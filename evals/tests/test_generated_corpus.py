@@ -121,10 +121,24 @@ def _ingested_world() -> World:
     """The vendor's real number in a contract and a listing 200 days back, a planted number in a contract
     and a listing 150 days back, and a change request whose own body mentions the real number with no
     label the reader can place, the classic wording of a fraudulent request."""
+    return _ingest(["Hello, please update our banking details for future payments.",
+                    "Please stop using our old number (415) 555-0142."], [])
+
+
+def _ingested_follow_up_world() -> World:
+    """The same records, a plain change request, and a follow-up 20 minutes later from the vendor's own
+    (hijacked) mailbox, in a thread and under a subject of its own, naming the real number as a bank
+    line: in the change context only because it arrived after the cutoff (re-review K1)."""
+    return _ingest(["Hello, please update our banking details for future payments."],
+                   [("f1", "email", 0, "ap@acme.example", "t-f1", "One more thing",
+                     ("Bank verification line: (415) 555-0142",), 20)])
+
+
+def _ingest(request_lines: list[str], extra: list[tuple]) -> World:
     t0 = dt.datetime(2026, 10, 1, 16, tzinfo=dt.UTC)
 
-    def doc(doc_id, channel, days, sender, thread, subject, *texts):
-        when = (t0 - dt.timedelta(days=days)).isoformat()
+    def doc(doc_id, channel, days, sender, thread, subject, *texts, minutes=0):
+        when = (t0 - dt.timedelta(days=days) + dt.timedelta(minutes=minutes)).isoformat()
         spans = [{"text": t, "x": 72, "y": 100 + 20 * n, "size": 11, "color": "#000000"} for n, t in enumerate(texts)]
         return {"id": doc_id, "kind": "email" if channel == "email" else "pdf",
                 "custody": {"channel": channel, "received_at": when, "sender": sender, "thread_id": thread,
@@ -136,9 +150,9 @@ def _ingested_world() -> World:
         doc("l1", "listing", 200, None, None, None, "Accounts receivable: (415) 555-0142"),
         doc("c2", "contract", 150, None, None, None, "Accounts receivable: (645) 555-0177"),
         doc("l2", "listing", 150, None, None, None, "Accounts receivable: (645) 555-0177"),
-        doc("req", "email", 0, "ap@acme.example", "req", "Updated banking details",
-            "Hello, please update our banking details for future payments.",
-            "Please stop using our old number (415) 555-0142."),
+        doc("req", "email", 0, "ap@acme.example", "req", "Updated banking details", *request_lines),
+        *(doc(i, ch, days, sender, thread, subject, *texts, minutes=minutes)
+          for i, ch, days, sender, thread, subject, texts, minutes in extra),
     ], extractor_version="lab-0033")
     req = next(d for d in ingested.documents if d["id"] == "req")
     settings = Settings()
@@ -162,3 +176,12 @@ def test_ingested_case_is_still_what_real_ingestion_produces():
     assert [(s.e164, s.party) for s in world.kwargs["sightings"] if s.document_id == req.document_id] == [
         (REAL_LINE, "unknown")]                      # the bare mention, in the request email itself
     assert world_digest(world) == world_digest(load_world(GENERATED / INGESTED))
+
+
+INGESTED_FOLLOW_UP = "planted-number-picked-after-follow-up-email"
+
+
+def test_ingested_follow_up_case_is_still_what_real_ingestion_produces():
+    world = _ingested_follow_up_world()
+    assert [(s.e164, s.party) for s in world.kwargs["sightings"] if s.document_id == "f1"] == [(REAL_LINE, "bank")]
+    assert world_digest(world) == world_digest(load_world(GENERATED / INGESTED_FOLLOW_UP))
