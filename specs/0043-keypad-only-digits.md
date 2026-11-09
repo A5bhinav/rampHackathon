@@ -44,7 +44,7 @@ The defects come from `evals/FINDINGS.md` on `sami/attack-lab-generative`, as of
   - Digits collect until `#`. There is no auto-submit at four.
   - `*` empties what is typed and emits a new `KeypadReset` event.
   - If digits are in hand and no key comes for 5 seconds, the entry is submitted as if `#` were
-    pressed. The 5 seconds is my call (Q76).
+    pressed. The 5 seconds is my call (Q78).
   - The relay keeps at most 16 keys and drops further digits. The entry is still submitted, and
     the policy refuses it.
   - A spoken turn or a silence still clears a partial entry, as today.
@@ -74,11 +74,11 @@ The defects come from `evals/FINDINGS.md` on `sami/attack-lab-generative`, as of
     answers (`app.py`). The core redials while the case has call attempts left, and otherwise sends
     the case to a person (`docs/state-machine.md`; a `failed` result counts as no person in
     `app.eval_guard`, migration `app/0011`). No `retry_at` is set, so the core waits its default 2 hours
-    (Q80).
+    (Q82).
   - **Second unclear, at the digits question:** the call finishes `answers_recorded` with no digits,
     keeping every other answer, so `decide` gives NR06 and a person sees the full call. This is my
     call: a redial would make an honest vendor answer everything again, for a keypad problem a
-    redial will not fix (Q77).
+    redial will not fix (Q79).
   - The violation count (`MAX_VIOLATIONS`) and the silence count keep their own budgets.
 - **D6. Unclear is never an answer.**
   - An agent says it with `AgentReply(unclear=True)`, and the text line and the relay turn that
@@ -98,7 +98,7 @@ The defects come from `evals/FINDINGS.md` on `sami/attack-lab-generative`, as of
     "they said they are not sure".
   - A model error or an out-of-set answer becomes `unclear`, where today it is the phase's safe
     value. So a timeout gets one more try, and a `no` the caller never said is never recorded.
-    This revises spec 0015's fail-closed values; it is my call (Q78).
+    This revises spec 0015's fail-closed values; it is my call (Q80).
 - **D8. Digits never reach the model.** `ClaudeAgent` replaces each run of three or more digits
   with `[digits]` in the text it sends to the model, through a `redact_digits` helper beside
   `digit_runs`.
@@ -182,7 +182,7 @@ None:
 - Earlier-call evidence never reaching `decide` (FINDINGS A16).
 - Removing the guard's exception for reading back spoken digits. It is harmless now, because no
   agent writes text.
-- Redacting digits from the in-memory transcript itself (Q79).
+- Redacting digits from the in-memory transcript itself (Q81).
 - The voice lab (spec 0017, not yet merged). Any frozen scenario whose call flow changes is
   refrozen by whichever of the two lands second.
 
@@ -190,13 +190,13 @@ None:
 
 None open. Sami approved the spec and every call in it as written on Nov 9:
 
-- **Q76, resolved:** submit after 5 seconds with no key.
-- **Q77, resolved:** a second unclear on the digits question finishes the call with no digits
+- **Q78, resolved:** submit after 5 seconds with no key.
+- **Q79, resolved:** a second unclear on the digits question finishes the call with no digits
   (NR06). Consent and the change question end `failed`, which leads to a redial.
-- **Q78, resolved:** a model error becomes `unclear` (D7), revising spec 0015's safe values.
-- **Q79, resolved for now:** only what the model gets is redacted. Redacting the transcript itself
+- **Q80, resolved:** a model error becomes `unclear` (D7), revising spec 0015's safe values.
+- **Q81, resolved for now:** only what the model gets is redacted. Redacting the transcript itself
   is out of scope.
-- **Q80, resolved:** an `unclear:*` failure sets no `retry_at`, so the core waits 2 hours.
+- **Q82, resolved:** an `unclear:*` failure sets no `retry_at`, so the core waits 2 hours.
 
 ## Commands
 
