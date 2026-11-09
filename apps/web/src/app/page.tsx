@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { Icon } from "@/components/icons";
 import { BrandMark } from "@/components/nav";
+import { HeroShot, StationShot } from "@/components/showcase";
 import { ACROSS, DEMO_STORIES, STORY_STATIONS, type StoryKey } from "@/lib/story";
+import "./landing.css";
 
 // The public "How it works" page (spec 0033). Static: it calls nothing and decides nothing. The
 // dashboard itself is at /app, behind sign-in.
@@ -49,16 +51,19 @@ export default function HowItWorks() {
       </header>
       <main className="shell story">
         <section className="story-hero" aria-labelledby="hero-h">
-          <p className="eyebrow">For accounts payable teams on Ramp</p>
-          <h1 id="hero-h">A changed bank account gets paid only after the real vendor says so.</h1>
-          <p className="lead">
-            When a vendor&apos;s bank details change in Ramp, Dialback holds their payments, calls the vendor on a phone number it can
-            prove is theirs, lets code decide what the answers mean, and waits for a second person to release.
-          </p>
-          <p className="story-cta">
-            <a className="button-link primary" href="#demo">See it on demo data</a>
-            <a className="button-link" href="#stations">How each step works</a>
-          </p>
+          <div className="story-hero-text">
+            <p className="eyebrow">For accounts payable teams on Ramp</p>
+            <h1 id="hero-h">A changed bank account gets paid only after the real vendor says so.</h1>
+            <p className="lead">
+              When a vendor&apos;s bank details change in Ramp, Dialback holds their payments, calls the vendor on a phone number it can
+              prove is theirs, lets code decide what the answers mean, and waits for a second person to release.
+            </p>
+            <p className="story-cta">
+              <a className="button-link primary" href="#demo">See it on demo data</a>
+              <a className="button-link" href="#stations">How each step works</a>
+            </p>
+          </div>
+          <HeroShot />
         </section>
 
         <section className="story-section" aria-labelledby="problem-h">
@@ -98,14 +103,18 @@ export default function HowItWorks() {
         <section className="story-section" id="stations" aria-labelledby="stations-h">
           <h2 id="stations-h">Seven stations, and what each one stops</h2>
           <p className="muted story-intro">Every bank change goes through the same stations, in this order. Inside the dashboard, each case's rail shows where it stands: hold, call, decision, sign-off and release.</p>
+          <p className="muted sub shot-caption">The pictures are drawings of the dashboard, filled with the demo company&apos;s fictional data and the product&apos;s own wording. They are not a live case.</p>
           <ol className="pipeline">
             {STORY_STATIONS.map((s, i) => (
               <li key={s.key} className="pipe-stop">
                 <span className="pipe-node"><Icon name={ICON[s.key]} size={20} /></span>
-                <div className="pipe-text">
-                  <h3><span className="pipe-n">{i + 1}</span> {s.label}{s.rules ? <span className="badge tone-muted">{s.rules}</span> : null}</h3>
-                  <p>{s.does}</p>
-                  <p className="pipe-stops"><strong>Stops:</strong> {s.stops}</p>
+                <div className="pipe-pair">
+                  <div className="pipe-text">
+                    <h3><span className="pipe-n">{i + 1}</span> {s.label}{s.rules ? <span className="badge tone-muted">{s.rules}</span> : null}</h3>
+                    <p>{s.does}</p>
+                    <p className="pipe-stops"><strong>Stops:</strong> {s.stops}</p>
+                  </div>
+                  <StationShot station={s.key} />
                 </div>
               </li>
             ))}
