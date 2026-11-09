@@ -15,6 +15,7 @@ import json
 import sys
 from pathlib import Path
 
+import demo
 from scenarios import SCENARIOS, Scenario
 from world import T0, Vendor, days, stamp
 
@@ -62,12 +63,17 @@ def build() -> dict[str, str]:
     # The manifest covers the documents too: an expectation rests on their custody (a thread, a
     # subject line, a sender's domain), so changing a document must move the frozen digest.
     out["truth/manifest.sha256"] = "".join(f"{sha256(c)}  {p}\n" for p, c in sorted(out.items()))
+    # The demo's ledger seed ships in the ledger package; it isn't truth, so it's outside the manifest.
+    out[demo.PATH] = dumps(demo.demo_seed())
     return out
 
 
 def on_disk() -> dict[str, str]:
-    return {str(p.relative_to(CORPUS)): p.read_text(encoding="utf-8")
-            for top in OWNED if (CORPUS / top).is_dir() for p in sorted((CORPUS / top).rglob("*")) if p.is_file()}
+    files = {str(p.relative_to(CORPUS)): p.read_text(encoding="utf-8")
+             for top in OWNED if (CORPUS / top).is_dir() for p in sorted((CORPUS / top).rglob("*")) if p.is_file()}
+    if (CORPUS / demo.PATH).is_file():
+        files[demo.PATH] = (CORPUS / demo.PATH).read_text(encoding="utf-8")
+    return files
 
 
 def check() -> list[str]:

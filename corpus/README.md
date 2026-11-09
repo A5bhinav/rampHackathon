@@ -55,6 +55,13 @@ expectation rests on their custody); its digest is pinned as `FROZEN_TRUTH_SHA25
 `build.py`, so moving the truth or a document means changing that line in review. Documents are a page model (spans with position, size and colour) plus custody;
 rendering them to PDF, and the 500-vendor background company, come next.
 
+## The demo's ledger (spec 0025)
+
+`generator/demo.py` also builds the demo seed's three vendors (acme, brightline, cobalt) into
+`packages/ledger/src/dialback_ledger/demo_seed.json`, which ships in the ledger package so the
+core's image has it. It is outside the frozen truth; `build.py --check` still keeps it byte for
+byte. Load it with `dialback-ledger demo load` after `dialback-core demo reset` (see the spec's runbook).
+
 ## Start here
 
 1. `generator/` with a seedable builder and a `make corpus` or `uv run` entry point; commit either the output or the exact command that regenerates it byte for byte.
