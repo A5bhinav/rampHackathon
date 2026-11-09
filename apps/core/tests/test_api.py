@@ -304,3 +304,19 @@ async def test_the_vendor_risk_list_reads_the_ledger(world):
 
 async def test_the_vendor_risk_list_of_an_unknown_dataset_is_not_found(world):
     await get(world, f"/api/datasets/{uuid.uuid4()}/vendor-risk", "clerk", RISK, status=404)
+
+
+async def test_a_demo_account_is_refused_outside_demo_data(world, database_url):
+    """Spec 0034: a demo account can't see a dev dataset's cases, so it can't act on them either. (The database's
+    own refusal, for a caller that gets past this, is supabase/tests/015_demo_accounts.sql.)"""
+    case = await verified_case(world)
+    async with await psycopg.AsyncConnection.connect(database_url, autocommit=True) as owner:  # the team, as the owner
+        await owner.execute("insert into app.demo_accounts (user_id) values (%s)", (world.users["approver1"],))
+    cid = str(case["id"])
+    await get(world, f"/api/cases/{cid}", "approver1", "/api/cases/{case_id}", status=404)  # it can't even see the case
+    for action in ("approve", "reject"):
+        await post(world, f"/api/cases/{cid}/release", "approver1", "/api/cases/{case_id}/release",
+                   {"expected_version": 1, "action": action, "reason": "Demo."}, status=404)
+    assert (await case_of(world))["state"] == "awaiting_release"
+    assert (await get(world, "/api/datasets", "approver1", "/api/datasets"))["datasets"] == []
+    assert (await get(world, f"/api/cases/{cid}", "approver2", "/api/cases/{case_id}"))["case"]["state"] == "awaiting_release"

@@ -159,7 +159,8 @@ export default function HowItWorks() {
             ))}
           </ul>
           <p className="muted sub">
-            Opening a case asks you to sign in. Everything in the demo is fictional: the company, the vendors, the accounts, the numbers.
+            Opening a case asks you to sign in; the sign-in page offers shared demo accounts, a clerk and an approver, that work only on
+            demo data. Everything in the demo is fictional: the company, the vendors, the accounts, the numbers.
           </p>
           <p><Link className="button-link primary" href="/app">Open the dashboard</Link></p>
         </section>
