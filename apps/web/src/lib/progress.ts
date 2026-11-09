@@ -36,6 +36,11 @@ const AT: Record<CaseState, { index: number; note: string; tone: Stage["tone"] }
   released: { index: 5, note: "", tone: "ok" },
 };
 const UNKNOWN = { index: 3, note: "Needs a person", tone: "warn" as const };
+
+/** Where a state sits on the rail (0 hold … 4 release, 5 past release); unknown is sign-off. */
+export function stationOf(state: CaseState): { index: number; note: string; tone: Stage["tone"] } {
+  return Object.hasOwn(AT, state) ? AT[state] : UNKNOWN;  // never a prototype key
+}
 const HOLD_IN_PLACE: readonly (HoldStatus | null)[] = ["confirmed", "releasing", "released"];
 
 /** The states this case visited in its current version: a new bank change starts the strip again. */
@@ -44,7 +49,7 @@ export function visitedThisVersion(timeline: readonly { version: number; to_stat
 }
 
 export function progress({ state, visited, holdStatus, hasDecision }: ProgressInput): Stage[] {
-  const at = Object.hasOwn(AT, state) ? AT[state] : UNKNOWN;  // never a prototype key
+  const at = stationOf(state);
   // A call is done only when it ended with answers recorded (calling -> deciding); a decision
   // only when one exists. Reaching the stage without finishing it is "not completed".
   const reached = (s: CaseState) => visited.includes(s);

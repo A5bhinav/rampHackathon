@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { OutcomeBadge, StateBadge } from "@/components/badges";
+import { PaymentLanes, QueueRail } from "@/components/flow";
 import { PageHead, Stats } from "@/components/page";
 import type { CaseState, CaseSummary } from "@/lib/api-types";
 import { core } from "@/lib/core";
+import { stationCounts } from "@/lib/flow";
 import { ago, brief, datasetNow, date, dueLabel, relative, when } from "@/lib/format";
 
 // Case queue: unfinished cases by state and age, and held bills near their due date (design,
@@ -28,13 +30,15 @@ export default async function CaseQueue({ params }: { params: Promise<{ datasetI
 
   return (
     <main>
-      <PageHead title="Case queue" lead="Every vendor whose bank details changed. Payments stay on hold until a different person releases them." />
-      <Stats label="Summary" items={[
+      <PageHead title="Case queue" lead="Every vendor whose bank details changed in Ramp. Their payments stay on hold until the vendor confirms on a number Dialback can prove, and a different person releases them." />
+      <QueueRail counts={stationCounts(cases)} />
+      <Stats label="Held payments" items={[
+        { label: "Bills on hold", value: cases.reduce((n, c) => n + c.bills_held, 0), tone: "info" },
         { label: "Waiting on a person", value: waiting.length, tone: "warn" },
-        { label: "In progress", value: working.length, tone: "info" },
         { label: "Payment overdue or due within 3 days", value: dueSoon, tone: "bad" },
         { label: "Hold not confirmed", value: unconfirmed, tone: "bad" },
       ]} />
+      <PaymentLanes cases={cases} now={now} datasetId={datasetId} />
       {cases.length === 0 ? <div className="card empty"><p>No open cases. A case opens here when a vendor&apos;s bank details change in Ramp.</p></div> : null}
       {waiting.length > 0 ? <QueueTable title="Waiting on a person" cases={waiting} datasetId={datasetId} now={now} /> : null}
       {working.length > 0 ? <QueueTable title="In progress" cases={working} datasetId={datasetId} now={now} /> : null}

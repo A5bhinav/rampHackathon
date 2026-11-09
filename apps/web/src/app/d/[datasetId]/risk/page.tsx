@@ -1,8 +1,8 @@
 import { notFound } from "next/navigation";
-import { PageHead, Stats } from "@/components/page";
+import { PageHead } from "@/components/page";
 import { CoreError, core } from "@/lib/core";
 import { phone } from "@/lib/lineage";
-import { counts, statusLabel, statusTone } from "@/lib/risk";
+import { counts, digitMarks, shares, statusLabel, statusTone, type RiskStatus } from "@/lib/risk";
 
 const STRIPE = { near_miss: "is-bad", unproven: "is-warn", missing: "", provable: "is-ok" } as const;
 
@@ -15,12 +15,10 @@ export default async function RiskPage({ params }: { params: Promise<{ datasetId
     throw e;
   });
 
-  const tones = { near_miss: "bad", unproven: "warn", missing: undefined, provable: "ok" } as const;
-
   return (
     <main>
       <PageHead title="Vendor risk" lead="Is each vendor's number on file one the Trust Ledger can prove? Each row says why, in the ledger's own words." />
-      <Stats label="Vendors by status" items={counts(vendors).map(([status, n]) => ({ label: cap(statusLabel(status)), value: n, tone: tones[status] }))} />
+      {vendors.length > 0 ? <RiskMix vendors={vendors} /> : null}
       {vendors.length === 0 ? (
         <section className="card empty"><p>The Trust Ledger has no documents for this dataset&apos;s vendors yet.</p></section>
       ) : (
@@ -35,7 +33,7 @@ export default async function RiskPage({ params }: { params: Promise<{ datasetId
                   <tr key={v.vendor_id} className={STRIPE[v.status]}>
                     <td><strong>{v.legal_name}</strong><div className="muted sub cell-note">{v.status_text}</div></td>
                     <td><span className={`badge ${statusTone(v.status)}`}>{statusLabel(v.status)}</span></td>
-                    <td className="mono nowrap">{v.number_on_file ? phone(v.number_on_file) : "—"}</td>
+                    <td className="mono nowrap">{v.number_on_file ? <OnFile number={v.number_on_file} provable={v.status === "near_miss" ? v.provable_number : null} /> : "—"}</td>
                     <td className="mono nowrap">{v.provable_number ? phone(v.provable_number) : "—"}</td>
                   </tr>
                 ))}
@@ -50,4 +48,44 @@ export default async function RiskPage({ params }: { params: Promise<{ datasetId
 
 function cap(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+const KEY = { near_miss: "bad", unproven: "warn", missing: "muted", provable: "ok" } as const;
+
+/** Vendors by status as one segmented bar (spec 0032): shares inside the blocks that fit them,
+ *  the legend naming each with its count, worst first. */
+function RiskMix({ vendors }: { vendors: { status: RiskStatus }[] }) {
+  const rows = counts(vendors);
+  const pct = shares(rows.map(([, n]) => n));
+  const label = rows.map(([status, n], i) => `${statusLabel(status)} ${n} (${pct[i]}%)`).join(", ");
+  return (
+    <section className="card mix" aria-labelledby="mix-h">
+      <div className="chart-head">
+        <h2 id="mix-h">Vendors by status <span className="count">{vendors.length}</span></h2>
+      </div>
+      <div className="segbar" role="img" aria-label={`Vendors by status: ${label}`}>
+        {rows.map(([status, n], i) => n ? (
+          <span key={status} className={`seg seg-${KEY[status]}`} style={{ flexGrow: n }} title={`${cap(statusLabel(status))}: ${n} (${pct[i]}%)`}>
+            {pct[i] >= 10 ? `${pct[i]}%` : ""}
+          </span>
+        ) : null)}
+      </div>
+      <ul className="legend mix-legend">
+        {rows.map(([status, n]) => (
+          <li key={status}><span className={`key seg-${KEY[status]}`} aria-hidden="true" />{cap(statusLabel(status))} <strong>{n}</strong></li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/** The number on file; for a near miss, the digits that differ from the provable one are marked. */
+function OnFile({ number, provable }: { number: string; provable: string | null }) {
+  const marks = digitMarks(number, provable);
+  if (!marks.some((m) => m.differs)) return <>{phone(number)}</>;
+  return (
+    <span title="Marked digits differ from the provable number">
+      {marks.map((m, i) => m.differs ? <mark key={i} className="digit-off">{m.ch}</mark> : m.ch)}
+    </span>
+  );
 }

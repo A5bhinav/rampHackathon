@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { ChainBadge, StateBadge } from "@/components/badges";
 import { DecisionConsole } from "@/components/console";
 import { DecisionDetail } from "@/components/decision";
+import { CaseRail } from "@/components/flow";
+import { PaymentPath } from "@/components/path";
 import { PageHead } from "@/components/page";
 import { CoreError, core } from "@/lib/core";
 import { brief, datasetNow, date, dueLabel, relative, when, words } from "@/lib/format";
@@ -74,17 +76,7 @@ export default async function CaseDetailPage({ params, searchParams }: {
         </div>
       </PageHead>
 
-      <ol className="progress" aria-label="Progress">
-        {steps.map((s, i) => (
-          <li key={s.key} className={`step is-${s.status} step-${s.tone}`} aria-current={s.status === "current" ? "step" : undefined}>
-            <span className="step-dot" aria-hidden="true">{s.status === "done" ? "✓" : s.status === "failed" ? "✕" : s.status === "current" ? "" : i + 1}</span>
-            <span className="step-text">
-              <span className="step-label">{s.label}</span>
-              <span className="step-note">{s.note}</span>
-            </span>
-          </li>
-        ))}
-      </ol>
+      <CaseRail steps={steps} />
 
       <div className="case-layout">
         <div className="case-main">
@@ -159,16 +151,14 @@ export default async function CaseDetailPage({ params, searchParams }: {
         <aside className="case-side" aria-label="The change and the hold">
           <section className="panel" aria-labelledby="change-h">
             <h2 id="change-h">The change</h2>
-            <div className="accounts">
-              <div className="account">
-                <span className="account-label">Old account</span>
-                <span className="mono">{change.old_account ? `${change.old_account.routing_number} ···${change.old_account.last4}` : "none on file"}</span>
-              </div>
-              <div className="account is-new">
-                <span className="account-label">New account</span>
-                <span className="mono">{change.new_account.routing_number} ···{change.new_account.last4}</span>
-              </div>
-            </div>
+            <PaymentPath
+              bills={c.bills_held}
+              nextPayment={c.next_payment_date}
+              held={hold?.status === "confirmed" || hold?.status === "releasing"}
+              released={hold?.status === "released"}
+              newAccount={`${change.new_account.routing_number} ···${change.new_account.last4}`}
+              oldAccount={change.old_account ? `${change.old_account.routing_number} ···${change.old_account.last4}` : null}
+            />
             <dl className="facts">
               <dt>Detected</dt><dd>{when(change.detected_at)}<div className="muted sub">via {change.detected_via}</div></dd>
               <dt>Entered by</dt><dd>{change.changed_by?.display_name ?? "Unknown (vendor-supplied or synced)"}</dd>
