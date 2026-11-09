@@ -55,6 +55,7 @@ class SightingSpec:
     subject: str = "other"           # other | same | re | fwd | external (the last three reply to it)
     recorded_late: bool = False      # recorded into the ledger after the case opened
     shared_id: bool = False          # a second, different document is filed under the same id
+    twin_first: bool = False         # that second document sorts first, so select() reads it instead
 
 
 @dataclass(frozen=True)
@@ -135,7 +136,8 @@ def make_world(*, numbers: list[NumberSpec], vendor_domains: tuple[str, ...] = (
             documents.append(DocumentRef(doc_id, sp.channel, received, _address(sp.sender, domain), thread,
                                          subject, recorded))
             if sp.shared_id:
-                documents.append(DocumentRef(doc_id, sp.channel, received, "ar@other.example", thread,
+                twin_sender = "" if sp.twin_first else "ar@other.example"   # "" sorts before every "ar@" sender
+                documents.append(DocumentRef(doc_id, sp.channel, received, twin_sender, thread,
                                              f"{subject} (second copy)", recorded))
             sightings.append(Sighting(spec.e164, doc_id, sp.channel, received, sp.visibility, sp.role,
                                       sp.party, recorded))
@@ -173,6 +175,7 @@ def profile(world: World) -> Counter[str]:
     p["mixed_party"] = int(any(len({s.party for s in v}) > 1 for v in by_number.values()))
     p["mixed_timing"] = int(any(len({s.received_at for s in v}) > 1 for v in by_number.values()))
     p["non_default_settings"] = int(world.settings != DEFAULT)
+    p["twin_first"] = int(any(d.sender == "" for d in docs))
     return p
 
 
@@ -220,6 +223,7 @@ _SIGHTING = st.builds(
     subject=st.sampled_from(["other", "other", "other", "same", "re", "fwd", "external"]),
     recorded_late=st.sampled_from([False] * 9 + [True]),
     shared_id=st.sampled_from([False] * 9 + [True]),
+    twin_first=st.booleans(),
 )
 
 

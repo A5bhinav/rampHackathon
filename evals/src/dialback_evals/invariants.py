@@ -1,10 +1,14 @@
 """Spec 0033, Task 2: the invariant oracle over select() worlds.
 
 `violations(world, out)` checks the rule's guarantees (I1-I7, I9) on one output. It recomputes
-visibility, counting channels, the change context, age and near misses from the world's raw inputs:
-a reference copy of the rule's frame, so it catches an implementation slip in select() (assembly of
-reasons, eligibility, ranking inputs) but not a misunderstanding both copies share. It reuses only
-the ledger's lookalike-domain classifier and sender parsing (classification, not the decision).
+visibility, counting channels, the change context, R2's first-seen order, age and near misses from the
+world's raw inputs. Where no document id is shared, that reference follows select()'s frame exactly, so
+there the structural checks catch regressions (a branch deleted, reasons mis-assembled), not design
+defects. Where two different documents share an id it is deliberately conservative, as R7 asks ("both
+count against"): the id is change context, a lookalike if any copy is one, and dated by its earliest
+copy. select() instead keeps the copy whose repr sorts first, so there the structural checks also catch
+a current defect (review finding I4). It reuses the ledger's lookalike-domain classifier and sender
+parsing (classification, not the decision), so a classifier bug is invisible to it.
 `metamorphic(world)` re-runs the rule on mutated copies of the world (I8, I10, I11, and "attacker
 evidence never helps"). `liveness(world, out)` is the L1 over-blocking floor. Every function returns
 violation labels; an empty list means the rule held.
@@ -59,7 +63,7 @@ def _own(sd: str | None, domains: tuple[str, ...]) -> bool:
 @dataclasses.dataclass(frozen=True)
 class _Number:
     visible: tuple[Sighting, ...]
-    visible_counting: tuple[Sighting, ...]
+    first_seen_in_context: bool          # R2: the earliest visible sighting is in context (ties count)
     clean: tuple[Sighting, ...]          # visible, counting, outside the change context
     first_clean: dt.datetime | None
     shown: dt.datetime                   # the time the rule reasons from when nothing is clean
@@ -78,13 +82,14 @@ def _frame(world: World) -> _Frame:
     kw, s = world.kwargs, world.settings
     opened, request = kw["case_opened_at"], kw["request"]
     domains = tuple(v.strip().lower().rstrip(".") for v in kw["vendor_domains"])
-    docs: dict[str, DocumentRef] = {}
-    conflicted: set[str] = set()
-    for d in sorted((d for d in kw["documents"] if d.recorded_at < opened), key=repr):
-        if d.id in docs and docs[d.id] != d:
-            conflicted.add(d.id)
-        docs.setdefault(d.id, d)
-    look = {d.id for d in docs.values() if (sd := sender_domain(d.sender)) and is_lookalike(sd, domains)}
+    copies: dict[str, list[DocumentRef]] = {}
+    for d in kw["documents"]:
+        if d.recorded_at < opened:
+            copies.setdefault(d.id, []).append(d)
+    conflicted = {i for i, cs in copies.items() if len(set(cs)) > 1}          # two different documents, one id
+    docs = {i: min(cs, key=lambda d: (d.received_at, repr(d))) for i, cs in copies.items()}   # earliest copy
+    look = {i for i, cs in copies.items()
+            if any((sd := sender_domain(d.sender)) and is_lookalike(sd, domains) for d in cs)}  # any copy
     starts = [kw["requested_cutoff"], *(docs[i].received_at for i in look)]
     if request is not None:
         starts.append(request.received_at)
@@ -108,11 +113,13 @@ def _frame(world: World) -> _Frame:
         mine = [r for r in rows if r.e164 == e164]
         when = {id(r): docs[r.document_id].received_at for r in mine}
         visible = tuple(r for r in mine if r.visibility == "visible")
-        vc = tuple(r for r in visible if counts(docs[r.document_id]))
-        clean = tuple(r for r in vc if r.document_id not in ctx)
+        ctx_times = [when[id(r)] for r in visible if r.document_id in ctx]
+        out_times = [when[id(r)] for r in visible if r.document_id not in ctx]
+        first_seen_ctx = bool(ctx_times) and (not out_times or min(ctx_times) <= min(out_times))
+        clean = tuple(r for r in visible if counts(docs[r.document_id]) and r.document_id not in ctx)
         first_clean = min((when[id(r)] for r in clean), default=None)
         shown = first_clean or min((when[id(r)] for r in visible), default=None) or min(when.values())
-        numbers[e164] = _Number(visible, vc, clean, first_clean, shown,
+        numbers[e164] = _Number(visible, first_seen_ctx, clean, first_clean, shown,
                                 frozenset(docs[r.document_id].channel for r in clean))
     return _Frame(docs, cutoff, numbers, ctx)
 
@@ -137,19 +144,6 @@ def _fax(r: Sighting) -> bool:
     return str(r.role).strip().lower() == "fax"
 
 
-def _clears_bar(f: _Frame, e164: str, s) -> bool:
-    n = f.numbers.get(e164)
-    if n is None or not n.visible or not n.clean:
-        return False
-    if any(r.party != "vendor" or _fax(r) for r in n.visible):
-        return False
-    if len(n.channels) < s.min_source_types:
-        return False
-    if f.cutoff - n.first_clean < dt.timedelta(days=s.min_age_days):
-        return False
-    return not _near_flagged(f, e164, s)
-
-
 def violations(world: World, out: dict) -> list[str]:
     """The structural invariants (I1-I7, I9) on one select() output."""
     s, found = world.settings, []
@@ -167,8 +161,8 @@ def violations(world: World, out: dict) -> list[str]:
         if n is None:
             found.append("I2_hidden_only_eligible")   # eligible with no sighting the rule could have read
             continue
-        if n.visible_counting and all(r.document_id in f.in_context_ids for r in n.visible_counting):
-            found.append("I1_incontext_only_eligible")
+        if n.first_seen_in_context:
+            found.append("I1_first_seen_in_context_eligible")
         if not n.visible:
             found.append("I2_hidden_only_eligible")
         if any(r.party != "vendor" or _fax(r) for r in n.visible):
@@ -177,13 +171,13 @@ def violations(world: World, out: dict) -> list[str]:
             found.append("I4_too_few_channels_eligible")
         if n.first_clean is None or f.cutoff - n.first_clean < min_age:
             found.append("I5_too_young_eligible")
+        if _near_flagged(f, c["e164"], s):              # every eligible number, poison or not (review I4)
+            found.append("I7_near_miss_eligible")
     pick = out.get("e164")
     if pick is not None:
         chosen = next((c for c in candidates if c["e164"] == pick), None)
         if chosen is None or not chosen.get("eligible") or chosen.get("reasons"):
             found.append("I6_pick_has_reasons")
-        if pick in world.poison and not _clears_bar(f, pick, s):
-            found.append("I7_poison_pick_below_bar")
         if world.kwargs["request"] is None:
             found.append("I9_picked_without_request")
     return sorted(set(found))
@@ -234,6 +228,11 @@ def metamorphic(world: World, base: dict | None = None) -> list[str]:
 
     if _eligible(run(plus("m_ctx", "contract", 1, f"ar@{domain}", thread, "visible"))) - eligible:
         found.append("M_incontext_helped")
+    rows = [r for r in kw["sightings"] if r.e164 == target]
+    if rows and kw["request"] is not None:             # R2: a sighting in context older than all others blocks it
+        days = (t_req - min(r.received_at for r in rows)).days + 1
+        if target in _eligible(run(plus("m_first", "contract", days, f"ar@{domain}", thread, "visible"))):
+            found.append("M_first_seen_ignored")
     hidden = run(plus("m_hidden", "contract", 400, f"ar@{domain}", "t_m_hidden", "white"))
     if _eligible(hidden) != eligible or hidden.get("e164") != base.get("e164"):
         found.append("M_hidden_helped")
