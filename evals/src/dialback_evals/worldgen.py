@@ -242,8 +242,9 @@ def _real(e164: str) -> NumberSpec:
 @st.composite
 def worlds(draw, settings: Settings | None = None) -> World:
     """Draw an adversarial world: settings (drawn when `settings` is None), 1 to 5 attacker-shaped
-    numbers with independent per-sighting knobs, 0 to 2 deliberate near-miss siblings, and one real,
-    established vendor line, so the rule always has a legitimate pick to rank against."""
+    numbers with independent per-sighting knobs, 0 to 2 deliberate near-miss siblings, one real,
+    established vendor line, so the rule always has a legitimate pick to rank against, and sometimes
+    a planted provable number and an in-thread label naming one of the two."""
     chosen = settings if settings is not None else draw(SETTINGS)
     count = draw(st.integers(1, 5))
     npas = draw(st.lists(st.sampled_from(FAR_NPAS[:-1]), min_size=count, max_size=count, unique=True))
@@ -259,6 +260,23 @@ def worlds(draw, settings: Settings | None = None) -> World:
         if sib not in taken:
             taken.add(sib)
             specs.append(draw(_number(sib, near_miss_of=base)))
+    # A planted provable number (K01's shape: contract + listing, vendor-labeled, visible) in two thirds
+    # of the worlds, at a drawn age, so the rule often has a second number the call could move to (I12).
+    # At one half the two-provable rate sat at its 20% floor (Nov 8 attempts, spec 0033). Its area
+    # code is one no other number uses, so it is never a near miss by accident.
+    targets = [real]
+    if draw(st.sampled_from([False, True, True])):
+        free = [npa for npa in FAR_NPAS[:-1] if npa not in npas]
+        planted = _fictional_e164(draw(st.sampled_from(free)), draw(st.integers(0, 99)))
+        specs.append(NumberSpec(planted, ["contract", "listing"], draw(st.integers(0, 700)), is_poison=True))
+        targets.append(planted)
+    # In half the worlds with a planted number, the attacker's own email in the request's thread names
+    # one of the two: as a bank line, a fax line, or a bare mention the reader can't place (party
+    # "unknown"). Only there does a label have a second number to hand the call to.
+    if len(targets) > 1 and draw(st.booleans()):
+        role, party = draw(st.sampled_from([("ar", "bank"), ("fax", "vendor"), ("unknown", "unknown")]))
+        label = SightingSpec("email", draw(st.integers(0, 30)), role=role, party=party, sender="other", in_thread=True)
+        specs.append(NumberSpec(draw(st.sampled_from(targets)), [], 0, sightings=(label,)))
     request_present = draw(st.sampled_from([True] * 9 + [False]))
     return make_world(numbers=specs, settings=chosen, request_present=request_present)
 

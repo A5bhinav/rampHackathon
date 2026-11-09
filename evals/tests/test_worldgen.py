@@ -2,11 +2,13 @@
 the generator actually reaches every rejection reason and knob path, and clean worlds stay clean."""
 from __future__ import annotations
 
+import datetime as dt
 import json
 import re
 from collections import Counter
 from pathlib import Path
 
+from dialback_evals.invariants import _fax, _frame, _near_flagged
 from dialback_evals.worldgen import NumberSpec, clean_worlds, make_world, profile, run, worlds
 from hypothesis import given, settings
 from hypothesis import strategies as st
@@ -49,6 +51,27 @@ def test_generated_numbers_are_fictional():
     check()
 
 
+def _reference_provable(world) -> tuple[set[str], set[str]]:
+    """The numbers the oracle's reference frame finds nothing against (I1-I5, I7), read from raw inputs
+    rather than from the rule, so a fixed rule cannot move these floors; and those of them that also
+    carry a visible label in the change context (what I12's removal half needs)."""
+    f, s = _frame(world), world.settings
+    ok, labeled = set(), set()
+    for e164, n in f.numbers.items():
+        if n.first_seen_in_context or not n.visible or len(n.channels) < s.min_source_types:
+            continue
+        if n.first_clean is None or f.cutoff - n.first_clean < dt.timedelta(days=s.min_age_days):
+            continue
+        if any((r.party != "vendor" or _fax(r)) and r.document_id not in f.in_context_ids for r in n.visible):
+            continue
+        if _near_flagged(f, e164, s):
+            continue
+        ok.add(e164)
+        if any((r.party != "vendor" or _fax(r)) and r.document_id in f.in_context_ids for r in n.visible):
+            labeled.add(e164)
+    return ok, labeled
+
+
 def test_generator_covers_every_reason_and_knob():
     seen, n = Counter(), [0]
 
@@ -60,7 +83,15 @@ def test_generator_covers_every_reason_and_knob():
         seen.update({r for c in out["candidates"] for r in c["reasons"]})
         seen.update(k for k, v in profile(world).items() if v)
         seen["some_eligible"] += any(c["eligible"] for c in out["candidates"])
+        ok, labeled = _reference_provable(world)
+        seen["two_provable"] += len(ok) >= 2
+        seen["context_label_on_provable"] += len(ok) >= 2 and bool(labeled)
     sample()
+    # I12 needs a second provable number for the call to move to, and its removal half needs a context
+    # label on a provable number (floors set Nov 8 before measuring; the old mix gave about 5% and 0%).
+    floors = {"two_provable": 0.20, "context_label_on_provable": 0.05}
+    short = {k: round(seen[k] / n[0], 3) for k, bar in floors.items() if seen[k] / n[0] < bar}
+    assert short == {}, short
     low = {k: round(seen[k] / n[0], 3) for k in sorted(REASONS | KNOBS)
            if seen[k] / n[0] < (0.05 if k in REASONS else 0.03)}
     assert low == {}, low   # every reason fires in >= 5% of worlds, every knob path in >= 3%
