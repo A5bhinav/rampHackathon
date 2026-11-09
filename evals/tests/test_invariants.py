@@ -6,14 +6,28 @@ import dataclasses
 import itertools
 
 import pytest
+from dialback_evals.frontier import overblock_world
 from dialback_evals.invariants import all_violations, l1_premise, liveness, metamorphic, violations
-from dialback_evals.worldgen import NumberSpec, SightingSpec, clean_worlds, make_world, run, worlds
-from dialback_ledger.select import Settings
+from dialback_evals.worldgen import (
+    VENDOR_DOMAIN,
+    NumberSpec,
+    SightingSpec,
+    clean_worlds,
+    make_world,
+    run,
+    worlds,
+)
+from dialback_ledger.lookalike import is_lookalike, sender_domain
+from dialback_ledger.select import Settings, change_context_documents, select
 from hypothesis import given, settings
 
 REAL = "+14155550142"
 NUM = "+13035550169"
 X = "+13035550101"
+# Gated on Nov 8 ("Gate it too"): select() lets a change-context label revoke a number. The real rule
+# fails this check in every world with an eligible number until the rule changes, so the oracle's
+# self-tests below set it aside when they ask the real rule to pass everything else.
+CONTEXT_LABEL = "M_incontext_label_blocked"
 
 
 def _rewrite(out: dict, e164: str, **changes) -> dict:
@@ -104,7 +118,7 @@ def test_clean_world_picks_a_provable_number():
 def test_each_metamorphic_check_catches_a_broken_rule(label, monkeypatch):
     world = make_world(numbers=[NumberSpec(REAL, ["contract", "listing"], 500), NumberSpec(X, ["contract"], 400)])
     honest = run(world)
-    assert metamorphic(world) == []                                              # the real rule passes
+    assert [m for m in metamorphic(world) if m != CONTEXT_LABEL] == []           # the real rule passes the rest
     calls = itertools.count()
 
     def docs(w):
@@ -133,7 +147,7 @@ def test_new_invariants_catch_broken_rules(monkeypatch):
     assert liveness(make_world(numbers=[real]), empty) == ["L1_clean_world_no_pick"]
     late = make_world(numbers=[real, NumberSpec("+14155550199", [], 500,
                                                 sightings=(SightingSpec("listing", 500, recorded_late=True),))])
-    assert metamorphic(late) == []
+    assert [m for m in metamorphic(late) if m != CONTEXT_LABEL] == []
     monkeypatch.setattr("dialback_evals.invariants.run",           # a rule that reads late records trips I10
                         lambda w: picked | {"inputs_sha256": str(len(w.kwargs["documents"]))})
     assert "M_late_changed" in metamorphic(late)
@@ -218,3 +232,65 @@ def test_first_seen_probe_catches_a_rule_that_ignores_it(monkeypatch):
     assert "M_first_seen_ignored" not in metamorphic(world)
     monkeypatch.setattr("dialback_evals.invariants.run", lambda w: honest)   # blind to the older sighting
     assert "M_first_seen_ignored" in metamorphic(world)
+
+
+# The reachable finding, gated Nov 8 (I12): a party or fax label on a change-context sighting must not
+# revoke a number first seen outside the change context. The attacker writes the change context.
+
+def _context_blind(world):
+    """select() with change-context labels ignored, the fix direction the gate asks for: a sighting on a
+    document in select()'s own change context keeps its timing and visibility but loses its party and
+    role. A number first seen in the context is still refused, by R2."""
+    kw = world.kwargs
+    ctx = {d.id for d in change_context_documents(**kw)}
+    rows = [dataclasses.replace(s, party="vendor", role="main") if s.document_id in ctx else s for s in kw["sightings"]]
+    return select(**{**kw, "sightings": rows})
+
+
+_PATHS = {   # each way a document lands in the change context, other than arriving after the cutoff
+    "thread": lambda d, req: d.thread_id == req.thread_id and d.id != req.document_id,
+    "subject": lambda d, req: d.subject == req.subject and d.thread_id != req.thread_id,
+    "lookalike": lambda d, req: bool((sd := sender_domain(d.sender)) and is_lookalike(sd, (VENDOR_DOMAIN,))),
+}
+_KINDS = {"bank": lambda s: s.party != "vendor", "fax": lambda s: s.role == "fax"}
+
+
+@pytest.mark.parametrize("path", sorted(_PATHS))
+@pytest.mark.parametrize("kind", sorted(_KINDS))
+def test_context_label_probe_catches_a_rule_that_lets_context_labels_revoke(kind, path, monkeypatch):
+    world = make_world(numbers=[NumberSpec(REAL, ["contract", "listing"], 500)])
+    monkeypatch.setattr("dialback_evals.invariants.run", _context_blind)
+    assert metamorphic(world) == []                       # a rule that ignores change-context labels passes
+    req = world.kwargs["request"]
+
+    def leaky(w):   # the fixed rule, except that one kind of label on one context path still revokes
+        docs = {d.id: d for d in w.kwargs["documents"]}
+        out = _context_blind(w)
+        hit = any(s.e164 == REAL and _KINDS[kind](s) and _PATHS[path](docs[s.document_id], req)
+                  for s in w.kwargs["sightings"])
+        return _rewrite(out, REAL, eligible=False, reasons=["not_vendor_party"]) if hit else out
+
+    monkeypatch.setattr("dialback_evals.invariants.run", leaky)
+    assert CONTEXT_LABEL in metamorphic(world)
+
+
+def test_context_blind_rule_passes_the_planted_bank_label_world(monkeypatch):
+    # The attacker's in-thread email names the real number as a bank line, and a planted provable
+    # number ranks below the real one. Ignoring change-context labels keeps the call on the real
+    # number, and the oracle must accept that rule (I3 reads labels from outside the context only).
+    world = overblock_world("bank_label_in_thread", 0, planted=True)
+    assert _context_blind(world)["e164"] == REAL
+    monkeypatch.setattr("dialback_evals.invariants.run", _context_blind)
+    assert all_violations(world) == []
+
+
+def test_context_blind_rule_never_trips_the_label_checks(monkeypatch):
+    monkeypatch.setattr("dialback_evals.invariants.run", _context_blind)
+
+    @given(worlds())
+    @settings(max_examples=300, deadline=None, derandomize=True, database=None)
+    def check(world):
+        out = _context_blind(world)
+        assert "I3_nonvendor_or_fax_eligible" not in violations(world, out)
+        assert CONTEXT_LABEL not in metamorphic(world, out)
+    check()

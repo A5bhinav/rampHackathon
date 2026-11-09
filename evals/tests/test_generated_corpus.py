@@ -95,7 +95,11 @@ def test_fuzz_is_clean_when_nothing_violates(tmp_path, monkeypatch):
 
 
 def test_rerun_reports_frozen_cases_the_rule_still_fails(tmp_path, monkeypatch):
+    # rerun()'s plumbing only. The baseline used to be the real rule passing a plain world; since the
+    # Nov 8 gate (I12) the real rule fails every world with an eligible number, so a passing oracle is
+    # stubbed here too. Whether the real rule passes the frozen cases is test_frozen_findings_rerun_against_the_rule.
     freeze(make_world(numbers=[NumberSpec("+14695550142", ["contract", "listing"], 500)]), "plain", tmp_path)
+    monkeypatch.setattr("dialback_evals.gencorpus.all_violations", lambda w: [])
     assert rerun(tmp_path) == []
     monkeypatch.setattr("dialback_evals.gencorpus.all_violations", lambda w: ["M_reorder"])
     assert rerun(tmp_path) == [("plain", ["M_reorder"])]

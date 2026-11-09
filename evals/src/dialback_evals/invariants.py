@@ -9,7 +9,7 @@ count against"): the id is change context, a lookalike if any copy is one, and d
 copy. select() instead keeps the copy whose repr sorts first, so there the structural checks also catch
 a current defect (review finding I4). It reuses the ledger's lookalike-domain classifier and sender
 parsing (classification, not the decision), so a classifier bug is invisible to it.
-`metamorphic(world)` re-runs the rule on mutated copies of the world (I8, I10, I11, and "attacker
+`metamorphic(world)` re-runs the rule on mutated copies of the world (I8, I10, I11, I12, and "attacker
 evidence never helps"). `liveness(world, out)` is the L1 over-blocking floor. Every function returns
 violation labels; an empty list means the rule held.
 """
@@ -165,7 +165,9 @@ def violations(world: World, out: dict) -> list[str]:
             found.append("I1_first_seen_in_context_eligible")
         if not n.visible:
             found.append("I2_hidden_only_eligible")
-        if any(r.party != "vendor" or _fax(r) for r in n.visible):
+        # Labels from outside the change context only: the attacker writes the context, and I12 requires
+        # that a label there not revoke a number (I1 still refuses one first seen in the context).
+        if any((r.party != "vendor" or _fax(r)) and r.document_id not in f.in_context_ids for r in n.visible):
             found.append("I3_nonvendor_or_fax_eligible")
         if len(n.channels) < s.min_source_types:
             found.append("I4_too_few_channels_eligible")
@@ -207,8 +209,9 @@ def _with(world: World, *, documents=None, sightings=None) -> World:
 
 def metamorphic(world: World, base: dict | None = None) -> list[str]:
     """Re-run the rule on mutated copies of the world. Attacker evidence (an in-context sighting, a
-    lookalike email, a second document under an existing id) may block a number but must never make
-    one eligible; hidden text and late records must change nothing at all."""
+    lookalike email, a second document under an existing id) must never make a number eligible; hidden
+    text and late records must change nothing at all; and a party or fax label in the change context
+    must never revoke a number first seen outside it (I12, gated Nov 8)."""
     kw, found = world.kwargs, []
     base = run(world) if base is None else base
     if run(world) != base:
@@ -256,7 +259,36 @@ def metamorphic(world: World, base: dict | None = None) -> list[str]:
         if any(_eligible(run(_with(world, documents=[*kw["documents"], twin]))) - eligible for twin in _twins(doc)):
             found.append("M_shared_id_helped")
             break
+    if eligible and (blocked := _label_probe(world, eligible)):
+        found.append(blocked)
     return found
+
+
+def _label_probe(world: World, eligible: frozenset[str]) -> str | None:
+    """I12: the attacker's own text in the change context names each eligible number as a bank line and
+    as a fax line, on every context path (the request's thread, its subject, a lookalike sender), at the
+    request's time. None of those labels may make the number ineligible. Only numbers already seen
+    outside the context before that time are probed, so R2's first-seen rule never comes into play."""
+    kw, request = world.kwargs, world.kwargs["request"]
+    if request is None or request.received_at >= kw["case_opened_at"]:
+        return None
+    when, base = request.received_at, _frame(world)
+    targets = sorted(e for e in eligible if e in base.numbers and any(
+        r.document_id not in base.in_context_ids and base.docs[r.document_id].received_at < when
+        for r in base.numbers[e].visible))
+    if not targets:
+        return None
+    other, look = "ar@other.example", _address("lookalike", kw["vendor_domains"][0])
+    docs = [DocumentRef("m_lbl_thread", "email", when, other, request.thread_id, "Doc m_lbl_thread", when),
+            DocumentRef("m_lbl_subject", "email", when, other, "t_m_lbl_subject", request.subject, when),
+            DocumentRef("m_lbl_look", "email", when, look, "t_m_lbl_look", "Doc m_lbl_look", when)]
+    rows = [Sighting(e, d.id, "email", when, "visible", role, party, when)
+            for d in docs for e in targets for role, party in (("ar", "bank"), ("fax", "vendor"))]
+    probe = _with(world, documents=[*kw["documents"], *docs], sightings=[*kw["sightings"], *rows])
+    ctx = _frame(probe).in_context_ids                  # keep only the paths this world's request opens
+    probe = _with(world, documents=[*kw["documents"], *(d for d in docs if d.id in ctx)],
+                  sightings=[*kw["sightings"], *(r for r in rows if r.document_id in ctx)])
+    return "M_incontext_label_blocked" if set(targets) - _eligible(run(probe)) else None
 
 
 def _clean(world: World) -> bool:
