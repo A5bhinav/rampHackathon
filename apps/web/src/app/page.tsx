@@ -18,7 +18,7 @@ const SCAM = [
 
 const COMPARE: { row: string; old: string; now: string }[] = [
   { row: "When a bank change appears", old: "Payments keep flowing unless someone remembers to stop them.",
-    now: "Payments to that vendor are held in Ramp at once, and the hold is read back (R1)." },
+    now: "Payments to that vendor are held in Ramp as soon as the change is detected, and the hold is read back (R1)." },
   { row: "Which number gets called", old: "Often the one in the email, which is the fraudster's.",
     now: "Only a number seen in two independent sources before the request; never one first seen in its thread (R2)." },
   { row: "Who makes the call", old: "A busy clerk, if there is time before the payment run.",
@@ -96,7 +96,7 @@ export default function HowItWorks() {
 
         <section className="story-section" id="stations" aria-labelledby="stations-h">
           <h2 id="stations-h">Seven stations, and what each one stops</h2>
-          <p className="muted story-intro">Every bank change goes through the same stations, in this order. The dashboard draws the last five as its rail.</p>
+          <p className="muted story-intro">Every bank change goes through the same stations, in this order. Inside the dashboard, each case's rail shows where it stands: hold, call, decision, sign-off and release.</p>
           <ol className="pipeline">
             {STORY_STATIONS.map((s, i) => (
               <li key={s.key} className="pipe-stop">
@@ -127,6 +127,7 @@ export default function HowItWorks() {
               <h3>Built and running</h3>
               <ul>
                 <li>The whole pipeline above, against a Ramp-shaped mock of Ramp&apos;s API, with fictional vendors and accounts.</li>
+                <li>The Trust Ledger&apos;s rule and the disclosed voice agent are built. A demo run can still use stand-ins for them (the rehearsal stack picks a fixed number and plays a scripted vendor), depending on how it is deployed; the case page shows what each call recorded.</li>
                 <li>The hold, the state machine, the four-eyes release and the evidence chain, enforced in Postgres.</li>
                 <li>The number-picking rule, checked against 20 frozen cases in the repo: 14 planted attacks, 1 stated known limit and 5 legitimate controls.</li>
               </ul>

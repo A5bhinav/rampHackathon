@@ -37,10 +37,12 @@ None. `/demo/<ref>` uses `GET /api/datasets` and `GET /api/cases` with every sta
 - [ ] `/` renders without a session and without calling the core; it links to `/app`.
 - [ ] `/app` opens the newest dataset's queue; with no dataset it says what creates one.
 - [ ] Signing in or up lands on `/app`; the shell links back to `/`.
-- [ ] Seven stations in order, each with a "what it stops" line and the rule it rests on.
-- [ ] `/demo/acme` opens Acme's newest case on the newest demo dataset; with no demo dataset,
-      or no case for that vendor, it opens the queue with a sentence saying why; an unknown ref
-      is a 404.
+- [ ] Seven stations in order, each with a "what it stops" line; from the hold on, each names the rule it rests on
+      (the bank change and detection come before any rule applies).
+- [ ] `/demo/acme` opens Acme's newest case on the newest demo dataset, signing the visitor in
+      first and coming back; with no demo dataset it says so, and with no case for that vendor it
+      opens the queue with a sentence saying why; an unknown ref is a 404. After sign-in only a
+      known `/demo/<ref>` is followed (no open redirect).
 - [ ] No figure the system didn't compute; status only as a word; works at 390px.
 
 ## Tests (written first)
@@ -48,7 +50,7 @@ None. `/demo/<ref>` uses `GET /api/datasets` and `GET /api/cases` with every sta
 | Acceptance item | Test |
 |---|---|
 | 4 | `apps/web/tests/story.test.ts` (seven stations, each with a rule and a stop line) |
-| 5 | `apps/web/tests/story.test.ts` (`demoTarget`: the newest demo dataset, the newest case for the vendor, the fallbacks) |
+| 5 | `apps/web/tests/story.test.ts` (`newestDemo`, `caseFor`, `safeNext`); the page's fallbacks by eye |
 | 1–3, 6 | Checked by eye at 1440 and 390 on the local stack |
 
 ## Out of scope

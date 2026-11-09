@@ -15,7 +15,7 @@ export const STORY_STATIONS: StoryStation[] = [
     does: "Ramp's webhook, a poller and a nightly sweep all compare Ramp's accounts with Dialback's own history, and agree on one case per change.",
     stops: "A missed or forged webhook letting a change slip past: the webhook is only a hint, the comparison is the truth." },
   { key: "hold", label: "Hold", rules: "R1",
-    does: "Payments to the vendor are put on hold in Ramp and their dates are saved. Dialback reads the hold back from Ramp before it does anything else.",
+    does: "As soon as the change is detected, payments to the vendor are put on hold in Ramp and their dates are saved. Dialback reads the hold back from Ramp before it does anything else.",
     stops: "Money leaving for the new account while anyone is still checking. A hold Ramp won't confirm is an alarm for a person." },
   { key: "number", label: "Pick a provable number", rules: "R2",
     does: "The Trust Ledger picks a phone number seen in at least two independent sources before the request arrived.",
@@ -27,7 +27,7 @@ export const STORY_STATIONS: StoryStation[] = [
     does: "A fixed rule table turns the recorded answers into Verified, Not verified or Needs review, and writes a sentence for every rule that fired.",
     stops: "A smooth talker persuading a model. The model only records answers; no tool it has can set an outcome." },
   { key: "release", label: "A second person releases", rules: "R5",
-    does: "An approver who did not enter the change reads the evidence, gives a reason, and releases or rejects. Only then does the hold lift.",
+    does: "An approver who did not enter the change reads the evidence and, with a written reason, releases (the hold lifts) or rejects (the case is blocked and the hold stays).",
     stops: "One person moving money alone. Postgres refuses the person who entered the change, whatever the page shows." },
 ];
 
@@ -54,6 +54,13 @@ export const DEMO_STORIES: DemoStory[] = [
   { ref: "cobalt", legal_name: "Cobalt Freight LLC", title: "Denied",
     story: "Cobalt's contact says the company never asked to change banks. Code says Not verified, and the hold stays on." },
 ];
+
+/** Where to go after signing in: a known demo link, or the dashboard. Nothing else is followed,
+ *  so the parameter can't send anyone off the site. */
+export function safeNext(raw: unknown): string {
+  const m = typeof raw === "string" ? /^\/demo\/([a-z]+)$/.exec(raw) : null;
+  return m && demoStory(m[1]) ? raw as string : "/app";
+}
 
 export function demoStory(ref: string): DemoStory | undefined {
   return DEMO_STORIES.find((s) => s.ref === ref);

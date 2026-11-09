@@ -25,13 +25,14 @@ export default async function CaseQueue({ params, searchParams }: {
   searchParams: Promise<{ missing?: string }>;
 }) {
   const { datasetId } = await params;
-  const missing = demoStory((await searchParams).missing ?? "");
+  const asked = demoStory((await searchParams).missing ?? "");
   const [cases, datasets] = await Promise.all([core.cases(datasetId), core.datasets()]);
   const now = datasetNow(datasets.find((d) => d.id === datasetId)?.sim_now);
   const waiting = cases.filter((c) => NEEDS_A_PERSON.includes(c.state)).sort(bySoonestPayment);
   const working = cases.filter((c) => !NEEDS_A_PERSON.includes(c.state)).sort(bySoonestPayment);
   const dueSoon = cases.filter((c) => dueLabel(c.next_payment_date, now)?.soon).length;
   const unconfirmed = cases.filter((c) => c.hold_status === "failed").length;
+  const missing = asked && !cases.some((c) => c.vendor.legal_name === asked.legal_name) ? asked : undefined;
 
   return (
     <main>

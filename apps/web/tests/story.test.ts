@@ -1,7 +1,7 @@
 // The public "How it works" page's stations and the demo links (spec 0033). `pnpm test`.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { DEMO_STORIES, STORY_STATIONS, caseFor, demoStory, newestDemo } from "../src/lib/story.ts";
+import { DEMO_STORIES, STORY_STATIONS, caseFor, demoStory, newestDemo, safeNext } from "../src/lib/story.ts";
 
 test("seven stations in pipeline order, each saying what it stops and the rule it rests on", () => {
   assert.deepEqual(STORY_STATIONS.map((s) => s.key),
@@ -40,4 +40,10 @@ test("the vendor's newest case, matched on its exact legal name", () => {
   assert.equal(caseFor(cases, "Acme Fasteners LLC")?.id, "new");
   assert.equal(caseFor(cases, "Cobalt Freight LLC"), undefined);
   assert.equal(caseFor([], "Acme Fasteners LLC"), undefined);
+});
+
+test("after sign-in, only a known demo link is followed; anything else opens the dashboard", () => {
+  assert.equal(safeNext("/demo/acme"), "/demo/acme");
+  for (const bad of [null, "", "/demo/nope", "/demo/acme/../../x", "//evil.example", "https://evil.example/demo/acme",
+    "/demo/acme?x=1", "/d/123/cases", "/demo/constructor"]) assert.equal(safeNext(bad), "/app", String(bad));
 });
