@@ -1,7 +1,7 @@
 // The case page's call view (spec 0036): display only, from what the core sends. `pnpm test`.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { answerText, checkRows, conversation, ruleChips } from "../src/lib/call.ts";
+import { anchoredRules, answerText, checkRows, conversation, ruleChips } from "../src/lib/call.ts";
 
 const a = (slot: string, value: string | null, turn: number, extra: Record<string, unknown> = {}) =>
   ({ slot, value, digit_count: null, turn_id: turn, capture_method: "speech", captured_at: "", feeds: [], ...extra }) as never;
@@ -17,9 +17,12 @@ test("the last four digits are only ever a count, refused or didn't know", () =>
   assert.equal(answerText(a("change_requested", "unsure", 7)), "Not sure");
   assert.equal(answerText(a("company_named", "Acme Fasteners", 3)), "Acme Fasteners");
   assert.equal(answerText(a("flag", "pressure_to_approve", 8)), "Pressed for approval");
+  assert.equal(answerText(a("speaker_name", "Jordan, call me on 415 555 0100", 5)), "Jordan, call me on •••");
+  assert.equal(answerText(a("speaker_role", "AR, 2 years", 5)), "AR, 2 years");
 });
 
 const decision = {
+  rules_fired: ["NV01_vendor_denied_change"], explanation: ["n1"],
   checklist: [
     { id: "V07_right_person_confirmed", sentence: "s7", status: "passed" },
     { id: "V08_digits_match", sentence: "s8", status: "not_met" },
@@ -35,7 +38,7 @@ test("chips name only rules this decision reports on, each with the core's statu
     { id: "V08_digits_match", label: "V08", status: "not met", tone: "warn" },
   ]);
   assert.deepEqual(ruleChips(["V07_right_person_confirmed"], null), [], "no decision: no chips");
-  const unchecked = { checklist: [{ id: "V07_right_person_confirmed", sentence: "s", status: "not_checked" }], fired: [] } as never;
+  const unchecked = { rules_fired: [], explanation: [], checklist: [{ id: "V07_right_person_confirmed", sentence: "s", status: "not_checked" }], fired: [] } as never;
   assert.deepEqual(ruleChips(["V07_right_person_confirmed"], unchecked), [], "a condition never run gets no chip");
 });
 
@@ -55,11 +58,25 @@ test("script checks read as words, and only a clean value is ok", () => {
     new_number_accepted: true, policy_violations: 0, speech_guard_trips: 2 });
   assert.deepEqual(rows.map((r) => [r.label, r.word, r.ok]), [
     ["AI and recording disclosed first", "yes", true],
-    ["Every answer is in the turn it cites", "no", false],
+    ["Every answer is in the turn it cites", "not all", false],
     ["The agent never said account digits", "never said", true],
     ["No new phone number accepted", "a new number was accepted", false],
     ["Policy violations", "none", true],
-    ["Speech-guard trips", "2", false],
+    ["Speech-guard trips", "2, should be none", false],
   ]);
   assert.deepEqual(checkRows(null), []);
+});
+
+test("a chip links only to a row the decision card renders", () => {
+  const ungrouped = { rules_fired: ["NV01_vendor_denied_change", "OLD_rule"], explanation: ["n1"],  // lengths differ: plain list, no anchors
+    checklist: [{ id: "V07_right_person_confirmed", sentence: "s", status: "not_checked" }],
+    fired: [{ id: "NV01_vendor_denied_change", sentence: "n1", block: "not_verified" }] } as never;
+  assert.deepEqual([...anchoredRules(ungrouped)], []);
+  assert.deepEqual(ruleChips(["NV01_vendor_denied_change", "V07_right_person_confirmed"], ungrouped), []);
+  assert.deepEqual([...anchoredRules(decision)].sort(), ["NV01_vendor_denied_change", "V07_right_person_confirmed", "V08_digits_match"]);
+});
+
+test("without a script every answer is still listed", () => {
+  const turns = conversation(undefined, [a("company_named", "Acme", 3)]);
+  assert.deepEqual([turns.asked.length, turns.extra.length], [0, 1]);
 });

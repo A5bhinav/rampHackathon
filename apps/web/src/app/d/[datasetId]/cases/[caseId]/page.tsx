@@ -134,9 +134,7 @@ export default async function CaseDetailPage({ params, searchParams }: {
           {detail.calls && detail.calls.length === 0 && c.state !== "open" ? (
             <section className="card empty" aria-label="The call">
               <p>
-                No call has been placed for this case.{" "}
-                {["held", "calling"].includes(c.state) ? "Dialback places it once it has a provable number and the calling window is open."
-                  : lastStep ? <>The last step: {lastStep.summary}</> : null}
+                No call has been placed for this case.{lastStep ? <> The last step: {lastStep.summary}</> : null}
               </p>
             </section>
           ) : null}

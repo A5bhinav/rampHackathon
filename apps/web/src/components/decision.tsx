@@ -10,7 +10,8 @@ const STATUS_TONE: Record<string, string> = { passed: "tone-ok", not_met: "tone-
  *  every sentence and status word is the core's. */
 export function DecisionDetail({ decision }: { decision: DecisionInfo }) {
   const groups = groupRules(decision.rules_fired, decision.explanation);
-  const listed = new Set((decision.checklist ?? []).map((c) => c.id));
+  const ran = (decision.checklist ?? []).some((c) => c.status !== "not_checked");
+  const listed = new Set(ran ? (decision.checklist ?? []).map((c) => c.id) : []);  // a folded checklist hides nothing recorded
   return (
     <>
       <div className="tags">

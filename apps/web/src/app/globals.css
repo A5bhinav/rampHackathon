@@ -537,3 +537,4 @@ ul.checks li { display: flex; justify-content: space-between; gap: 10px; align-i
   ul.checklist li > span:nth-child(2) { grid-column: 1 / -1; grid-row: 2; }
 }
 details.fold summary { cursor: pointer; color: var(--accent); font-weight: 500; font-size: 0.875rem; margin-bottom: 8px; }
+.rule-group li { scroll-margin-top: 90px; }

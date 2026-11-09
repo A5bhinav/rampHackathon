@@ -10,7 +10,7 @@ export function CallCard({ call, script, decision, total }: {
   call: CallAttempt; script: CallScript | undefined; decision: DecisionInfo | null; total: number;
 }) {
   const talked = call.answers.length > 0;
-  const turns = script ? conversation(script, call.answers) : null;
+  const turns = conversation(script, call.answers);
   const checks = checkRows(call.checks);
   return (
     <section className="card call-card" aria-labelledby={`call-${call.call_id}`}>
@@ -23,31 +23,39 @@ export function CallCard({ call, script, decision, total }: {
       <dl className="call-meta">
         <div><dt>Started</dt><dd>{when(call.started_at) || "—"}</dd></div>
         <div><dt>Answered by</dt><dd>{call.answered_by === "human" ? "a person" : call.answered_by === "machine" ? "a machine" : "unknown"}</dd></div>
-        <div><dt>Dialed</dt><dd>{call.dialed_number_is_pick === true ? "the Trust Ledger's pick" : call.dialed_number_is_pick === false ? "not the pick" : "unknown"}{call.direction ? `, ${call.direction}` : ""}</dd></div>
+        <div><dt>Dialed</dt><dd>{call.dialed_number_is_pick === true ? "the Trust Ledger's pick" : call.dialed_number_is_pick === false ? <span className="badge tone-bad">not the Trust Ledger&apos;s pick</span> : "unknown"}{call.direction ? `, ${call.direction}` : ""}</dd></div>
         {call.provider ? <div><dt>Line</dt><dd>{call.provider}</dd></div> : null}
         {call.agent_version ? <div><dt>Agent</dt><dd className="mono">{call.agent_version}</dd></div> : null}
       </dl>
       {call.reason ? <p className="muted">{call.reason}</p> : null}
 
-      {talked && turns && script ? (
+      {talked ? (
+        <>
+        <p className="muted sub">
+          Each answer shows the turn it came from and chips for the decision rules that read it, with the status the decision
+          recorded for that rule. A rule that reads several answers shows under each of them.
+        </p>
         <ol className="convo" aria-label="The conversation, as recorded">
-          <li className="say say-agent">
-            <span className="say-who">Agent · fixed disclosure, word for word</span>
-            <p>{script.disclosure}</p>
-          </li>
+          {script ? (
+            <li className="say say-agent">
+              <span className="say-who">Agent · the fixed disclosure (today&apos;s script) · disclosed first: {call.checks ? (call.checks.disclosure_first ? "yes" : "no") : "not reported"}</span>
+              <p>{script.disclosure}</p>
+            </li>
+          ) : null}
           {turns.asked.map((q) => (
             <li key={q.slot} className="say-pair">
               <div className="say say-agent">
                 <span className="say-who">Agent · {SLOT_LABEL[q.slot] ?? q.slot} · scripted wording</span>
                 <p>{q.wording}</p>
               </div>
-              {q.answers.length ? q.answers.map((x) => <Answer key={`${x.slot}-${x.turn_id}`} answer={x} decision={decision} />) : (
+              {q.answers.length ? q.answers.map((x, i) => <Answer key={`${x.slot}-${x.turn_id}-${i}`} answer={x} decision={decision} />) : (
                 <div className="say say-callee is-none"><p>No answer recorded.</p></div>
               )}
             </li>
           ))}
-          {turns.extra.map((x) => <li key={`${x.slot}-${x.turn_id}`}><Answer answer={x} decision={decision} /></li>)}
+          {turns.extra.map((x, i) => <li key={`${x.slot}-${x.turn_id}-${i}`}><Answer answer={x} decision={decision} /></li>)}
         </ol>
+        </>
       ) : null}
 
       {checks.length ? (
