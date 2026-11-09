@@ -34,10 +34,17 @@ def test_disclosure_gives_a_callback_number() -> None:
 
 
 def test_question_order_is_fixed() -> None:
-    assert ORDER == (Phase.CONSENT, Phase.COMPANY, Phase.DEPARTMENT, Phase.NAME_ROLE, Phase.CHANGE, Phase.LAST4)
+    # Name and role are two questions, each answer recorded as said (spec 0034, B5 and D2).
+    assert ORDER == (Phase.CONSENT, Phase.COMPANY, Phase.DEPARTMENT, Phase.NAME, Phase.ROLE, Phase.CHANGE,
+                     Phase.LAST4)
     assert [PHASE_SLOT[p] for p in ORDER] == ["recording_consent", "company_named", "department", "speaker_name",
-                                             "change_requested", "account_last4"]
+                                             "speaker_role", "change_requested", "account_last4"]
     assert set(QUESTIONS) == set(ORDER)
+
+
+def test_name_and_role_have_their_own_questions() -> None:
+    assert QUESTIONS[Phase.NAME].wording(SCRIPT) == "May I have your name?"
+    assert QUESTIONS[Phase.ROLE].wording(SCRIPT) == "And what's your role there?"
 
 
 def test_company_question_never_names_the_vendor() -> None:

@@ -1,10 +1,15 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ChainBadge, OutcomeBadge, StateBadge } from "@/components/badges";
+import { ChainBadge, StateBadge } from "@/components/badges";
+import { CallCard } from "@/components/call";
 import { DecisionConsole } from "@/components/console";
 import { DecisionDetail } from "@/components/decision";
+import { CaseRail } from "@/components/flow";
+import { PaymentPath } from "@/components/path";
+import { PageHead } from "@/components/page";
 import { CoreError, core } from "@/lib/core";
-import { datasetNow, date, dueLabel, relative, when, words } from "@/lib/format";
+import { brief, datasetNow, date, dueLabel, relative, when, words } from "@/lib/format";
+import { progress, visitedThisVersion } from "@/lib/progress";
 import { releaseAction, reviewAction } from "./actions";
 
 // Case detail and the release console: the timeline from the evidence log, the chain badge,
@@ -15,6 +20,8 @@ const NOTICES: Record<string, string> = {
   already_applied: "That was already recorded.",
   awaiting_second_approver: "Your approval is recorded. A second approver must release this change.",
 };
+
+const EDGE: Record<string, string> = { verified: "edge-ok", not_verified: "edge-bad", needs_review: "edge-warn" };
 
 export default async function CaseDetailPage({ params, searchParams }: {
   params: Promise<{ datasetId: string; caseId: string }>;
@@ -37,144 +44,192 @@ export default async function CaseDetailPage({ params, searchParams }: {
     ? detail.releases.find((r) => r.action === "approve" && r.case_version === c.version) : undefined;
   const lastStep = detail.timeline.at(-1);  // its summary is the core's template, so the reason is never guessed here
 
+  const visited = visitedThisVersion(detail.timeline, c.version);
+  const steps = progress({ state: c.state, visited, holdStatus: hold?.status ?? null, hasDecision: Boolean(decision) }).map((s) => {
+    if (s.status !== "done") return s;
+    if (s.key === "hold") return { ...s, note: brief(hold?.confirmed_at) };
+    if (s.key === "call") return { ...s, note: "Answered" };
+    if (s.key === "decision" && decision) return { ...s, note: words(decision.outcome) };
+    if (s.key === "release") return { ...s, note: brief(hold?.released_at) || "Released" };
+    return s;
+  });
+
   return (
     <main>
-      <p className="back"><Link href={`/d/${datasetId}/cases`}><span className="arrow" aria-hidden="true">←</span> Case queue</Link></p>
       {done && NOTICES[done] ? (
         <p className="result ok" role="status">{NOTICES[done]}{to ? ` The case moved to ${words(to)}.` : ""}</p>
       ) : null}
-      <p className="eyebrow">Bank-detail change</p>
-      <h1>{c.vendor.legal_name}</h1>
-      <p style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-        <StateBadge state={c.state} />
-        <OutcomeBadge outcome={c.outcome} />
-        <ChainBadge chain={detail.chain} />
-        <span className="muted">Version {c.version}</span>
-        <Link href={`${path}/lineage`}>Number lineage</Link>
-        {c.unknown_changer ? <span className="badge tone-warn">Unknown changer: two approvers</span> : null}
-        {c.deadline_at && !["released", "releasing"].includes(c.state) ? (
-          <span className={`badge ${deadlinePassed ? "tone-bad" : "tone-muted"}`} title={when(c.deadline_at)}>
-            Deadline {deadlinePassed ? "passed" : relative(c.deadline_at, now)}
-          </span>
-        ) : null}
-      </p>
-      {firstApproval ? (
-        <p className="result ok" role="status">
-          {firstApproval.actor.display_name} approved this change {when(firstApproval.created_at)}. The change has no known author, so
-          a second, different approver must release it.
-        </p>
-      ) : null}
+      <PageHead
+        back={{ href: `/d/${datasetId}/cases`, label: "Case queue" }}
+        title={c.vendor.legal_name}
+        aside={<Link className="button-link" href={`${path}/lineage`}>Number lineage</Link>}
+      >
+        <div className="tags">
+          <StateBadge state={c.state} />
+          <Link className="badge-link" href={`/d/${datasetId}/evidence${detail.chain.ok ? "" : `#row-${detail.chain.first_bad_seq}`}`}>
+            <ChainBadge chain={detail.chain} />
+          </Link>
+          {c.unknown_changer ? <span className="badge tone-warn">Unknown changer: two approvers</span> : null}
+          {c.deadline_at && !["released", "releasing"].includes(c.state) ? (
+            <span className={`badge ${deadlinePassed ? "tone-bad" : "tone-muted"}`} title={when(c.deadline_at)}>
+              Deadline {deadlinePassed ? "passed" : relative(c.deadline_at, now)}
+            </span>
+          ) : null}
+          <span className="muted sub">Version {c.version}</span>
+        </div>
+      </PageHead>
 
-      <div className="grid">
-        <section className="card" aria-labelledby="change-h">
-          <h2 id="change-h">The change</h2>
-          <dl className="facts">
-            <dt>Old account</dt><dd className="mono">{change.old_account ? `${change.old_account.routing_number} ···${change.old_account.last4}` : "none on file"}</dd>
-            <dt>New account</dt><dd className="mono">{change.new_account.routing_number} ···{change.new_account.last4}</dd>
-            <dt>Detected</dt><dd>{when(change.detected_at)} via {change.detected_via}</dd>
-            <dt>Entered by</dt><dd>{change.changed_by?.display_name ?? "Unknown (vendor-supplied or synced)"}</dd>
-          </dl>
-        </section>
+      <CaseRail steps={steps} />
 
-        <section className="card" aria-labelledby="hold-h">
-          <h2 id="hold-h">The hold</h2>
-          {hold ? (
-            <>
-              <dl className="facts">
-                <dt>Status</dt><dd>{hold.status === "failed" ? <span className="badge tone-bad">not confirmed</span> : words(hold.status)}</dd>
-                <dt>Confirmed</dt><dd>{when(hold.confirmed_at)}</dd>
-                <dt>Released</dt><dd>{when(hold.released_at)}</dd>
-              </dl>
-              {hold.schedule.length > 0 ? (
-                <>
-                  <p className="muted" style={{ marginBottom: 4 }}>Saved payment dates, restored on release:</p>
-                  <ul className="plain">
-                    {hold.schedule.map((s) => {
-                      const due = hold.released_at ? null : dueLabel(s.payment_date, now);
-                      return (
-                        <li key={s.bill_id}>
-                          <span className="mono">{s.bill_id.slice(0, 8)}</span> · {date(s.payment_date)}
-                          {due ? <> <span className={`badge ${due.soon ? "tone-bad" : "tone-muted"}`}>{due.text}</span></> : null}
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </>
-              ) : null}
-              {hold.last_error ? <p className="result error">{hold.last_error}</p> : null}
-            </>
-          ) : <p className="muted">Being placed.</p>}
-        </section>
-
-        <section className="card" aria-labelledby="decision-h">
-          <h2 id="decision-h">The decision</h2>
-          {decision ? <DecisionDetail decision={decision} /> : (
-            <p className="muted">
-              {["needs_review", "blocked"].includes(c.state) && lastStep
-                ? <>Code made no decision for this version. The last step: {lastStep.summary}</>
-                : "No decision yet for this version."}
+      <div className="case-layout">
+        <div className="case-main">
+          {firstApproval ? (
+            <p className="result ok" role="status">
+              {firstApproval.actor.display_name} approved this change {when(firstApproval.created_at)}. The change has no known author, so
+              a second, different approver must release it.
             </p>
-          )}
-        </section>
-      </div>
+          ) : null}
 
-      {can.can_approve || can.can_reject ? (
-        <section className="card">
-          <DecisionConsole
-            title="Release"
-            hint="Approving lifts the hold in Ramp and restores the saved payment dates. Rejecting keeps the hold on."
-            caseId={c.id} version={c.version} path={path} action={releaseAction}
-            buttons={[
-              ...(can.can_approve ? [{ value: "approve", label: "Approve release", tone: "primary" as const }] : []),
-              ...(can.can_reject ? [{ value: "reject", label: "Reject", tone: "danger" as const }] : []),
-            ]}
-          />
-        </section>
-      ) : null}
-      {can.can_review ? (
-        <section className="card">
-          <DecisionConsole
-            title="Review"
-            hint="Clearing sends the case to release, where a different approver must still approve it."
-            caseId={c.id} version={c.version} path={path} action={reviewAction}
-            buttons={[{ value: "clear", label: "Clear for release", tone: "primary" }, { value: "block", label: "Block", tone: "danger" }]}
-          />
-        </section>
-      ) : null}
-      {can.reasons.length > 0 ? (
-        <section className="card" aria-label="Why no action is offered">
-          <ul className="plain">{can.reasons.map((r) => <li key={r} className="muted">{r}</li>)}</ul>
-        </section>
-      ) : null}
+          <section className={`card lead-card ${decision ? EDGE[decision.outcome] ?? "" : ""}`} aria-labelledby="decision-h">
+            <h2 id="decision-h">The decision</h2>
+            {decision ? <DecisionDetail decision={decision} /> : (
+              <p className="muted">
+                {["needs_review", "blocked"].includes(c.state) && lastStep
+                  ? <>Code made no decision for this version. The last step: {lastStep.summary}</>
+                  : "No decision yet for this version. Code decides once the call's answers are in; until then the hold stays on."}
+              </p>
+            )}
+          </section>
 
-      <section className="card" aria-labelledby="timeline-h">
-        <h2 id="timeline-h">Timeline, from the evidence log</h2>
-        <ol className="timeline">
-          {detail.timeline.map((e) => (
-            <li key={e.seq}>
-              <span className="seq">#{e.seq}</span>
-              <div>
-                <div>{e.summary}</div>
-                <div className="muted" style={{ fontSize: "0.85rem" }}>
-                  {when(e.occurred_at)} · {e.actor.display_name} · {e.from_state ? `${words(e.from_state)} → ` : ""}{words(e.to_state)} ·{" "}
-                  <span className="mono" title={e.hash}>{e.hash.slice(0, 12)}</span>
-                </div>
-              </div>
-            </li>
+          {can.can_approve || can.can_reject ? (
+            <section className="card console-card">
+              <DecisionConsole
+                title="Release"
+                hint="Approving lifts the hold in Ramp and restores the saved payment dates. Rejecting keeps the hold on."
+                caseId={c.id} version={c.version} path={path} action={releaseAction}
+                buttons={[
+                  ...(can.can_approve ? [{ value: "approve", label: "Approve release", tone: "primary" as const }] : []),
+                  ...(can.can_reject ? [{ value: "reject", label: "Reject", tone: "danger" as const }] : []),
+                ]}
+              />
+            </section>
+          ) : null}
+          {can.can_review ? (
+            <section className="card console-card">
+              <DecisionConsole
+                title="Review"
+                hint="Clearing sends the case to release, where a different approver must still approve it."
+                caseId={c.id} version={c.version} path={path} action={reviewAction}
+                buttons={[{ value: "clear", label: "Clear for release", tone: "primary" }, { value: "block", label: "Block", tone: "danger" }]}
+              />
+            </section>
+          ) : null}
+          {can.reasons.length > 0 ? (
+            <section className="note" aria-label="Why no action is offered">
+              <ul className="plain">{can.reasons.map((r) => <li key={r}>{r}</li>)}</ul>
+            </section>
+          ) : null}
+
+          {(detail.calls ?? []).map((call) => (
+            <CallCard key={call.call_id} call={call} script={detail.call_script} decision={decision} total={detail.calls?.length ?? 0} />
           ))}
-        </ol>
-      </section>
+          {detail.calls && detail.calls.length === 0 && c.state !== "open" ? (
+            <section className="card empty" aria-label="The call">
+              <p>
+                No call has been placed for this case.{lastStep ? <> The last step: {lastStep.summary}</> : null}
+              </p>
+            </section>
+          ) : null}
 
-      {detail.releases.length > 0 ? (
-        <section className="card" aria-labelledby="releases-h">
-          <h2 id="releases-h">Approvals</h2>
-          <ul className="plain">
-            {detail.releases.map((r) => (
-              <li key={`${r.actor.id}-${r.created_at}`}>{r.actor.display_name} {r.action === "approve" ? "approved" : "rejected"} version {r.case_version}, {when(r.created_at)}: “{r.reason}”</li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
+          <section className="section" aria-labelledby="timeline-h">
+            <h2 id="timeline-h">Timeline <span className="h-note">from the evidence log</span></h2>
+            <ol className="timeline">
+              {detail.timeline.map((e) => (
+                <li key={e.seq}>
+                  <span className="seq">#{e.seq}</span>
+                  <div>
+                    <div>{e.summary}</div>
+                    <div className="meta">
+                      <span>{when(e.occurred_at)}</span>
+                      <span>{e.actor.display_name}</span>
+                      <span>{e.from_state ? `${words(e.from_state)} → ` : ""}{words(e.to_state)}</span>
+                      <span className="mono" title={e.hash}>{e.hash.slice(0, 12)}</span>
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </section>
+        </div>
+
+        <aside className="case-side" aria-label="The change and the hold">
+          <section className="panel" aria-labelledby="change-h">
+            <h2 id="change-h">The change</h2>
+            <PaymentPath
+              bills={c.bills_held}
+              nextPayment={c.next_payment_date}
+              holdStatus={hold?.status ?? null}
+              newAccount={`${change.new_account.routing_number} ···${change.new_account.last4}`}
+              oldAccount={change.old_account ? `${change.old_account.routing_number} ···${change.old_account.last4}` : null}
+            />
+            <dl className="facts">
+              <dt>Detected</dt><dd>{when(change.detected_at)}<div className="muted sub">via {change.detected_via}</div></dd>
+              <dt>Entered by</dt><dd>{change.changed_by?.display_name ?? "Unknown (vendor-supplied or synced)"}</dd>
+            </dl>
+          </section>
+
+          <section className="panel" aria-labelledby="hold-h">
+            <h2 id="hold-h">The hold</h2>
+            {hold ? (
+              <>
+                <dl className="facts">
+                  <dt>Status</dt><dd>{hold.status === "failed" ? <span className="badge tone-bad">not confirmed</span> : words(hold.status)}</dd>
+                  <dt>Confirmed</dt><dd>{when(hold.confirmed_at)}</dd>
+                  <dt>Released</dt><dd>{when(hold.released_at)}</dd>
+                </dl>
+                {hold.schedule.length > 0 ? (
+                  <>
+                    <h3 className="panel-sub">Saved payment dates, restored on release</h3>
+                    <ul className="schedule">
+                      {hold.schedule.map((s) => {
+                        const due = hold.released_at ? null : dueLabel(s.payment_date, now);
+                        return (
+                          <li key={s.bill_id}>
+                            <span className="mono muted" title={s.bill_id}>{s.bill_id.slice(0, 8)}</span>
+                            <span>{date(s.payment_date)}</span>
+                            {due ? <span className={`badge ${due.soon ? "tone-bad" : "tone-muted"}`}>{due.text}</span> : <span />}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </>
+                ) : null}
+                {hold.last_error ? <p className="result error">{hold.last_error}</p> : null}
+              </>
+            ) : (
+              <p className="muted">
+                Dialback is placing the hold in Ramp and will read it back before doing anything else. If Ramp won&apos;t confirm
+                it, the case goes to a person and an alert is raised.
+              </p>
+            )}
+          </section>
+
+          {detail.releases.length > 0 ? (
+            <section className="panel" aria-labelledby="releases-h">
+              <h2 id="releases-h">Approvals</h2>
+              <ul className="approvals">
+                {detail.releases.map((r) => (
+                  <li key={`${r.actor.id}-${r.created_at}`}>
+                    <div><strong>{r.actor.display_name}</strong> {r.action === "approve" ? "approved" : "rejected"} version {r.case_version}</div>
+                    <div className="muted sub">{when(r.created_at)}</div>
+                    <blockquote>{r.reason}</blockquote>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+        </aside>
+      </div>
     </main>
   );
 }

@@ -7,11 +7,11 @@ Secrets go into Railway and Vercel variables, never into the repo or a chat.
 |---|---|---|---|---|
 | Core API and worker (`apps/core`) | Railway, one always-on service | `apps/core/railway.json`, `apps/core/Dockerfile` | `dialback-core serve`, after `python scripts/db/migrate.py` | `GET /healthz` |
 | Ramp mock (`apps/ramp-mock`) | Railway, private | `apps/ramp-mock/railway.json`, `apps/ramp-mock/Dockerfile` | `dialback-ramp-mock` | `GET /healthz` |
-| Voice service (`apps/voice`, Sami) | Railway | added with the voice service | | |
+| Voice service (`apps/voice`, Sami) | Railway, public (Twilio calls it) | `apps/voice/Dockerfile` | `dialback-voice` | `GET /healthz` |
 | Dashboard (`apps/web`) | Vercel | `apps/web/vercel.json` | Next.js | |
 | Database, sign-in | Supabase | `supabase/migrations/` | applied by the core's pre-deploy step | |
 
-The `images` CI job builds both Railway images on every PR. It migrates a database from the core image twice (the second run must change nothing), then starts both services and waits for `/healthz`.
+The `images` CI job builds the three Railway images on every PR. It migrates a database from the core image twice (the second run must change nothing), then starts all three services and waits for `/healthz`.
 
 ## 1. Supabase (once)
 
@@ -36,7 +36,7 @@ The `images` CI job builds both Railway images on every PR. It migrates a databa
    - Name it `ramp-mock`.
    - Set its config file to `/apps/ramp-mock/railway.json`.
    - Give it no public domain. Only the core talks to it, over Railway's private network.
-3. **Networking:** generate a public domain for `core` only (Settings → Networking). The dashboard calls the core, and the voice service posts call reports to it.
+3. **Networking:** generate a public domain for `core` (the dashboard calls it) and for `voice` (Twilio calls it). The mock stays private. The voice service posts call reports to the core over the private network.
 4. **Variables:** paste the blocks below into each service's Variables → Raw editor. For the secrets, make shared variables in Project Settings → Shared Variables, so the two services can't drift.
    - Generate each secret with `openssl rand -hex 32`.
    - `MOCK_RAMP_SECRET` must be the same in both services.
@@ -100,12 +100,69 @@ The `ramp-mock` URL uses Railway's reference variables (`${{service.VARIABLE}}`)
 | `DIALBACK_POLL_SECONDS`, `DIALBACK_RECONCILE_SECONDS`, `DIALBACK_FULL_SWEEP_SECONDS`, `DIALBACK_VERIFY_SECONDS` | no | Job intervals; default 60, 300, 86400 and 300 |
 | `PORT`, `HOST` | no | Set by the image (8001; an empty `HOST` binds IPv4 and IPv6) |
 
+### The voice service (specs 0029 and 0030)
+
+A third service from the same repo, named `voice`. In its Settings: Dockerfile path
+`apps/voice/Dockerfile`, root directory `/`, start command `dialback-voice`, health check
+`/healthz`, watch paths `apps/voice/**`, `packages/policy/**`, `pyproject.toml`, `uv.lock` (the
+same way the core's settings are applied; Railway no longer reads `railway.json`). Give it a public domain: Twilio fetches its instructions, posts call statuses and
+opens the ConversationRelay WebSocket there. The core calls it over the private network. It runs no
+migrations; it uses the database the core migrates.
+
+`voice` service. The team sets the secrets; they never go in the repo or a chat:
+
+```bash
+DATABASE_URL=${{shared.DATABASE_URL}}
+DIALBACK_INTERNAL_TOKEN=${{core.INTERNAL_API_TOKEN}}
+DIALBACK_CORE_URL=http://${{core.RAILWAY_PRIVATE_DOMAIN}}:8001
+DIALBACK_PUBLIC_BASE_URL=https://${{RAILWAY_PUBLIC_DOMAIN}}
+DIALBACK_WS_BASE_URL=wss://${{RAILWAY_PUBLIC_DOMAIN}}
+DIALBACK_CALL_TOKEN_KEY=<openssl rand -hex 32>
+DIALBACK_CUSTOMER_NAME=<the customer the disclosure names>
+DIALBACK_AP_CALLBACK_NUMBER=<the AP callback number the disclosure gives, E.164>
+DIALBACK_DIAL_ALLOWLIST=<the team phones, comma-separated E.164>
+DIALBACK_VOICE=live
+TWILIO_ACCOUNT_SID=<from Twilio>
+TWILIO_AUTH_TOKEN=<from Twilio>
+TWILIO_FROM_NUMBER=<the Twilio number, E.164>
+ANTHROPIC_API_KEY=<the voice agent's key>
+PORT=8080
+```
+
+On the `core` service, add:
+
+```bash
+VOICE_URL=http://${{voice.RAILWAY_PRIVATE_DOMAIN}}:8080
+DIALBACK_RESOLVER=ledger
+```
+
+`DIALBACK_RESOLVER=ledger` makes the core use the Trust Ledger's pick, the number the voice
+service reads and dials. With `stub`, the core's pick and the voice service's disagree, and every
+call is refused `number_not_selected`.
+
+| Variable | Required | Meaning |
+|---|---|---|
+| `DATABASE_URL` | yes | Without it the service refuses to boot |
+| `DIALBACK_INTERNAL_TOKEN` | yes | The core's `INTERNAL_API_TOKEN`: authenticates `POST /calls` and the call reports |
+| `DIALBACK_VOICE` | no | `text` (default: accepts calls, dials nobody) or `live` |
+| `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_NUMBER`, `DIALBACK_CALL_TOKEN_KEY`, `DIALBACK_CORE_URL`, `DIALBACK_PUBLIC_BASE_URL`, `DIALBACK_WS_BASE_URL` | for `live` | All of them, or the service stays on the text line and logs which are missing |
+| `ANTHROPIC_API_KEY` | for `live` | The voice agent. Without it a live call runs the scripted placeholder (logged) |
+| `DIALBACK_CUSTOMER_NAME`, `DIALBACK_AP_CALLBACK_NUMBER` | for `live` | Named in the disclosure (R8). Missing: the live path stays off and the service runs the text line (logged) |
+| `DIALBACK_DIAL_ALLOWLIST` | for any call | Comma-separated E.164. Every dialed number must be on it, in every dataset (AGENTS.md). Empty: nobody is called |
+| `DIALBACK_CALLING_TZ` | no | `America/Los_Angeles`. Non-demo datasets call weekdays 9:00 to 16:30 in this zone, fixed here; keep the core's `DIALBACK_CALLING_*` at their defaults or calls are refused. An unknown zone stops the service at startup |
+| `PORT`, `HOST` | no | Set by the image (8080; an empty `HOST` binds IPv4 and IPv6) |
+
+For a demo call to ring a team phone, the ledger's pick for the vendor must be that phone, and the
+phone must be on the allowlist: `dialback-ledger demo load --phone acme=+1...` after `demo reset`.
+The whole first call, step by step, is `docs/live-call.md`.
+
 ## 3. Vercel (once)
 
 1. **Add a new project from the GitHub repo** and set **Root Directory** to `apps/web`.
    - Vercel detects Next.js.
    - `apps/web/vercel.json` installs only the dashboard's packages from the pnpm workspace, and fails the build if the generated API types are stale.
    - Keep "Include files outside the root directory" on (the default), because the generated types live in `packages/contracts`.
+   - `apps/web/vercel.json`'s `ignoreCommand` (`apps/web/scripts/vercel-ignore-build.sh`) cancels the build when nothing the dashboard reads (`apps/web`, `packages/contracts`, the root `package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`, `.npmrc`) changed since the branch's last successful deployment. A branch's first deployment, a redeploy of the same commit, and anything the script can't check all build. A canceled build still counts toward the Hobby plan's 100 deployments a day ([Vercel's docs](https://vercel.com/docs/project-configuration/project-settings#ignored-build-step)): it saves build time and the build slot, not quota. To force a build of a commit it skipped, redeploy with "Use project's Ignore Build Step" unchecked.
 2. **Variables** (Settings → Environment Variables):
 
 | Variable | Preview | Production | Meaning |

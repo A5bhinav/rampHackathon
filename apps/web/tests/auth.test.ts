@@ -1,7 +1,7 @@
 // Sign-in rules that don't need a browser or a Supabase project (spec 0010). `pnpm test`.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { MIN_NEW_PASSWORD, SESSION_HOURS, Throttle, authMode, cleanEmail, cleanName, cleanNewPassword, cleanPassword, sessionFresh, signedInAt, signUpNotice } from "../src/lib/auth-mode.ts";
+import { MIN_NEW_PASSWORD, PASSWORD_RULE, SESSION_HOURS, Throttle, authMode, cleanEmail, cleanName, cleanNewPassword, cleanPassword, demoAccounts, sessionFresh, signedInAt, signUpNotice } from "../src/lib/auth-mode.ts";
 
 const SUPABASE = { SUPABASE_URL: "https://abcdefghijklmnop.supabase.co", SUPABASE_PUBLISHABLE_KEY: "sb_publishable_x" };
 
@@ -67,13 +67,23 @@ test("a new account's name is trimmed and 1 to 80 characters, without control ch
   }
 });
 
-test(`a new password is ${MIN_NEW_PASSWORD} to 72 characters, kept as typed`, () => {
+test(`a new password is ${MIN_NEW_PASSWORD} to 72 characters with a lowercase, an uppercase, a digit and a symbol`, () => {
+  // Spec 0033: the same rule Supabase enforces (password_required_characters), so the form never
+  // lets through a password Supabase would refuse, and says why before it gets there.
   assert.equal(MIN_NEW_PASSWORD, 8);
-  assert.equal(cleanNewPassword(" 8 chars"), " 8 chars", "never trimmed");
-  assert.equal(cleanNewPassword("x".repeat(72)), "x".repeat(72));
-  for (const bad of ["", "7 chars", "x".repeat(73), null, 42]) {
+  assert.equal(cleanNewPassword("Abcdef1!"), "Abcdef1!");
+  assert.equal(cleanNewPassword(" Abcd1!x"), " Abcd1!x", "kept as typed, never trimmed");
+  assert.equal(cleanNewPassword("Aa1" + "\\" + "xxxx"), "Aa1\\xxxx", "a backslash is one of Supabase's symbols");
+  const long = "Aa1!" + "x".repeat(68);
+  assert.equal(cleanNewPassword(long), long, "72 characters is the most");
+  for (const bad of ["abcdef1!", "ABCDEF1!", "Abcdefg!", "Abcdefg1", "Ab1!", "Abcdef1 x", "Abcdef1€", long + "x", "", null, 42]) {
     assert.equal(cleanNewPassword(bad), null, JSON.stringify(bad));
   }
+});
+
+test("the password rule is spelled out for the form", () => {
+  assert.match(PASSWORD_RULE, /8 to 72 characters/);
+  for (const part of ["lowercase", "uppercase", "number", "symbol"]) assert.match(PASSWORD_RULE, new RegExp(part));
 });
 
 test("each sign-up answer maps to one notice, and only a session signs someone in", () => {
@@ -89,4 +99,18 @@ test("each sign-up answer maps to one notice, and only a session signs someone i
   assert.equal(signUpNotice({ status: 400, code: "validation_failed" }, false), "failed");
   assert.equal(signUpNotice({ status: 422, code: "signup_disabled" }, false), "failed");
   assert.equal(signUpNotice({ status: 400, code: "anything" }, true), "failed", "an error wins over a session");
+});
+
+test("one-click demo accounts: only with the flag, Supabase, and both accounts' credentials", () => {
+  const full = { SUPABASE_URL: "u", SUPABASE_PUBLISHABLE_KEY: "k", DIALBACK_DEMO_SIGN_IN: "on",
+    DIALBACK_DEMO_CLERK_EMAIL: "Demo.Clerk@Example.test ", DIALBACK_DEMO_CLERK_PASSWORD: "a-long-password-1",
+    DIALBACK_DEMO_APPROVER_EMAIL: "demo.approver@example.test", DIALBACK_DEMO_APPROVER_PASSWORD: "a-long-password-2" };
+  const on = demoAccounts(full);
+  assert.deepEqual(on && Object.keys(on), ["clerk", "approver"]);
+  assert.equal(on?.clerk.email, "demo.clerk@example.test");
+  for (const off of [
+    { ...full, DIALBACK_DEMO_SIGN_IN: undefined }, { ...full, DIALBACK_DEMO_SIGN_IN: "yes" },
+    { ...full, DIALBACK_DEMO_APPROVER_PASSWORD: "" }, { ...full, DIALBACK_DEMO_CLERK_EMAIL: "not an email" },
+    { ...full, SUPABASE_URL: undefined }, { ...full, DIALBACK_AUTH_MODE: "dev" },
+  ]) assert.equal(demoAccounts(off), null);
 });

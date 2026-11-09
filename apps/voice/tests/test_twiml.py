@@ -72,3 +72,18 @@ def test_a_forged_twiml_fetch_is_rejected_and_mints_no_token():
     assert r.status_code == 401
     token = tokens.mint(KEY, case_id=CASE, attempt=1, number_e164=NUMBER)
     assert token not in r.text and "welcomeGreeting" not in r.text
+
+
+def test_machine_detection_rides_to_the_call_as_a_parameter():
+    # Spec 0029: Twilio's synchronous machine detection answers on the instruction fetch. "human"
+    # rides to the WebSocket as a parameter, so the call report can say a person answered (V03);
+    # anything else is passed as "machine" or not at all, never as "human".
+    path = f"/twilio/twiml/{CALL}"
+    for answered, expected in (("human", "human"), ("machine_start", "machine"), ("fax", "machine"), ("unknown", None)):
+        params = {"AnsweredBy": answered}
+        r = _client().post(path, data=params, headers={"X-Twilio-Signature": _sign(BASE + path, params)})
+        assert r.status_code == 200, r.text
+        if expected is None:
+            assert 'name="answered_by"' not in r.text, answered
+        else:
+            assert f'<Parameter name="answered_by" value="{expected}"/>' in r.text, answered

@@ -16,13 +16,17 @@ from psycopg.rows import dict_row
 
 from .store import CallDial, dial_from_row
 
+# Seconds to wait for a connection: a database that can't be reached fails the call closed quickly,
+# and app.py runs the lookup off the event loop, so it never stalls other calls (spec 0029).
+CONNECT_TIMEOUT = 5
+
 # One row per call_id: the case and its vendor, and the number from the pinned contact point. The
 # left join ties the pick to the case's own vendor and dataset, so a pin at any other contact point
 # yields a null number and dial_from_row fails it closed (defense in depth for R2: contact_point_id
 # has no FK yet, Q40). Reading app.cases is a select, never a write, so the money-path "one door" is
 # untouched.
 _SQL = """
-    select c.case_id, c.attempt, cp.e164 as number_e164, v.legal_name, v.trade_names
+    select c.case_id, c.attempt, cp.id as contact_point_id, cp.e164 as number_e164, v.legal_name, v.trade_names
     from voice.calls c
     join app.cases ca on ca.id = c.case_id
     join app.vendors v on v.id = ca.vendor_id
@@ -37,8 +41,11 @@ def make_lookup(database_url: str, *, customer_name: str,
     """A synchronous lookup_call backed by psycopg: one query by call_id, mapped through
     dial_from_row, with the fixed disclosure names filled from settings."""
     def lookup_call(call_id: UUID) -> CallDial | None:
-        with psycopg.connect(database_url, row_factory=dict_row) as conn:
-            row = conn.execute(_SQL, {"call_id": call_id}).fetchone()
+        try:
+            with psycopg.connect(database_url, row_factory=dict_row, connect_timeout=CONNECT_TIMEOUT) as conn:
+                row = conn.execute(_SQL, {"call_id": call_id}).fetchone()
+        except psycopg.Error:
+            return None  # the database can't be read: don't run a call we only half know (R7)
         if row is None:
             return None
         names = tuple(n for n in (row["legal_name"], *(row["trade_names"] or ())) if n)

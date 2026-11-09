@@ -6,9 +6,9 @@ double and no Postgres; the real psycopg adapter is the thin piece the psql-back
 What the store reads lives in three places: the case in `app.cases` (exists, finished, held), the
 call history in `voice.calls` (attempts for the case, AI calls to the number in 30 days, and the
 Idempotency-Key for replay), and the chosen number in the Trust Ledger
-(`ledger.number_selections` to `ledger.contact_points`, spec 0012 decision 8). The ledger tables
-are not final yet (spec 0012, Q40), so the adapter fails closed on a missing pick: no provable
-number means `has_number_pick=False`, which refuses the call with `number_not_selected` (R2, R7)."""
+(`ledger.number_selections` to `ledger.contact_points`, spec 0012 decision 8). The Postgres
+adapter is `pg_store.py` (spec 0029). It fails closed on a missing pick: no provable number means
+`has_number_pick=False`, which refuses the call with `number_not_selected` (R2, R7)."""
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -39,6 +39,9 @@ class CallDial:
     customer_name: str
     callback_number: str
     vendor_names: tuple[str, ...]
+    # The Trust Ledger pick this call dials. Every call report carries it, so the core's decide()
+    # can tell the call reached the pick (spec 0029). None only for a row that predates it.
+    contact_point_id: UUID | None = None
 
 
 def dial_from_row(row: Mapping[str, Any] | None) -> CallDial | None:
@@ -46,8 +49,8 @@ def dial_from_row(row: Mapping[str, Any] | None) -> CallDial | None:
     the token and the disclosure need is absent. Fail closed (R2, R7): never invent a number or a
     name, so a route reads `None` and declines a call it only half knows. `vendor_names` is allowed
     to be empty (there may be no vendor to name; the disclosure does not use it). The query that
-    builds the row joins `voice.calls`, `app.cases` and the ledger pick, whose shapes are not final
-    (Q40/Q50), so it lands with the ledger; this mapper is the fixed contract it fills."""
+    builds the row (`pg_store.make_lookup`, spec 0029) joins `voice.calls`, `app.cases`, the vendor
+    and the ledger pick; this mapper is the fixed contract it fills."""
     if row is None:
         return None
     required = ("case_id", "attempt", "number_e164", "customer_name", "callback_number")
@@ -56,7 +59,8 @@ def dial_from_row(row: Mapping[str, Any] | None) -> CallDial | None:
     return CallDial(case_id=row["case_id"], attempt=int(row["attempt"]),
                     number_e164=row["number_e164"], customer_name=row["customer_name"],
                     callback_number=row["callback_number"],
-                    vendor_names=tuple(row.get("vendor_names") or ()))
+                    vendor_names=tuple(row.get("vendor_names") or ()),
+                    contact_point_id=row.get("contact_point_id"))
 
 
 @dataclass(frozen=True)

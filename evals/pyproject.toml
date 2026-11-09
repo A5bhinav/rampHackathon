@@ -8,6 +8,7 @@ dependencies = [
   "dialback-decision",
   "dialback-ledger",
   "jsonschema>=4",
+  "dialback-core",
   "pyyaml>=6",
 ]
 

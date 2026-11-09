@@ -1,8 +1,12 @@
 import Link from "next/link";
 import { OutcomeBadge, StateBadge } from "@/components/badges";
+import { PaymentLanes, QueueRail } from "@/components/flow";
+import { PageHead, Stats } from "@/components/page";
 import type { CaseState, CaseSummary } from "@/lib/api-types";
 import { core } from "@/lib/core";
-import { ago, datasetNow, date, dueLabel, relative, when } from "@/lib/format";
+import { stationCounts } from "@/lib/flow";
+import { demoStory } from "@/lib/story";
+import { ago, brief, datasetNow, date, dueLabel, relative, when } from "@/lib/format";
 
 // Case queue: unfinished cases by state and age, and held bills near their due date (design,
 // "Dashboard"). Cases waiting on a person come first, soonest saved payment date first, then
@@ -16,60 +20,95 @@ function bySoonestPayment(a: CaseSummary, b: CaseSummary): number {
   return ka === kb ? a.opened_at.localeCompare(b.opened_at) : ka.localeCompare(kb);
 }
 
-export default async function CaseQueue({ params }: { params: Promise<{ datasetId: string }> }) {
+export default async function CaseQueue({ params, searchParams }: {
+  params: Promise<{ datasetId: string }>;
+  searchParams: Promise<{ missing?: string }>;
+}) {
   const { datasetId } = await params;
-  const [cases, datasets] = await Promise.all([core.cases(datasetId), core.datasets()]);
+  const asked = demoStory((await searchParams).missing ?? "");
+  const [cases, datasets, all] = await Promise.all([core.cases(datasetId), core.datasets(), core.allCases(datasetId)]);
+  const released = all.filter((c) => c.state === "released").sort((a, b) => b.updated_at.localeCompare(a.updated_at));
   const now = datasetNow(datasets.find((d) => d.id === datasetId)?.sim_now);
   const waiting = cases.filter((c) => NEEDS_A_PERSON.includes(c.state)).sort(bySoonestPayment);
   const working = cases.filter((c) => !NEEDS_A_PERSON.includes(c.state)).sort(bySoonestPayment);
   const dueSoon = cases.filter((c) => dueLabel(c.next_payment_date, now)?.soon).length;
   const unconfirmed = cases.filter((c) => c.hold_status === "failed").length;
+  const missing = asked && !cases.some((c) => c.vendor.legal_name === asked.legal_name) ? asked : undefined;
 
   return (
     <main>
-      <p className="eyebrow">Held payments</p>
-      <h1>Case queue</h1>
-      <p className="muted">Every vendor whose bank details changed. Payments stay on hold until a different person releases them.</p>
-      <div className="summary" role="group" aria-label="Summary">
-        <span className="badge tone-warn">{waiting.length} waiting on a person</span>
-        <span className="badge tone-info">{working.length} in progress</span>
-        {dueSoon > 0 ? <span className="badge tone-bad">{dueSoon} with a payment overdue or due within 3 days</span> : null}
-        {unconfirmed > 0 ? <span className="badge tone-bad">{unconfirmed} hold not confirmed</span> : null}
-      </div>
-      {cases.length === 0 ? <div className="card"><p className="muted">No open cases.</p></div> : null}
+      <PageHead title="Case queue" lead="Every vendor whose bank details changed in Ramp, and where each change stands. Dialback holds their payments, calls the vendor on a number it can prove, and a different person signs off." />
+      {missing ? (
+        <p className="note" role="status">
+          {missing.legal_name} has no case on this dataset yet. Its case opens when the team makes the demo&apos;s bank change for it
+          (<span className="mono">dialback-core demo change --vendor {missing.ref}</span>).
+        </p>
+      ) : null}
+      <QueueRail counts={stationCounts(cases)} />
+      <Stats label="Held payments" items={[
+        { label: "Bills on hold", value: cases.filter((c) => c.hold_status === "confirmed" || c.hold_status === "releasing").reduce((n, c) => n + c.bills_held, 0) },
+        { label: "Waiting on a person", value: waiting.length, tone: "warn" },
+        { label: "Payment overdue or due within 3 days", value: dueSoon, tone: "bad" },
+        { label: "Hold not confirmed", value: unconfirmed, tone: "bad" },
+      ]} />
+      <PaymentLanes cases={cases} now={now} datasetId={datasetId} />
+      {cases.length === 0 ? <div className="card empty"><p>No open cases. A case opens here when a vendor&apos;s bank details change in Ramp.{released.length ? " Released changes are listed below." : ""}</p></div> : null}
       {waiting.length > 0 ? <QueueTable title="Waiting on a person" cases={waiting} datasetId={datasetId} now={now} /> : null}
       {working.length > 0 ? <QueueTable title="In progress" cases={working} datasetId={datasetId} now={now} /> : null}
+      {released.length > 0 ? (
+        <section className="card queue-group" aria-label="Released">
+          <h2>Released <span className="count">{released.length}</span> <span className="h-note">the hold is off; nothing is left to decide</span></h2>
+          <ul className="released">
+            {released.map((c) => (
+              <li key={c.id}>
+                <Link href={`/d/${datasetId}/cases/${c.id}`}>{c.vendor.legal_name}</Link>
+                <OutcomeBadge outcome={c.outcome} />
+                <span className="muted sub" title={when(c.updated_at)}>released {ago(c.updated_at, now)}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
     </main>
   );
 }
 
+// A stripe on the vendor cell for what needs eyes first: an unconfirmed hold, a payment due soon, a block.
+function stripe(c: CaseSummary, soon: boolean): string {
+  if (c.hold_status === "failed" || soon || c.state === "blocked") return "is-bad";
+  if (c.state === "needs_review") return "is-warn";
+  if (c.state === "awaiting_release") return "is-ok";
+  return "";
+}
+
 function QueueTable({ title, cases, datasetId, now }: { title: string; cases: CaseSummary[]; datasetId: string; now: Date }) {
   return (
-    <section className="card table-wrap queue-group" aria-label={title}>
-      <h2>{title} <span className="muted sub">{cases.length}</span></h2>
+    <section className="card queue-group" aria-label={title}>
+      <h2>{title} <span className="count">{cases.length}</span></h2>
+      <div className="table-wrap">
       <table>
         <thead>
-          <tr><th>Vendor</th><th>State</th><th>Decision</th><th>Held bills</th><th>Next payment date</th><th>Opened</th><th>Deadline</th></tr>
+          <tr><th className="w-vendor">Vendor</th><th>State</th><th>Decision</th><th className="num">Held bills</th><th>Next payment</th><th>Opened</th><th>Deadline</th></tr>
         </thead>
         <tbody>
           {cases.map((c) => {
             const due = dueLabel(c.next_payment_date, now);
             return (
-              <tr key={c.id}>
+              <tr key={c.id} className={stripe(c, Boolean(due?.soon))}>
                 <td>
                   <Link href={`/d/${datasetId}/cases/${c.id}`}>{c.vendor.legal_name}</Link>
-                  {c.unknown_changer ? <div><span className="badge tone-warn">two approvers</span></div> : null}
+                  {c.unknown_changer ? <div className="cell-note"><span className="badge tone-warn">two approvers</span></div> : null}
                 </td>
-                <td><StateBadge state={c.state} />{c.version > 1 ? <div className="muted sub">change {c.version}</div> : null}</td>
+                <td><StateBadge state={c.state} />{c.version > 1 ? <div className="muted sub cell-note">change {c.version}</div> : null}</td>
                 <td><OutcomeBadge outcome={c.outcome} /></td>
-                <td>{c.hold_status === "failed" ? <span className="badge tone-bad">hold not confirmed</span> : c.bills_held}</td>
+                <td className="num">{c.hold_status === "failed" ? <span className="badge tone-bad">hold not confirmed</span> : c.bills_held}</td>
                 <td>
                   {date(c.next_payment_date)}
-                  {due ? <div><span className={`badge ${due.soon ? "tone-bad" : "tone-muted"}`}>{due.text}</span></div> : null}
+                  {due ? <div className="cell-note"><span className={`badge ${due.soon ? "tone-bad" : "tone-muted"}`}>{due.text}</span></div> : null}
                 </td>
-                <td>{when(c.opened_at)}<div className="muted sub">{ago(c.opened_at, now)}</div></td>
-                <td>
-                  {when(c.deadline_at)}
+                <td className="nowrap"><span title={when(c.opened_at)}>{brief(c.opened_at)}</span><div className="muted sub">{ago(c.opened_at, now)}</div></td>
+                <td className="nowrap">
+                  <span title={when(c.deadline_at)}>{brief(c.deadline_at) || "—"}</span>
                   {c.deadline_at && c.state !== "releasing" ? (  // as on the case page: no countdown once a release is under way
                     <div className="muted sub">{Date.parse(c.deadline_at) < now.getTime() ? "passed" : relative(c.deadline_at, now)}</div>
                   ) : null}
@@ -79,6 +118,7 @@ function QueueTable({ title, cases, datasetId, now }: { title: string; cases: Ca
           })}
         </tbody>
       </table>
+      </div>
     </section>
   );
 }

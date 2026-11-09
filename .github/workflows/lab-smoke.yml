@@ -2,7 +2,7 @@ name: lab-smoke
 
 # The attack lab's voice slice (spec 0017). Runs on changes to the agent, the policy, the decision
 # engine, or the lab itself: a change that weakens the agent fails the build (AGENTS.md "done means").
-# Deterministic (ScriptedAgent via LabAgent, scripted callers), so it needs no API key and no spend.
+# Deterministic (the production ScriptedAgent, scripted callers), so it needs no API key and no spend.
 # The live-model gate and the full-pipeline run land later.
 on:
   pull_request:
@@ -10,7 +10,11 @@ on:
       - "apps/voice/**"
       - "packages/policy/**"
       - "packages/decision/**"
+      - "apps/core/src/dialback_core/company.py"   # the lab reuses production's company check
+      - "apps/core/src/dialback_core/answers.py"   # and the digits it reads from a call report
       - "evals/**"
+      - "pyproject.toml"
+      - "uv.lock"
       - ".github/workflows/lab-smoke.yml"
   push:
     branches: [main]

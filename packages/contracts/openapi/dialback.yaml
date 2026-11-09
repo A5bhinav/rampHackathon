@@ -75,6 +75,29 @@ paths:
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /api/datasets/{dataset_id}/evidence:
+    get:
+      operationId: getEvidenceLog
+      summary: The dataset's evidence chain, row by row, with the live check and the last scheduled check (spec 0035)
+      description: >-
+        Every row's hashes, newest first, and two checks Postgres runs on each row: whether its
+        content hash still matches its body, and whether it links to the row before. The chain
+        status is audit.verify_chain, recomputed now. The page decides nothing.
+      parameters:
+        - $ref: '#/components/parameters/DatasetId'
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 1000, default: 500 }
+      responses:
+        '200':
+          description: OK, whether or not the chain is intact
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EvidenceLog' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   /api/datasets/{dataset_id}/alerts:
     get:
       operationId: listOpenAlerts
@@ -484,6 +507,185 @@ components:
           description: One templated sentence per rule that fired.
           type: array
           items: { type: string }
+        fired:
+          description: >-
+            The rules that fired, each with its sentence and the block of the rule table it
+            belongs to, in the order the engine recorded them (spec 0035). Optional: older cores
+            don't send it.
+          type: array
+          items: { $ref: '#/components/schemas/FiredRule' }
+        checklist:
+          description: >-
+            The Verified conditions (V01 to V12, and S01 in strict mode), each passed, not met or
+            not checked, read from the rules the engine recorded; the core never re-runs them.
+            Not checked means an earlier block decided first. Optional.
+          type: array
+          items: { $ref: '#/components/schemas/ChecklistItem' }
+        checklist_note:
+          description: A templated sentence saying why the checklist reads as it does. Optional.
+          type: string
+        effect:
+          description: A templated sentence saying what the outcome does to the hold and who acts next. Optional.
+          type: string
+
+    FiredRule:
+      type: object
+      additionalProperties: false
+      required: [id, sentence, block]
+      properties:
+        id: { type: string }
+        sentence: { type: string }
+        block:
+          type: string
+          enum: [input, not_verified, needs_review, verified, not_met, engine, retired]
+
+    ChecklistItem:
+      type: object
+      additionalProperties: false
+      required: [id, sentence, status]
+      properties:
+        id: { type: string, description: 'The condition, e.g. V08_digits_match.' }
+        sentence:
+          type: string
+          description: The condition's sentence when it holds, or its unmet sentence when it doesn't.
+        status: { type: string, enum: [passed, not_met, not_checked] }
+
+    CallAnswerView:
+      description: >-
+        One answer the callee gave, as code recorded it. For account_last4 there is never a digit:
+        value is null with digit_count, or dont_know / refused (ADR-8).
+      type: object
+      additionalProperties: false
+      required: [slot, value, digit_count, turn_id, capture_method, captured_at, feeds]
+      properties:
+        slot: { $ref: '../schemas/call-answers.schema.json#/$defs/Slot' }
+        value:
+          oneOf: [{ type: string }, { type: 'null' }]
+        digit_count:
+          oneOf: [{ type: integer, minimum: 1, maximum: 4 }, { type: 'null' }]
+        turn_id: { type: integer, minimum: 0, description: The transcript turn the answer cites. }
+        capture_method: { type: string, enum: [speech, keypad] }
+        captured_at: { type: string }
+        feeds:
+          description: The decision rules that read this answer.
+          type: array
+          items: { type: string }
+
+    CallAttempt:
+      description: >-
+        One call, from its call_started and call_ended evidence and, when the voice service
+        stored it, voice.calls. No transcript is kept; the answers cite the turn they came from.
+      type: object
+      additionalProperties: false
+      required: [call_id, attempt, started_at, ended_at, result, reason, answered_by, direction, dialed_number_is_pick,
+                 provider, agent_version, last_four_result, answers, checks]
+      properties:
+        call_id: { $ref: '#/components/schemas/Uuid' }
+        attempt: { type: integer, minimum: 1 }
+        started_at:
+          oneOf: [{ $ref: '#/components/schemas/Timestamp' }, { type: 'null' }]
+        ended_at:
+          oneOf: [{ $ref: '#/components/schemas/Timestamp' }, { type: 'null' }]
+        result:
+          description: Null while the call is still running.
+          oneOf:
+            - type: string
+              enum: [answers_recorded, no_answer, voicemail, busy, failed, machine, declined, callback_requested, timed_out]
+            - type: 'null'
+        reason:
+          description: A templated sentence for how the call ended, or the voice service's reason code.
+          oneOf: [{ type: string }, { type: 'null' }]
+        answered_by:
+          oneOf: [{ type: string, enum: [human, machine] }, { type: 'null' }]
+        direction:
+          oneOf: [{ type: string, enum: [outbound, inbound] }, { type: 'null' }]
+        dialed_number_is_pick:
+          oneOf: [{ type: boolean }, { type: 'null' }]
+        provider:
+          oneOf: [{ type: string }, { type: 'null' }]
+        agent_version:
+          oneOf: [{ type: string }, { type: 'null' }]
+        last_four_result:
+          oneOf: [{ $ref: '../schemas/evidence-event.schema.json#/$defs/LastFourResult' }, { type: 'null' }]
+        answers:
+          type: array
+          items: { $ref: '#/components/schemas/CallAnswerView' }
+        checks:
+          oneOf: [{ $ref: '../schemas/evidence-event.schema.json#/$defs/CallChecks' }, { type: 'null' }]
+
+    CallScript:
+      description: >-
+        The call's fixed text from the call policy, with the customer's name and callback number
+        left as labels. The agent words each question itself; the disclosure is always word for word.
+      type: object
+      additionalProperties: false
+      required: [disclosure, questions, note]
+      properties:
+        disclosure: { type: string }
+        questions:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [slot, wording]
+            properties:
+              slot: { type: string }
+              wording: { type: string }
+        note: { type: string, description: A templated sentence on what is and isn't kept from a call. }
+
+    EvidenceRow:
+      type: object
+      additionalProperties: false
+      required: [seq, type, case_id, vendor, occurred_at, actor_kind, prev_hash, content_hash, hash, content_ok, link_ok]
+      properties:
+        seq: { type: integer, minimum: 1 }
+        type: { type: string }
+        case_id:
+          oneOf: [{ $ref: '#/components/schemas/Uuid' }, { type: 'null' }]
+        vendor:
+          description: The case's vendor's legal name, when the row belongs to a case.
+          oneOf: [{ type: string }, { type: 'null' }]
+        occurred_at: { $ref: '#/components/schemas/Timestamp' }
+        actor_kind: { type: string, enum: [system, person] }
+        prev_hash: { $ref: '../schemas/evidence-event.schema.json#/$defs/Sha256Hex' }
+        content_hash: { $ref: '../schemas/evidence-event.schema.json#/$defs/Sha256Hex' }
+        hash: { $ref: '../schemas/evidence-event.schema.json#/$defs/Sha256Hex' }
+        content_ok: { type: boolean, description: 'Postgres recomputed the content hash from the stored body, and it matches.' }
+        link_ok:
+          type: boolean
+          description: The row's prev_hash is the previous row's hash and its hash is sha256(prev_hash + content_hash).
+
+    EvidenceLog:
+      type: object
+      additionalProperties: false
+      required: [chain, last_check, events, total]
+      properties:
+        chain: { $ref: '#/components/schemas/ChainStatus' }
+        last_check:
+          description: >-
+            What the scheduled verify job found on its last run on this dataset, or null if it
+            hasn't run. It also compares the tip with the one its previous run saw, so it can find
+            deleted or rewritten newest rows that a recompute alone can't.
+          oneOf:
+            - type: object
+              additionalProperties: false
+              required: [finished_at, ok]
+              properties:
+                finished_at:
+                  oneOf: [{ $ref: '#/components/schemas/Timestamp' }, { type: 'null' }]
+                ok:
+                  description: Whether that run found the chain intact; null if it recorded no result.
+                  oneOf: [{ type: boolean }, { type: 'null' }]
+                first_bad_seq:
+                  oneOf: [{ type: integer, minimum: 1 }, { type: 'null' }]
+                detail:
+                  oneOf: [{ type: string }, { type: 'null' }]
+            - type: 'null'
+        total: { type: integer, minimum: 0 }
+        events:
+          description: Newest first, at most limit rows.
+          type: array
+          items: { $ref: '#/components/schemas/EvidenceRow' }
 
     ReleaseRecord:
       type: object
@@ -559,6 +761,13 @@ components:
           items: { $ref: '#/components/schemas/TimelineEntry' }
         chain: { $ref: '#/components/schemas/ChainStatus' }
         permissions: { $ref: '#/components/schemas/Permissions' }
+        calls:
+          description: Every call placed for this case, oldest first (spec 0035). Optional.
+          type: array
+          items: { $ref: '#/components/schemas/CallAttempt' }
+        call_script:
+          description: The call's fixed text (spec 0035). Optional.
+          $ref: '#/components/schemas/CallScript'
 
     ReleaseRequest:
       type: object

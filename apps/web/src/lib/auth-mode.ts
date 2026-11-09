@@ -81,8 +81,22 @@ export function cleanPassword(raw: unknown): string | null {
 /** A new password: at least this long, and at most 72 characters (Supabase's limit). */
 export const MIN_NEW_PASSWORD = 8;
 
+/** The symbols Supabase counts, exactly as its `password_required_characters` setting lists them
+ *  (spec 0033), so the form and Supabase agree on what a symbol is. */
+export const PASSWORD_SYMBOLS = "!@#$%^&*()_+-=[]{};'\\:\"|<>?,./`~";
+
+/** The rule in words, for the form. */
+export const PASSWORD_RULE =
+  `${MIN_NEW_PASSWORD} to 72 characters, with at least one lowercase letter, one uppercase letter, one number and one symbol`;
+
+/** A new password, kept as typed, if it meets the rule Supabase enforces: 8 to 72 characters with a
+ *  lowercase and an uppercase letter, a digit and a symbol (spec 0033). Otherwise null. */
 export function cleanNewPassword(raw: unknown): string | null {
-  return typeof raw === "string" && raw.length >= MIN_NEW_PASSWORD && raw.length <= 72 ? raw : null;
+  if (typeof raw !== "string" || raw.length < MIN_NEW_PASSWORD || raw.length > 72) return null;
+  const has = (chars: (c: string) => boolean) => [...raw].some(chars);
+  const ok = has((c) => c >= "a" && c <= "z") && has((c) => c >= "A" && c <= "Z")
+    && has((c) => c >= "0" && c <= "9") && has((c) => PASSWORD_SYMBOLS.includes(c));
+  return ok ? raw : null;
 }
 
 /** The name a person signs up with: trimmed, 1 to 80 characters, no control characters. */
@@ -105,6 +119,26 @@ export function signUpNotice(error: { status?: number; code?: string } | null, h
     return "failed";
   }
   return hasSession ? null : "confirm";
+}
+
+// One-click demo accounts (spec 0034) ----------------------------------------------------------
+
+export type DemoRole = "clerk" | "approver";
+export type DemoAccounts = Record<DemoRole, { email: string; password: string }>;
+
+/** The shared demo accounts, only when DIALBACK_DEMO_SIGN_IN=on, in Supabase mode, and both are
+ *  fully set; anything else is null and no button is shown. The passwords stay on the server. The
+ *  database lets these accounts act only on demo datasets, whatever this returns. */
+export function demoAccounts(env: Env): DemoAccounts | null {
+  if (env.DIALBACK_DEMO_SIGN_IN !== "on" || authMode(env) !== "supabase") return null;
+  const one = (role: string) => {
+    const email = cleanEmail(env[`DIALBACK_DEMO_${role}_EMAIL`]);
+    const password = cleanPassword(env[`DIALBACK_DEMO_${role}_PASSWORD`]);
+    return email && password ? { email, password } : null;
+  };
+  const clerk = one("CLERK");
+  const approver = one("APPROVER");
+  return clerk && approver ? { clerk, approver } : null;
 }
 
 export function cleanEmail(raw: unknown): string | null {

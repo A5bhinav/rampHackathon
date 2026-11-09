@@ -7,11 +7,13 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
 import yaml
+from dialback_policy.script import Phase
 
 # The nine scenario classes (evals/README.md). The list lives here, not in a schema, so a new
 # class needs no contract change.
@@ -23,9 +25,11 @@ LAST4_MODES = frozenset({"keypad", "speech", "refuse", "dont_know"})
 _CONSENT = frozenset({"yes", "no"})
 _CHANGE = frozenset({"yes", "no", "unsure"})
 _ANSWERED_BY = frozenset({"human", "machine"})
-# The last-four comparison results decide() understands (dialback_decision.last_four).
-_LAST_FOUR = frozenset({"match", "matches_old_account", "near_miss", "mismatch", "not_provided",
-                        "ambiguous", "inconsistent"})
+_DIRECTIONS = frozenset({"outbound", "inbound"})
+_ENDS = frozenset({"answers_recorded", "voicemail", "failed", "no_answer"})
+LEGIT_CLASSES = frozenset({"legit_bank_switch", "legit_odd_contact"})
+_RULE_ID = re.compile(r"(V|NV|NR|S)[0-9]{2}_[a-z_]+")
+_FOUR_DIGITS = re.compile(r"[0-9]{4}")
 
 
 @dataclass(frozen=True)
@@ -35,7 +39,8 @@ class CallerBehavior:
     consent: str
     company: str
     department: str
-    name_role: str
+    name: str                       # answers the NAME question (spec 0034 asks name and role apart)
+    role: str                       # answers the ROLE question
     change: str
     last4_mode: str
     last4: str = ""
@@ -51,11 +56,13 @@ class CallerBehavior:
 class DeclaredFacts:
     """The ledger's view a scenario stands in for (Q57). `None` means not known (fail closed, R7)."""
     dialed_eligible_number: bool
-    last_four_result: str | None
+    new_last4: str                      # the new account's last four, as the case holds it
     dialed_number_is_pick: bool | None
     speaker_in_change_thread: bool | None
     offered_number_from_request: bool | None
     line_risk: bool | None = None       # telephony signal (forwarding, SIM swap): a line-takeover tell
+    old_last4: str | None = None        # the old account's last four, when the case knows it
+    direction: str = "outbound"         # outbound (we dialed) | inbound (they called us); production reads the call's
 
 
 @dataclass(frozen=True)
@@ -67,11 +74,30 @@ class Scenario:
     vendor_name: str            # the real vendor being verified (company_matches compares to this)
     caller: CallerBehavior
     facts: DeclaredFacts
+    expect_rule: str | None = None      # the decision rule that must fire (the defense under test)
+    expect_end: str = "answers_recorded"  # how the call must end
 
 
 def load_scenarios(directory: str | Path) -> list[Scenario]:
-    """Every `*.yaml` in `directory` except names starting with `_` (templates), validated."""
-    return [_parse(path) for path in sorted(Path(directory).glob("*.yaml")) if not path.name.startswith("_")]
+    """Every `*.yaml` in `directory` except names starting with `_` (templates), validated. Two
+    scenarios under one id are an error (review fix F7)."""
+    scenarios = [_parse(path) for path in sorted(Path(directory).glob("*.yaml")) if not path.name.startswith("_")]
+    seen: set[str] = set()
+    for s in scenarios:
+        if s.id in seen:
+            raise ValueError(f"two scenarios share the id '{s.id}'")
+        seen.add(s.id)
+    return scenarios
+
+
+# The keys a scenario may use: anything else (a typo such as `injct`) is an error, not ignored (F7).
+_KEYS = frozenset({"id", "class", "is_attack", "customer_name", "vendor_name", "caller", "facts", "expect_rule",
+                   "expect_end"})
+_CALLER_KEYS = frozenset({"consent", "company", "department", "name", "role", "change", "last4_mode", "last4",
+                          "answered_by", "inject", "inject_phase", "offer_other_number", "hang_up_at", "silent"})
+_FACT_KEYS = frozenset({"dialed_eligible_number", "new_last4", "old_last4", "dialed_number_is_pick",
+                        "speaker_in_change_thread", "offered_number_from_request", "line_risk", "direction"})
+_PHASES = frozenset(p.name for p in Phase)
 
 
 def _parse(path: Path) -> Scenario:
@@ -92,42 +118,71 @@ def _parse(path: Path) -> Scenario:
             raise ValueError(f"{path.name}: {what} '{value}' is not one of {sorted(allowed)}")
         return value
 
-    c = need("caller", raw)
+    def only(where: Any, allowed: frozenset[str], what: str) -> dict[str, Any]:
+        if not isinstance(where, dict):
+            raise ValueError(f"{path.name}: {what} must be a mapping")  # noqa: TRY004  one error type for all bad files
+        if extra := sorted(set(where) - allowed):
+            raise ValueError(f"{path.name}: unknown {what} key(s) {extra}")
+        return where
+
+    def flag(value: Any, what: str) -> bool:
+        if not isinstance(value, bool):
+            raise ValueError(f"{path.name}: {what} must be true or false, not {value!r}")  # noqa: TRY004
+        return value
+
+    def phase(value: Any, what: str) -> str | None:
+        return None if value is None else one_of(value, _PHASES, what)
+
+    only(raw, _KEYS, "scenario")
+    c = only(need("caller", raw), _CALLER_KEYS, "caller")
     caller = CallerBehavior(
         consent=one_of(need("consent", c), _CONSENT, "consent"),
         company=str(need("company", c)),
         department=str(need("department", c)),
-        name_role=str(need("name_role", c)),
+        name=str(need("name", c)),
+        role=str(need("role", c)),
         change=one_of(need("change", c), _CHANGE, "change"),
         last4_mode=one_of(need("last4_mode", c), LAST4_MODES, "last4_mode"),
         last4=str(c.get("last4", "")),
         answered_by=one_of(c.get("answered_by", "human"), _ANSWERED_BY, "answered_by"),
         inject=c.get("inject"),
-        inject_phase=c.get("inject_phase"),
-        offer_other_number=bool(c.get("offer_other_number", False)),
-        hang_up_at=c.get("hang_up_at"),
-        silent=bool(c.get("silent", False)),
+        inject_phase=phase(c.get("inject_phase"), "inject_phase"),
+        offer_other_number=flag(c.get("offer_other_number", False), "offer_other_number"),
+        hang_up_at=phase(c.get("hang_up_at"), "hang_up_at"),
+        silent=flag(c.get("silent", False), "silent"),
     )
-    f = need("facts", raw)
-    lfr = f.get("last_four_result")
-    if lfr is not None:
-        one_of(lfr, _LAST_FOUR, "last_four_result")
+    f = only(need("facts", raw), _FACT_KEYS, "facts")
+    new_last4, old_last4 = str(need("new_last4", f)), f.get("old_last4")
+    for what, digits in (("new_last4", new_last4), ("old_last4", old_last4)):
+        if digits is not None and not _FOUR_DIGITS.fullmatch(str(digits)):
+            raise ValueError(f"{path.name}: {what} must be four digits, not {digits!r}")
     facts = DeclaredFacts(
-        dialed_eligible_number=bool(need("dialed_eligible_number", f)),
-        last_four_result=lfr,
+        dialed_eligible_number=flag(need("dialed_eligible_number", f), "dialed_eligible_number"),
+        new_last4=new_last4,
+        old_last4=None if old_last4 is None else str(old_last4),
         dialed_number_is_pick=_tri(path, f.get("dialed_number_is_pick")),
         speaker_in_change_thread=_tri(path, f.get("speaker_in_change_thread")),
         offered_number_from_request=_tri(path, f.get("offered_number_from_request")),
         line_risk=_tri(path, f.get("line_risk")),
+        direction=one_of(f.get("direction", "outbound"), _DIRECTIONS, "direction"),
     )
+    scenario_class = one_of(need("class", raw), CLASSES, "class")
+    is_attack = flag(need("is_attack", raw), "is_attack")
+    if is_attack == (scenario_class in LEGIT_CLASSES):
+        raise ValueError(f"{path.name}: is_attack {is_attack} disagrees with class '{scenario_class}'")
+    expect_rule = raw.get("expect_rule")
+    if expect_rule is not None and not _RULE_ID.fullmatch(str(expect_rule)):
+        raise ValueError(f"{path.name}: expect_rule '{expect_rule}' is not a decision rule id")
     return Scenario(
         id=str(need("id", raw)),
-        scenario_class=one_of(need("class", raw), CLASSES, "class"),
-        is_attack=bool(need("is_attack", raw)),
+        scenario_class=scenario_class,
+        is_attack=is_attack,
         customer_name=str(need("customer_name", raw)),
         vendor_name=str(need("vendor_name", raw)),
         caller=caller,
         facts=facts,
+        expect_rule=None if expect_rule is None else str(expect_rule),
+        expect_end=one_of(raw.get("expect_end", "answers_recorded"), _ENDS, "expect_end"),
     )
 
 

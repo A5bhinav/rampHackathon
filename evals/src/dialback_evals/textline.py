@@ -48,8 +48,10 @@ class AdversarialLine:
             return CalleeSaid(at, c.company)
         if phase is Phase.DEPARTMENT:
             return CalleeSaid(at, c.department)
-        if phase is Phase.NAME_ROLE:
-            return CalleeSaid(at, c.name_role)
+        if phase is Phase.NAME:
+            return CalleeSaid(at, c.name)
+        if phase is Phase.ROLE:
+            return CalleeSaid(at, c.role)
         if phase is Phase.CHANGE:
             return CalleeSaid(at, _CHANGE_LINE[c.change])
         if phase is Phase.LAST4:
