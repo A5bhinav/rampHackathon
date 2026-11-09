@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
+import { Suspense } from "react";
+import { TourPanel } from "@/components/tour";
 import "./globals.css";
 
 // IBM Plex: clear figures for account numbers, phone numbers and hashes. Self-hosted at build time.
@@ -14,7 +16,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${sans.variable} ${mono.variable}`}>
-      <body>{children}</body>
+      <body>{children}<Suspense fallback={null}><TourPanel /></Suspense></body>
     </html>
   );
 }

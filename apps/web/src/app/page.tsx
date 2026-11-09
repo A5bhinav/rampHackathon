@@ -56,7 +56,8 @@ export default function HowItWorks() {
             prove is theirs, lets code decide what the answers mean, and waits for a second person to release.
           </p>
           <p className="story-cta">
-            <a className="button-link primary" href="#demo">See it on demo data</a>
+            <Link className="button-link primary" href="/tour/1">Take the guided demo</Link>
+            <a className="button-link" href="#demo">See it on demo data</a>
             <a className="button-link" href="#stations">How each step works</a>
           </p>
         </section>
@@ -136,7 +137,7 @@ export default function HowItWorks() {
             <div className="panel">
               <h3>Not built yet</h3>
               <ul>
-                <li>The attack lab that would replay hundreds of scams and score the whole system. It is a plan in the repo, so there is no scorecard to show.</li>
+                <li>The attack lab that would replay hundreds of scams and score the whole system. It is a plan in the repo, so there is <Link href="/scorecard">no scorecard</Link> to show.</li>
                 <li>Ramp&apos;s own sandbox: everything runs against the mock.</li>
               </ul>
             </div>
