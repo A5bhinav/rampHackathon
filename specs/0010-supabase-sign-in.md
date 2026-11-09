@@ -63,7 +63,7 @@ Today the only sign-in is the local dev one. It is off in production, so a produ
    - **Calls to the core:** the server sends the session's access token. The dashboard never decides who someone is: the core verifies the token (decision 1).
    - **Sign-out** ends this browser's Supabase session only (`scope: "local"`), since the judges share accounts. It always deletes the cookies, even when Supabase can't be reached.
 
-6. **Accounts are made by the team; nobody signs up.**
+6. **Accounts are made by the team; nobody signs up.** *Replaced on Nov 8 by spec 0027: people sign up themselves and get the clerk role; the team still grants approver and auditor.*
    - **No sign-ups, no email:** sign-ups are off in the project's Auth settings, and so is "Confirm email". Supabase never sends mail.
    - **Creating an account:** add each person on the Users page with their email and a generated password (16+ characters, never chosen by hand). Then give them a profile and a role in `app.user_profiles` and `app.user_roles` with `scripts/db/add_user.py`.
    - **Judges:** they get one approver account and one clerk account.

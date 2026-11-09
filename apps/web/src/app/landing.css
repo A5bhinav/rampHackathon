@@ -1,0 +1,122 @@
+/* The public page's product pictures (spec 0040). One idea, used for every picture: a raised
+   product card on a soft tile, with a second card stacked behind it. The existing tokens only
+   (globals.css); depth comes from a layered shadow, not new colours. Scoped to .story. */
+
+.story {
+  --shot-tile: var(--surface-2);
+  --shadow-raised: 0 1px 1px rgba(11, 35, 67, 0.05), 0 6px 14px -6px rgba(11, 35, 67, 0.12),
+    0 22px 44px -18px rgba(11, 35, 67, 0.22);
+}
+
+/* The hero: the words, then the demo company's queue. */
+.story .story-hero { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 48px; align-items: center;
+  max-width: none; padding-bottom: 8px; }
+.story .story-hero h1 { max-width: 18ch; }
+
+/* The tile and the card on it. */
+.shot { position: relative; isolation: isolate; background: var(--shot-tile); border: 1px solid var(--line);
+  border-radius: calc(var(--radius) + 6px); padding: 30px 26px 26px; min-width: 0; }
+.shot-back { position: absolute; z-index: -1; left: 48px; right: 48px; top: 20px; height: 40px; border-radius: var(--radius);
+  background: color-mix(in srgb, var(--surface) 70%, var(--line)); border: 1px solid var(--line-strong); opacity: 0.8; }
+.shot-card { position: relative; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  box-shadow: var(--shadow-raised); padding: 14px 16px 16px; font-size: 0.8125rem; color: var(--text-2); }
+.shot-card p { margin: 0; }
+.shot-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; color: var(--text); font-weight: 600;
+  padding-bottom: 10px; margin-bottom: 12px; border-bottom: 1px solid var(--line); }
+.shot-head > span:first-child { min-width: 0; }
+.shot-head .badge { flex: none; font-weight: 500; }
+
+.shot-diff { display: grid; gap: 8px; margin: 0 0 12px; }
+.shot-diff div { display: grid; grid-template-columns: 4.5rem 1fr; gap: 8px; align-items: baseline; padding: 8px 10px;
+  border-radius: var(--radius-sm); background: var(--surface-2); }
+.shot-diff div.now { background: var(--warn-bg); color: var(--text); }
+.shot-diff dt { color: var(--muted); font-size: 0.75rem; }
+.shot-diff dd { margin: 0; }
+.shot-diff dd.mono { font-size: 0.8125rem; }
+.shot-foot { display: grid; grid-template-columns: 14px 1fr; gap: 6px; align-items: start; color: var(--muted); font-size: 0.75rem; }
+.shot-foot .icon { margin-top: 2px; }
+.shot-foot:not(:has(.icon)) { display: block; }
+
+.shot-list { list-style: none; margin: 0 0 12px; padding: 0; }
+.shot-list li { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: center; padding: 8px 0;
+  border-bottom: 1px solid var(--line); }
+.shot-list li:has(.icon) { grid-template-columns: 1fr auto auto 14px; }
+.shot-list li .icon { color: var(--info); }
+.shot-result { display: flex; gap: 6px; align-items: center; color: var(--info); font-weight: 500; }
+.shot-result.ok { color: var(--ok); }
+
+.shot-big { font-size: 1.25rem; color: var(--text); letter-spacing: -0.01em; margin-bottom: 8px !important; }
+.shot-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px !important; }
+.shot-chip { padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line-strong); font-size: 0.75rem; color: var(--text-2);
+  background: var(--surface); }
+.shot-checks { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 6px; }
+.shot-checks li { position: relative; padding-left: 20px; }
+.shot-checks li::before { content: "✓"; position: absolute; left: 2px; color: var(--ok); font-weight: 600; }
+.shot-checks .mono { color: var(--muted); margin-right: 4px; }
+.shot-refused .badge { flex: none; }
+.shot-refused { display: flex; align-items: flex-start; gap: 10px; padding: 8px 10px;
+  border-radius: var(--radius-sm); border: 1px dashed color-mix(in srgb, var(--bad) 35%, var(--line)); color: var(--text-2); }
+
+.shot-convo { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.shot-convo li { display: grid; gap: 6px; }
+.shot-convo .agent, .shot-convo .vendor { display: block; max-width: 88%; padding: 6px 10px; border-radius: 10px; line-height: 1.35; }
+.shot-convo li:not(:first-child) { grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 8px; }
+.shot-convo li:not(:first-child) .agent { max-width: none; }
+.shot-convo .agent { background: var(--surface-2); color: var(--text-2); border-top-left-radius: 3px; }
+.shot-convo .agent.first { max-width: 100%; background: var(--accent-soft); color: var(--text); }
+.shot-convo .vendor { justify-self: end; white-space: nowrap; max-width: none; background: var(--accent); color: var(--accent-ink); border-top-right-radius: 3px; font-weight: 500; }
+
+.shot-effect { color: var(--text); margin-bottom: 12px !important; padding: 8px 10px; border-radius: var(--radius-sm); background: var(--ok-bg); }
+.shot-field { display: grid; gap: 4px; margin: 12px 0 !important; padding: 10px; border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm); color: var(--text); }
+.shot-field .muted { font-size: 0.75rem; }
+.shot-button { display: flex; justify-content: flex-end; gap: 8px; }
+.shot-button span { padding: 7px 14px; border-radius: var(--radius-sm); background: var(--accent); color: var(--accent-ink); font-weight: 600;
+  border: 1px solid var(--accent); }
+.shot-button span.ghost { background: var(--surface); color: var(--text); border-color: var(--line-strong); }
+.shot-note { margin: 12px 2px 0; font-size: 0.75rem; color: var(--muted); }
+
+/* The hero's queue. */
+.hero-shot { padding: 34px 28px 28px; }
+.hero-shot .shot-card { padding: 16px 18px 6px; }
+.hero-cases { list-style: none; margin: 0; padding: 0; }
+.hero-cases > li { padding: 12px 0 14px; }
+.hero-cases > li + li { border-top: 1px solid var(--line); }
+.hero-case-top { display: flex; justify-content: space-between; gap: 10px; align-items: center; color: var(--text); }
+.hero-case-top strong { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hero-cases p { margin: 2px 0 10px; font-size: 0.75rem; }
+.mini-rail { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.mini-rail li { font-size: 0.6875rem; color: var(--muted); padding-top: 6px; border-top: 3px solid var(--line); background: none; }
+.mini-rail li.done { border-top-color: var(--accent); color: var(--text-2); }
+.mini-rail li.done::before { content: "✓ "; color: var(--accent); }
+.mini-rail li.skipped { border-top-style: dotted; }
+.mini-rail li.now { font-weight: 600; }
+.mini-rail li.now.tone-ok { border-top-color: var(--fill-ok); color: var(--ok); }
+.mini-rail li.now.tone-warn { border-top-color: var(--fill-warn); color: var(--warn); }
+.mini-rail li.now.tone-bad { border-top-color: var(--fill-bad); color: var(--bad); }
+
+/* Each station: its words and its picture, one pair in one card. */
+.story .pipe-pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); gap: 24px; align-items: center;
+  background: var(--surface); border: 1px solid var(--line); border-radius: calc(var(--radius) + 6px); padding: 14px;
+  box-shadow: var(--shadow); }
+.story .pipe-pair .pipe-text { background: none; border: 0; padding: 10px 6px 10px 10px; }
+.story .pipe-pair .shot { border-color: transparent; }
+.story .pipe-stop { padding-bottom: 20px; }
+.story .pipe-stop:not(:last-child)::before { top: 52px; }
+.story .pipe-node { margin-top: 6px; box-shadow: 0 4px 10px -4px rgba(11, 35, 67, 0.18); }
+.shot-caption { margin: -8px 0 22px; }
+
+@media (max-width: 960px) {
+  .story .story-hero { grid-template-columns: 1fr; gap: 28px; }
+  .story .pipe-pair { grid-template-columns: 1fr; gap: 6px; }
+}
+@media (max-width: 520px) {
+  .story .pipe-stop { grid-template-columns: 1fr; gap: 10px; }
+  .story .pipe-stop:not(:last-child)::before { display: none; }
+  .story .pipe-node { margin: 0; }
+  .shot, .hero-shot { padding: 22px 12px 12px; }
+  .shot-back { left: 26px; right: 26px; top: 10px; }
+  .story .pipe-pair { padding: 10px; }
+  .story .pipe-pair .pipe-text { padding: 6px 4px; }
+  .shot-diff div { grid-template-columns: 1fr; gap: 2px; }
+}

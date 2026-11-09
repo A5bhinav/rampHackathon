@@ -31,9 +31,13 @@ jobs:
       - name: Install the Python workspace
         run: uv sync --all-packages --locked
       - name: Lint
-        run: uv run --no-project --with ruff ruff check apps packages scripts evals
+        run: uv run --no-project --with ruff ruff check apps packages scripts corpus evals
+      - name: Corpus (frozen truth, spec 0020)
+        run: python3 corpus/generator/build.py --check && uv run --no-project --with pytest pytest -q corpus/generator
       - name: Decision engine
         run: cd packages/decision && uv run pytest -q
+      - name: Trust Ledger (selection rule against the frozen corpus)
+        run: cd packages/ledger && uv run pytest -q
       - name: Call policy (script, tools, speech guard)
         run: cd packages/policy && uv run pytest -q
       - name: Ramp mock

@@ -1,4 +1,4 @@
-"""scripts/db/add_user.py against a migrated throwaway database with a stand-in auth.users (spec 0010, D6).
+"""scripts/db/add_user.py against a migrated throwaway database with a stand-in auth.users (specs 0010 and 0027).
 
     uv run --with pytest pytest scripts/db/test_add_user.py
 """
@@ -29,9 +29,10 @@ def existing(conn, email: str) -> uuid.UUID:
 
 def test_a_created_person_gets_a_profile_and_roles_and_loses_them_again(conn):
     user_id = existing(conn, "riley@example.test")
-    result = apply(conn, "Riley@Example.TEST", name="Riley Approver", add=("approver", "auditor"))
-    assert result == {"user_id": str(user_id), "display_name": "Riley Approver", "ramp_user_id": None, "roles": ["approver", "auditor"]}
-    again = apply(conn, "riley@example.test", add=("approver",))  # idempotent, and the name stays
+    result = apply(conn, "Riley@Example.TEST", name="Riley Approver", add=("approver", "auditor"), user_id=str(user_id))
+    assert result == {"user_id": str(user_id), "display_name": "Riley Approver", "ramp_user_id": None, "roles": ["approver", "auditor"],
+                      "demo_only": False}
+    again = apply(conn, "riley@example.test", add=("approver",), user_id=str(user_id).upper())  # idempotent, and the name stays
     assert again["roles"] == ["approver", "auditor"] and again["display_name"] == "Riley Approver"
     assert apply(conn, "riley@example.test", remove=("approver",))["roles"] == ["auditor"]
 
@@ -42,8 +43,17 @@ def test_a_clerk_is_matched_to_their_ramp_user(conn):
     assert result["ramp_user_id"] == "ramp-user-123" and result["roles"] == ["clerk"]
 
 
+def test_a_demo_account_is_marked_and_stays_marked(conn):
+    """Spec 0034: --demo-only puts the account in app.demo_accounts, once."""
+    user_id = existing(conn, "demo.approver@example.test")
+    result = apply(conn, "demo.approver@example.test", name="Demo Approver", add=("approver",), user_id=str(user_id), demo_only=True)
+    assert result["demo_only"] is True and result["roles"] == ["approver"]
+    assert apply(conn, "demo.approver@example.test", demo_only=True)["demo_only"] is True
+    assert conn.execute("select count(*) from app.demo_accounts where user_id = %s", (user_id,)).fetchone()[0] == 1
+
+
 @pytest.mark.parametrize(("email", "name", "message"), [
-    ("nobody@example.test", "Nobody", "create them"),
+    ("nobody@example.test", "Nobody", "sign up on the dashboard first"),
     ("new@example.test", None, "needs --name"),
     ("shared@example.test", "Shared", "share the email"),
 ])
@@ -53,4 +63,20 @@ def test_refuses_people_who_dont_exist_are_unnamed_or_ambiguous(conn, email, nam
     if email == "shared@example.test":
         existing(conn, "SHARED@example.test")
     with pytest.raises(UserError, match=message):
-        apply(conn, email, name=name, add=("approver",))
+        apply(conn, email, name=name, add=("clerk",))
+
+
+def test_approver_and_auditor_need_the_accounts_own_id(conn):
+    """Anyone can sign up with any address (spec 0027), so the email alone doesn't say who holds
+    the account: the id the person reads off their dashboard does."""
+    user_id = existing(conn, "judge@example.test")
+    for role in ("approver", "auditor"):
+        with pytest.raises(UserError, match="need --user-id"):
+            apply(conn, "judge@example.test", name="Judge", add=(role,))
+    with pytest.raises(UserError, match="different id"):
+        apply(conn, "judge@example.test", name="Judge", add=("approver",), user_id=str(uuid.uuid4()))
+    roles = conn.execute("select count(*) from app.user_roles where user_id = %s", (user_id,)).fetchone()[0]
+    assert roles == 0, "a refused grant grants nothing"
+    assert apply(conn, "judge@example.test", name="Judge", add=("clerk",))["roles"] == ["clerk"], "clerk needs no id"
+    assert apply(conn, "judge@example.test", add=("approver",), user_id=str(user_id))["roles"] == ["approver", "clerk"]
+    assert apply(conn, "judge@example.test", remove=("approver",))["roles"] == ["clerk"], "removing needs no id"

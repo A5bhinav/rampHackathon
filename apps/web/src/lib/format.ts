@@ -47,3 +47,10 @@ export function relative(iso: string | null | undefined, now: Date): string {
 export function ago(iso: string | null | undefined, now: Date): string {
   return iso && Date.parse(iso) <= now.getTime() ? relative(iso, now) : "";
 }
+
+const short = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "UTC" });
+
+/** A short stamp for tight spaces (the progress strip): "Nov 8, 14:02 UTC". */
+export function brief(iso: string | null | undefined): string {
+  return iso ? `${short.format(new Date(iso))} UTC` : "";
+}

@@ -15,20 +15,23 @@ class Phase(StrEnum):
     CONSENT = "consent"
     COMPANY = "company"
     DEPARTMENT = "department"
-    NAME_ROLE = "name_role"
+    NAME = "name"
+    ROLE = "role"
     CHANGE = "change"
     LAST4 = "last4"
 
 
-ORDER: tuple[Phase, ...] = (Phase.CONSENT, Phase.COMPANY, Phase.DEPARTMENT, Phase.NAME_ROLE, Phase.CHANGE,
+ORDER: tuple[Phase, ...] = (Phase.CONSENT, Phase.COMPANY, Phase.DEPARTMENT, Phase.NAME, Phase.ROLE, Phase.CHANGE,
                             Phase.LAST4)
 
-# The slot whose answer completes each phase. Name and role share a phase; the name completes it.
+# The slot whose answer completes each phase. Name and role are two questions, so each answer is
+# recorded as said and the decision always gets a role to check (spec 0034, D2).
 PHASE_SLOT: dict[Phase, str] = {
     Phase.CONSENT: "recording_consent",
     Phase.COMPANY: "company_named",
     Phase.DEPARTMENT: "department",
-    Phase.NAME_ROLE: "speaker_name",
+    Phase.NAME: "speaker_name",
+    Phase.ROLE: "speaker_role",
     Phase.CHANGE: "change_requested",
     Phase.LAST4: "account_last4",
 }
@@ -87,8 +90,10 @@ QUESTIONS: dict[Phase, Question] = {
                             lambda s: "Could you tell me the name of the company I've reached?"),
     Phase.DEPARTMENT: Question("Ask which department or team you are speaking with.",
                                lambda s: "Which department or team am I speaking with?"),
-    Phase.NAME_ROLE: Question("Ask for the person's name and their role.",
-                              lambda s: "May I have your name and your role there?"),
+    Phase.NAME: Question("Ask for the person's name.",
+                         lambda s: "May I have your name?"),
+    Phase.ROLE: Question("Ask for the person's role or job title there.",
+                         lambda s: "And what's your role there?"),
     Phase.CHANGE: Question("Ask whether their company recently asked the customer to change how they get paid.",
                            lambda s: f"Has your company recently asked {s.customer_name} to change how you get paid?"),
     Phase.LAST4: Question("Ask for the last four digits of the account they want to be paid into. They may say "

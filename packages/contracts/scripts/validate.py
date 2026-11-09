@@ -6,8 +6,8 @@
 
 1. Every JSON Schema in schemas/ is a valid 2020-12 schema.
 2. Every example in examples/, named <schema-stem>.<case>.json, validates against
-   schemas/<schema-stem>.schema.json. Evidence envelopes must hold integers only (the chain
-   refuses floats).
+   schemas/<schema-stem>.schema.json. Evidence envelopes and selections must hold integers
+   only (both are hashed, and the chain refuses floats).
 3. Every OpenAPI document in openapi/ is a valid OpenAPI 3.1 document, and every inline
    request or response `example` validates against the schema beside it.
 
@@ -84,7 +84,7 @@ def check_schemas_and_examples() -> int:
             continue
         data = load(ex)
         errors = errors_for(schemas[schema_path], data)
-        if stem == "evidence-event":
+        if stem in ("evidence-event", "selection"):  # both are hashed; floats are refused
             errors += integers_only(data)
         if errors:
             failures += 1

@@ -1,0 +1,2451 @@
+{
+ "about": "Fictional ledger documents for the demo seed's vendors (spec 0025). Receive times are shifted by (load time - anchor). Written by corpus/generator/build.py; never edit by hand.",
+ "anchor": "2026-10-01T16:00:00Z",
+ "v": 1,
+ "vendors": {
+  "acme": {
+   "documents": [
+    {
+     "claimed_date": null,
+     "custody": {
+      "channel": "vendor_master",
+      "parent_document_id": null,
+      "received_at": "2022-08-23T16:00:00Z",
+      "sender": null,
+      "subject": null,
+      "thread_id": null
+     },
+     "header_date": null,
+     "id": "9fdb1c0a-7394-54b7-aa1d-f5d2d2d00b4d",
+     "kind": "vendor_master_record",
+     "pages": [
+      {
+       "height": 792,
+       "spans": [
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Vendor master: Acme Fasteners LLC",
+         "x": 72,
+         "y": 72
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Phone on file: 206.555.0117",
+         "x": 72,
+         "y": 86
+        }
+       ],
+       "width": 612
+      }
+     ],
+     "scan": false
+    },
+    {
+     "claimed_date": null,
+     "custody": {
+      "channel": "contract",
+      "parent_document_id": null,
+      "received_at": "2023-03-11T16:00:00Z",
+      "sender": null,
+      "subject": null,
+      "thread_id": null
+     },
+     "header_date": null,
+     "id": "b89b05a1-2ecc-5aa1-941e-e7539ce63f9a",
+     "kind": "contract",
+     "pages": [
+      {
+       "height": 792,
+       "spans": [
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Master supply agreement: Acme Fasteners LLC",
+         "x": 72,
+         "y": 72
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Main: 206.555.0117",
+         "x": 72,
+         "y": 86
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Accounts receivable: 206-555-0142",
+         "x": 72,
+         "y": 100
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Notices: legal@acme.example",
+         "x": 72,
+         "y": 114
+        }
+       ],
+       "width": 612
+      }
+     ],
+     "scan": false
+    },
+    {
+     "claimed_date": null,
+     "custody": {
+      "channel": "listing",
+      "parent_document_id": null,
+      "received_at": "2023-06-09T16:00:00Z",
+      "sender": null,
+      "subject": null,
+      "thread_id": null
+     },
+     "header_date": null,
+     "id": "c6d7f066-889b-569c-9d42-5e3909cd9a0e",
+     "kind": "listing",
+     "pages": [
+      {
+       "height": 792,
+       "spans": [
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Acme Fasteners LLC: business listing",
+         "x": 72,
+         "y": 72
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Main: 206.555.0117",
+         "x": 72,
+         "y": 86
+        }
+       ],
+       "width": 612
+      }
+     ],
+     "scan": false
+    },
+    {
+     "claimed_date": null,
+     "custody": {
+      "channel": "listing",
+      "parent_document_id": null,
+      "received_at": "2024-06-08T16:00:00Z",
+      "sender": null,
+      "subject": null,
+      "thread_id": null
+     },
+     "header_date": null,
+     "id": "28b234ff-5c56-5a21-baaa-64d50a05cf68",
+     "kind": "listing",
+     "pages": [
+      {
+       "height": 792,
+       "spans": [
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Acme Fasteners LLC: business listing",
+         "x": 72,
+         "y": 72
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Main: 206-555-0117",
+         "x": 72,
+         "y": 86
+        }
+       ],
+       "width": 612
+      }
+     ],
+     "scan": false
+    },
+    {
+     "claimed_date": null,
+     "custody": {
+      "channel": "vendor_portal",
+      "parent_document_id": null,
+      "received_at": "2024-01-05T16:00:00Z",
+      "sender": null,
+      "subject": null,
+      "thread_id": null
+     },
+     "header_date": null,
+     "id": "803b2dac-bf9a-5626-8987-645a617bb765",
+     "kind": "portal_entry",
+     "pages": [
+      {
+       "height": 792,
+       "spans": [
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Vendor profile: Acme Fasteners LLC",
+         "x": 72,
+         "y": 72
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Accounts receivable: 206.555.0142",
+         "x": 72,
+         "y": 86
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Billing: 206-555-0142",
+         "x": 72,
+         "y": 100
+        }
+       ],
+       "width": 612
+      }
+     ],
+     "scan": false
+    },
+    {
+     "claimed_date": null,
+     "custody": {
+      "channel": "email",
+      "parent_document_id": null,
+      "received_at": "2023-04-10T16:00:00Z",
+      "sender": "Acme Fasteners LLC Accounts Receivable <ar@acme.example>",
+      "subject": "Invoice 1633",
+      "thread_id": "thr-demo-acme-6"
+     },
+     "header_date": "2023-04-10T16:00:00Z",
+     "id": "5afdbf6a-4045-5d56-8010-8f52ed13bd52",
+     "kind": "email",
+     "pages": [
+      {
+       "height": 792,
+       "spans": [
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Hello, please find invoice 1633 attached.",
+         "x": 72,
+         "y": 72
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Thank you",
+         "x": 72,
+         "y": 86
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Accounts receivable: (206) 555-0142",
+         "x": 72,
+         "y": 100
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Main: 206-555-0117",
+         "x": 72,
+         "y": 114
+        }
+       ],
+       "width": 612
+      }
+     ],
+     "scan": false
+    },
+    {
+     "claimed_date": null,
+     "custody": {
+      "channel": "email",
+      "parent_document_id": "5afdbf6a-4045-5d56-8010-8f52ed13bd52",
+      "received_at": "2023-04-10T16:00:00Z",
+      "sender": "Acme Fasteners LLC Accounts Receivable <ar@acme.example>",
+      "subject": "Invoice 1633",
+      "thread_id": "thr-demo-acme-6"
+     },
+     "header_date": null,
+     "id": "4e979656-9cc5-566b-aa58-a5d8b0805f8f",
+     "kind": "invoice",
+     "pages": [
+      {
+       "height": 792,
+       "spans": [
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "INVOICE 1633",
+         "x": 72,
+         "y": 72
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Acme Fasteners LLC",
+         "x": 72,
+         "y": 86
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Remit questions to:",
+         "x": 72,
+         "y": 100
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Accounts receivable: 206-555-0142",
+         "x": 72,
+         "y": 114
+        }
+       ],
+       "width": 612
+      }
+     ],
+     "scan": false
+    },
+    {
+     "claimed_date": null,
+     "custody": {
+      "channel": "email",
+      "parent_document_id": null,
+      "received_at": "2023-11-03T08:00:00Z",
+      "sender": "Acme Fasteners LLC Accounts Receivable <ar@acme.example>",
+      "subject": "Invoice 1634",
+      "thread_id": "thr-demo-acme-8"
+     },
+     "header_date": "2023-11-03T08:00:00Z",
+     "id": "87bbf3d2-11ee-58d1-8b4f-acf2420e8c74",
+     "kind": "email",
+     "pages": [
+      {
+       "height": 792,
+       "spans": [
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Hello, please find invoice 1634 attached.",
+         "x": 72,
+         "y": 72
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Thank you",
+         "x": 72,
+         "y": 86
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Accounts receivable: 206.555.0142",
+         "x": 72,
+         "y": 100
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Main: 206-555-0117",
+         "x": 72,
+         "y": 114
+        }
+       ],
+       "width": 612
+      }
+     ],
+     "scan": false
+    },
+    {
+     "claimed_date": null,
+     "custody": {
+      "channel": "email",
+      "parent_document_id": "87bbf3d2-11ee-58d1-8b4f-acf2420e8c74",
+      "received_at": "2023-11-03T08:00:00Z",
+      "sender": "Acme Fasteners LLC Accounts Receivable <ar@acme.example>",
+      "subject": "Invoice 1634",
+      "thread_id": "thr-demo-acme-8"
+     },
+     "header_date": null,
+     "id": "f8b0dd13-f96a-5b65-bb56-0cf5ee7b6429",
+     "kind": "invoice",
+     "pages": [
+      {
+       "height": 792,
+       "spans": [
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "INVOICE 1634",
+         "x": 72,
+         "y": 72
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Acme Fasteners LLC",
+         "x": 72,
+         "y": 86
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Remit questions to:",
+         "x": 72,
+         "y": 100
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Accounts receivable: (206) 555-0142",
+         "x": 72,
+         "y": 114
+        }
+       ],
+       "width": 612
+      }
+     ],
+     "scan": false
+    },
+    {
+     "claimed_date": null,
+     "custody": {
+      "channel": "email",
+      "parent_document_id": null,
+      "received_at": "2024-05-28T00:00:00Z",
+      "sender": "Acme Fasteners LLC Accounts Receivable <ar@acme.example>",
+      "subject": "Invoice 1635",
+      "thread_id": "thr-demo-acme-10"
+     },
+     "header_date": "2024-05-28T00:00:00Z",
+     "id": "570b2250-c3f6-5215-a39b-de36afea6e3e",
+     "kind": "email",
+     "pages": [
+      {
+       "height": 792,
+       "spans": [
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Hello, please find invoice 1635 attached.",
+         "x": 72,
+         "y": 72
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Thank you",
+         "x": 72,
+         "y": 86
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Accounts receivable: (206) 555-0142",
+         "x": 72,
+         "y": 100
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Main: (206) 555-0117",
+         "x": 72,
+         "y": 114
+        }
+       ],
+       "width": 612
+      }
+     ],
+     "scan": false
+    },
+    {
+     "claimed_date": null,
+     "custody": {
+      "channel": "email",
+      "parent_document_id": "570b2250-c3f6-5215-a39b-de36afea6e3e",
+      "received_at": "2024-05-28T00:00:00Z",
+      "sender": "Acme Fasteners LLC Accounts Receivable <ar@acme.example>",
+      "subject": "Invoice 1635",
+      "thread_id": "thr-demo-acme-10"
+     },
+     "header_date": null,
+     "id": "4b0cb216-6c8f-53d3-8d59-b1c8ab36ba48",
+     "kind": "invoice",
+     "pages": [
+      {
+       "height": 792,
+       "spans": [
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "INVOICE 1635",
+         "x": 72,
+         "y": 72
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Acme Fasteners LLC",
+         "x": 72,
+         "y": 86
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Remit questions to:",
+         "x": 72,
+         "y": 100
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Accounts receivable: 206-555-0142",
+         "x": 72,
+         "y": 114
+        }
+       ],
+       "width": 612
+      }
+     ],
+     "scan": false
+    },
+    {
+     "claimed_date": null,
+     "custody": {
+      "channel": "email",
+      "parent_document_id": null,
+      "received_at": "2024-12-20T16:00:00Z",
+      "sender": "Acme Fasteners LLC Accounts Receivable <ar@acme.example>",
+      "subject": "Invoice 1636",
+      "thread_id": "thr-demo-acme-12"
+     },
+     "header_date": "2024-12-20T16:00:00Z",
+     "id": "4a941ed6-350d-562a-aabe-3abf644f8f2f",
+     "kind": "email",
+     "pages": [
+      {
+       "height": 792,
+       "spans": [
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Hello, please find invoice 1636 attached.",
+         "x": 72,
+         "y": 72
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Thank you",
+         "x": 72,
+         "y": 86
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Accounts receivable: (206) 555-0142",
+         "x": 72,
+         "y": 100
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Main: 206.555.0117",
+         "x": 72,
+         "y": 114
+        }
+       ],
+       "width": 612
+      }
+     ],
+     "scan": false
+    },
+    {
+     "claimed_date": null,
+     "custody": {
+      "channel": "email",
+      "parent_document_id": "4a941ed6-350d-562a-aabe-3abf644f8f2f",
+      "received_at": "2024-12-20T16:00:00Z",
+      "sender": "Acme Fasteners LLC Accounts Receivable <ar@acme.example>",
+      "subject": "Invoice 1636",
+      "thread_id": "thr-demo-acme-12"
+     },
+     "header_date": null,
+     "id": "09cbf376-a874-5eeb-8e26-1c3c188f04b4",
+     "kind": "invoice",
+     "pages": [
+      {
+       "height": 792,
+       "spans": [
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "INVOICE 1636",
+         "x": 72,
+         "y": 72
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Acme Fasteners LLC",
+         "x": 72,
+         "y": 86
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Remit questions to:",
+         "x": 72,
+         "y": 100
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Accounts receivable: (206) 555-0142",
+         "x": 72,
+         "y": 114
+        }
+       ],
+       "width": 612
+      }
+     ],
+     "scan": false
+    },
+    {
+     "claimed_date": null,
+     "custody": {
+      "channel": "email",
+      "parent_document_id": null,
+      "received_at": "2025-07-15T08:00:00Z",
+      "sender": "Acme Fasteners LLC Accounts Receivable <ar@acme.example>",
+      "subject": "Invoice 1637",
+      "thread_id": "thr-demo-acme-14"
+     },
+     "header_date": "2025-07-15T08:00:00Z",
+     "id": "fa4143db-66cd-52f7-b650-f8a3c4816164",
+     "kind": "email",
+     "pages": [
+      {
+       "height": 792,
+       "spans": [
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Hello, please find invoice 1637 attached.",
+         "x": 72,
+         "y": 72
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Thank you",
+         "x": 72,
+         "y": 86
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Accounts receivable: 206.555.0142",
+         "x": 72,
+         "y": 100
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Main: (206) 555-0117",
+         "x": 72,
+         "y": 114
+        }
+       ],
+       "width": 612
+      }
+     ],
+     "scan": false
+    },
+    {
+     "claimed_date": null,
+     "custody": {
+      "channel": "email",
+      "parent_document_id": "fa4143db-66cd-52f7-b650-f8a3c4816164",
+      "received_at": "2025-07-15T08:00:00Z",
+      "sender": "Acme Fasteners LLC Accounts Receivable <ar@acme.example>",
+      "subject": "Invoice 1637",
+      "thread_id": "thr-demo-acme-14"
+     },
+     "header_date": null,
+     "id": "499a36b3-d829-52c8-82f9-63070bb22b45",
+     "kind": "invoice",
+     "pages": [
+      {
+       "height": 792,
+       "spans": [
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "INVOICE 1637",
+         "x": 72,
+         "y": 72
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Acme Fasteners LLC",
+         "x": 72,
+         "y": 86
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Remit questions to:",
+         "x": 72,
+         "y": 100
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Accounts receivable: (206) 555-0142",
+         "x": 72,
+         "y": 114
+        }
+       ],
+       "width": 612
+      }
+     ],
+     "scan": false
+    },
+    {
+     "claimed_date": null,
+     "custody": {
+      "channel": "email",
+      "parent_document_id": null,
+      "received_at": "2026-02-07T00:00:00Z",
+      "sender": "Acme Fasteners LLC Accounts Receivable <ar@acme.example>",
+      "subject": "Invoice 1638",
+      "thread_id": "thr-demo-acme-16"
+     },
+     "header_date": "2026-02-07T00:00:00Z",
+     "id": "1f03fab9-b057-5830-a449-eb3bf6876687",
+     "kind": "email",
+     "pages": [
+      {
+       "height": 792,
+       "spans": [
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Hello, please find invoice 1638 attached.",
+         "x": 72,
+         "y": 72
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Thank you",
+         "x": 72,
+         "y": 86
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Accounts receivable: 206.555.0142",
+         "x": 72,
+         "y": 100
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Main: 206-555-0117",
+         "x": 72,
+         "y": 114
+        }
+       ],
+       "width": 612
+      }
+     ],
+     "scan": false
+    },
+    {
+     "claimed_date": null,
+     "custody": {
+      "channel": "email",
+      "parent_document_id": "1f03fab9-b057-5830-a449-eb3bf6876687",
+      "received_at": "2026-02-07T00:00:00Z",
+      "sender": "Acme Fasteners LLC Accounts Receivable <ar@acme.example>",
+      "subject": "Invoice 1638",
+      "thread_id": "thr-demo-acme-16"
+     },
+     "header_date": null,
+     "id": "5a5d2d9e-d4d6-5871-8425-c9b2476aee56",
+     "kind": "invoice",
+     "pages": [
+      {
+       "height": 792,
+       "spans": [
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "INVOICE 1638",
+         "x": 72,
+         "y": 72
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Acme Fasteners LLC",
+         "x": 72,
+         "y": 86
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Remit questions to:",
+         "x": 72,
+         "y": 100
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Accounts receivable: 206-555-0142",
+         "x": 72,
+         "y": 114
+        }
+       ],
+       "width": 612
+      }
+     ],
+     "scan": false
+    }
+   ],
+   "domain": "acme.example",
+   "name": "Acme Fasteners LLC",
+   "phones": {
+    "ar": "+12065550142",
+    "main": "+12065550117",
+    "on_file": "+12065550117"
+   },
+   "request": {
+    "claimed_date": null,
+    "custody": {
+     "channel": "email",
+     "parent_document_id": null,
+     "received_at": "2026-10-01T16:00:00Z",
+     "sender": "Dana Whitfield <ar@acme.example>",
+     "subject": "Re: Invoice 1638",
+     "thread_id": "thr-demo-acme-16"
+    },
+    "header_date": "2026-10-01T16:00:00Z",
+    "id": "da7f195b-bf7b-5ad6-a429-a5a43dad987b",
+    "kind": "email",
+    "pages": [
+     {
+      "height": 792,
+      "spans": [
+       {
+        "color": "#000000",
+        "size": 10,
+        "text": "We have moved our banking. Please pay the account ending 4821 from today.",
+        "x": 72,
+        "y": 72
+       },
+       {
+        "color": "#000000",
+        "size": 10,
+        "text": "Thank you",
+        "x": 72,
+        "y": 86
+       }
+      ],
+      "width": 612
+     }
+    ],
+    "scan": false
+   }
+  },
+  "brightline": {
+   "documents": [
+    {
+     "claimed_date": null,
+     "custody": {
+      "channel": "vendor_master",
+      "parent_document_id": null,
+      "received_at": "2022-08-23T16:00:00Z",
+      "sender": null,
+      "subject": null,
+      "thread_id": null
+     },
+     "header_date": null,
+     "id": "5a305b28-0bd8-5bc4-aff2-fc31ce3a876a",
+     "kind": "vendor_master_record",
+     "pages": [
+      {
+       "height": 792,
+       "spans": [
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Vendor master: Brightline Office Supply Inc",
+         "x": 72,
+         "y": 72
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Phone on file: (312) 555-0117",
+         "x": 72,
+         "y": 86
+        }
+       ],
+       "width": 612
+      }
+     ],
+     "scan": false
+    },
+    {
+     "claimed_date": null,
+     "custody": {
+      "channel": "email",
+      "parent_document_id": null,
+      "received_at": "2023-04-10T16:00:00Z",
+      "sender": "Brightline Office Supply Inc Accounts Receivable <ar@brightline.example>",
+      "subject": "Invoice 1669",
+      "thread_id": "thr-demo-brightline-2"
+     },
+     "header_date": "2023-04-10T16:00:00Z",
+     "id": "6eda55f2-c261-52a8-a33f-33de5e6f0ea5",
+     "kind": "email",
+     "pages": [
+      {
+       "height": 792,
+       "spans": [
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Hello, please find invoice 1669 attached.",
+         "x": 72,
+         "y": 72
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Thank you",
+         "x": 72,
+         "y": 86
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Accounts receivable: (312) 555-0142",
+         "x": 72,
+         "y": 100
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Main: 312.555.0117",
+         "x": 72,
+         "y": 114
+        }
+       ],
+       "width": 612
+      }
+     ],
+     "scan": false
+    },
+    {
+     "claimed_date": null,
+     "custody": {
+      "channel": "email",
+      "parent_document_id": "6eda55f2-c261-52a8-a33f-33de5e6f0ea5",
+      "received_at": "2023-04-10T16:00:00Z",
+      "sender": "Brightline Office Supply Inc Accounts Receivable <ar@brightline.example>",
+      "subject": "Invoice 1669",
+      "thread_id": "thr-demo-brightline-2"
+     },
+     "header_date": null,
+     "id": "d711fcb5-c7f0-5fc2-9db0-c959268e48e4",
+     "kind": "invoice",
+     "pages": [
+      {
+       "height": 792,
+       "spans": [
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "INVOICE 1669",
+         "x": 72,
+         "y": 72
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Brightline Office Supply Inc",
+         "x": 72,
+         "y": 86
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Remit questions to:",
+         "x": 72,
+         "y": 100
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Accounts receivable: (312) 555-0142",
+         "x": 72,
+         "y": 114
+        }
+       ],
+       "width": 612
+      }
+     ],
+     "scan": false
+    },
+    {
+     "claimed_date": null,
+     "custody": {
+      "channel": "email",
+      "parent_document_id": null,
+      "received_at": "2023-11-03T08:00:00Z",
+      "sender": "Brightline Office Supply Inc Accounts Receivable <ar@brightline.example>",
+      "subject": "Invoice 1670",
+      "thread_id": "thr-demo-brightline-4"
+     },
+     "header_date": "2023-11-03T08:00:00Z",
+     "id": "02529e7f-f4e5-5901-bd82-c0ced5ecd2c1",
+     "kind": "email",
+     "pages": [
+      {
+       "height": 792,
+       "spans": [
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Hello, please find invoice 1670 attached.",
+         "x": 72,
+         "y": 72
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Thank you",
+         "x": 72,
+         "y": 86
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Accounts receivable: 312-555-0142",
+         "x": 72,
+         "y": 100
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Main: 312.555.0117",
+         "x": 72,
+         "y": 114
+        }
+       ],
+       "width": 612
+      }
+     ],
+     "scan": false
+    },
+    {
+     "claimed_date": null,
+     "custody": {
+      "channel": "email",
+      "parent_document_id": "02529e7f-f4e5-5901-bd82-c0ced5ecd2c1",
+      "received_at": "2023-11-03T08:00:00Z",
+      "sender": "Brightline Office Supply Inc Accounts Receivable <ar@brightline.example>",
+      "subject": "Invoice 1670",
+      "thread_id": "thr-demo-brightline-4"
+     },
+     "header_date": null,
+     "id": "a3712638-47b6-53cc-86cf-df60ecec4325",
+     "kind": "invoice",
+     "pages": [
+      {
+       "height": 792,
+       "spans": [
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "INVOICE 1670",
+         "x": 72,
+         "y": 72
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Brightline Office Supply Inc",
+         "x": 72,
+         "y": 86
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Remit questions to:",
+         "x": 72,
+         "y": 100
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Accounts receivable: 312-555-0142",
+         "x": 72,
+         "y": 114
+        }
+       ],
+       "width": 612
+      }
+     ],
+     "scan": false
+    },
+    {
+     "claimed_date": null,
+     "custody": {
+      "channel": "email",
+      "parent_document_id": null,
+      "received_at": "2024-05-28T00:00:00Z",
+      "sender": "Brightline Office Supply Inc Accounts Receivable <ar@brightline.example>",
+      "subject": "Invoice 1671",
+      "thread_id": "thr-demo-brightline-6"
+     },
+     "header_date": "2024-05-28T00:00:00Z",
+     "id": "67feb142-693c-5964-9ce5-f74dc6c49a38",
+     "kind": "email",
+     "pages": [
+      {
+       "height": 792,
+       "spans": [
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Hello, please find invoice 1671 attached.",
+         "x": 72,
+         "y": 72
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Thank you",
+         "x": 72,
+         "y": 86
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Accounts receivable: 312-555-0142",
+         "x": 72,
+         "y": 100
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Main: 312-555-0117",
+         "x": 72,
+         "y": 114
+        }
+       ],
+       "width": 612
+      }
+     ],
+     "scan": false
+    },
+    {
+     "claimed_date": null,
+     "custody": {
+      "channel": "email",
+      "parent_document_id": "67feb142-693c-5964-9ce5-f74dc6c49a38",
+      "received_at": "2024-05-28T00:00:00Z",
+      "sender": "Brightline Office Supply Inc Accounts Receivable <ar@brightline.example>",
+      "subject": "Invoice 1671",
+      "thread_id": "thr-demo-brightline-6"
+     },
+     "header_date": null,
+     "id": "3a5049c4-f03c-5c7d-80e6-dd9ffe7d6f2c",
+     "kind": "invoice",
+     "pages": [
+      {
+       "height": 792,
+       "spans": [
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "INVOICE 1671",
+         "x": 72,
+         "y": 72
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Brightline Office Supply Inc",
+         "x": 72,
+         "y": 86
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Remit questions to:",
+         "x": 72,
+         "y": 100
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Accounts receivable: 312-555-0142",
+         "x": 72,
+         "y": 114
+        }
+       ],
+       "width": 612
+      }
+     ],
+     "scan": false
+    },
+    {
+     "claimed_date": null,
+     "custody": {
+      "channel": "email",
+      "parent_document_id": null,
+      "received_at": "2024-12-20T16:00:00Z",
+      "sender": "Brightline Office Supply Inc Accounts Receivable <ar@brightline.example>",
+      "subject": "Invoice 1672",
+      "thread_id": "thr-demo-brightline-8"
+     },
+     "header_date": "2024-12-20T16:00:00Z",
+     "id": "e154bd31-4ca3-5a73-871f-a6b9a80982d8",
+     "kind": "email",
+     "pages": [
+      {
+       "height": 792,
+       "spans": [
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Hello, please find invoice 1672 attached.",
+         "x": 72,
+         "y": 72
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Thank you",
+         "x": 72,
+         "y": 86
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Accounts receivable: 312.555.0142",
+         "x": 72,
+         "y": 100
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Main: 312.555.0117",
+         "x": 72,
+         "y": 114
+        }
+       ],
+       "width": 612
+      }
+     ],
+     "scan": false
+    },
+    {
+     "claimed_date": null,
+     "custody": {
+      "channel": "email",
+      "parent_document_id": "e154bd31-4ca3-5a73-871f-a6b9a80982d8",
+      "received_at": "2024-12-20T16:00:00Z",
+      "sender": "Brightline Office Supply Inc Accounts Receivable <ar@brightline.example>",
+      "subject": "Invoice 1672",
+      "thread_id": "thr-demo-brightline-8"
+     },
+     "header_date": null,
+     "id": "cd34dc2a-672d-53b0-895f-39410f7c5e35",
+     "kind": "invoice",
+     "pages": [
+      {
+       "height": 792,
+       "spans": [
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "INVOICE 1672",
+         "x": 72,
+         "y": 72
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Brightline Office Supply Inc",
+         "x": 72,
+         "y": 86
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Remit questions to:",
+         "x": 72,
+         "y": 100
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Accounts receivable: (312) 555-0142",
+         "x": 72,
+         "y": 114
+        }
+       ],
+       "width": 612
+      }
+     ],
+     "scan": false
+    },
+    {
+     "claimed_date": null,
+     "custody": {
+      "channel": "email",
+      "parent_document_id": null,
+      "received_at": "2025-07-15T08:00:00Z",
+      "sender": "Brightline Office Supply Inc Accounts Receivable <ar@brightline.example>",
+      "subject": "Invoice 1673",
+      "thread_id": "thr-demo-brightline-10"
+     },
+     "header_date": "2025-07-15T08:00:00Z",
+     "id": "23412337-99f6-5c29-8422-84a02f354f09",
+     "kind": "email",
+     "pages": [
+      {
+       "height": 792,
+       "spans": [
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Hello, please find invoice 1673 attached.",
+         "x": 72,
+         "y": 72
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Thank you",
+         "x": 72,
+         "y": 86
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Accounts receivable: (312) 555-0142",
+         "x": 72,
+         "y": 100
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Main: 312-555-0117",
+         "x": 72,
+         "y": 114
+        }
+       ],
+       "width": 612
+      }
+     ],
+     "scan": false
+    },
+    {
+     "claimed_date": null,
+     "custody": {
+      "channel": "email",
+      "parent_document_id": "23412337-99f6-5c29-8422-84a02f354f09",
+      "received_at": "2025-07-15T08:00:00Z",
+      "sender": "Brightline Office Supply Inc Accounts Receivable <ar@brightline.example>",
+      "subject": "Invoice 1673",
+      "thread_id": "thr-demo-brightline-10"
+     },
+     "header_date": null,
+     "id": "8e6fc389-a24e-5a55-97fd-0045a023581d",
+     "kind": "invoice",
+     "pages": [
+      {
+       "height": 792,
+       "spans": [
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "INVOICE 1673",
+         "x": 72,
+         "y": 72
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Brightline Office Supply Inc",
+         "x": 72,
+         "y": 86
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Remit questions to:",
+         "x": 72,
+         "y": 100
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Accounts receivable: 312-555-0142",
+         "x": 72,
+         "y": 114
+        }
+       ],
+       "width": 612
+      }
+     ],
+     "scan": false
+    },
+    {
+     "claimed_date": null,
+     "custody": {
+      "channel": "email",
+      "parent_document_id": null,
+      "received_at": "2026-02-07T00:00:00Z",
+      "sender": "Brightline Office Supply Inc Accounts Receivable <ar@brightline.example>",
+      "subject": "Invoice 1674",
+      "thread_id": "thr-demo-brightline-12"
+     },
+     "header_date": "2026-02-07T00:00:00Z",
+     "id": "f23a7821-58e5-5a8b-827d-31e6dc9de629",
+     "kind": "email",
+     "pages": [
+      {
+       "height": 792,
+       "spans": [
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Hello, please find invoice 1674 attached.",
+         "x": 72,
+         "y": 72
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Thank you",
+         "x": 72,
+         "y": 86
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Accounts receivable: (312) 555-0142",
+         "x": 72,
+         "y": 100
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Main: 312-555-0117",
+         "x": 72,
+         "y": 114
+        }
+       ],
+       "width": 612
+      }
+     ],
+     "scan": false
+    },
+    {
+     "claimed_date": null,
+     "custody": {
+      "channel": "email",
+      "parent_document_id": "f23a7821-58e5-5a8b-827d-31e6dc9de629",
+      "received_at": "2026-02-07T00:00:00Z",
+      "sender": "Brightline Office Supply Inc Accounts Receivable <ar@brightline.example>",
+      "subject": "Invoice 1674",
+      "thread_id": "thr-demo-brightline-12"
+     },
+     "header_date": null,
+     "id": "4c05c954-4cb1-5fa3-9448-dfcf4d5d6dc5",
+     "kind": "invoice",
+     "pages": [
+      {
+       "height": 792,
+       "spans": [
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "INVOICE 1674",
+         "x": 72,
+         "y": 72
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Brightline Office Supply Inc",
+         "x": 72,
+         "y": 86
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Remit questions to:",
+         "x": 72,
+         "y": 100
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Accounts receivable: 312-555-0142",
+         "x": 72,
+         "y": 114
+        }
+       ],
+       "width": 612
+      }
+     ],
+     "scan": false
+    }
+   ],
+   "domain": "brightline.example",
+   "name": "Brightline Office Supply Inc",
+   "phones": {
+    "ar": "+13125550142",
+    "main": "+13125550117",
+    "on_file": "+13125550117"
+   },
+   "request": {
+    "claimed_date": null,
+    "custody": {
+     "channel": "email",
+     "parent_document_id": null,
+     "received_at": "2026-10-01T16:00:00Z",
+     "sender": "Sam Ortiz <ar@brightline.example>",
+     "subject": "Updated banking details",
+     "thread_id": "thr-demo-brightline-14"
+    },
+    "header_date": "2026-10-01T16:00:00Z",
+    "id": "ffaeabad-db55-5f05-9fe4-841ccb8cefea",
+    "kind": "email",
+    "pages": [
+     {
+      "height": 792,
+      "spans": [
+       {
+        "color": "#000000",
+        "size": 10,
+        "text": "We have moved our banking. Please pay the account ending 4821 from today.",
+        "x": 72,
+        "y": 72
+       },
+       {
+        "color": "#000000",
+        "size": 10,
+        "text": "Thank you",
+        "x": 72,
+        "y": 86
+       }
+      ],
+      "width": 612
+     }
+    ],
+    "scan": false
+   }
+  },
+  "cobalt": {
+   "documents": [
+    {
+     "claimed_date": null,
+     "custody": {
+      "channel": "vendor_master",
+      "parent_document_id": null,
+      "received_at": "2022-08-23T16:00:00Z",
+      "sender": null,
+      "subject": null,
+      "thread_id": null
+     },
+     "header_date": null,
+     "id": "ff9fb6c0-fc33-5985-a6db-3a9df8143f25",
+     "kind": "vendor_master_record",
+     "pages": [
+      {
+       "height": 792,
+       "spans": [
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Vendor master: Cobalt Freight LLC",
+         "x": 72,
+         "y": 72
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Phone on file: 617.555.0124",
+         "x": 72,
+         "y": 86
+        }
+       ],
+       "width": 612
+      }
+     ],
+     "scan": false
+    },
+    {
+     "claimed_date": null,
+     "custody": {
+      "channel": "contract",
+      "parent_document_id": null,
+      "received_at": "2023-03-11T16:00:00Z",
+      "sender": null,
+      "subject": null,
+      "thread_id": null
+     },
+     "header_date": null,
+     "id": "ac3731c2-8ee9-5a34-8c54-fdac120e224f",
+     "kind": "contract",
+     "pages": [
+      {
+       "height": 792,
+       "spans": [
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Master supply agreement: Cobalt Freight LLC",
+         "x": 72,
+         "y": 72
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Main: (617) 555-0117",
+         "x": 72,
+         "y": 86
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Accounts receivable: (617) 555-0142",
+         "x": 72,
+         "y": 100
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Notices: legal@cobalt.example",
+         "x": 72,
+         "y": 114
+        }
+       ],
+       "width": 612
+      }
+     ],
+     "scan": false
+    },
+    {
+     "claimed_date": null,
+     "custody": {
+      "channel": "listing",
+      "parent_document_id": null,
+      "received_at": "2023-06-09T16:00:00Z",
+      "sender": null,
+      "subject": null,
+      "thread_id": null
+     },
+     "header_date": null,
+     "id": "87619025-409b-5a59-854b-529228415183",
+     "kind": "listing",
+     "pages": [
+      {
+       "height": 792,
+       "spans": [
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Cobalt Freight LLC: business listing",
+         "x": 72,
+         "y": 72
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Main: 617.555.0117",
+         "x": 72,
+         "y": 86
+        }
+       ],
+       "width": 612
+      }
+     ],
+     "scan": false
+    },
+    {
+     "claimed_date": null,
+     "custody": {
+      "channel": "listing",
+      "parent_document_id": null,
+      "received_at": "2024-06-08T16:00:00Z",
+      "sender": null,
+      "subject": null,
+      "thread_id": null
+     },
+     "header_date": null,
+     "id": "ee672551-7e2c-5b15-b367-f4fac199b72c",
+     "kind": "listing",
+     "pages": [
+      {
+       "height": 792,
+       "spans": [
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Cobalt Freight LLC: business listing",
+         "x": 72,
+         "y": 72
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Main: (617) 555-0117",
+         "x": 72,
+         "y": 86
+        }
+       ],
+       "width": 612
+      }
+     ],
+     "scan": false
+    },
+    {
+     "claimed_date": null,
+     "custody": {
+      "channel": "vendor_portal",
+      "parent_document_id": null,
+      "received_at": "2024-01-05T16:00:00Z",
+      "sender": null,
+      "subject": null,
+      "thread_id": null
+     },
+     "header_date": null,
+     "id": "f6ecd898-f5fe-5efc-b296-4a947d6cc2e6",
+     "kind": "portal_entry",
+     "pages": [
+      {
+       "height": 792,
+       "spans": [
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Vendor profile: Cobalt Freight LLC",
+         "x": 72,
+         "y": 72
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Accounts receivable: 617-555-0142",
+         "x": 72,
+         "y": 86
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Billing: 617.555.0142",
+         "x": 72,
+         "y": 100
+        }
+       ],
+       "width": 612
+      }
+     ],
+     "scan": false
+    },
+    {
+     "claimed_date": null,
+     "custody": {
+      "channel": "email",
+      "parent_document_id": null,
+      "received_at": "2023-04-10T16:00:00Z",
+      "sender": "Cobalt Freight LLC Accounts Receivable <ar@cobalt.example>",
+      "subject": "Invoice 1321",
+      "thread_id": "thr-demo-cobalt-6"
+     },
+     "header_date": "2023-04-10T16:00:00Z",
+     "id": "96f9933a-3587-50e7-81f1-e56f3764702f",
+     "kind": "email",
+     "pages": [
+      {
+       "height": 792,
+       "spans": [
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Hello, please find invoice 1321 attached.",
+         "x": 72,
+         "y": 72
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Thank you",
+         "x": 72,
+         "y": 86
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Accounts receivable: (617) 555-0142",
+         "x": 72,
+         "y": 100
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Main: (617) 555-0117",
+         "x": 72,
+         "y": 114
+        }
+       ],
+       "width": 612
+      }
+     ],
+     "scan": false
+    },
+    {
+     "claimed_date": null,
+     "custody": {
+      "channel": "email",
+      "parent_document_id": "96f9933a-3587-50e7-81f1-e56f3764702f",
+      "received_at": "2023-04-10T16:00:00Z",
+      "sender": "Cobalt Freight LLC Accounts Receivable <ar@cobalt.example>",
+      "subject": "Invoice 1321",
+      "thread_id": "thr-demo-cobalt-6"
+     },
+     "header_date": null,
+     "id": "b5808638-b94d-551a-b228-d7d402cf72af",
+     "kind": "invoice",
+     "pages": [
+      {
+       "height": 792,
+       "spans": [
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "INVOICE 1321",
+         "x": 72,
+         "y": 72
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Cobalt Freight LLC",
+         "x": 72,
+         "y": 86
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Remit questions to:",
+         "x": 72,
+         "y": 100
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Accounts receivable: 617-555-0142",
+         "x": 72,
+         "y": 114
+        }
+       ],
+       "width": 612
+      }
+     ],
+     "scan": false
+    },
+    {
+     "claimed_date": null,
+     "custody": {
+      "channel": "email",
+      "parent_document_id": null,
+      "received_at": "2023-11-03T08:00:00Z",
+      "sender": "Cobalt Freight LLC Accounts Receivable <ar@cobalt.example>",
+      "subject": "Invoice 1322",
+      "thread_id": "thr-demo-cobalt-8"
+     },
+     "header_date": "2023-11-03T08:00:00Z",
+     "id": "00af5144-46cd-51e9-9fd5-fd1507aaf6a6",
+     "kind": "email",
+     "pages": [
+      {
+       "height": 792,
+       "spans": [
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Hello, please find invoice 1322 attached.",
+         "x": 72,
+         "y": 72
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Thank you",
+         "x": 72,
+         "y": 86
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Accounts receivable: 617-555-0142",
+         "x": 72,
+         "y": 100
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Main: (617) 555-0117",
+         "x": 72,
+         "y": 114
+        }
+       ],
+       "width": 612
+      }
+     ],
+     "scan": false
+    },
+    {
+     "claimed_date": null,
+     "custody": {
+      "channel": "email",
+      "parent_document_id": "00af5144-46cd-51e9-9fd5-fd1507aaf6a6",
+      "received_at": "2023-11-03T08:00:00Z",
+      "sender": "Cobalt Freight LLC Accounts Receivable <ar@cobalt.example>",
+      "subject": "Invoice 1322",
+      "thread_id": "thr-demo-cobalt-8"
+     },
+     "header_date": null,
+     "id": "7d138d61-cb63-5fac-97f3-5250050f20f8",
+     "kind": "invoice",
+     "pages": [
+      {
+       "height": 792,
+       "spans": [
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "INVOICE 1322",
+         "x": 72,
+         "y": 72
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Cobalt Freight LLC",
+         "x": 72,
+         "y": 86
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Remit questions to:",
+         "x": 72,
+         "y": 100
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Accounts receivable: 617.555.0142",
+         "x": 72,
+         "y": 114
+        }
+       ],
+       "width": 612
+      }
+     ],
+     "scan": false
+    },
+    {
+     "claimed_date": null,
+     "custody": {
+      "channel": "email",
+      "parent_document_id": null,
+      "received_at": "2024-05-28T00:00:00Z",
+      "sender": "Cobalt Freight LLC Accounts Receivable <ar@cobalt.example>",
+      "subject": "Invoice 1323",
+      "thread_id": "thr-demo-cobalt-10"
+     },
+     "header_date": "2024-05-28T00:00:00Z",
+     "id": "1d5db2a8-2a09-5adb-8374-adeb3929b6e3",
+     "kind": "email",
+     "pages": [
+      {
+       "height": 792,
+       "spans": [
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Hello, please find invoice 1323 attached.",
+         "x": 72,
+         "y": 72
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Thank you",
+         "x": 72,
+         "y": 86
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Accounts receivable: 617-555-0142",
+         "x": 72,
+         "y": 100
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Main: 617-555-0117",
+         "x": 72,
+         "y": 114
+        }
+       ],
+       "width": 612
+      }
+     ],
+     "scan": false
+    },
+    {
+     "claimed_date": null,
+     "custody": {
+      "channel": "email",
+      "parent_document_id": "1d5db2a8-2a09-5adb-8374-adeb3929b6e3",
+      "received_at": "2024-05-28T00:00:00Z",
+      "sender": "Cobalt Freight LLC Accounts Receivable <ar@cobalt.example>",
+      "subject": "Invoice 1323",
+      "thread_id": "thr-demo-cobalt-10"
+     },
+     "header_date": null,
+     "id": "08d6e118-2e4d-55af-a9d8-ad7ab3d4d96c",
+     "kind": "invoice",
+     "pages": [
+      {
+       "height": 792,
+       "spans": [
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "INVOICE 1323",
+         "x": 72,
+         "y": 72
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Cobalt Freight LLC",
+         "x": 72,
+         "y": 86
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Remit questions to:",
+         "x": 72,
+         "y": 100
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Accounts receivable: 617.555.0142",
+         "x": 72,
+         "y": 114
+        }
+       ],
+       "width": 612
+      }
+     ],
+     "scan": false
+    },
+    {
+     "claimed_date": null,
+     "custody": {
+      "channel": "email",
+      "parent_document_id": null,
+      "received_at": "2024-12-20T16:00:00Z",
+      "sender": "Cobalt Freight LLC Accounts Receivable <ar@cobalt.example>",
+      "subject": "Invoice 1324",
+      "thread_id": "thr-demo-cobalt-12"
+     },
+     "header_date": "2024-12-20T16:00:00Z",
+     "id": "2f9cbbff-7349-5744-b226-819361eb11ed",
+     "kind": "email",
+     "pages": [
+      {
+       "height": 792,
+       "spans": [
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Hello, please find invoice 1324 attached.",
+         "x": 72,
+         "y": 72
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Thank you",
+         "x": 72,
+         "y": 86
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Accounts receivable: (617) 555-0142",
+         "x": 72,
+         "y": 100
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Main: 617-555-0117",
+         "x": 72,
+         "y": 114
+        }
+       ],
+       "width": 612
+      }
+     ],
+     "scan": false
+    },
+    {
+     "claimed_date": null,
+     "custody": {
+      "channel": "email",
+      "parent_document_id": "2f9cbbff-7349-5744-b226-819361eb11ed",
+      "received_at": "2024-12-20T16:00:00Z",
+      "sender": "Cobalt Freight LLC Accounts Receivable <ar@cobalt.example>",
+      "subject": "Invoice 1324",
+      "thread_id": "thr-demo-cobalt-12"
+     },
+     "header_date": null,
+     "id": "e5741f3f-3b0e-5c66-a2d8-88fe247dc1be",
+     "kind": "invoice",
+     "pages": [
+      {
+       "height": 792,
+       "spans": [
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "INVOICE 1324",
+         "x": 72,
+         "y": 72
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Cobalt Freight LLC",
+         "x": 72,
+         "y": 86
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Remit questions to:",
+         "x": 72,
+         "y": 100
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Accounts receivable: 617.555.0142",
+         "x": 72,
+         "y": 114
+        }
+       ],
+       "width": 612
+      }
+     ],
+     "scan": false
+    },
+    {
+     "claimed_date": null,
+     "custody": {
+      "channel": "email",
+      "parent_document_id": null,
+      "received_at": "2025-07-15T08:00:00Z",
+      "sender": "Cobalt Freight LLC Accounts Receivable <ar@cobalt.example>",
+      "subject": "Invoice 1325",
+      "thread_id": "thr-demo-cobalt-14"
+     },
+     "header_date": "2025-07-15T08:00:00Z",
+     "id": "1fe37d02-e56f-5ffe-a3dd-319a62b453f0",
+     "kind": "email",
+     "pages": [
+      {
+       "height": 792,
+       "spans": [
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Hello, please find invoice 1325 attached.",
+         "x": 72,
+         "y": 72
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Thank you",
+         "x": 72,
+         "y": 86
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Accounts receivable: 617.555.0142",
+         "x": 72,
+         "y": 100
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Main: 617-555-0117",
+         "x": 72,
+         "y": 114
+        }
+       ],
+       "width": 612
+      }
+     ],
+     "scan": false
+    },
+    {
+     "claimed_date": null,
+     "custody": {
+      "channel": "email",
+      "parent_document_id": "1fe37d02-e56f-5ffe-a3dd-319a62b453f0",
+      "received_at": "2025-07-15T08:00:00Z",
+      "sender": "Cobalt Freight LLC Accounts Receivable <ar@cobalt.example>",
+      "subject": "Invoice 1325",
+      "thread_id": "thr-demo-cobalt-14"
+     },
+     "header_date": null,
+     "id": "b57a9fb6-aaad-5eff-9a11-4b027f5ab044",
+     "kind": "invoice",
+     "pages": [
+      {
+       "height": 792,
+       "spans": [
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "INVOICE 1325",
+         "x": 72,
+         "y": 72
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Cobalt Freight LLC",
+         "x": 72,
+         "y": 86
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Remit questions to:",
+         "x": 72,
+         "y": 100
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Accounts receivable: (617) 555-0142",
+         "x": 72,
+         "y": 114
+        }
+       ],
+       "width": 612
+      }
+     ],
+     "scan": false
+    },
+    {
+     "claimed_date": null,
+     "custody": {
+      "channel": "email",
+      "parent_document_id": null,
+      "received_at": "2026-02-07T00:00:00Z",
+      "sender": "Cobalt Freight LLC Accounts Receivable <ar@cobalt.example>",
+      "subject": "Invoice 1326",
+      "thread_id": "thr-demo-cobalt-16"
+     },
+     "header_date": "2026-02-07T00:00:00Z",
+     "id": "6024f544-af45-5e94-a331-e4f93f4164ec",
+     "kind": "email",
+     "pages": [
+      {
+       "height": 792,
+       "spans": [
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Hello, please find invoice 1326 attached.",
+         "x": 72,
+         "y": 72
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Thank you",
+         "x": 72,
+         "y": 86
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Accounts receivable: 617-555-0142",
+         "x": 72,
+         "y": 100
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Main: 617.555.0117",
+         "x": 72,
+         "y": 114
+        }
+       ],
+       "width": 612
+      }
+     ],
+     "scan": false
+    },
+    {
+     "claimed_date": null,
+     "custody": {
+      "channel": "email",
+      "parent_document_id": "6024f544-af45-5e94-a331-e4f93f4164ec",
+      "received_at": "2026-02-07T00:00:00Z",
+      "sender": "Cobalt Freight LLC Accounts Receivable <ar@cobalt.example>",
+      "subject": "Invoice 1326",
+      "thread_id": "thr-demo-cobalt-16"
+     },
+     "header_date": null,
+     "id": "adeea3b5-09a8-51b7-9bb1-60f567031ada",
+     "kind": "invoice",
+     "pages": [
+      {
+       "height": 792,
+       "spans": [
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "INVOICE 1326",
+         "x": 72,
+         "y": 72
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Cobalt Freight LLC",
+         "x": 72,
+         "y": 86
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Remit questions to:",
+         "x": 72,
+         "y": 100
+        },
+        {
+         "color": "#000000",
+         "size": 10,
+         "text": "Accounts receivable: (617) 555-0142",
+         "x": 72,
+         "y": 114
+        }
+       ],
+       "width": 612
+      }
+     ],
+     "scan": false
+    }
+   ],
+   "domain": "cobalt.example",
+   "name": "Cobalt Freight LLC",
+   "phones": {
+    "ar": "+16175550142",
+    "main": "+16175550117",
+    "offered": "+16175550143",
+    "on_file": "+16175550124"
+   },
+   "request": {
+    "claimed_date": null,
+    "custody": {
+     "channel": "email",
+     "parent_document_id": null,
+     "received_at": "2026-10-01T16:00:00Z",
+     "sender": "Morgan Pryce <ar@cobalt.example>",
+     "subject": "Re: Invoice 1326",
+     "thread_id": "thr-demo-cobalt-16"
+    },
+    "header_date": "2026-10-01T16:00:00Z",
+    "id": "2d179867-b483-529a-b9cc-2070436dda25",
+    "kind": "email",
+    "pages": [
+     {
+      "height": 792,
+      "spans": [
+       {
+        "color": "#000000",
+        "size": 10,
+        "text": "We have moved our banking. Please pay the account ending 4821 from today.",
+        "x": 72,
+        "y": 72
+       },
+       {
+        "color": "#000000",
+        "size": 10,
+        "text": "Thank you",
+        "x": 72,
+        "y": 86
+       },
+       {
+        "color": "#000000",
+        "size": 10,
+        "text": "Questions? Call me directly.",
+        "x": 72,
+        "y": 100
+       },
+       {
+        "color": "#000000",
+        "size": 10,
+        "text": "AR direct: (617) 555-0143",
+        "x": 72,
+        "y": 114
+       }
+      ],
+      "width": 612
+     }
+    ],
+    "scan": false
+   }
+  }
+ }
+}

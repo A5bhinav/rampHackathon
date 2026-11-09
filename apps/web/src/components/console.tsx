@@ -20,7 +20,7 @@ export function DecisionConsole({ title, hint, caseId, version, path, action, bu
   return (
     <form className="console" action={submit}>
       <h2>{title}</h2>
-      <p className="muted" style={{ margin: 0 }}>{hint}</p>
+      <p className="muted console-hint">{hint}</p>
       <input type="hidden" name="case_id" value={caseId} />
       <input type="hidden" name="expected_version" value={version} />
       <input type="hidden" name="path" value={path} />

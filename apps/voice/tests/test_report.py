@@ -12,7 +12,7 @@ import asyncio
 import json
 import pathlib
 import uuid
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
 import httpx
 import jsonschema
@@ -143,7 +143,7 @@ def _contract_registry() -> Registry:
             parsed = urlparse(uri)
             if parsed.scheme != "file":
                 raise LookupError(f"refusing to fetch {uri}: only local contracts resolve")
-            path = pathlib.Path(parsed.path)
+            path = pathlib.Path(unquote(parsed.path))  # as_uri() escapes "+", spaces...; undo it
         text = path.read_text(encoding="utf-8")
         data = yaml.safe_load(text) if path.suffix in (".yaml", ".yml") else json.loads(text)
         return Resource.from_contents(data, default_specification=DRAFT202012)

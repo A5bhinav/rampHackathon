@@ -5,12 +5,14 @@
     dialback-core import-vendors --dataset <id>          initial import (baseline) or a full sweep
     dialback-core retire-dataset --dataset <id>          hide a dataset; nothing is deleted
     dialback-core run-job --dataset <id> --job reconcile run poll, full_sweep, reconcile or verify_chain now
+    dialback-core demo reset|change|tamper|status|chaos  one command per demo beat (spec 0011)
 """
 from __future__ import annotations
 
 import argparse
 import asyncio
 import datetime as dt
+import json
 import logging
 import os
 from uuid import UUID
@@ -18,16 +20,21 @@ from uuid import UUID
 import httpx
 import uvicorn
 
+from . import demo
 from .app import create_app
 from .datasets import create_dataset, retire_dataset
 from .db import open_pool, system_tx
 from .detection import Keys, import_all
+from .flags import RampMode
 from .jobs import JOBS, Jobs
 from .ramp import RampConnector
 from .settings import Settings
 
 
 async def _new_dataset(settings: Settings, kind: str, label: str, sim_now: str | None) -> None:
+    if kind == "demo" and settings.ramp_mode is RampMode.SANDBOX:
+        # Spec 0034: shared demo accounts may act on any demo dataset, so none may sit on Ramp's sandbox.
+        raise SystemExit("refused: a demo dataset can't be made against Ramp's sandbox (use DIALBACK_RAMP=mock)")
     pool = await open_pool(settings.database_url, max_size=2)
     try:
         d = await create_dataset(pool, kind, label, dt.datetime.fromisoformat(sim_now) if sim_now else None)
@@ -70,6 +77,50 @@ async def _retire(settings: Settings, dataset_id: UUID) -> None:
         await pool.close()
 
 
+async def _demo(settings: Settings, args: argparse.Namespace) -> int:
+    pool = await open_pool(settings.database_url, max_size=3)
+    async with httpx.AsyncClient(base_url=settings.ramp_base_url, timeout=15.0) as mock, httpx.AsyncClient(timeout=10.0) as http:
+        env = demo.DemoEnv(pool=pool, settings=settings, mock=mock, connector=RampConnector(settings, http),
+                           owner_url=settings.database_url)
+        try:
+            if args.action == "reset":
+                links, seed = dict(_link(x) for x in args.link), demo.load_seed(args.seed)
+                r = await demo.reset(env, seed, links)
+                for w in r.warnings:
+                    print(f"warning: {w}")
+                print(f"dataset {r.dataset.id}\nchain   {r.dataset.chain_id}")
+                print("vendors " + ", ".join(f"{v['ref']} ({v['name']})" for v in seed["vendors"]))
+                print(f"linked  {', '.join(r.linked) or 'nobody'}")
+                print("next    dialback-core demo change --vendor acme")
+            elif args.action == "change":
+                account = await demo.change(env, demo.load_seed(args.seed), args.vendor, by=args.by, unknown=args.unknown)
+                print(f"bank change made in the Ramp mock (new account {account}); the core opens the case and places the hold")
+            elif args.action == "tamper":
+                t = await demo.tamper(env, confirmed=args.yes_break_the_chain, seq=args.seq, dataset_id=args.dataset)
+                print(f"edited event #{t.seq} of dataset {t.dataset_id}")
+                print(f"alert   {t.alert}" if t.alert else "alert   none yet: the scheduled chain check raises it within "
+                      "DIALBACK_VERIFY_SECONDS (check with `dialback-core demo status`)")
+            elif args.action == "status":
+                print(json.dumps(await demo.status(env), indent=2, default=str))
+            elif args.action == "chaos":
+                s = await demo.chaos(env, args.state == "on", seed=args.chaos_seed)
+                print(f"chaos {'on' if s.get('chaos_seed') is not None else 'off'}: "
+                      f"seed={s.get('chaos_seed')} errors={s.get('chaos_error_permille')}‰ drops={s.get('chaos_drop_permille')}‰")
+        except demo.DemoError as exc:
+            print(f"refused: {exc}")
+            return 2
+        finally:
+            await pool.close()
+    return 0
+
+
+def _link(raw: str) -> tuple[str, str]:
+    ref, sep, email = raw.partition("=")
+    if not sep or not ref or "@" not in email:
+        raise demo.DemoError(f"--link takes <ref>=<email>, not {raw!r}")
+    return ref, email
+
+
 def run() -> None:
     logging.basicConfig(level=os.environ.get("LOG_LEVEL", "INFO"))
     parser = argparse.ArgumentParser(prog="dialback-core")
@@ -84,6 +135,25 @@ def run() -> None:
     rj = sub.add_parser("run-job")
     rj.add_argument("--dataset", type=UUID, required=True)
     rj.add_argument("--job", choices=JOBS, required=True)
+    dm = sub.add_parser("demo").add_subparsers(dest="action", required=True)
+    reset = dm.add_parser("reset", help="a fresh demo company; earlier demo datasets are hidden, nothing is deleted")
+    reset.add_argument("--seed", default=str(demo.DEFAULT_SEED))
+    reset.add_argument("--link", action="append", default=[], metavar="REF=EMAIL",
+                       help="point that Dialback account at the seeded Ramp user with this ref (repeatable)")
+    ch = dm.add_parser("change", help="beat 2: the vendor's seeded bank change")
+    ch.add_argument("--vendor", required=True)
+    ch.add_argument("--seed", default=str(demo.DEFAULT_SEED))
+    who = ch.add_mutually_exclusive_group()
+    who.add_argument("--by", default="clerk", help="the seeded user who makes it (default: clerk)")
+    who.add_argument("--unknown", action="store_true", help="no known author: two approvers are needed")
+    tp = dm.add_parser("tamper", help="beat 6: edit one evidence row by hand, then run the verify job")
+    tp.add_argument("--yes-break-the-chain", action="store_true")
+    tp.add_argument("--seq", type=int)
+    tp.add_argument("--dataset", type=UUID, help="default: the current demo")
+    dm.add_parser("status", help="pre-flight: the current demo, its cases, the chain and alerts")
+    cz = dm.add_parser("chaos", help="spec 0008's chaos mode on the current demo business")
+    cz.add_argument("state", choices=("on", "off"))
+    cz.add_argument("--chaos-seed", type=int, default=11)
     args = parser.parse_args()
 
     settings = Settings.from_env()
@@ -97,6 +167,8 @@ def run() -> None:
         asyncio.run(_retire(settings, args.dataset))
     elif args.cmd == "run-job":
         asyncio.run(_run_job(settings, args.dataset, args.job))
+    elif args.cmd == "demo":
+        raise SystemExit(asyncio.run(_demo(settings, args)))
 
 
 if __name__ == "__main__":

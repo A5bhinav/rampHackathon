@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import httpx
 from dialback_voice.agent import ScriptedAgent
+from dialback_voice.claude_agent import ClaudeAgent
 from dialback_voice.settings import Settings, TwilioConfig
 from dialback_voice.twilio.origination import TwilioOriginator
 from dialback_voice.wire import build_twilio_deps
@@ -42,5 +43,18 @@ def test_complete_config_builds_live_deps():
     assert isinstance(deps.originator, TwilioOriginator)     # the real REST client is wired
     assert deps.lookup_call is sentinel                      # the lookup seam is threaded through
     assert callable(deps.report_ended)                       # the CoreClient report seam is wired
-    assert isinstance(deps.agent_for(), ScriptedAgent)       # placeholder until the agent spec
+    assert isinstance(deps.agent_for(), ScriptedAgent)       # placeholder when no agent key is set
     assert deps.clock is clk
+
+
+def test_the_anthropic_key_swaps_in_the_claude_agent():
+    # With the agent key present, agent_for builds the live ClaudeAgent over the injected model;
+    # without it, it stays the ScriptedAgent placeholder (test_complete_config_builds_live_deps).
+    http = httpx.AsyncClient()
+    fake_model = object()
+    deps = build_twilio_deps(Settings(voice_mode="live", twilio=CFG, anthropic_api_key=b"sk-x"),
+                             lookup_call=lambda c: None, http=http, clock=lambda: None,
+                             model_for=lambda key: fake_model)
+    agent = deps.agent_for()
+    assert isinstance(agent, ClaudeAgent)
+    assert agent.model is fake_model

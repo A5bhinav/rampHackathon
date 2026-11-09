@@ -249,3 +249,35 @@ FIXED = {
     ENGINE_ERROR: "The decision engine hit an error, so a person must review this change.",
     NOT_MET: "Not every condition for verifying this change was met, so a person must review it.",
 }
+
+# Which rules read each recorded answer (spec 0035), so the dashboard can link an answer to the
+# rules it fed without knowing the rules. Display only: decide() never reads this table.
+# Order and identity facts read several slots' turns (facts.answers_in_order, facts.same_person).
+SLOT_RULES: dict[str, tuple[str, ...]] = {
+    "recording_consent": ("V04_recording_consent", "V10_answers_grounded", "NR02_no_recording_consent",
+                          "NR14_answer_not_in_transcript"),
+    "company_named": ("V05_company_matches", "NR03_wrong_company"),
+    "department": (),
+    "speaker_name": ("V06_speaker_identified", "V07_right_person_confirmed", "V09_same_person", "V10_answers_grounded",
+                     "NR04_speaker_from_change_thread", "NR14_answer_not_in_transcript", "NR17_split_speakers",
+                     "S01_known_contact"),
+    "speaker_role": ("V06_speaker_identified", "NR18_contradictory_answers"),
+    "change_requested": ("V07_right_person_confirmed", "V09_same_person", "V10_answers_grounded", "NV01_vendor_denied_change",
+                         "NR09_change_unsure", "NR14_answer_not_in_transcript", "NR17_split_speakers",
+                         "NR18_contradictory_answers"),
+    "account_last4": ("V08_digits_match", "V10_answers_grounded", "NV02_digits_mismatch", "NV03_digits_match_old_account",
+                      "NR05_digits_near_miss", "NR06_digits_not_provided", "NR07_digits_ambiguous", "NR08_digits_inconsistent",
+                      "NR14_answer_not_in_transcript"),
+    "offered_number": ("V12_no_flags", "NV04_offered_number_from_request", "NR13_another_number"),
+    "flag": ("V12_no_flags", "NR10_pressure", "NR11_opt_out", "NR12_asked_what_is_checked", "NR13_another_number",
+             "NR16_other_flag", "NR17_split_speakers"),
+}
+
+# An earlier attempt's answers count only against the change (spec 0005, D2): a consented "no"
+# or wrong digits decide Not verified, and anything else it raised is NR19.
+EARLIER_SLOT_RULES: dict[str, tuple[str, ...]] = {
+    "recording_consent": ("NR19_earlier_call_concern",),
+    "change_requested": ("NV01_vendor_denied_change", "NR19_earlier_call_concern"),
+    "account_last4": ("NV02_digits_mismatch", "NV03_digits_match_old_account", "NR19_earlier_call_concern"),
+    "flag": ("NR19_earlier_call_concern",),
+}

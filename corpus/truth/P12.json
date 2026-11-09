@@ -1,0 +1,298 @@
+{
+ "documents": "poison/P12-email-counts-once/documents.json",
+ "expected": {
+  "cutoff": "2026-10-01T16:00:00Z",
+  "outcome": "picked",
+  "pick": "+18585550142",
+  "rejected": {
+   "+18585550169": [
+    "too_few_source_types"
+   ]
+  }
+ },
+ "id": "P12",
+ "kind": "poison",
+ "planted": [
+  {
+   "e164": "+18585550117",
+   "sightings": [
+    {
+     "channel": "contract",
+     "document_id": "8beb7f2a-5481-5ba8-8cf6-3e3bbef0de41",
+     "party": "vendor",
+     "quote": "Main: (858) 555-0117",
+     "received_at": "2023-03-11T16:00:00Z",
+     "role": "main",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "179341ed-8cb1-57ac-a77b-a74809531b81",
+     "party": "vendor",
+     "quote": "Main: (858) 555-0117",
+     "received_at": "2023-04-10T16:00:00Z",
+     "role": "main",
+     "visibility": "visible"
+    },
+    {
+     "channel": "listing",
+     "document_id": "460231ed-522f-5cbb-b6bc-c054cb2e3bd7",
+     "party": "vendor",
+     "quote": "Main: 858.555.0117",
+     "received_at": "2023-06-09T16:00:00Z",
+     "role": "main",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "6a3d432a-d76f-55a4-976f-bc63aede2126",
+     "party": "vendor",
+     "quote": "Main: 858.555.0117",
+     "received_at": "2023-11-03T08:00:00Z",
+     "role": "main",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "99f187e3-e5f6-5857-b8b6-34efc2e3f5eb",
+     "party": "vendor",
+     "quote": "Main: (858) 555-0117",
+     "received_at": "2024-05-28T00:00:00Z",
+     "role": "main",
+     "visibility": "visible"
+    },
+    {
+     "channel": "listing",
+     "document_id": "d3e5f0fc-9c81-5361-9ef9-422d6be7e27a",
+     "party": "vendor",
+     "quote": "Main: 858-555-0117",
+     "received_at": "2024-06-08T16:00:00Z",
+     "role": "main",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "c6347051-544d-5cc8-8bd3-8ca6a007006b",
+     "party": "vendor",
+     "quote": "Main: 858-555-0117",
+     "received_at": "2024-12-20T16:00:00Z",
+     "role": "main",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "12833cd5-a7c0-5d5b-8818-90be9a36d9bb",
+     "party": "vendor",
+     "quote": "Main: (858) 555-0117",
+     "received_at": "2025-07-15T08:00:00Z",
+     "role": "main",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "8cb10b6d-edc9-5b4b-8f3c-4a6df55f8edb",
+     "party": "vendor",
+     "quote": "Main: 858-555-0117",
+     "received_at": "2026-02-07T00:00:00Z",
+     "role": "main",
+     "visibility": "visible"
+    }
+   ],
+   "truth": "real"
+  },
+  {
+   "e164": "+18585550142",
+   "sightings": [
+    {
+     "channel": "contract",
+     "document_id": "8beb7f2a-5481-5ba8-8cf6-3e3bbef0de41",
+     "party": "vendor",
+     "quote": "Accounts receivable: 858.555.0142",
+     "received_at": "2023-03-11T16:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "179341ed-8cb1-57ac-a77b-a74809531b81",
+     "party": "vendor",
+     "quote": "Accounts receivable: 858.555.0142",
+     "received_at": "2023-04-10T16:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "24abc63d-0cbd-5d21-b321-6f084a5a653b",
+     "party": "vendor",
+     "quote": "Accounts receivable: 858-555-0142",
+     "received_at": "2023-04-10T16:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "6a3d432a-d76f-55a4-976f-bc63aede2126",
+     "party": "vendor",
+     "quote": "Accounts receivable: (858) 555-0142",
+     "received_at": "2023-11-03T08:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "b92639ef-fe8b-5ffc-84f0-66cd17a4455e",
+     "party": "vendor",
+     "quote": "Accounts receivable: 858-555-0142",
+     "received_at": "2023-11-03T08:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "vendor_portal",
+     "document_id": "47bc7fe4-01f5-5809-bc40-37359d7f82ee",
+     "party": "vendor",
+     "quote": "Accounts receivable: 858.555.0142",
+     "received_at": "2024-01-05T16:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "vendor_portal",
+     "document_id": "47bc7fe4-01f5-5809-bc40-37359d7f82ee",
+     "party": "vendor",
+     "quote": "Billing: 858-555-0142",
+     "received_at": "2024-01-05T16:00:00Z",
+     "role": "billing",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "544ae4ce-7da4-5838-b41c-0071e389adef",
+     "party": "vendor",
+     "quote": "Accounts receivable: 858-555-0142",
+     "received_at": "2024-05-28T00:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "99f187e3-e5f6-5857-b8b6-34efc2e3f5eb",
+     "party": "vendor",
+     "quote": "Accounts receivable: 858.555.0142",
+     "received_at": "2024-05-28T00:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "7d205f03-aa3c-5e28-9444-eda2449e411a",
+     "party": "vendor",
+     "quote": "Accounts receivable: 858.555.0142",
+     "received_at": "2024-12-20T16:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "c6347051-544d-5cc8-8bd3-8ca6a007006b",
+     "party": "vendor",
+     "quote": "Accounts receivable: 858.555.0142",
+     "received_at": "2024-12-20T16:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "12833cd5-a7c0-5d5b-8818-90be9a36d9bb",
+     "party": "vendor",
+     "quote": "Accounts receivable: (858) 555-0142",
+     "received_at": "2025-07-15T08:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "e1496461-f2b3-56f9-8f29-447077f7272e",
+     "party": "vendor",
+     "quote": "Accounts receivable: (858) 555-0142",
+     "received_at": "2025-07-15T08:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "8cb10b6d-edc9-5b4b-8f3c-4a6df55f8edb",
+     "party": "vendor",
+     "quote": "Accounts receivable: (858) 555-0142",
+     "received_at": "2026-02-07T00:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "c13ee3d6-ea04-504b-969d-03e840bceda4",
+     "party": "vendor",
+     "quote": "Accounts receivable: (858) 555-0142",
+     "received_at": "2026-02-07T00:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    }
+   ],
+   "truth": "real"
+  },
+  {
+   "e164": "+18585550169",
+   "sightings": [
+    {
+     "channel": "email",
+     "document_id": "7c00f366-ad01-57b5-9db9-16b2354bcfca",
+     "party": "vendor",
+     "quote": "AR direct: 858-555-0169",
+     "received_at": "2026-05-04T16:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "cb239fc4-9b37-512f-8f99-e2ceb550c858",
+     "party": "vendor",
+     "quote": "AR direct: 858.555.0169",
+     "received_at": "2026-05-04T16:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "2b26935c-4966-5b46-8ae7-20b79a36de37",
+     "party": "vendor",
+     "quote": "AR direct: 858-555-0169",
+     "received_at": "2026-05-14T16:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "7bcb3ad9-93bf-5dae-a7a4-1d2060f0600e",
+     "party": "vendor",
+     "quote": "AR direct: 858-555-0169",
+     "received_at": "2026-05-24T16:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    }
+   ],
+   "truth": "poison"
+  }
+ ],
+ "ramp_change_at": "2026-10-01T18:00:00Z",
+ "request_document_id": "279bfa1d-e125-5f3b-974a-636553ad14ea",
+ "request_received_at": "2026-10-01T16:00:00Z",
+ "source": "proposed",
+ "title": "One number from two mailboxes, an attachment and another domain",
+ "vendor": {
+  "domain": "denholm.example",
+  "lookalike": "denho1m.example",
+  "name": "Denholm Coatings",
+  "slug": "email-counts-once"
+ }
+}

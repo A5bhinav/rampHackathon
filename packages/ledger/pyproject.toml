@@ -2,10 +2,13 @@
 name = "dialback-ledger"
 version = "0.0.0"
 requires-python = ">=3.13"
-dependencies = []
+dependencies = ["rfc8785>=0.1", "phonenumbers>=8.13", "psycopg[binary]>=3.2"]
+
+[project.scripts]
+dialback-ledger = "dialback_ledger.demo:main"
 
 [dependency-groups]
-dev = ["pytest>=8", "hypothesis>=6"]
+dev = ["pytest>=8", "hypothesis>=6", "jsonschema>=4"]
 
 [build-system]
 requires = ["hatchling"]
@@ -13,3 +16,8 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/dialback_ledger"]
+
+[tool.pytest.ini_options]
+# Tests that take `database_url` get a migrated Postgres (scripts/db/pgtemp.py); the rest need none.
+pythonpath = ["../../scripts/db"]
+addopts = "-p pgtemp"

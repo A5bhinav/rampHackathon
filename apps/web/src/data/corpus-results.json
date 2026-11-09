@@ -1,0 +1,1321 @@
+{
+ "generated_by": "scripts/corpus/results.py",
+ "rule_version": "ledger-select-v1",
+ "reason_text": {
+  "first_seen_in_change_context": "Not provable: this number first appeared in the change request, its thread, a lookalike domain or after the request, which is where a fraudster's number would come from.",
+  "too_few_source_types": "Not provable: it wasn't seen in at least two independent channels before the request (all email counts as one channel, and the old number on file never counts).",
+  "younger_than_minimum_age": "Not provable: it was first seen too recently before the request; the rule needs a number the vendor has used for months.",
+  "near_miss_of_older_number": "Not provable: it is one digit off, or two swapped digits away from, an older number of this vendor.",
+  "hidden_text_only": "Not provable: it appeared only in text a person couldn't see (white, tiny or off the page).",
+  "not_vendor_party": "Not provable: the documents label it as someone else's number, such as a bank's or a customer's, or their labels disagree.",
+  "fax_line": "Not provable: the documents label it as a fax line."
+ },
+ "cases": [
+  {
+   "id": "C01",
+   "kind": "control",
+   "source": "proposed",
+   "title": "A real change whose thread repeats the established numbers",
+   "vendor": "Glenmar Facilities",
+   "request": {
+    "subject": "Re: Invoice 1897",
+    "received_at": "2026-10-01T16:00:00Z"
+   },
+   "expected": {
+    "outcome": "picked",
+    "pick": "+16155550142"
+   },
+   "actual": {
+    "outcome": "picked",
+    "pick": "+16155550142",
+    "reason": null
+   },
+   "matches": true,
+   "problems": [],
+   "picked_planted": false,
+   "planted": [
+    {
+     "e164": "+16155550117",
+     "truth": "real",
+     "sightings": 10,
+     "channels": [
+      "contract",
+      "email",
+      "listing"
+     ],
+     "hidden": "none",
+     "first_seen_at": "2023-03-11T16:00:00.000000Z",
+     "eligible": true,
+     "reasons": []
+    },
+    {
+     "e164": "+16155550142",
+     "truth": "real",
+     "sightings": 16,
+     "channels": [
+      "contract",
+      "email",
+      "vendor_portal"
+     ],
+     "hidden": "none",
+     "first_seen_at": "2023-03-11T16:00:00.000000Z",
+     "eligible": true,
+     "reasons": []
+    }
+   ]
+  },
+  {
+   "id": "C02",
+   "kind": "control",
+   "source": "proposed",
+   "title": "A direct line one digit from the main line, added two years ago (Q43: long-established)",
+   "vendor": "Kestrel Electrical",
+   "request": {
+    "subject": "Updated banking details",
+    "received_at": "2026-10-01T16:00:00Z"
+   },
+   "expected": {
+    "outcome": "picked",
+    "pick": "+12485550142"
+   },
+   "actual": {
+    "outcome": "picked",
+    "pick": "+12485550142",
+    "reason": null
+   },
+   "matches": true,
+   "problems": [],
+   "picked_planted": false,
+   "planted": [
+    {
+     "e164": "+12485550117",
+     "truth": "real",
+     "sightings": 9,
+     "channels": [
+      "contract",
+      "email",
+      "listing"
+     ],
+     "hidden": "none",
+     "first_seen_at": "2023-03-11T16:00:00.000000Z",
+     "eligible": true,
+     "reasons": []
+    },
+    {
+     "e164": "+12485550142",
+     "truth": "real",
+     "sightings": 15,
+     "channels": [
+      "contract",
+      "email",
+      "vendor_portal"
+     ],
+     "hidden": "none",
+     "first_seen_at": "2023-03-11T16:00:00.000000Z",
+     "eligible": true,
+     "reasons": []
+    },
+    {
+     "e164": "+12485550143",
+     "truth": "real",
+     "sightings": 3,
+     "channels": [
+      "contract",
+      "email",
+      "vendor_portal"
+     ],
+     "hidden": "none",
+     "first_seen_at": "2024-10-31T16:00:00.000000Z",
+     "eligible": true,
+     "reasons": []
+    }
+   ]
+  },
+  {
+   "id": "C03",
+   "kind": "control",
+   "source": "proposed",
+   "title": "A small vendor known only by email (a correct refusal)",
+   "vendor": "Lindqvist Print Works",
+   "request": {
+    "subject": "Updated banking details",
+    "received_at": "2026-10-01T16:00:00Z"
+   },
+   "expected": {
+    "outcome": "no_provable_number",
+    "pick": null
+   },
+   "actual": {
+    "outcome": "no_provable_number",
+    "pick": null,
+    "reason": "No number was seen in at least 2 independent source types, at least 90 days before the change request and outside it, without being a near miss of an older number."
+   },
+   "matches": true,
+   "problems": [],
+   "picked_planted": false,
+   "planted": [
+    {
+     "e164": "+14105550117",
+     "truth": "real",
+     "sightings": 6,
+     "channels": [
+      "email"
+     ],
+     "hidden": "none",
+     "first_seen_at": "2023-04-10T16:00:00.000000Z",
+     "eligible": false,
+     "reasons": [
+      "too_few_source_types"
+     ]
+    },
+    {
+     "e164": "+14105550142",
+     "truth": "real",
+     "sightings": 12,
+     "channels": [
+      "email"
+     ],
+     "hidden": "none",
+     "first_seen_at": "2023-04-10T16:00:00.000000Z",
+     "eligible": false,
+     "reasons": [
+      "too_few_source_types"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "C04",
+   "kind": "control",
+   "source": "proposed",
+   "title": "The second source is a scanned contract (vision path)",
+   "vendor": "Norcott Coatings",
+   "request": {
+    "subject": "Updated banking details",
+    "received_at": "2026-10-01T16:00:00Z"
+   },
+   "expected": {
+    "outcome": "picked",
+    "pick": "+14695550142"
+   },
+   "actual": {
+    "outcome": "picked",
+    "pick": "+14695550142",
+    "reason": null
+   },
+   "matches": true,
+   "problems": [],
+   "picked_planted": false,
+   "planted": [
+    {
+     "e164": "+14695550117",
+     "truth": "real",
+     "sightings": 7,
+     "channels": [
+      "contract",
+      "email"
+     ],
+     "hidden": "none",
+     "first_seen_at": "2023-03-11T16:00:00.000000Z",
+     "eligible": true,
+     "reasons": []
+    },
+    {
+     "e164": "+14695550142",
+     "truth": "real",
+     "sightings": 13,
+     "channels": [
+      "contract",
+      "email"
+     ],
+     "hidden": "none",
+     "first_seen_at": "2023-03-11T16:00:00.000000Z",
+     "eligible": true,
+     "reasons": []
+    }
+   ]
+  },
+  {
+   "id": "C05",
+   "kind": "control",
+   "source": "proposed",
+   "title": "A contract printed 2019, received 200 days ago",
+   "vendor": "Thornbury Logistics",
+   "request": {
+    "subject": "Updated banking details",
+    "received_at": "2026-10-01T16:00:00Z"
+   },
+   "expected": {
+    "outcome": "picked",
+    "pick": "+13365550142"
+   },
+   "actual": {
+    "outcome": "picked",
+    "pick": "+13365550142",
+    "reason": null
+   },
+   "matches": true,
+   "problems": [],
+   "picked_planted": false,
+   "planted": [
+    {
+     "e164": "+13365550117",
+     "truth": "real",
+     "sightings": 8,
+     "channels": [
+      "contract",
+      "email",
+      "listing"
+     ],
+     "hidden": "none",
+     "first_seen_at": "2025-09-26T16:00:00.000000Z",
+     "eligible": true,
+     "reasons": []
+    },
+    {
+     "e164": "+13365550142",
+     "truth": "real",
+     "sightings": 15,
+     "channels": [
+      "contract",
+      "email",
+      "vendor_portal"
+     ],
+     "hidden": "none",
+     "first_seen_at": "2025-09-26T16:00:00.000000Z",
+     "eligible": true,
+     "reasons": []
+    }
+   ]
+  },
+  {
+   "id": "K01",
+   "kind": "known_limit",
+   "source": "named",
+   "title": "Mailbox and listing controlled for 120 days, no stored contract (stated limit)",
+   "vendor": "Fenwick Print Works",
+   "request": {
+    "subject": "Updated banking details",
+    "received_at": "2026-10-01T16:00:00Z"
+   },
+   "expected": {
+    "outcome": "picked",
+    "pick": "+19715550169"
+   },
+   "actual": {
+    "outcome": "picked",
+    "pick": "+19715550169",
+    "reason": null
+   },
+   "matches": true,
+   "problems": [],
+   "picked_planted": true,
+   "planted": [
+    {
+     "e164": "+19715550117",
+     "truth": "real",
+     "sightings": 6,
+     "channels": [
+      "email"
+     ],
+     "hidden": "none",
+     "first_seen_at": "2023-04-10T16:00:00.000000Z",
+     "eligible": false,
+     "reasons": [
+      "too_few_source_types"
+     ]
+    },
+    {
+     "e164": "+19715550142",
+     "truth": "real",
+     "sightings": 12,
+     "channels": [
+      "email"
+     ],
+     "hidden": "none",
+     "first_seen_at": "2023-04-10T16:00:00.000000Z",
+     "eligible": false,
+     "reasons": [
+      "too_few_source_types"
+     ]
+    },
+    {
+     "e164": "+19715550169",
+     "truth": "poison",
+     "sightings": 5,
+     "channels": [
+      "email",
+      "listing"
+     ],
+     "hidden": "none",
+     "first_seen_at": "2026-06-03T16:00:00.000000Z",
+     "eligible": true,
+     "reasons": []
+    }
+   ]
+  },
+  {
+   "id": "P01",
+   "kind": "poison",
+   "source": "named",
+   "title": "A one-digit-off AR number in a reply on a real invoice thread",
+   "vendor": "Brightwell Coatings",
+   "request": {
+    "subject": "Re: Invoice 1815",
+    "received_at": "2026-10-01T16:00:00Z"
+   },
+   "expected": {
+    "outcome": "picked",
+    "pick": "+14155550142"
+   },
+   "actual": {
+    "outcome": "picked",
+    "pick": "+14155550142",
+    "reason": null
+   },
+   "matches": true,
+   "problems": [],
+   "picked_planted": false,
+   "planted": [
+    {
+     "e164": "+14155550117",
+     "truth": "real",
+     "sightings": 9,
+     "channels": [
+      "contract",
+      "email",
+      "listing"
+     ],
+     "hidden": "none",
+     "first_seen_at": "2023-03-11T16:00:00.000000Z",
+     "eligible": true,
+     "reasons": []
+    },
+    {
+     "e164": "+14155550142",
+     "truth": "real",
+     "sightings": 15,
+     "channels": [
+      "contract",
+      "email",
+      "vendor_portal"
+     ],
+     "hidden": "none",
+     "first_seen_at": "2023-03-11T16:00:00.000000Z",
+     "eligible": true,
+     "reasons": []
+    },
+    {
+     "e164": "+14155550143",
+     "truth": "poison",
+     "sightings": 1,
+     "channels": [
+      "email"
+     ],
+     "hidden": "none",
+     "first_seen_at": "2026-10-01T16:00:00.000000Z",
+     "eligible": false,
+     "reasons": [
+      "first_seen_in_change_context",
+      "near_miss_of_older_number",
+      "too_few_source_types",
+      "younger_than_minimum_age"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "P02",
+   "kind": "poison",
+   "source": "named",
+   "title": "A lookalike domain writes ten days before the request",
+   "vendor": "Corvane Print Works",
+   "request": {
+    "subject": "Updated banking details",
+    "received_at": "2026-10-01T16:00:00Z"
+   },
+   "expected": {
+    "outcome": "picked",
+    "pick": "+12125550142"
+   },
+   "actual": {
+    "outcome": "picked",
+    "pick": "+12125550142",
+    "reason": null
+   },
+   "matches": true,
+   "problems": [],
+   "picked_planted": false,
+   "planted": [
+    {
+     "e164": "+12125550117",
+     "truth": "real",
+     "sightings": 9,
+     "channels": [
+      "contract",
+      "email",
+      "listing"
+     ],
+     "hidden": "none",
+     "first_seen_at": "2023-03-11T16:00:00.000000Z",
+     "eligible": true,
+     "reasons": []
+    },
+    {
+     "e164": "+12125550142",
+     "truth": "real",
+     "sightings": 15,
+     "channels": [
+      "contract",
+      "email",
+      "vendor_portal"
+     ],
+     "hidden": "none",
+     "first_seen_at": "2023-03-11T16:00:00.000000Z",
+     "eligible": true,
+     "reasons": []
+    },
+    {
+     "e164": "+12125550169",
+     "truth": "poison",
+     "sightings": 2,
+     "channels": [
+      "email"
+     ],
+     "hidden": "none",
+     "first_seen_at": "2026-09-21T16:00:00.000000Z",
+     "eligible": false,
+     "reasons": [
+      "first_seen_in_change_context",
+      "too_few_source_types",
+      "younger_than_minimum_age"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "P03",
+   "kind": "poison",
+   "source": "named",
+   "title": "A compromised mailbox signs six weekly statements with a new number",
+   "vendor": "Halden Electrical",
+   "request": {
+    "subject": "Updated banking details",
+    "received_at": "2026-10-01T16:00:00Z"
+   },
+   "expected": {
+    "outcome": "picked",
+    "pick": "+13125550142"
+   },
+   "actual": {
+    "outcome": "picked",
+    "pick": "+13125550142",
+    "reason": null
+   },
+   "matches": true,
+   "problems": [],
+   "picked_planted": false,
+   "planted": [
+    {
+     "e164": "+13125550117",
+     "truth": "real",
+     "sightings": 9,
+     "channels": [
+      "contract",
+      "email",
+      "listing"
+     ],
+     "hidden": "none",
+     "first_seen_at": "2023-03-11T16:00:00.000000Z",
+     "eligible": true,
+     "reasons": []
+    },
+    {
+     "e164": "+13125550142",
+     "truth": "real",
+     "sightings": 15,
+     "channels": [
+      "contract",
+      "email",
+      "vendor_portal"
+     ],
+     "hidden": "none",
+     "first_seen_at": "2023-03-11T16:00:00.000000Z",
+     "eligible": true,
+     "reasons": []
+    },
+    {
+     "e164": "+13125550169",
+     "truth": "poison",
+     "sightings": 7,
+     "channels": [
+      "email"
+     ],
+     "hidden": "none",
+     "first_seen_at": "2026-08-20T16:00:00.000000Z",
+     "eligible": false,
+     "reasons": [
+      "too_few_source_types",
+      "younger_than_minimum_age"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "P04a",
+   "kind": "poison",
+   "source": "named",
+   "title": "Hidden PDF text: white",
+   "vendor": "Maribel Electrical",
+   "request": {
+    "subject": "Updated banking details",
+    "received_at": "2026-10-01T16:00:00Z"
+   },
+   "expected": {
+    "outcome": "picked",
+    "pick": "+12065550142"
+   },
+   "actual": {
+    "outcome": "picked",
+    "pick": "+12065550142",
+    "reason": null
+   },
+   "matches": true,
+   "problems": [],
+   "picked_planted": false,
+   "planted": [
+    {
+     "e164": "+12065550117",
+     "truth": "real",
+     "sightings": 9,
+     "channels": [
+      "contract",
+      "email",
+      "listing"
+     ],
+     "hidden": "none",
+     "first_seen_at": "2023-03-11T16:00:00.000000Z",
+     "eligible": true,
+     "reasons": []
+    },
+    {
+     "e164": "+12065550142",
+     "truth": "real",
+     "sightings": 15,
+     "channels": [
+      "contract",
+      "email",
+      "vendor_portal"
+     ],
+     "hidden": "none",
+     "first_seen_at": "2023-03-11T16:00:00.000000Z",
+     "eligible": true,
+     "reasons": []
+    },
+    {
+     "e164": "+12065550169",
+     "truth": "poison",
+     "sightings": 2,
+     "channels": [
+      "contract",
+      "email"
+     ],
+     "hidden": "all",
+     "first_seen_at": "2026-03-15T16:00:00.000000Z",
+     "eligible": false,
+     "reasons": [
+      "hidden_text_only",
+      "too_few_source_types",
+      "younger_than_minimum_age"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "P04b",
+   "kind": "poison",
+   "source": "named",
+   "title": "Hidden PDF text: 1-point",
+   "vendor": "Ostrava Logistics",
+   "request": {
+    "subject": "Updated banking details",
+    "received_at": "2026-10-01T16:00:00Z"
+   },
+   "expected": {
+    "outcome": "picked",
+    "pick": "+16175550142"
+   },
+   "actual": {
+    "outcome": "picked",
+    "pick": "+16175550142",
+    "reason": null
+   },
+   "matches": true,
+   "problems": [],
+   "picked_planted": false,
+   "planted": [
+    {
+     "e164": "+16175550117",
+     "truth": "real",
+     "sightings": 9,
+     "channels": [
+      "contract",
+      "email",
+      "listing"
+     ],
+     "hidden": "none",
+     "first_seen_at": "2023-03-11T16:00:00.000000Z",
+     "eligible": true,
+     "reasons": []
+    },
+    {
+     "e164": "+16175550142",
+     "truth": "real",
+     "sightings": 15,
+     "channels": [
+      "contract",
+      "email",
+      "vendor_portal"
+     ],
+     "hidden": "none",
+     "first_seen_at": "2023-03-11T16:00:00.000000Z",
+     "eligible": true,
+     "reasons": []
+    },
+    {
+     "e164": "+16175550169",
+     "truth": "poison",
+     "sightings": 2,
+     "channels": [
+      "contract",
+      "email"
+     ],
+     "hidden": "all",
+     "first_seen_at": "2026-03-15T16:00:00.000000Z",
+     "eligible": false,
+     "reasons": [
+      "hidden_text_only",
+      "too_few_source_types",
+      "younger_than_minimum_age"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "P04c",
+   "kind": "poison",
+   "source": "named",
+   "title": "Hidden PDF text: off the page",
+   "vendor": "Pellam Industrial Supply",
+   "request": {
+    "subject": "Updated banking details",
+    "received_at": "2026-10-01T16:00:00Z"
+   },
+   "expected": {
+    "outcome": "picked",
+    "pick": "+13035550142"
+   },
+   "actual": {
+    "outcome": "picked",
+    "pick": "+13035550142",
+    "reason": null
+   },
+   "matches": true,
+   "problems": [],
+   "picked_planted": false,
+   "planted": [
+    {
+     "e164": "+13035550117",
+     "truth": "real",
+     "sightings": 9,
+     "channels": [
+      "contract",
+      "email",
+      "listing"
+     ],
+     "hidden": "none",
+     "first_seen_at": "2023-03-11T16:00:00.000000Z",
+     "eligible": true,
+     "reasons": []
+    },
+    {
+     "e164": "+13035550142",
+     "truth": "real",
+     "sightings": 15,
+     "channels": [
+      "contract",
+      "email",
+      "vendor_portal"
+     ],
+     "hidden": "none",
+     "first_seen_at": "2023-03-11T16:00:00.000000Z",
+     "eligible": true,
+     "reasons": []
+    },
+    {
+     "e164": "+13035550169",
+     "truth": "poison",
+     "sightings": 2,
+     "channels": [
+      "contract",
+      "email"
+     ],
+     "hidden": "all",
+     "first_seen_at": "2026-03-15T16:00:00.000000Z",
+     "eligible": false,
+     "reasons": [
+      "hidden_text_only",
+      "too_few_source_types",
+      "younger_than_minimum_age"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "P05",
+   "kind": "poison",
+   "source": "named",
+   "title": "An email and a letter dated 2024 that arrived five days ago",
+   "vendor": "Quillon Fasteners",
+   "request": {
+    "subject": "Updated banking details",
+    "received_at": "2026-10-01T16:00:00Z"
+   },
+   "expected": {
+    "outcome": "picked",
+    "pick": "+15125550142"
+   },
+   "actual": {
+    "outcome": "picked",
+    "pick": "+15125550142",
+    "reason": null
+   },
+   "matches": true,
+   "problems": [],
+   "picked_planted": false,
+   "planted": [
+    {
+     "e164": "+15125550117",
+     "truth": "real",
+     "sightings": 9,
+     "channels": [
+      "contract",
+      "email",
+      "listing"
+     ],
+     "hidden": "none",
+     "first_seen_at": "2023-03-11T16:00:00.000000Z",
+     "eligible": true,
+     "reasons": []
+    },
+    {
+     "e164": "+15125550142",
+     "truth": "real",
+     "sightings": 15,
+     "channels": [
+      "contract",
+      "email",
+      "vendor_portal"
+     ],
+     "hidden": "none",
+     "first_seen_at": "2023-03-11T16:00:00.000000Z",
+     "eligible": true,
+     "reasons": []
+    },
+    {
+     "e164": "+15125550169",
+     "truth": "poison",
+     "sightings": 2,
+     "channels": [
+      "email",
+      "paper_mail"
+     ],
+     "hidden": "none",
+     "first_seen_at": "2026-09-26T16:00:00.000000Z",
+     "eligible": false,
+     "reasons": [
+      "younger_than_minimum_age"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "P06",
+   "kind": "poison",
+   "source": "named",
+   "title": "The old vendor master's number on file is the fraudster's",
+   "vendor": "Rossmere Print Works",
+   "request": {
+    "subject": "Updated banking details",
+    "received_at": "2026-10-01T16:00:00Z"
+   },
+   "expected": {
+    "outcome": "picked",
+    "pick": "+14045550142"
+   },
+   "actual": {
+    "outcome": "picked",
+    "pick": "+14045550142",
+    "reason": null
+   },
+   "matches": true,
+   "problems": [],
+   "picked_planted": false,
+   "planted": [
+    {
+     "e164": "+14045550117",
+     "truth": "real",
+     "sightings": 9,
+     "channels": [
+      "contract",
+      "email",
+      "listing"
+     ],
+     "hidden": "none",
+     "first_seen_at": "2023-03-11T16:00:00.000000Z",
+     "eligible": true,
+     "reasons": []
+    },
+    {
+     "e164": "+14045550142",
+     "truth": "real",
+     "sightings": 15,
+     "channels": [
+      "contract",
+      "email",
+      "vendor_portal"
+     ],
+     "hidden": "none",
+     "first_seen_at": "2023-03-11T16:00:00.000000Z",
+     "eligible": true,
+     "reasons": []
+    },
+    {
+     "e164": "+14045550169",
+     "truth": "poison",
+     "sightings": 3,
+     "channels": [
+      "email",
+      "vendor_master"
+     ],
+     "hidden": "none",
+     "first_seen_at": "2026-03-15T16:00:00.000000Z",
+     "eligible": false,
+     "reasons": [
+      "too_few_source_types"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "P07",
+   "kind": "poison",
+   "source": "proposed",
+   "title": "The request's subject line in another thread twelve days earlier",
+   "vendor": "Tavish Industrial Supply",
+   "request": {
+    "subject": "Updated banking details",
+    "received_at": "2026-10-01T16:00:00Z"
+   },
+   "expected": {
+    "outcome": "picked",
+    "pick": "+17025550142"
+   },
+   "actual": {
+    "outcome": "picked",
+    "pick": "+17025550142",
+    "reason": null
+   },
+   "matches": true,
+   "problems": [],
+   "picked_planted": false,
+   "planted": [
+    {
+     "e164": "+17025550117",
+     "truth": "real",
+     "sightings": 9,
+     "channels": [
+      "contract",
+      "email",
+      "listing"
+     ],
+     "hidden": "none",
+     "first_seen_at": "2023-03-11T16:00:00.000000Z",
+     "eligible": true,
+     "reasons": []
+    },
+    {
+     "e164": "+17025550142",
+     "truth": "real",
+     "sightings": 15,
+     "channels": [
+      "contract",
+      "email",
+      "vendor_portal"
+     ],
+     "hidden": "none",
+     "first_seen_at": "2023-03-11T16:00:00.000000Z",
+     "eligible": true,
+     "reasons": []
+    },
+    {
+     "e164": "+17025550169",
+     "truth": "poison",
+     "sightings": 1,
+     "channels": [
+      "email"
+     ],
+     "hidden": "none",
+     "first_seen_at": "2026-09-19T16:00:00.000000Z",
+     "eligible": false,
+     "reasons": [
+      "first_seen_in_change_context",
+      "too_few_source_types",
+      "younger_than_minimum_age"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "P08",
+   "kind": "poison",
+   "source": "proposed",
+   "title": "Two swapped digits, in two source types, 150 days old",
+   "vendor": "Velden Electrical",
+   "request": {
+    "subject": "Updated banking details",
+    "received_at": "2026-10-01T16:00:00Z"
+   },
+   "expected": {
+    "outcome": "picked",
+    "pick": "+19195550142"
+   },
+   "actual": {
+    "outcome": "picked",
+    "pick": "+19195550142",
+    "reason": null
+   },
+   "matches": true,
+   "problems": [],
+   "picked_planted": false,
+   "planted": [
+    {
+     "e164": "+19195550117",
+     "truth": "real",
+     "sightings": 9,
+     "channels": [
+      "contract",
+      "email",
+      "listing"
+     ],
+     "hidden": "none",
+     "first_seen_at": "2023-03-11T16:00:00.000000Z",
+     "eligible": true,
+     "reasons": []
+    },
+    {
+     "e164": "+19195550124",
+     "truth": "poison",
+     "sightings": 2,
+     "channels": [
+      "email",
+      "paper_mail"
+     ],
+     "hidden": "none",
+     "first_seen_at": "2026-05-04T16:00:00.000000Z",
+     "eligible": false,
+     "reasons": [
+      "near_miss_of_older_number"
+     ]
+    },
+    {
+     "e164": "+19195550142",
+     "truth": "real",
+     "sightings": 15,
+     "channels": [
+      "contract",
+      "email",
+      "vendor_portal"
+     ],
+     "hidden": "none",
+     "first_seen_at": "2023-03-11T16:00:00.000000Z",
+     "eligible": true,
+     "reasons": []
+    }
+   ]
+  },
+  {
+   "id": "P09",
+   "kind": "poison",
+   "source": "proposed",
+   "title": "Visible text tells an automated reader the 'verified' number",
+   "vendor": "Wexley Logistics",
+   "request": {
+    "subject": "Updated banking details",
+    "received_at": "2026-10-01T16:00:00Z"
+   },
+   "expected": {
+    "outcome": "picked",
+    "pick": "+15035550142"
+   },
+   "actual": {
+    "outcome": "picked",
+    "pick": "+15035550142",
+    "reason": null
+   },
+   "matches": true,
+   "problems": [],
+   "picked_planted": false,
+   "planted": [
+    {
+     "e164": "+15035550117",
+     "truth": "real",
+     "sightings": 9,
+     "channels": [
+      "contract",
+      "email",
+      "listing"
+     ],
+     "hidden": "none",
+     "first_seen_at": "2023-03-11T16:00:00.000000Z",
+     "eligible": true,
+     "reasons": []
+    },
+    {
+     "e164": "+15035550142",
+     "truth": "real",
+     "sightings": 15,
+     "channels": [
+      "contract",
+      "email",
+      "vendor_portal"
+     ],
+     "hidden": "none",
+     "first_seen_at": "2023-03-11T16:00:00.000000Z",
+     "eligible": true,
+     "reasons": []
+    },
+    {
+     "e164": "+15035550169",
+     "truth": "poison",
+     "sightings": 1,
+     "channels": [
+      "email"
+     ],
+     "hidden": "none",
+     "first_seen_at": "2026-09-28T16:00:00.000000Z",
+     "eligible": false,
+     "reasons": [
+      "too_few_source_types",
+      "younger_than_minimum_age"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "P10",
+   "kind": "poison",
+   "source": "proposed",
+   "title": "A contract amendment and a portal entry arrive between the request and Ramp",
+   "vendor": "Yarrow Facilities",
+   "request": {
+    "subject": "Updated banking details",
+    "received_at": "2026-10-01T16:00:00Z"
+   },
+   "expected": {
+    "outcome": "picked",
+    "pick": "+16145550142"
+   },
+   "actual": {
+    "outcome": "picked",
+    "pick": "+16145550142",
+    "reason": null
+   },
+   "matches": true,
+   "problems": [],
+   "picked_planted": false,
+   "planted": [
+    {
+     "e164": "+16145550117",
+     "truth": "real",
+     "sightings": 9,
+     "channels": [
+      "contract",
+      "email",
+      "listing"
+     ],
+     "hidden": "none",
+     "first_seen_at": "2023-03-11T16:00:00.000000Z",
+     "eligible": true,
+     "reasons": []
+    },
+    {
+     "e164": "+16145550142",
+     "truth": "real",
+     "sightings": 15,
+     "channels": [
+      "contract",
+      "email",
+      "vendor_portal"
+     ],
+     "hidden": "none",
+     "first_seen_at": "2023-03-11T16:00:00.000000Z",
+     "eligible": true,
+     "reasons": []
+    },
+    {
+     "e164": "+16145550169",
+     "truth": "poison",
+     "sightings": 2,
+     "channels": [
+      "contract",
+      "vendor_portal"
+     ],
+     "hidden": "none",
+     "first_seen_at": "2026-10-01T17:00:00.000000Z",
+     "eligible": false,
+     "reasons": [
+      "first_seen_in_change_context",
+      "too_few_source_types",
+      "younger_than_minimum_age"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "P11",
+   "kind": "poison",
+   "source": "proposed",
+   "title": "A fake listing and two emails, 60 days old",
+   "vendor": "Ashgrove Facilities",
+   "request": {
+    "subject": "Updated banking details",
+    "received_at": "2026-10-01T16:00:00Z"
+   },
+   "expected": {
+    "outcome": "picked",
+    "pick": "+17205550142"
+   },
+   "actual": {
+    "outcome": "picked",
+    "pick": "+17205550142",
+    "reason": null
+   },
+   "matches": true,
+   "problems": [],
+   "picked_planted": false,
+   "planted": [
+    {
+     "e164": "+17205550117",
+     "truth": "real",
+     "sightings": 9,
+     "channels": [
+      "contract",
+      "email",
+      "listing"
+     ],
+     "hidden": "none",
+     "first_seen_at": "2023-03-11T16:00:00.000000Z",
+     "eligible": true,
+     "reasons": []
+    },
+    {
+     "e164": "+17205550142",
+     "truth": "real",
+     "sightings": 15,
+     "channels": [
+      "contract",
+      "email",
+      "vendor_portal"
+     ],
+     "hidden": "none",
+     "first_seen_at": "2023-03-11T16:00:00.000000Z",
+     "eligible": true,
+     "reasons": []
+    },
+    {
+     "e164": "+17205550169",
+     "truth": "poison",
+     "sightings": 3,
+     "channels": [
+      "email",
+      "listing"
+     ],
+     "hidden": "none",
+     "first_seen_at": "2026-08-02T16:00:00.000000Z",
+     "eligible": false,
+     "reasons": [
+      "younger_than_minimum_age"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "P12",
+   "kind": "poison",
+   "source": "proposed",
+   "title": "One number from two mailboxes, an attachment and another domain",
+   "vendor": "Denholm Coatings",
+   "request": {
+    "subject": "Updated banking details",
+    "received_at": "2026-10-01T16:00:00Z"
+   },
+   "expected": {
+    "outcome": "picked",
+    "pick": "+18585550142"
+   },
+   "actual": {
+    "outcome": "picked",
+    "pick": "+18585550142",
+    "reason": null
+   },
+   "matches": true,
+   "problems": [],
+   "picked_planted": false,
+   "planted": [
+    {
+     "e164": "+18585550117",
+     "truth": "real",
+     "sightings": 9,
+     "channels": [
+      "contract",
+      "email",
+      "listing"
+     ],
+     "hidden": "none",
+     "first_seen_at": "2023-03-11T16:00:00.000000Z",
+     "eligible": true,
+     "reasons": []
+    },
+    {
+     "e164": "+18585550142",
+     "truth": "real",
+     "sightings": 15,
+     "channels": [
+      "contract",
+      "email",
+      "vendor_portal"
+     ],
+     "hidden": "none",
+     "first_seen_at": "2023-03-11T16:00:00.000000Z",
+     "eligible": true,
+     "reasons": []
+    },
+    {
+     "e164": "+18585550169",
+     "truth": "poison",
+     "sightings": 4,
+     "channels": [
+      "email"
+     ],
+     "hidden": "none",
+     "first_seen_at": "2026-05-04T16:00:00.000000Z",
+     "eligible": false,
+     "reasons": [
+      "too_few_source_types"
+     ]
+    }
+   ]
+  }
+ ]
+}

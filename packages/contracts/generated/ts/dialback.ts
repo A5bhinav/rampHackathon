@@ -55,6 +55,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/datasets/{dataset_id}/evidence": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The dataset's evidence chain, row by row, with the live check and the last scheduled check (spec 0035)
+         * @description Every row's hashes, newest first, and two checks Postgres runs on each row: whether its content hash still matches its body, and whether it links to the row before. The chain status is audit.verify_chain, recomputed now. The page decides nothing.
+         */
+        get: operations["getEvidenceLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/datasets/{dataset_id}/alerts": {
         parameters: {
             query?: never;
@@ -64,6 +84,28 @@ export interface paths {
         };
         /** Unresolved alerts for a dataset, critical first */
         get: operations["listOpenAlerts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/datasets/{dataset_id}/vendor-risk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The vendor risk list (spec 0026) - is each vendor's number on file one the Trust Ledger can prove?
+         * @description One row per vendor with ledger documents, worst first (near_miss, unproven, missing,
+         *     provable), then by name. The status is decided by code from `ledger-select-v1` as of now;
+         *     `status_text` is the ledger's sentence for it, so the dashboard writes none of its own.
+         */
+        get: operations["getVendorRisk"];
         put?: never;
         post?: never;
         delete?: never;
@@ -98,6 +140,31 @@ export interface paths {
         };
         /** Everything the case detail page and the release console show */
         get: operations["getCase"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/cases/{case_id}/selection": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The number lineage panel - the selection the case used, and why (spec 0023)
+         * @description The selection named by the case's latest `number_resolved` or `no_provable_number`
+         *     event, as `ledger.number_selections` stores it (`selection.schema.json`), read under the
+         *     person's own token. `selection` is null when the case has no selection yet, or its event
+         *     names none that the ledger stored. `reason_text` gives the ledger's template sentence for
+         *     each reason code, and `notes` its sentences for the panel's other states; the dashboard
+         *     shows these and never writes its own.
+         */
+        get: operations["getCaseSelection"];
         put?: never;
         post?: never;
         delete?: never;
@@ -266,6 +333,101 @@ export interface components {
             decided_at: components["schemas"]["Timestamp"];
             /** @description One templated sentence per rule that fired. */
             explanation: string[];
+            /** @description The rules that fired, each with its sentence and the block of the rule table it belongs to, in the order the engine recorded them (spec 0035). Optional: older cores don't send it. */
+            fired?: components["schemas"]["FiredRule"][];
+            /** @description The Verified conditions (V01 to V12, and S01 in strict mode), each passed, not met or not checked, read from the rules the engine recorded; the core never re-runs them. Not checked means an earlier block decided first. Optional. */
+            checklist?: components["schemas"]["ChecklistItem"][];
+            /** @description A templated sentence saying why the checklist reads as it does. Optional. */
+            checklist_note?: string;
+            /** @description A templated sentence saying what the outcome does to the hold and who acts next. Optional. */
+            effect?: string;
+        };
+        FiredRule: {
+            id: string;
+            sentence: string;
+            /** @enum {string} */
+            block: "input" | "not_verified" | "needs_review" | "verified" | "not_met" | "engine" | "retired";
+        };
+        ChecklistItem: {
+            /** @description The condition, e.g. V08_digits_match. */
+            id: string;
+            /** @description The condition's sentence when it holds, or its unmet sentence when it doesn't. */
+            sentence: string;
+            /** @enum {string} */
+            status: "passed" | "not_met" | "not_checked";
+        };
+        /** @description One answer the callee gave, as code recorded it. For account_last4 there is never a digit: value is null with digit_count, or dont_know / refused (ADR-8). */
+        CallAnswerView: {
+            slot: components["schemas"]["Slot"];
+            value: string | null;
+            digit_count: number | null;
+            /** @description The transcript turn the answer cites. */
+            turn_id: number;
+            /** @enum {string} */
+            capture_method: "speech" | "keypad";
+            captured_at: string;
+            /** @description The decision rules that read this answer. */
+            feeds: string[];
+        };
+        /** @description One call, from its call_started and call_ended evidence and, when the voice service stored it, voice.calls. No transcript is kept; the answers cite the turn they came from. */
+        CallAttempt: {
+            call_id: components["schemas"]["Uuid"];
+            attempt: number;
+            started_at: components["schemas"]["Timestamp"] | null;
+            ended_at: components["schemas"]["Timestamp"] | null;
+            /** @description Null while the call is still running. */
+            result: ("answers_recorded" | "no_answer" | "voicemail" | "busy" | "failed" | "machine" | "declined" | "callback_requested" | "timed_out") | null;
+            /** @description A templated sentence for how the call ended, or the voice service's reason code. */
+            reason: string | null;
+            answered_by: ("human" | "machine") | null;
+            direction: ("outbound" | "inbound") | null;
+            dialed_number_is_pick: boolean | null;
+            provider: string | null;
+            agent_version: string | null;
+            last_four_result: components["schemas"]["LastFourResult"] | null;
+            answers: components["schemas"]["CallAnswerView"][];
+            checks: components["schemas"]["CallChecks"] | null;
+        };
+        /** @description The call's fixed text from the call policy, with the customer's name and callback number left as labels. The agent words each question itself; the disclosure is always word for word. */
+        CallScript: {
+            disclosure: string;
+            questions: {
+                slot: string;
+                wording: string;
+            }[];
+            /** @description A templated sentence on what is and isn't kept from a call. */
+            note: string;
+        };
+        EvidenceRow: {
+            seq: number;
+            type: string;
+            case_id: components["schemas"]["Uuid"] | null;
+            /** @description The case's vendor's legal name, when the row belongs to a case. */
+            vendor: string | null;
+            occurred_at: components["schemas"]["Timestamp"];
+            /** @enum {string} */
+            actor_kind: "system" | "person";
+            prev_hash: components["schemas"]["Sha256Hex"];
+            content_hash: components["schemas"]["Sha256Hex"];
+            hash: components["schemas"]["Sha256Hex"];
+            /** @description Postgres recomputed the content hash from the stored body, and it matches. */
+            content_ok: boolean;
+            /** @description The row's prev_hash is the previous row's hash and its hash is sha256(prev_hash + content_hash). */
+            link_ok: boolean;
+        };
+        EvidenceLog: {
+            chain: components["schemas"]["ChainStatus"];
+            /** @description What the scheduled verify job found on its last run on this dataset, or null if it hasn't run. It also compares the tip with the one its previous run saw, so it can find deleted or rewritten newest rows that a recompute alone can't. */
+            last_check: {
+                finished_at: components["schemas"]["Timestamp"] | null;
+                /** @description Whether that run found the chain intact; null if it recorded no result. */
+                ok: boolean | null;
+                first_bad_seq?: number | null;
+                detail?: string | null;
+            } | null;
+            total: number;
+            /** @description Newest first, at most limit rows. */
+            events: components["schemas"]["EvidenceRow"][];
         };
         ReleaseRecord: {
             actor: components["schemas"]["Person"];
@@ -314,6 +476,10 @@ export interface components {
             timeline: components["schemas"]["TimelineEntry"][];
             chain: components["schemas"]["ChainStatus"];
             permissions: components["schemas"]["Permissions"];
+            /** @description Every call placed for this case, oldest first (spec 0035). Optional. */
+            calls?: components["schemas"]["CallAttempt"][];
+            /** @description The call's fixed text (spec 0035). Optional. */
+            call_script?: components["schemas"]["CallScript"];
         };
         ReleaseRequest: {
             /** @description The case version the person saw. */
@@ -337,6 +503,44 @@ export interface components {
             version: number;
             evidence_seq?: number | null;
         };
+        SelectionView: {
+            /** @description The stored selection document, or null when there is none yet. */
+            selection: components["schemas"]["selection.schema"] | null;
+            /** @description The ledger's sentence for each reason code a candidate can carry. */
+            reason_text: {
+                first_seen_in_change_context: string;
+                too_few_source_types: string;
+                younger_than_minimum_age: string;
+                near_miss_of_older_number: string;
+                hidden_text_only: string;
+                not_vendor_party: string;
+                fax_line: string;
+            };
+            /** @description The ledger's sentences for the panel's other states, so the dashboard writes none of its own. */
+            notes: {
+                /** @description When `selection` is null: what that means for the case. */
+                no_selection: string;
+                /** @description Under a no_provable_number selection: what happens next. */
+                no_provable_number: string;
+                /** @description Beside the alternates: when they are used. */
+                alternates: string;
+            };
+        };
+        VendorRisk: {
+            vendor_id: components["schemas"]["Uuid"];
+            legal_name: string;
+            /**
+             * @description provable - the number on file meets the rule; near_miss - it is a near miss of a number the rule can prove; unproven - the rule can't prove it; missing - no number on file.
+             * @enum {string}
+             */
+            status: "near_miss" | "unproven" | "missing" | "provable";
+            /** @description What the old vendor master says, in E.164, or null. */
+            number_on_file: string | null;
+            /** @description The number ledger-select-v1 would pick today, in E.164, or null. */
+            provable_number: string | null;
+            /** @description The ledger's sentence for the status. */
+            status_text: string;
+        };
         Error: {
             /** @enum {string} */
             code: "unauthenticated" | "forbidden" | "not_found" | "version_conflict" | "transition_refused" | "invalid_request";
@@ -359,6 +563,189 @@ export interface components {
         LastFourResult: "match" | "matches_old_account" | "near_miss" | "mismatch" | "not_provided" | "ambiguous" | "inconsistent";
         /** @enum {string} */
         EventType: "change_detected" | "hold_confirmed" | "hold_failed" | "number_resolved" | "no_provable_number" | "call_started" | "call_ended" | "call_timeout" | "retry_timer_fired" | "decision_made" | "review_cleared" | "review_blocked" | "release_co_approved" | "release_approved" | "release_rejected" | "hold_release_confirmed" | "deadline_reached" | "command_failed";
+        /**
+         * @description Fixed list. The agent cannot invent slots.
+         * @enum {string}
+         */
+        Slot: "recording_consent" | "company_named" | "department" | "speaker_name" | "speaker_role" | "change_requested" | "account_last4" | "offered_number" | "flag";
+        /** @description Computed by code in the voice service after the call, never by the model. Shared by the stored CallEndedBody and the core-voice report (openapi/internal.yaml). Checks that need case or ledger data (company match against the vendor's names, whether the speaker first appeared in the change thread) stay with the core. */
+        CallChecks: {
+            /** @description The fixed AI and recording disclosure played in full as the first turn. */
+            disclosure_first: boolean;
+            /** @description Every recorded answer appears in the transcript turn it cites. */
+            answers_grounded: boolean;
+            /** @description Must be false. True is a script violation. */
+            agent_spoke_account_digits: boolean;
+            /** @description Must be false. True is a script violation. */
+            new_number_accepted: boolean;
+            /** @description Unknown tools or invalid tool arguments. */
+            policy_violations: number;
+            speech_guard_trips: number;
+        };
+        /**
+         * @description How a value reached us, from custody metadata, never from a model (ADR-13). All email counts as one source type. The old vendor master's number on file is never a source type; see Candidate.on_file.
+         * @enum {unknown}
+         */
+        SourceType: "email" | "contract" | "vendor_portal" | "listing" | "paper_mail";
+        E164: string;
+        SourceTypes: components["schemas"]["SourceType"][];
+        /**
+         * Format: date-time
+         * @description UTC, RFC 3339.
+         */
+        "$defs-Timestamp": string;
+        /**
+         * @description The line's role as the labeler read it.
+         * @enum {unknown}
+         */
+        "$defs-Role": "main" | "ar" | "billing" | "fax" | "unknown";
+        /**
+         * @description Why a candidate isn't eligible. first_seen_in_change_context: R2. too_few_source_types: fewer than rule_settings.min_source_types before the cutoff. younger_than_minimum_age: first seen less than rule_settings.min_age_days before the cutoff. near_miss_of_older_number: one digit off, or two swapped digits away from, an older vendor number, and not an established sibling line. hidden_text_only: seen only in text a person couldn't see (white, tiny or off-page). not_vendor_party: labeled as the customer's or a bank's number. fax_line: labeled as a fax.
+         * @enum {unknown}
+         */
+        Reason: "first_seen_in_change_context" | "too_few_source_types" | "younger_than_minimum_age" | "near_miss_of_older_number" | "hidden_text_only" | "not_vendor_party" | "fax_line";
+        /** @description The settings the rule ran with; the ablations vary these. */
+        RuleSettings: {
+            /** @description Independent source types needed before the cutoff (v1: 2). */
+            min_source_types: number;
+            /** @description Days the number must have been seen before the cutoff (v1: 90). */
+            min_age_days: number;
+            /** @description Edit distance, in digits, that counts as a near miss (v1: 1, plus one swap of adjacent digits). */
+            near_miss_distance: number;
+            /** @description A message with the request's subject line within this many days counts as change context (v1: 30). */
+            same_subject_window_days: number;
+        };
+        Pick: {
+            contact_point_id: components["schemas"]["Uuid"];
+            e164: components["schemas"]["E164"];
+            source_types: components["schemas"]["SourceTypes"];
+        };
+        Candidate: {
+            contact_point_id: components["schemas"]["Uuid"];
+            e164: components["schemas"]["E164"];
+            /** @description Our receive time of the earliest observation before the cutoff. */
+            first_seen_at: components["schemas"]["$defs-Timestamp"];
+            /** @description Independent source types seen before the cutoff. */
+            source_types: components["schemas"]["SourceTypes"];
+            /** @description The old vendor master lists this number. Shown, never counted. */
+            on_file: boolean;
+            roles?: components["schemas"]["$defs-Role"][];
+            /** @description Observations before the cutoff that this candidate rests on. */
+            observation_count?: number;
+            /** @description The older contact point this number is a near miss of, when reasons has near_miss_of_older_number. */
+            near_miss_of?: components["schemas"]["Uuid"];
+            eligible: boolean;
+            /** @description 1 is the pick. Present only on eligible candidates. */
+            rank?: number;
+            /** @description Empty when eligible. */
+            reasons: components["schemas"]["Reason"][];
+        } & unknown;
+        Sha256: string;
+        /**
+         * Selection
+         * @description What dialback_ledger.select_number(case) returns, and what ledger.number_selections stores: the number a case will call, up to two alternates, or no_provable_number, plus every candidate the rule looked at and why it was or wasn't eligible. Owner: Inesh. The core reads number_selection_id, rule_version, contact_point_id, reason and source_types (spec 0002, D11). Rules: phone numbers only, in E.164; never a bank account number (ADR-8); numbers are integers; a selection reads only rows recorded before the cutoff and stores a hash of them, so it can be replayed.
+         */
+        "selection.schema": {
+            /**
+             * @description Selection document version.
+             * @constant
+             */
+            v: 1;
+            /** @description The ledger.number_selections row this document is stored in. */
+            number_selection_id: components["schemas"]["Uuid"];
+            case_id: components["schemas"]["Uuid"];
+            dataset_id: components["schemas"]["Uuid"];
+            vendor_id: components["schemas"]["Uuid"];
+            /** @description The selection rule that ran, e.g. ledger-select-v1. The stub reports ledger-stub-v0. */
+            rule_version: string;
+            rule_settings: components["schemas"]["RuleSettings"];
+            /** @description The cutoff the core passed (the change's detection time). */
+            requested_cutoff: components["schemas"]["$defs-Timestamp"];
+            /** @description The cutoff the rule used: the earliest of the request's arrival, the first message from a lookalike domain and the change appearing in Ramp, never later than requested_cutoff. Our own receive times only, never a printed date or an email's Date: header. */
+            cutoff: components["schemas"]["$defs-Timestamp"];
+            /**
+             * @description picked: call contact_point_id. no_provable_number: no call; the case goes to needs_review (R7).
+             * @enum {unknown}
+             */
+            outcome: "picked" | "no_provable_number";
+            /** @description The chosen ledger.contact_points row. Present only when outcome is picked. */
+            contact_point_id?: components["schemas"]["Uuid"];
+            /** @description The chosen number. Present only when outcome is picked. */
+            e164?: components["schemas"]["E164"];
+            /** @description The independent source types behind the chosen number (copied into number_resolved). */
+            source_types?: components["schemas"]["SourceTypes"];
+            /** @description Eligible runners-up in rank order, used only if the chosen number is dead. Present only when outcome is picked. */
+            alternates?: components["schemas"]["Pick"][];
+            /** @description Why no number was picked, for a person. Required when outcome is no_provable_number. */
+            reason?: string;
+            /** @description Every phone number the rule considered for this vendor, eligible or not, in rank order (eligible first). */
+            candidates: components["schemas"]["Candidate"][];
+            /** @description SHA-256 of the canonical (RFC 8785) list of ledger rows the rule read, so the selection can be replayed and checked. */
+            inputs_sha256: components["schemas"]["Sha256"];
+            $defs: {
+                /** Format: uuid */
+                Uuid: string;
+                /**
+                 * Format: date-time
+                 * @description UTC, RFC 3339.
+                 */
+                Timestamp: string;
+                Sha256: string;
+                E164: string;
+                /**
+                 * @description How a value reached us, from custody metadata, never from a model (ADR-13). All email counts as one source type. The old vendor master's number on file is never a source type; see Candidate.on_file.
+                 * @enum {unknown}
+                 */
+                SourceType: "email" | "contract" | "vendor_portal" | "listing" | "paper_mail";
+                SourceTypes: components["schemas"]["SourceType"][];
+                /**
+                 * @description The line's role as the labeler read it.
+                 * @enum {unknown}
+                 */
+                Role: "main" | "ar" | "billing" | "fax" | "unknown";
+                Pick: {
+                    contact_point_id: components["schemas"]["Uuid"];
+                    e164: components["schemas"]["E164"];
+                    source_types: components["schemas"]["SourceTypes"];
+                };
+                /**
+                 * @description Why a candidate isn't eligible. first_seen_in_change_context: R2. too_few_source_types: fewer than rule_settings.min_source_types before the cutoff. younger_than_minimum_age: first seen less than rule_settings.min_age_days before the cutoff. near_miss_of_older_number: one digit off, or two swapped digits away from, an older vendor number, and not an established sibling line. hidden_text_only: seen only in text a person couldn't see (white, tiny or off-page). not_vendor_party: labeled as the customer's or a bank's number. fax_line: labeled as a fax.
+                 * @enum {unknown}
+                 */
+                Reason: "first_seen_in_change_context" | "too_few_source_types" | "younger_than_minimum_age" | "near_miss_of_older_number" | "hidden_text_only" | "not_vendor_party" | "fax_line";
+                Candidate: {
+                    contact_point_id: components["schemas"]["Uuid"];
+                    e164: components["schemas"]["E164"];
+                    /** @description Our receive time of the earliest observation before the cutoff. */
+                    first_seen_at: components["schemas"]["$defs-Timestamp"];
+                    /** @description Independent source types seen before the cutoff. */
+                    source_types: components["schemas"]["SourceTypes"];
+                    /** @description The old vendor master lists this number. Shown, never counted. */
+                    on_file: boolean;
+                    roles?: components["schemas"]["$defs-Role"][];
+                    /** @description Observations before the cutoff that this candidate rests on. */
+                    observation_count?: number;
+                    /** @description The older contact point this number is a near miss of, when reasons has near_miss_of_older_number. */
+                    near_miss_of?: components["schemas"]["Uuid"];
+                    eligible: boolean;
+                    /** @description 1 is the pick. Present only on eligible candidates. */
+                    rank?: number;
+                    /** @description Empty when eligible. */
+                    reasons: components["schemas"]["Reason"][];
+                } & unknown;
+                /** @description The settings the rule ran with; the ablations vary these. */
+                RuleSettings: {
+                    /** @description Independent source types needed before the cutoff (v1: 2). */
+                    min_source_types: number;
+                    /** @description Days the number must have been seen before the cutoff (v1: 90). */
+                    min_age_days: number;
+                    /** @description Edit distance, in digits, that counts as a near miss (v1: 1, plus one swap of adjacent digits). */
+                    near_miss_distance: number;
+                    /** @description A message with the request's subject line within this many days counts as change context (v1: 30). */
+                    same_subject_window_days: number;
+                };
+            };
+        } & (unknown & unknown);
     };
     responses: {
         /** @description Missing, expired or invalid token */
@@ -506,6 +893,32 @@ export interface operations {
             404: components["responses"]["NotFound"];
         };
     };
+    getEvidenceLog: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                dataset_id: components["parameters"]["DatasetId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK, whether or not the chain is intact */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvidenceLog"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
+        };
+    };
     listOpenAlerts: {
         parameters: {
             query?: never;
@@ -525,6 +938,32 @@ export interface operations {
                 content: {
                     "application/json": {
                         alerts: components["schemas"]["Alert"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getVendorRisk: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dataset_id: components["parameters"]["DatasetId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        vendors: components["schemas"]["VendorRisk"][];
                     };
                 };
             };
@@ -579,6 +1018,30 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CaseDetail"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getCaseSelection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: components["parameters"]["CaseId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SelectionView"];
                 };
             };
             401: components["responses"]["Unauthenticated"];

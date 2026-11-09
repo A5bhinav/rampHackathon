@@ -73,6 +73,9 @@ cd apps/web && CORE_URL=http://127.0.0.1:8001 DIALBACK_AUTH_MODE=dev DIALBACK_JW
 | `DIALBACK_AUTH_MODE` | `dev` for the local sign-in; ignored when `VERCEL_ENV=production` |
 | `DIALBACK_JWT_SECRET` | Dev mode only: the same secret the core verifies with |
 | `DIALBACK_DEV_USERS` | Dev mode only: `uuid:Name,uuid:Name` |
+| `DIALBACK_DEMO_SIGN_IN` | `on` shows one-click demo accounts on the sign-in page (spec 0034); anything else hides them |
+| `DIALBACK_DEMO_CLERK_EMAIL`, `DIALBACK_DEMO_CLERK_PASSWORD` | The shared demo clerk's Supabase sign-in. Server-only; never in the repo |
+| `DIALBACK_DEMO_APPROVER_EMAIL`, `DIALBACK_DEMO_APPROVER_PASSWORD` | The shared demo approver's. Both accounts are marked `--demo-only` with `scripts/db/add_user.py`, so the database lets them act only on demo datasets |
 
 ### Setting up the Supabase project for sign-in
 
@@ -82,12 +85,13 @@ cd apps/web && CORE_URL=http://127.0.0.1:8001 DIALBACK_AUTH_MODE=dev DIALBACK_JW
 2. **Access-token expiry:** 15 minutes (900 seconds), in the project settings under JWT Keys.
    Signing out or deleting someone ends their access within that time (spec 0010, D8).
    Supabase advises against anything under 5 minutes.
-3. **No sign-ups and no emails:** on the Auth Providers page, open the Email provider. Turn off
-   "Confirm email", so accounts work without any email, and set the minimum password length to
-   16. Then turn off new-user sign-ups, so nobody can create an account from the dashboard.
-4. **Accounts:** for each person, add a user on the Authentication → Users page with their
-   email and a generated password. Then give them a profile and a role with
-   `scripts/db/add_user.py` (spec 0010, D6). Generate passwords; never pick them by hand:
+3. **Sign-ups, no emails** (spec 0027): on the Auth Providers page, open the Email provider. Turn
+   off "Confirm email", so accounts work without any email, keep new-user sign-ups on, and set
+   the minimum password length to 8.
+4. **Accounts:** people create their own on `/sign-up` and get the clerk role. For approver or
+   auditor, the person reads their user id off the dashboard's header, and the team runs
+   `scripts/db/add_user.py --email ... --user-id ... --role approver`. Accounts the team makes on
+   the Authentication → Users page get clerk the same way. Generate those passwords:
 
    ```bash
    python3 -c "import secrets; print(secrets.token_urlsafe(18))"

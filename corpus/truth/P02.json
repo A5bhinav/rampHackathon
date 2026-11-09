@@ -1,0 +1,280 @@
+{
+ "documents": "poison/P02-lookalike-domain/documents.json",
+ "expected": {
+  "cutoff": "2026-09-21T16:00:00Z",
+  "outcome": "picked",
+  "pick": "+12125550142",
+  "rejected": {
+   "+12125550169": [
+    "first_seen_in_change_context"
+   ]
+  }
+ },
+ "id": "P02",
+ "kind": "poison",
+ "planted": [
+  {
+   "e164": "+12125550117",
+   "sightings": [
+    {
+     "channel": "contract",
+     "document_id": "d8479f7c-e6b3-5918-b7a2-26c3d0dbc7bf",
+     "party": "vendor",
+     "quote": "Main: 212.555.0117",
+     "received_at": "2023-03-11T16:00:00Z",
+     "role": "main",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "7ee7ef44-2eae-5816-a4d4-950b115f06b5",
+     "party": "vendor",
+     "quote": "Main: (212) 555-0117",
+     "received_at": "2023-04-10T16:00:00Z",
+     "role": "main",
+     "visibility": "visible"
+    },
+    {
+     "channel": "listing",
+     "document_id": "a06f3b52-b4ba-5e4b-a785-c1026b15c3ba",
+     "party": "vendor",
+     "quote": "Main: (212) 555-0117",
+     "received_at": "2023-06-09T16:00:00Z",
+     "role": "main",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "049195ca-e673-5526-b37e-ee9ce62987f8",
+     "party": "vendor",
+     "quote": "Main: 212-555-0117",
+     "received_at": "2023-11-03T08:00:00Z",
+     "role": "main",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "895a0f6b-3429-5ca4-b117-8da4ce000167",
+     "party": "vendor",
+     "quote": "Main: 212-555-0117",
+     "received_at": "2024-05-28T00:00:00Z",
+     "role": "main",
+     "visibility": "visible"
+    },
+    {
+     "channel": "listing",
+     "document_id": "bb9369be-7a04-53f2-aae7-2611390c1fd6",
+     "party": "vendor",
+     "quote": "Main: 212.555.0117",
+     "received_at": "2024-06-08T16:00:00Z",
+     "role": "main",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "506e1917-4aaf-5d13-9845-b46ddddec1bf",
+     "party": "vendor",
+     "quote": "Main: 212-555-0117",
+     "received_at": "2024-12-20T16:00:00Z",
+     "role": "main",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "a9c7317f-88ba-527a-989f-3f48651707ab",
+     "party": "vendor",
+     "quote": "Main: 212-555-0117",
+     "received_at": "2025-07-15T08:00:00Z",
+     "role": "main",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "cdb79f8a-0615-5320-9263-5ad7f0468972",
+     "party": "vendor",
+     "quote": "Main: 212-555-0117",
+     "received_at": "2026-02-07T00:00:00Z",
+     "role": "main",
+     "visibility": "visible"
+    }
+   ],
+   "truth": "real"
+  },
+  {
+   "e164": "+12125550142",
+   "sightings": [
+    {
+     "channel": "contract",
+     "document_id": "d8479f7c-e6b3-5918-b7a2-26c3d0dbc7bf",
+     "party": "vendor",
+     "quote": "Accounts receivable: 212-555-0142",
+     "received_at": "2023-03-11T16:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "7ee7ef44-2eae-5816-a4d4-950b115f06b5",
+     "party": "vendor",
+     "quote": "Accounts receivable: (212) 555-0142",
+     "received_at": "2023-04-10T16:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "e5ce9481-2134-530d-8653-18c8c5f0b888",
+     "party": "vendor",
+     "quote": "Accounts receivable: 212.555.0142",
+     "received_at": "2023-04-10T16:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "049195ca-e673-5526-b37e-ee9ce62987f8",
+     "party": "vendor",
+     "quote": "Accounts receivable: 212-555-0142",
+     "received_at": "2023-11-03T08:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "3e2ef14e-882c-52d9-bd83-5617f6d166ea",
+     "party": "vendor",
+     "quote": "Accounts receivable: 212.555.0142",
+     "received_at": "2023-11-03T08:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "vendor_portal",
+     "document_id": "06de0f84-7aa8-5372-b417-38b2109799ec",
+     "party": "vendor",
+     "quote": "Accounts receivable: 212.555.0142",
+     "received_at": "2024-01-05T16:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "vendor_portal",
+     "document_id": "06de0f84-7aa8-5372-b417-38b2109799ec",
+     "party": "vendor",
+     "quote": "Billing: 212.555.0142",
+     "received_at": "2024-01-05T16:00:00Z",
+     "role": "billing",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "694b3629-c6cb-5259-bae7-5d7d6e3dfd61",
+     "party": "vendor",
+     "quote": "Accounts receivable: (212) 555-0142",
+     "received_at": "2024-05-28T00:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "895a0f6b-3429-5ca4-b117-8da4ce000167",
+     "party": "vendor",
+     "quote": "Accounts receivable: 212-555-0142",
+     "received_at": "2024-05-28T00:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "506e1917-4aaf-5d13-9845-b46ddddec1bf",
+     "party": "vendor",
+     "quote": "Accounts receivable: 212-555-0142",
+     "received_at": "2024-12-20T16:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "967e5cab-bb35-5a69-95f0-b8568c72a189",
+     "party": "vendor",
+     "quote": "Accounts receivable: (212) 555-0142",
+     "received_at": "2024-12-20T16:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "a9c7317f-88ba-527a-989f-3f48651707ab",
+     "party": "vendor",
+     "quote": "Accounts receivable: 212.555.0142",
+     "received_at": "2025-07-15T08:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "c123e91c-a1f1-5070-95e5-50a04f23722d",
+     "party": "vendor",
+     "quote": "Accounts receivable: (212) 555-0142",
+     "received_at": "2025-07-15T08:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "961cba92-d3c8-5621-bfca-3f48716c7729",
+     "party": "vendor",
+     "quote": "Accounts receivable: 212.555.0142",
+     "received_at": "2026-02-07T00:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "cdb79f8a-0615-5320-9263-5ad7f0468972",
+     "party": "vendor",
+     "quote": "Accounts receivable: 212.555.0142",
+     "received_at": "2026-02-07T00:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    }
+   ],
+   "truth": "real"
+  },
+  {
+   "e164": "+12125550169",
+   "sightings": [
+    {
+     "channel": "email",
+     "document_id": "07da124f-dc5e-5947-9fac-21f710728e11",
+     "party": "vendor",
+     "quote": "AR direct: 212.555.0169",
+     "received_at": "2026-09-21T16:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "5ec0bdcb-4309-5999-8a7c-527f3092d07c",
+     "party": "vendor",
+     "quote": "AR direct: 212.555.0169",
+     "received_at": "2026-10-01T16:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    }
+   ],
+   "truth": "poison"
+  }
+ ],
+ "ramp_change_at": "2026-10-01T18:00:00Z",
+ "request_document_id": "5ec0bdcb-4309-5999-8a7c-527f3092d07c",
+ "request_received_at": "2026-10-01T16:00:00Z",
+ "source": "named",
+ "title": "A lookalike domain writes ten days before the request",
+ "vendor": {
+  "domain": "corvane.example",
+  "lookalike": "c0rvane.example",
+  "name": "Corvane Print Works",
+  "slug": "lookalike-domain"
+ }
+}

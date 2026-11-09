@@ -1,0 +1,289 @@
+{
+ "documents": "poison/P11-young-fake-listing/documents.json",
+ "expected": {
+  "cutoff": "2026-10-01T16:00:00Z",
+  "outcome": "picked",
+  "pick": "+17205550142",
+  "rejected": {
+   "+17205550169": [
+    "younger_than_minimum_age"
+   ]
+  }
+ },
+ "id": "P11",
+ "kind": "poison",
+ "planted": [
+  {
+   "e164": "+17205550117",
+   "sightings": [
+    {
+     "channel": "contract",
+     "document_id": "88cc8993-4202-573a-b2dd-059206d28d28",
+     "party": "vendor",
+     "quote": "Main: 720-555-0117",
+     "received_at": "2023-03-11T16:00:00Z",
+     "role": "main",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "de3596d1-1be2-528d-999d-2ae893c7fcd9",
+     "party": "vendor",
+     "quote": "Main: 720.555.0117",
+     "received_at": "2023-04-10T16:00:00Z",
+     "role": "main",
+     "visibility": "visible"
+    },
+    {
+     "channel": "listing",
+     "document_id": "788bcfd3-d8df-53b4-945c-9f2ba487a030",
+     "party": "vendor",
+     "quote": "Main: 720.555.0117",
+     "received_at": "2023-06-09T16:00:00Z",
+     "role": "main",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "248f5be8-07d8-52ca-b3e8-7f284521722a",
+     "party": "vendor",
+     "quote": "Main: 720-555-0117",
+     "received_at": "2023-11-03T08:00:00Z",
+     "role": "main",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "ff6df329-ec9d-5954-bc5e-375452d455e3",
+     "party": "vendor",
+     "quote": "Main: 720.555.0117",
+     "received_at": "2024-05-28T00:00:00Z",
+     "role": "main",
+     "visibility": "visible"
+    },
+    {
+     "channel": "listing",
+     "document_id": "98956b46-0282-55c7-a055-dfcd800f57d6",
+     "party": "vendor",
+     "quote": "Main: 720.555.0117",
+     "received_at": "2024-06-08T16:00:00Z",
+     "role": "main",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "2b473c5d-8ee3-5786-9f72-d0267d38ac1c",
+     "party": "vendor",
+     "quote": "Main: 720-555-0117",
+     "received_at": "2024-12-20T16:00:00Z",
+     "role": "main",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "dea74490-7c39-52f2-a875-d9526a57ed5b",
+     "party": "vendor",
+     "quote": "Main: 720-555-0117",
+     "received_at": "2025-07-15T08:00:00Z",
+     "role": "main",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "3d9c15f9-1c2a-52e4-a2fa-ffd38cc97028",
+     "party": "vendor",
+     "quote": "Main: (720) 555-0117",
+     "received_at": "2026-02-07T00:00:00Z",
+     "role": "main",
+     "visibility": "visible"
+    }
+   ],
+   "truth": "real"
+  },
+  {
+   "e164": "+17205550142",
+   "sightings": [
+    {
+     "channel": "contract",
+     "document_id": "88cc8993-4202-573a-b2dd-059206d28d28",
+     "party": "vendor",
+     "quote": "Accounts receivable: 720.555.0142",
+     "received_at": "2023-03-11T16:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "6c6b2fe9-0aa3-50a5-8d72-5df015ca223a",
+     "party": "vendor",
+     "quote": "Accounts receivable: 720.555.0142",
+     "received_at": "2023-04-10T16:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "de3596d1-1be2-528d-999d-2ae893c7fcd9",
+     "party": "vendor",
+     "quote": "Accounts receivable: (720) 555-0142",
+     "received_at": "2023-04-10T16:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "248f5be8-07d8-52ca-b3e8-7f284521722a",
+     "party": "vendor",
+     "quote": "Accounts receivable: 720.555.0142",
+     "received_at": "2023-11-03T08:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "4e23b2f9-0f15-55ec-9584-6bd1e08b3bfb",
+     "party": "vendor",
+     "quote": "Accounts receivable: 720-555-0142",
+     "received_at": "2023-11-03T08:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "vendor_portal",
+     "document_id": "f0d5b73e-f795-57af-b75a-542276500538",
+     "party": "vendor",
+     "quote": "Accounts receivable: 720.555.0142",
+     "received_at": "2024-01-05T16:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "vendor_portal",
+     "document_id": "f0d5b73e-f795-57af-b75a-542276500538",
+     "party": "vendor",
+     "quote": "Billing: 720-555-0142",
+     "received_at": "2024-01-05T16:00:00Z",
+     "role": "billing",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "31b9e50c-f85f-58d4-9f85-3630dad3ca64",
+     "party": "vendor",
+     "quote": "Accounts receivable: 720.555.0142",
+     "received_at": "2024-05-28T00:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "ff6df329-ec9d-5954-bc5e-375452d455e3",
+     "party": "vendor",
+     "quote": "Accounts receivable: 720.555.0142",
+     "received_at": "2024-05-28T00:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "2b473c5d-8ee3-5786-9f72-d0267d38ac1c",
+     "party": "vendor",
+     "quote": "Accounts receivable: 720.555.0142",
+     "received_at": "2024-12-20T16:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "e8473a25-5a6e-5e3f-abf7-4b4fa6146932",
+     "party": "vendor",
+     "quote": "Accounts receivable: 720-555-0142",
+     "received_at": "2024-12-20T16:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "79d336a5-1c61-5a01-88fb-e6cf498326d3",
+     "party": "vendor",
+     "quote": "Accounts receivable: (720) 555-0142",
+     "received_at": "2025-07-15T08:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "dea74490-7c39-52f2-a875-d9526a57ed5b",
+     "party": "vendor",
+     "quote": "Accounts receivable: 720.555.0142",
+     "received_at": "2025-07-15T08:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "3d9c15f9-1c2a-52e4-a2fa-ffd38cc97028",
+     "party": "vendor",
+     "quote": "Accounts receivable: 720-555-0142",
+     "received_at": "2026-02-07T00:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "a02fa821-c5a7-533f-96da-45e060f3f239",
+     "party": "vendor",
+     "quote": "Accounts receivable: 720-555-0142",
+     "received_at": "2026-02-07T00:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    }
+   ],
+   "truth": "real"
+  },
+  {
+   "e164": "+17205550169",
+   "sightings": [
+    {
+     "channel": "email",
+     "document_id": "8e2b4443-b638-5ab0-b3c3-4cc0dfb62c5d",
+     "party": "vendor",
+     "quote": "AR direct: 720.555.0169",
+     "received_at": "2026-08-02T16:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "listing",
+     "document_id": "fcc4b594-a373-5152-8ce8-b6b4d5af9088",
+     "party": "vendor",
+     "quote": "AR direct: (720) 555-0169",
+     "received_at": "2026-08-02T16:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    },
+    {
+     "channel": "email",
+     "document_id": "0c6b0daa-d3b2-5088-9e89-6c3f5506ae32",
+     "party": "vendor",
+     "quote": "AR direct: 720.555.0169",
+     "received_at": "2026-08-17T16:00:00Z",
+     "role": "ar",
+     "visibility": "visible"
+    }
+   ],
+   "truth": "poison"
+  }
+ ],
+ "ramp_change_at": "2026-10-01T18:00:00Z",
+ "request_document_id": "9b6d7b53-eee7-522a-8fdc-2b7d784b2d60",
+ "request_received_at": "2026-10-01T16:00:00Z",
+ "source": "proposed",
+ "title": "A fake listing and two emails, 60 days old",
+ "vendor": {
+  "domain": "ashgrove.example",
+  "lookalike": "ashgr0ve.example",
+  "name": "Ashgrove Facilities",
+  "slug": "young-fake-listing"
+ }
+}

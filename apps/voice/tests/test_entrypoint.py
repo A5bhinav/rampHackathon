@@ -1,0 +1,173 @@
+"""The voice service entrypoint (spec 0016). `build_app` wires `create_app` from `Settings` and the
+injected store, Twilio deps and model: text mode serves the call endpoints with no Twilio routes and
+authenticates `POST /calls`; live mode mounts the Twilio routes. `create_asgi_app` assembles the app
+from injectable store and lookup factories. All driven with the in-memory store double and a fake
+lookup, no Postgres, no live account, no key. The real store and pool are the ledger seam."""
+from __future__ import annotations
+
+import datetime as dt
+import inspect
+import uuid
+
+import httpx
+import pytest
+from dialback_policy.script import Script
+from dialback_policy.step import CallContext
+from dialback_voice.agent import ScriptedAgent
+from dialback_voice.entrypoint import _ledger_lookup, _ledger_store, build_app, create_asgi_app
+from dialback_voice.guards import PreDialInputs
+from dialback_voice.settings import Settings, TwilioConfig
+from dialback_voice.store import PreDial
+from dialback_voice.transport import ScriptedVendor, VendorScript, run_call
+from fastapi.testclient import TestClient
+
+
+def _utc_now() -> dt.datetime:
+    return dt.datetime.now(dt.UTC)
+
+TOKEN = b"internal-service-token-for-tests"
+TOKEN_STR = TOKEN.decode()
+CFG = TwilioConfig(account_sid="ACtest00000000000000000000000000", auth_token=b"auth",
+                   from_number="+14155550100", call_token_key=b"key", core_url="https://core.internal",
+                   internal_token=TOKEN, public_base_url="https://voice.example",
+                   ws_base_url="wss://voice.example")
+
+
+class _Store:
+    """The minimum POST /calls touches before it refuses: no prior call, and a pre-dial with no number
+    pick, so a request that gets past auth returns 409 number_not_selected (fail closed)."""
+
+    async def find_call(self, key):
+        return None
+
+    async def gather_pre_dial(self, *, case_id, attempt):
+        inputs = PreDialInputs(case_exists=True, case_finished=False, case_held=True, has_number_pick=False,
+                               number_opted_out=False, within_calling_window=True, attempts_used=0,
+                               number_calls_last_30d=0, demo_dataset=False, number_on_allowlist=True)
+        return PreDial(inputs=inputs, contact_point_id=None, number_e164=None)
+
+    async def record_call(self, **kwargs):
+        raise AssertionError("record_call should not be reached when there is no number pick")
+
+    async def mark_dialed(self, *a, **k):
+        raise AssertionError
+
+    async def mark_failed(self, *a, **k):
+        raise AssertionError
+
+
+def _text_app() -> TestClient:
+    settings = Settings(voice_mode="text", internal_api_token=TOKEN)
+    app = build_app(settings, store=_Store(), http=httpx.AsyncClient(), clock=_utc_now,
+                    lookup_call=lambda c: None)
+    return TestClient(app)
+
+
+def _post(client, *, token=TOKEN_STR):
+    return client.post("/calls", json={"case_id": str(uuid.uuid4()), "attempt": 1},
+                       headers={"Idempotency-Key": "k1", "Authorization": f"Bearer {token}"})
+
+
+def test_text_mode_serves_calls_and_healthz_no_twilio_routes():
+    client = _text_app()
+    assert client.get("/healthz").json() == {"ok": True}
+    assert client.get(f"/twilio/twiml/{uuid.uuid4()}").status_code == 404   # no Twilio routes in text mode
+
+
+def test_post_calls_needs_the_internal_token():
+    client = _text_app()
+    assert _post(client, token="wrong").status_code == 401            # the token is wired from settings
+    r = _post(client)                                                 # right token gets past auth
+    assert r.status_code == 409 and r.json()["code"] == "number_not_selected"
+
+
+def test_live_mode_mounts_the_twilio_routes():
+    settings = Settings(voice_mode="live", twilio=CFG, internal_api_token=TOKEN)   # no agent key: ScriptedAgent
+    app = build_app(settings, store=_Store(), http=httpx.AsyncClient(), clock=_utc_now,
+                    lookup_call=lambda c: None)
+    client = TestClient(app)
+    # the route is mounted: a bad (missing) Twilio signature is 401, not a 404 for an absent route
+    assert client.get(f"/twilio/twiml/{uuid.uuid4()}").status_code == 401
+
+
+def test_create_asgi_app_wires_injected_factories():
+    store = _Store()
+    app = create_asgi_app(Settings(voice_mode="text", internal_api_token=TOKEN),
+                          store_for=lambda: store, lookup_for=lambda: (lambda c: None),
+                          http=httpx.AsyncClient(), clock=_utc_now)
+    assert TestClient(app).get("/healthz").json() == {"ok": True}
+
+
+def test_the_store_factory_still_fails_closed_until_the_ledger():
+    # PR2: the Postgres CallStore lands with the ledger; until then the default factory raises so a
+    # deploy without a real store cannot boot (R7).
+    with pytest.raises(NotImplementedError):
+        _ledger_store(Settings(voice_mode="live"))
+
+
+def test_the_lookup_factory_builds_from_database_url_and_fails_closed_without_it():
+    # PR1 (spec 0029): lookup_call is built from DATABASE_URL; with no URL the factory raises on boot
+    # rather than serve a lookup that resolves nothing (R7). Building it opens no connection.
+    with pytest.raises(RuntimeError):
+        _ledger_lookup(Settings(voice_mode="live"))
+    lookup = _ledger_lookup(Settings(voice_mode="live", database_url="postgresql://u:p@h/db",
+                                     customer_name="Northwind Traders", callback_number="(415) 555-0100"))
+    assert callable(lookup)
+
+
+def test_create_asgi_app_with_default_factories_raises_on_boot():
+    # With no factories injected, create_asgi_app falls to the ledger seam and raises rather than
+    # serving a half-wired app (R7). A regression to a silent default would let it start.
+    with pytest.raises(NotImplementedError):
+        create_asgi_app(Settings(voice_mode="text", internal_api_token=TOKEN))
+
+
+def test_create_asgi_app_with_a_database_builds_the_postgres_store(database_url):
+    # Spec 0029: with DATABASE_URL the default factories build the Postgres store and lookup, so the
+    # service boots for real; without it, the seam above still refuses to boot.
+    from dialback_voice.pg_store import PgCallStore
+    settings = Settings(voice_mode="text", internal_api_token=TOKEN, database_url=database_url,
+                        customer_name="Northwind Traders", callback_number="+14155550100")
+    app = create_asgi_app(settings, http=httpx.AsyncClient(), clock=_utc_now)
+    assert isinstance(app.state.store, PgCallStore)
+    assert TestClient(app).get("/healthz").json() == {"ok": True}
+
+
+def _default_clock():
+    """The clock the deployed service actually runs on: create_asgi_app's default (main() injects none)."""
+    return inspect.signature(create_asgi_app).parameters["clock"].default
+
+
+def test_the_default_clock_is_the_utc_wall_clock():
+    # Spec 0034, B2: the policy stamps answers with at.astimezone(UTC), so the clock must be an aware
+    # datetime. time.monotonic (a float) ended every live call internal_error at the first answer.
+    now = _default_clock()()
+    assert isinstance(now, dt.datetime) and now.utcoffset() == dt.timedelta(0)
+
+
+def test_a_call_on_the_default_clock_records_the_callee_answer():
+    ctx = CallContext(call_id="c1", script=Script("Northwind Traders", "+14155550100"),
+                      vendor_names=("Acme Fasteners",))
+    result = run_call(ctx, ScriptedAgent(), ScriptedVendor(VendorScript(consent="no")), clock=_default_clock())
+    assert (result.end.result, result.end.reason) == ("answers_recorded", "consent_refused")
+    assert [a["value"] for a in result.answers["answers"] if a["slot"] == "recording_consent"] == ["no"]
+
+
+def test_uvicorn_has_a_websocket_backend():
+    # Spec 0034, B4: ConversationRelay is a WebSocket. With no backend installed uvicorn logs "No
+    # supported WebSocket library detected" and answers the upgrade 404. The image installs only the
+    # declared runtime dependencies (uv sync --no-dev --package dialback-voice), so the backend must
+    # be declared, not just present in a dev venv.
+    import tomllib
+    from pathlib import Path
+
+    from uvicorn.config import Config
+    pyproject = Path(__file__).resolve().parents[1] / "pyproject.toml"
+    deps = [d.replace(" ", "") for d in tomllib.loads(pyproject.read_text())["project"]["dependencies"]]
+    assert any(d.startswith(("uvicorn[standard]", "websockets", "wsproto")) for d in deps), deps
+
+    async def asgi(scope, receive, send):  # pragma: no cover - never served
+        pass
+    config = Config(asgi, ws="auto")
+    config.load()
+    assert config.ws_protocol_class is not None
