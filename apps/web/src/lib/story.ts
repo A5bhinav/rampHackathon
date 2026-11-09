@@ -58,8 +58,10 @@ export const DEMO_STORIES: DemoStory[] = [
 /** Where to go after signing in: a known demo link, or the dashboard. Nothing else is followed,
  *  so the parameter can't send anyone off the site. */
 export function safeNext(raw: unknown): string {
-  const m = typeof raw === "string" ? /^\/demo\/([a-z]+)$/.exec(raw) : null;
-  return m && demoStory(m[1]) ? raw as string : "/app";
+  if (typeof raw !== "string") return "/app";
+  if (/^\/tour\/[1-8]$/.test(raw)) return raw;  // the guided demo (spec 0039)
+  const m = /^\/demo\/([a-z]+)$/.exec(raw);
+  return m && demoStory(m[1]) ? raw : "/app";
 }
 
 export function demoStory(ref: string): DemoStory | undefined {

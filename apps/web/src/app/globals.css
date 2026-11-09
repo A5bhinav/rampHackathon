@@ -589,3 +589,16 @@ figure.card { margin: 0 0 20px; }
   border-radius: var(--radius-sm); background: var(--accent-soft); }
 .demo-sign-in h2 { font-size: 0.9375rem; margin-bottom: 6px; }
 .demo-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* The guided demo and the released list (spec 0039). ------------------------------------------- */
+.tour { position: fixed; right: 20px; bottom: 20px; z-index: 30; width: min(380px, calc(100vw - 32px)); background: var(--text);
+  color: #fff; border-radius: var(--radius); padding: 16px 18px; box-shadow: var(--shadow-lift); }
+.tour-count { font-size: 0.75rem; color: color-mix(in srgb, #fff 70%, transparent); margin: 0 0 4px; }
+.tour-title { color: #fff; font-size: 1rem; margin: 0 0 6px; }
+.tour-caption { font-size: 0.875rem; color: color-mix(in srgb, #fff 88%, transparent); margin: 0 0 12px; }
+.tour-nav { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.tour a.button-link { box-shadow: none; background-image: none; }
+.tour a.tour-end { color: color-mix(in srgb, #fff 75%, transparent); font-size: 0.8125rem; margin-left: auto; box-shadow: none; }
+@media (max-width: 520px) { .tour { right: 16px; bottom: 16px; } }
+ul.released { list-style: none; padding: 0 20px 16px; margin: 0; display: grid; gap: 8px; }
+ul.released li { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }

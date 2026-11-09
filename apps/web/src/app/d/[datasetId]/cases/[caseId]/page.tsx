@@ -96,7 +96,7 @@ export default async function CaseDetailPage({ params, searchParams }: {
               <p className="muted">
                 {["needs_review", "blocked"].includes(c.state) && lastStep
                   ? <>Code made no decision for this version. The last step: {lastStep.summary}</>
-                  : "No decision yet for this version."}
+                  : "No decision yet for this version. Code decides once the call's answers are in; until then the hold stays on."}
               </p>
             )}
           </section>
@@ -206,7 +206,12 @@ export default async function CaseDetailPage({ params, searchParams }: {
                 ) : null}
                 {hold.last_error ? <p className="result error">{hold.last_error}</p> : null}
               </>
-            ) : <p className="muted">Being placed.</p>}
+            ) : (
+              <p className="muted">
+                Dialback is placing the hold in Ramp and will read it back before doing anything else. If Ramp won&apos;t confirm
+                it, the case goes to a person and an alert is raised.
+              </p>
+            )}
           </section>
 
           {detail.releases.length > 0 ? (
