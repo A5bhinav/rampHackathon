@@ -1,14 +1,19 @@
 import Link from "next/link";
 import { AlertBanners } from "@/components/alerts";
 import { BrandMark, NavLinks } from "@/components/nav";
-import { core } from "@/lib/core";
+import { notFound } from "next/navigation";
+import { CoreError, core } from "@/lib/core";
 
 // The shell: who is signed in, which dataset, navigation, and the alert banners on every page.
 // Pages owned by Inesh (number lineage, vendor risk list) and Sami (call view, scorecard)
 // plug in under /d/[datasetId]/ and get a link here when they land.
 export default async function DatasetShell({ children, params }: { children: React.ReactNode; params: Promise<{ datasetId: string }> }) {
   const { datasetId } = await params;
-  const [me, datasets, alerts] = await Promise.all([core.me(), core.datasets(), core.alerts(datasetId)]);
+  // An unknown dataset (404) or one that isn't an id (422) is a not-found page, not an error.
+  const [me, datasets, alerts] = await Promise.all([core.me(), core.datasets(), core.alerts(datasetId).catch((e) => {
+    if (e instanceof CoreError && (e.status === 404 || e.status === 422)) notFound();
+    throw e;
+  })]);
   const current = datasets.find((d) => d.id === datasetId);
   return (
     <>

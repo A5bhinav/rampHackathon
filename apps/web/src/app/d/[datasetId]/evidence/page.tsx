@@ -16,48 +16,60 @@ export default async function EvidencePage({ params }: { params: Promise<{ datas
     throw e;
   });
   const { chain, last_check: check } = log;
-  const bad = chain.first_bad_seq;
+  // Broken if the recompute just now found a break, or the scheduled check did (it also catches
+  // deleted or rewritten newest rows, which a recompute alone can't). Both verdicts are the core's.
+  const jobFound = check?.ok === false;
+  const broken = !chain.ok || jobFound;
+  const bad = chain.first_bad_seq ?? (jobFound ? check?.first_bad_seq ?? null : null);
+  const listed = bad !== null && log.events.some((e) => e.seq === bad);
   return (
     <main>
       <PageHead
         title="Evidence chain"
-        lead="Every state change on this dataset, in an append-only log. Each row's hash covers its own body and the row before it, so a row edited by hand no longer matches its hash, and Postgres says which row."
+        lead="Every state change on this dataset, in an append-only log. Each row stores the hash of the row before it, and its own hash covers that link and the recorded event, so a row edited by hand stops matching its hash and Postgres names it."
       />
 
-      <section className={`card lead-card ${chain.ok ? "edge-ok" : "edge-bad chain-alarm"}`} aria-labelledby="chain-h" role={chain.ok ? undefined : "alert"}>
+      <section className={`card lead-card ${broken ? "edge-bad chain-alarm" : "edge-ok"}`} aria-labelledby="chain-h" role={broken ? "alert" : undefined}>
         <h2 id="chain-h">
-          <span className={`badge ${chain.ok ? "tone-ok" : "tone-bad"}`}>{chain.ok ? "intact" : "broken"}</span>
-          {chainHeadline(chain)}
+          <span className={`badge ${broken ? "tone-bad" : "tone-ok"}`}>{broken ? "broken" : "intact"}</span>
+          {chain.ok && jobFound ? `Broken at row #${bad ?? "?"}` : chainHeadline(chain)}
         </h2>
-        {chain.ok ? (
+        {!broken ? (
           <p className="muted">
             The newest row is #{chain.tip_seq ?? "—"}, hash <span className="mono" title={chain.tip_hash ?? ""}>{chain.tip_hash ? short(chain.tip_hash) : "—"}</span>.
-            Change one character in any row and this check fails at that row.
+            Edit the recorded event in any row and this check fails at that row.
           </p>
         ) : (
           <>
-            <p>Postgres says: {chain.detail}. Rows before #{bad} still check out ({chain.checked} of them); from #{bad} on, the record can&apos;t be trusted.</p>
-            <p><a className="button-link" href={`#row-${bad}`}>Jump to row #{bad}</a></p>
+            <p>
+              Postgres says: {chain.ok ? check?.detail : chain.detail}.
+              {!chain.ok ? <> Rows before #{bad} still check out ({chain.checked} of them); from #{bad} on, the record can&apos;t be trusted.</> : null}
+            </p>
+            {listed ? <p><a className="button-link" href={`#row-${bad}`}>Jump to row #{bad}</a></p>
+              : bad !== null ? <p className="muted sub">Row #{bad} is not among the rows listed below.</p> : null}
           </>
         )}
         <p className="muted sub">
+          This card was recomputed when the page loaded.{" "}
           {check?.finished_at
-            ? <>The scheduled check last ran {when(check.finished_at)} and found the chain {check.ok ? "intact" : check.ok === false ? "broken" : "in an unknown state"}.</>
+            ? <>The scheduled check last ran {when(check.finished_at)} and found the chain {check.ok ? "intact" : check.ok === false ? `broken at row #${check.first_bad_seq ?? "?"}` : "in an unknown state"}.</>
             : "The scheduled check hasn't run on this dataset yet."}
-          {" "}This card was recomputed when the page loaded.
         </p>
       </section>
 
       <figure className="card chain-how">
         <ol className="links" aria-hidden="true">
           {["#1", "#2", "#3"].map((n, i) => (
-            <li key={n}><span className="link-row"><b>{n}</b><span className="mono">prev {i ? "= hash of " + `#${i}` : "= 000…0"}</span><span className="mono">hash = sha256(prev + body)</span></span></li>
+            <li key={n}><span className="link-row"><b>{n}</b><span className="mono">prev_hash {i ? "= hash of " + `#${i}` : "= 000…0"}</span><span className="mono">hash = sha256(prev_hash + sha256(event))</span></span></li>
           ))}
         </ol>
         <figcaption className="muted">
-          Each row stores the hash of the row before it, and its own hash covers that link and its body. A row edited by hand no
-          longer matches its own hash (&ldquo;body edited&rdquo;); a row deleted or reordered no longer matches its neighbour
-          (&ldquo;link broken&rdquo;). Nobody can update or delete rows through the app: Postgres refuses it.
+          Each row stores the hash of the row before it, and its own hash covers that link and the recorded event. A row whose
+          event was edited by hand no longer matches its content hash (&ldquo;body edited&rdquo;). A row deleted or moved from
+          the middle breaks the next row&apos;s link (&ldquo;link broken&rdquo;); deleting or rewriting the newest rows is caught by
+          the scheduled check, which remembers the newest row it last saw. Nobody can update or delete rows through the app:
+          Postgres refuses it. Someone with the database owner&apos;s keys can still rewrite a row, which is why every edit is
+          made detectable rather than impossible.
         </figcaption>
       </figure>
 
@@ -96,8 +108,9 @@ export default async function EvidencePage({ params }: { params: Promise<{ datas
           </div>
         )}
         <p className="card-head muted sub">
-          Each row&apos;s result is Postgres checking that row alone, with the chain&apos;s own hash functions. The scheduled check
-          walks the chain from the first row and stops at the first break, which is the row the card above names.
+          Each row&apos;s result is Postgres checking that row&apos;s own hashes and its link to the row before, with the
+          chain&apos;s own functions. The card above recomputes the whole chain from the first row and names the first break; the
+          scheduled check does the same every few minutes and also compares the newest row with the one it last saw.
         </p>
       </section>
     </main>
