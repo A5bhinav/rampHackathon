@@ -318,5 +318,6 @@ async def test_a_demo_account_is_refused_outside_demo_data(world, database_url):
         await post(world, f"/api/cases/{cid}/release", "approver1", "/api/cases/{case_id}/release",
                    {"expected_version": 1, "action": action, "reason": "Demo."}, status=404)
     assert (await case_of(world))["state"] == "awaiting_release"
-    assert (await get(world, "/api/datasets", "approver1", "/api/datasets"))["datasets"] == []
+    seen = {d["id"] for d in (await get(world, "/api/datasets", "approver1", "/api/datasets"))["datasets"]}
+    assert str(world.dataset.id) not in seen, "a dev dataset is hidden from a demo account"
     assert (await get(world, f"/api/cases/{cid}", "approver2", "/api/cases/{case_id}"))["case"]["state"] == "awaiting_release"

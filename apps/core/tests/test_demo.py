@@ -302,3 +302,14 @@ async def test_every_command_needs_a_current_demo(pool, database_url):
             await command
     await world.core.aclose()
     await world.mock.aclose()
+
+
+def test_no_demo_dataset_is_made_against_the_sandbox():
+    """Spec 0034: shared demo accounts may act on any demo dataset, so none may sit on Ramp's sandbox."""
+    import asyncio
+
+    from conftest import core_settings
+    from dialback_core.flags import RampMode
+    from dialback_core.main import _new_dataset
+    with pytest.raises(SystemExit, match="sandbox"):
+        asyncio.run(_new_dataset(core_settings(ramp_mode=RampMode.SANDBOX), "demo", "Demo", None))

@@ -12,14 +12,18 @@ the page.
 ## Decisions
 
 1. **A demo account is a row in `app.demo_accounts`** (migration `app/0012`), added by the team
-   as the owner with `scripts/db/add_user.py --demo-only`. Nobody signed in can write the table.
+   as the owner with `scripts/db/add_user.py --demo-only`. Nobody signed in can read or write the
+   table; `app.is_demo_account()` answers for the policies and triggers.
 2. **Postgres refuses a demo account outside demo data.** A trigger on `app.cases` (every state
    change) and on `app.releases` (every approval, including the first of two) raises
    `insufficient_privilege` when the signed-in person (`auth.uid()`) is a demo account and the
-   dataset's kind isn't `demo`. System writes (no signed-in person) are untouched. Demo datasets
-   exist only through `dialback-core demo reset`, which refuses Ramp's sandbox (spec 0011).
-3. **Demo accounts see only demo datasets and their cases** (row-level security on
-   `app.datasets` and `app.cases`), so the dashboard never offers them anything else.
+   dataset's kind isn't `demo`. System writes (no signed-in person) are untouched. The rule trusts
+   the kind, so a dataset's kind can't change after it is made (a trigger), and neither `demo
+   reset` nor `new-dataset --kind demo` makes a demo dataset against Ramp's sandbox.
+3. **Demo accounts see only demo datasets and their cases** (restrictive row-level security
+   policies on `app.datasets` and `app.cases`, so a permissive policy added later can't widen
+   them). Alerts, holds and evidence rows stay readable to any signed-in person, as today; the
+   API reaches them only through a dataset or case the person can see.
 4. **The accounts are made by the team, not the seed.** The core has no Supabase admin key, so
    it can't create auth users. Runbook: create the two users in Supabase (generated passwords),
    `add_user.py --demo-only` for both (`--role approver --user-id …` for the approver),
