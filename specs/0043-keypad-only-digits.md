@@ -188,17 +188,15 @@ None:
 
 ## Open questions
 
-These are for Sami. Each one has a call above, so the build is not blocked.
+None open. Sami approved the spec and every call in it as written on Nov 9:
 
-- **Q76.** How long to wait after the last key before submitting? This spec uses 5 seconds.
-- **Q77.** After a second unclear on the digits question, should the call finish with no digits
-  (NR06, a person sees it now), or end `failed` like consent and the change (a redial)? This spec
-  finishes it.
-- **Q78.** Should a model error become `unclear` (D7), or keep spec 0015's safe value?
-- **Q79.** Should spoken digits be redacted from the transcript as soon as they are heard, not only
-  in what the model gets?
-- **Q80.** Should an `unclear:*` failure set `retry_at`? This spec sets none, so the core waits 2
-  hours. A dropped call uses now plus 5 minutes.
+- **Q76, resolved:** submit after 5 seconds with no key.
+- **Q77, resolved:** a second unclear on the digits question finishes the call with no digits
+  (NR06). Consent and the change question end `failed`, which leads to a redial.
+- **Q78, resolved:** a model error becomes `unclear` (D7), revising spec 0015's safe values.
+- **Q79, resolved for now:** only what the model gets is redacted. Redacting the transcript itself
+  is out of scope.
+- **Q80, resolved:** an `unclear:*` failure sets no `retry_at`, so the core waits 2 hours.
 
 ## Commands
 
