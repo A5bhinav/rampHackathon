@@ -42,6 +42,7 @@ export default function HowItWorks() {
             <Link className="brand" href="/"><BrandMark />Dialback</Link>
             <a href="#stations">The pipeline</a>
             <a href="#demo">Demo data</a>
+            <Link href="/corpus">Frozen test cases</Link>
           </nav>
           <div className="who"><Link className="button-link primary" href="/app">Open the dashboard</Link></div>
         </div>
@@ -129,7 +130,7 @@ export default function HowItWorks() {
                 <li>The whole pipeline above, against a Ramp-shaped mock of Ramp&apos;s API, with fictional vendors and accounts.</li>
                 <li>The Trust Ledger&apos;s rule and the disclosed voice agent are built. A demo run can still use stand-ins for them (the rehearsal stack picks a fixed number and plays a scripted vendor), depending on how it is deployed; the case page shows what each call recorded.</li>
                 <li>The hold, the state machine, the four-eyes release and the evidence chain, enforced in Postgres.</li>
-                <li>The number-picking rule, checked against 20 frozen cases in the repo: 14 planted attacks, 1 stated known limit and 5 legitimate controls.</li>
+                <li>The number-picking rule, checked against 20 frozen cases in the repo: 14 planted attacks, 1 stated known limit and 5 legitimate controls. <Link href="/corpus">See each case and what the rule did</Link>.</li>
               </ul>
             </div>
             <div className="panel">
