@@ -5,13 +5,14 @@
     dialback-core import-vendors --dataset <id>          initial import (baseline) or a full sweep
     dialback-core retire-dataset --dataset <id>          hide a dataset; nothing is deleted
     dialback-core run-job --dataset <id> --job reconcile run poll, full_sweep, reconcile or verify_chain now
-    dialback-core demo reset|change                      one command per demo beat (spec 0011)
+    dialback-core demo reset|change|tamper|status|chaos  one command per demo beat (spec 0011)
 """
 from __future__ import annotations
 
 import argparse
 import asyncio
 import datetime as dt
+import json
 import logging
 import os
 from uuid import UUID
@@ -90,6 +91,17 @@ async def _demo(settings: Settings, args: argparse.Namespace) -> int:
             elif args.action == "change":
                 account = await demo.change(env, demo.load_seed(args.seed), args.vendor, by=args.by, unknown=args.unknown)
                 print(f"bank change made in the Ramp mock (new account {account}); the core opens the case and places the hold")
+            elif args.action == "tamper":
+                t = await demo.tamper(env, confirmed=args.yes_break_the_chain, seq=args.seq, dataset_id=args.dataset)
+                print(f"edited event #{t.seq} of dataset {t.dataset_id}")
+                print(f"alert   {t.alert}" if t.alert else "alert   none yet: the scheduled chain check raises it within "
+                      "DIALBACK_VERIFY_SECONDS (check with `dialback-core demo status`)")
+            elif args.action == "status":
+                print(json.dumps(await demo.status(env), indent=2, default=str))
+            elif args.action == "chaos":
+                s = await demo.chaos(env, args.state == "on", seed=args.chaos_seed)
+                print(f"chaos {'on' if s.get('chaos_seed') is not None else 'off'}: "
+                      f"seed={s.get('chaos_seed')} errors={s.get('chaos_error_permille')}‰ drops={s.get('chaos_drop_permille')}‰")
         except demo.DemoError as exc:
             print(f"refused: {exc}")
             return 2
@@ -130,6 +142,14 @@ def run() -> None:
     who = ch.add_mutually_exclusive_group()
     who.add_argument("--by", default="clerk", help="the seeded user who makes it (default: clerk)")
     who.add_argument("--unknown", action="store_true", help="no known author: two approvers are needed")
+    tp = dm.add_parser("tamper", help="beat 6: edit one evidence row by hand, then run the verify job")
+    tp.add_argument("--yes-break-the-chain", action="store_true")
+    tp.add_argument("--seq", type=int)
+    tp.add_argument("--dataset", type=UUID, help="default: the current demo")
+    dm.add_parser("status", help="pre-flight: the current demo, its cases, the chain and alerts")
+    cz = dm.add_parser("chaos", help="spec 0008's chaos mode on the current demo business")
+    cz.add_argument("state", choices=("on", "off"))
+    cz.add_argument("--chaos-seed", type=int, default=11)
     args = parser.parse_args()
 
     settings = Settings.from_env()
