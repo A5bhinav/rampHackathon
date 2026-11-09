@@ -248,14 +248,27 @@ def _context_blind(world):
 
 
 def _fail_closed(world):
-    """The other fix shape: today's checks, but when a number is refused only because of change-context
-    labels, the whole case is refused (no pick) instead of the call moving to the next number."""
+    """The other fix shape, as the scratch trial measured it (review 2, B2): today's per-number checks
+    and eligibility flags, unchanged. The rule calls only the numbers, from the top of its call list
+    (the pick, then up to two alternates), on which it agrees with the same ranking made with
+    change-context labels set aside. If the two disagree on the pick, it calls no one, with a
+    schema-valid no_provable_number and a reason for a person."""
     out = select(**world.kwargs)
-    if {c["e164"] for c in _context_blind(world)["candidates"] if c["eligible"]} - {
-            c["e164"] for c in out["candidates"] if c["eligible"]}:
-        return {k: v for k, v in out.items() if k != "e164"} | {
-            "outcome": "no_provable_number", "candidates": [{**c, "eligible": False} for c in out["candidates"]]}
-    return out
+
+    def calls(o):
+        return ([o["e164"]] if o.get("e164") else []) + [a["e164"] for a in o.get("alternates", [])]
+
+    mine, theirs = calls(out), calls(_context_blind(world))
+    agreed = 0
+    while agreed < min(len(mine), len(theirs)) and mine[agreed] == theirs[agreed]:
+        agreed += 1
+    if not mine or agreed == len(mine):
+        return out
+    if agreed:
+        return out | {"alternates": out["alternates"][:agreed - 1]}
+    return {k: v for k, v in out.items() if k not in ("e164", "contact_point_id", "source_types", "alternates")} | {
+        "outcome": "no_provable_number",
+        "reason": "The change request's own text would change which number is called, so none is."}
 
 
 _PATHS = {   # each way a document lands in the change context, other than arriving after the cutoff
@@ -317,33 +330,72 @@ def test_label_already_in_the_world_that_moved_the_call_is_caught(monkeypatch):
     assert _label_hits(planted) == [CONTEXT_LABEL]
 
 
-def test_a_rule_that_refuses_the_case_passes_i12(monkeypatch):
-    # Refusing the case when attacker text disputes a number is a valid fix: the call goes nowhere.
+def _labels_under(rule, world) -> set[str]:
+    """Every label the whole oracle finds on `world` with `rule` standing in for select()."""
+    import dialback_evals.invariants as inv
+    real = inv.run
+    inv.run = rule
+    try:
+        return set(all_violations(world))
+    finally:
+        inv.run = real
+
+
+def test_a_rule_that_refuses_the_case_passes_i12():
+    # Refusing the case when attacker text would change who is called is a valid fix: the call goes
+    # nowhere, and the refusal is a schema-valid no_provable_number (review 2, B2).
     planted = overblock_world("bank_label_in_thread", 0, planted=True)
-    assert _fail_closed(planted).get("e164") is None
-    monkeypatch.setattr("dialback_evals.invariants.run", _fail_closed)
-    assert _label_hits(_two_numbers()) == []
-    assert _label_hits(planted) == []
+    out = _fail_closed(planted)
+    assert out.get("e164") is None and "I6_schema" not in violations(planted, out)
+    assert _labels_under(_fail_closed, _two_numbers()) == set()
+    assert _labels_under(_fail_closed, planted) == set()
+
+
+def test_fail_closed_fix_adds_no_violation_today_lacks():
+    # The whole oracle, not only I3 and I12: the fail-closed shape must never trip I12, and must add no
+    # label today's rule does not already have in the same world (review 2, B2).
+    def today(world):
+        return select(**world.kwargs)
+
+    @given(worlds())
+    @settings(max_examples=200, deadline=None, derandomize=True, database=None)
+    def check(world):
+        fixed = _labels_under(_fail_closed, world)
+        assert not {m for m in fixed if m.startswith(LABEL_PREFIX)}, fixed
+        assert fixed <= _labels_under(today, world), fixed - _labels_under(today, world)
+    check()
+
+
+def test_context_blind_fix_opens_the_lookalike_hole():
+    # Why ignoring change-context labels is not a valid fix, though it passes I12: an attacker's
+    # lookalike email pulls the cutoff earlier, a clean listing that calls X a bank's line lands in
+    # the change context, the label is ignored, and X (older than the real line) becomes eligible.
+    x = NumberSpec(X, [], 0, is_poison=True, sightings=(SightingSpec("contract", 400), SightingSpec("listing", 400),
+                                                         SightingSpec("listing", 20, party="bank")))
+    world = make_world(numbers=[NumberSpec(REAL, ["contract", "listing"], 200), x])
+    assert "M_lookalike_helped" not in _labels_under(lambda w: select(**w.kwargs), world)
+    assert "M_lookalike_helped" in _labels_under(_context_blind, world)
+    assert "M_lookalike_helped" not in _labels_under(_fail_closed, world)
 
 
 def test_context_blind_rule_passes_the_planted_bank_label_world(monkeypatch):
     # The attacker's in-thread email names the real number as a bank line, and a planted provable
     # number ranks below the real one. Ignoring change-context labels keeps the call on the real
-    # number, and the oracle must accept that rule (I3 reads labels from outside the context only).
+    # number, and the oracle must accept that output (I3 reads labels from outside the context only),
+    # even though the shape is not a valid fix overall (the test above).
     world = overblock_world("bank_label_in_thread", 0, planted=True)
     assert _context_blind(world)["e164"] == REAL
     monkeypatch.setattr("dialback_evals.invariants.run", _context_blind)
     assert all_violations(world) == []
 
 
-@pytest.mark.parametrize("rule", [_context_blind, _fail_closed], ids=["context_blind", "fail_closed"])
-def test_neither_fix_shape_trips_the_label_checks(rule, monkeypatch):
-    monkeypatch.setattr("dialback_evals.invariants.run", rule)
+def test_context_blind_rule_never_trips_i3_or_i12(monkeypatch):
+    monkeypatch.setattr("dialback_evals.invariants.run", _context_blind)
 
     @given(worlds())
     @settings(max_examples=300, deadline=None, derandomize=True, database=None)
     def check(world):
-        out = rule(world)
+        out = _context_blind(world)
         assert "I3_nonvendor_or_fax_eligible" not in violations(world, out)
         assert not [m for m in metamorphic(world, out) if m.startswith(LABEL_PREFIX)]
     check()
