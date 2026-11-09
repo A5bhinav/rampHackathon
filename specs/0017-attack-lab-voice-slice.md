@@ -72,6 +72,48 @@ Driven with the `ScriptedAgent` and scripted adversarial lines: no live account,
 - **Q58 (resolved):** the scorecard keeps the full lab's top-level shape, with counts and hard-gate pass/fail only; Wilson intervals and seed-family grouping are added with the full lab, so it extends rather than replaces.
 - Carried: the scenario classes (`evals/README.md`), `DIALBACK_LAB_ATTACKER`, and **Q41** (the prompt and model-pin `config_version` hash that `lab-smoke` pins, which lands with the live-model gate).
 
+## Review fixes (Nov 9)
+
+A fresh review (Nov 9) found that the lab passes when the product is broken: 13 of 16 deliberate
+breaks went unnoticed, including the speech guard switched off, an agent obeying the injected line,
+an agent recording "yes" whatever was said, and seven decision rules disabled. It also found that
+the lab tests a patched agent (`LabAgent`) and lab-made facts (`dialed_out` always true, a stricter
+company comparison than production's), and that main's spec 0034 (name and role asked as two
+questions) breaks it. The full list is in `evals/FINDINGS.md`, section C. This section scopes the
+rework; where it changes an earlier decision, the original stays above and this section wins.
+
+What the rework must deliver (each with a test that fails first):
+
+- F1. Main's API: the text line answers `Phase.NAME` and `Phase.ROLE`; a scenario states `name` and
+  `role` instead of `name_role`.
+- F2. The product, not a copy: the agent under test is the production `ScriptedAgent` (main's records
+  the role itself); `LabAgent` is deleted. `company_matches` is production's `every_name_matches`
+  (`apps/core/src/dialback_core/company.py`). `dialed_out` comes from a scenario fact `direction`
+  (`outbound` by default, as production reads the call's direction), not a constant.
+- F3. The missing gates, read off the `CallResult`: no policy violations and grounded answers (R3);
+  no speech-guard trip, so the agent never even tries to say what it must not (R4); every recorded
+  answer for a phase's slot cites a callee turn from that phase, so an injected line cannot redirect
+  the record (R9).
+- F4. Each scenario names the decision rule that must block it (`expect_rule`) and the call ending it
+  expects (`expect_end`, `answers_recorded` by default); the gate fails when that rule did not fire
+  or the call ended otherwise. A crashed call no longer passes as a blocked attack, and removing any
+  one defense fails the scenario that names it.
+- F5. The oracle: a legitimate scenario that cannot verify must not come out `verified` (R7); a
+  scenario's `is_attack` must agree with its class.
+- F6. Coverage: scenarios for a consent refusal, a machine answer, a hang-up, silence, an inbound call
+  and a garbage caller, so each defense the decision rules name is the reason some scenario fails
+  closed.
+- F7. Inputs: unknown keys, a phase name the text line does not know, a non-boolean flag and a
+  duplicate scenario id are errors; `lab run` exits non-zero when it loads no scenarios, and finds
+  the scenarios from the repo root wherever it runs; `--max-usd` above 0 and
+  `DIALBACK_LAB_ATTACKER=llm` are refused until a paid attacker exists.
+- F8. The freeze: `lab freeze` writes each scenario's hash and required outcome to
+  `evals/scenarios/<split>/expected.lock.json`; `lab run` fails when a scenario no longer matches it,
+  so an expectation cannot move without a deliberate re-freeze.
+- F9. The break suite: the 16 deliberate breaks (broken agents and product mutations) live in
+  `evals/tests/test_breaks.py`, and every one must fail the lab. A break that only a misbehaving
+  agent can reveal (the speech guard switched off) is tested with one.
+
 ## Suggested layout
 
 ```
