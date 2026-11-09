@@ -121,6 +121,29 @@ async def test_an_unknown_changer_needs_two_approvers(world):
     assert second["to_state"] == "releasing"
 
 
+async def test_only_an_approver_reviews(world):
+    """Spec 0028: anyone can sign up (spec 0027), so clearing or blocking a review needs approver."""
+    world.voice.refuse = "outside_calling_window"
+    await import_all(world.pool, world.ramp, world.keys, world.dataset.id)
+    await change_and_detect(world)
+    cid = str((await case_of(world))["id"])
+    view = await get(world, f"/api/cases/{cid}", "clerk2", "/api/cases/{case_id}")
+    assert view["case"]["state"] == "needs_review"
+    assert view["permissions"]["can_review"] is False
+    assert any("approver role" in r for r in view["permissions"]["reasons"])
+    for action in ("clear", "block"):
+        body = {"expected_version": 1, "action": action, "reason": "I called them and they confirmed."}
+        refused = await post(world, f"/api/cases/{cid}/review", "clerk2", "/api/cases/{case_id}/review", body, status=403)
+        assert refused["code"] == "forbidden" and "approver role" in refused["message"]
+    assert (await case_of(world))["state"] == "needs_review", "nothing moved"
+    assert (await get(world, f"/api/cases/{cid}", "approver1", "/api/cases/{case_id}"))["permissions"]["can_review"] is True
+    clear = {"expected_version": 1, "action": "clear", "reason": "Reached the CFO on the 2023 contract number; confirmed."}
+    assert (await post(world, f"/api/cases/{cid}/review", "approver1", "/api/cases/{case_id}/review", clear))["to_state"] == "awaiting_release"
+    # Past review, an approver is told the state, never that they lack a role they have.
+    again = await post(world, f"/api/cases/{cid}/review", "approver2", "/api/cases/{case_id}/review", clear, status=409)
+    assert again["code"] == "transition_refused" and "approver role" not in again["message"]
+
+
 async def test_review_then_a_different_approver_releases(world):
     world.voice.refuse = "outside_calling_window"
     await import_all(world.pool, world.ramp, world.keys, world.dataset.id)
@@ -138,6 +161,29 @@ async def test_review_then_a_different_approver_releases(world):
     detail = await get(world, f"/api/cases/{cid}", "approver2", "/api/cases/{case_id}")
     refusal = next(e for e in detail["timeline"] if e["type"] == "command_failed")
     assert refusal["summary"].startswith("The voice service checked the call and did not place it (outside the vendor's calling hours)")
+
+
+async def test_a_refused_calls_alert_names_the_reason(world):
+    """Spec 0031: a pre-dial refusal is the system working, so the banner says why, in the timeline's words."""
+    from dialback_core.timeline import alert_message
+    world.voice.refuse = "not_on_dial_allowlist"
+    await import_all(world.pool, world.ramp, world.keys, world.dataset.id)
+    await change_and_detect(world)
+    ds = str(world.dataset.id)
+    alerts = (await get(world, f"/api/datasets/{ds}/alerts", "approver1", "/api/datasets/{dataset_id}/alerts"))["alerts"]
+    stuck = [a for a in alerts if a["kind"] == "command_stuck"]
+    assert len(stuck) == 1
+    assert stuck[0]["message"] == ("The call wasn't placed: the number is not on the team's dial allowlist. "
+                                   "The hold stays on and a person must review.")
+    cid = str((await case_of(world))["id"])
+    detail = await get(world, f"/api/cases/{cid}", "approver1", "/api/cases/{case_id}")
+    refusal = next(e for e in detail["timeline"] if e["type"] == "command_failed")
+    assert "the number is not on the team's dial allowlist" in refusal["summary"], "the banner and the timeline agree"
+    # Anything that isn't a pre-dial refusal keeps its stored text.
+    assert alert_message("Command place_call failed after 5 attempts",
+                         {"command": "place_call", "last_error": "voice service unreachable: ConnectError"}) \
+        == "Command place_call failed after 5 attempts"
+    assert alert_message("Command release_hold failed after 5 attempts", None) == "Command release_hold failed after 5 attempts"
 
 
 async def test_alerts_and_a_hand_edited_evidence_row(world, database_url):

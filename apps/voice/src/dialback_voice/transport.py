@@ -19,6 +19,11 @@ from .agent import Agent
 Clock = Callable[[], dt.datetime]
 
 
+def wall_clock() -> dt.datetime:
+    """The live clock: an aware UTC datetime, which the policy stamps on every answer (spec 0034, B2)."""
+    return dt.datetime.now(dt.UTC)
+
+
 @dataclass(frozen=True)
 class CallResult:
     end: policy.End
@@ -82,7 +87,8 @@ class VendorScript:
     consent: str = "yes"                # yes | no
     company: str = "Acme Fasteners"
     department: str = "Accounts payable"
-    name_role: str = "Jordan Lee, AP clerk"
+    name: str = "Jordan Lee"
+    role: str = "AP clerk"
     change: str = "yes"                 # yes | no | unsure
     last4: str = "4821"
     last4_mode: str = "keypad"          # keypad | speech | refuse | dont_know
@@ -119,8 +125,10 @@ class ScriptedVendor:
             return policy.CalleeSaid(at, s.company)
         if phase is Phase.DEPARTMENT:
             return policy.CalleeSaid(at, s.department)
-        if phase is Phase.NAME_ROLE:
-            return policy.CalleeSaid(at, s.name_role)
+        if phase is Phase.NAME:
+            return policy.CalleeSaid(at, s.name)
+        if phase is Phase.ROLE:
+            return policy.CalleeSaid(at, s.role)
         if phase is Phase.CHANGE:
             return policy.CalleeSaid(at, _CHANGE_LINE[s.change])
         if phase is Phase.LAST4:

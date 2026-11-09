@@ -41,9 +41,27 @@ PRE_DIAL_REASON = {
     "outside_calling_window": "outside the vendor's calling hours",
     "attempt_cap_reached": "the case has used its call attempts",
     "number_cap_reached": "the number has had its calls this month",
-    "not_on_dial_allowlist": "the number is not on the demo's dial allowlist",
+    "not_on_dial_allowlist": "the number is not on the team's dial allowlist",
     "voice_not_configured": "no voice service is configured",
 }
+
+
+def refusal_reason(body: dict[str, Any] | None) -> str | None:
+    """Why the voice service refused a call, in plain words, if this command_failed body is a
+    pre-dial refusal of place_call; None for anything else (spec 0031)."""
+    b = body or {}
+    error = str(b.get("last_error", ""))
+    if b.get("command") != "place_call" or not error.startswith(PRE_DIAL):
+        return None
+    code = error.removeprefix(PRE_DIAL).strip() or "unknown"
+    return PRE_DIAL_REASON.get(code, code)
+
+
+def alert_message(stored: str, failed_body: dict[str, Any] | None) -> str:
+    """The banner text for an alert (spec 0031): a refused call says why, in the timeline's words;
+    every other alert keeps the message the database stored."""
+    reason = refusal_reason(failed_body)
+    return f"The call wasn't placed: {reason}. The hold stays on and a person must review." if reason else stored
 
 
 def _plural(n: int, word: str) -> str:
@@ -98,10 +116,9 @@ def summary(event_type: str, body: dict[str, Any], actor_name: str) -> str:
         case "deadline_reached":
             return "Three business days passed without a decision; the hold stays on and a person must review."
         case "command_failed":
-            error = str(b.get("last_error", ""))
-            if b.get("command") == "place_call" and error.startswith(PRE_DIAL):
-                code = error.removeprefix(PRE_DIAL).strip() or "unknown"
-                return (f"The voice service checked the call and did not place it ({PRE_DIAL_REASON.get(code, code)}); "
+            reason = refusal_reason(b)
+            if reason:
+                return (f"The voice service checked the call and did not place it ({reason}); "
                         "the hold stays on and a person must review.")
             return f"A step kept failing ({b.get('command', 'unknown')}); the hold stays on and a person must review."
         case _:

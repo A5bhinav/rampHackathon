@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { MIN_NEW_PASSWORD, authMode, type SignUpNotice } from "@/lib/auth-mode";
+import { MIN_NEW_PASSWORD, PASSWORD_RULE, authMode, type SignUpNotice } from "@/lib/auth-mode";
 import { signUp } from "./actions";
 import { BrandMark } from "@/components/nav";
 
@@ -8,7 +8,7 @@ type Params = Partial<Record<SignUpNotice, string>>;
 
 const NOTICES: [SignUpNotice, string][] = [
   ["exists", "An account with that email already exists. Sign in instead."],
-  ["weak", `Choose a stronger password: ${MIN_NEW_PASSWORD} to 72 characters, not a common one.`],
+  ["weak", `Choose a stronger password: ${PASSWORD_RULE}.`],
   ["failed", "Check your name and email, then try again."],
   ["slow", "Too many attempts. Wait a few minutes, then try again."],
   ["unavailable", "Sign-up isn't available right now. Try again in a minute."],
@@ -36,7 +36,7 @@ export default async function SignUp({ searchParams }: { searchParams: Promise<P
           <label htmlFor="password">Password</label>
           <input id="password" name="password" type="password" autoComplete="new-password"
                  minLength={MIN_NEW_PASSWORD} maxLength={72} required />
-          <p className="muted">At least {MIN_NEW_PASSWORD} characters.</p>
+          <p className="muted sub field-hint">{PASSWORD_RULE[0].toUpperCase() + PASSWORD_RULE.slice(1)}.</p>
           <button className="primary" type="submit">Create account</button>
         </form>
         <p className="muted">Already have an account? <Link href="/sign-in">Sign in</Link></p>

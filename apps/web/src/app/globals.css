@@ -337,7 +337,7 @@ textarea, input[type="email"], input[type="password"], input[type="text"], selec
   transition: border-color 140ms var(--ease), box-shadow 140ms var(--ease); }
 textarea { min-height: 88px; resize: vertical; }
 textarea:focus, input:focus, select:focus { outline: none; border-color: var(--accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); border-radius: var(--radius-sm); }
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent); border-radius: var(--radius-sm); }
 select, button { font: inherit; }
 button, .button-link {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;

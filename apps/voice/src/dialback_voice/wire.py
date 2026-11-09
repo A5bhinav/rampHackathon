@@ -3,9 +3,8 @@
 `build_twilio_deps` returns the deps only when settings carries a validated `TwilioConfig`;
 otherwise it returns None, so `create_app(twilio=None)` mounts no Twilio routes and the service runs
 the text line (R7). It wires the real `TwilioOriginator` and the `CoreClient` report seam.
-`lookup_call` is threaded in: its psycopg query joins `voice.calls`, `app.cases` and the ledger
-pick, whose shapes are not final (Q40/Q50), so the entrypoint passes the real one once the ledger
-lands. `agent_for` is the live `ClaudeAgent` when `ANTHROPIC_API_KEY` is set (spec 0015), else the
+`lookup_call` is threaded in: the entrypoint passes the Postgres one (`pg_store.make_lookup`,
+spec 0029). `agent_for` is the live `ClaudeAgent` when `ANTHROPIC_API_KEY` is set (spec 0015), else the
 `ScriptedAgent` placeholder; the key gates the agent, not the Twilio routes."""
 from __future__ import annotations
 

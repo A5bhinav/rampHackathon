@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { PageHead } from "@/components/page";
 import type { Candidate, SelectionView } from "@/lib/api-types";
 import { PageHead } from "@/components/page-head";
 import { CoreError, core } from "@/lib/core";
@@ -26,9 +27,7 @@ export default async function LineagePage({ params }: { params: Promise<{ datase
         lead="The number this case will call, where the Trust Ledger saw it, and every number it refused."
       />
       {!s ? (
-        <section className="card">
-          <p>{view.notes.no_selection}</p>
-        </section>
+        <section className="card lead-card"><p>{view.notes.no_selection}</p></section>
       ) : (
         <>
           <Chosen view={view} />
@@ -84,13 +83,14 @@ function Chosen({ view }: { view: SelectionView }) {
         <p className="figure">{phone(pick.e164)}</p>
       </div>
       <dl className="facts">
-        <dt>Seen in</dt><dd><Sources candidate={pick} /></dd>
+        <dt>Seen in</dt><dd className="candidate-sources"><Sources candidate={pick} /></dd>
         <dt>First seen</dt><dd>{seenBefore(pick.first_seen_at, s.cutoff)} ({when(pick.first_seen_at)})</dd>
         <dt>Sightings</dt><dd>{pick.observation_count ?? "—"}</dd>
         <dt>Alternates</dt>
         <dd>{alternates.length ? alternates.map((a) => phone(a.e164)).join(", ") : "none"}{" "}
-          <span className="muted">{view.notes.alternates}</span></dd>
+          <div className="muted sub">{view.notes.alternates}</div></dd>
       </dl>
+      </div>
     </section>
   );
 }

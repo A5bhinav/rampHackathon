@@ -31,7 +31,8 @@ CALLBACK_HOUR = 10
 CALLBACK_TIME_QUESTION = "What time would work best for us to call you back?"
 AGENT_TOOLS = ("record_answer", "schedule_callback", "end_call")
 FIXED_WORDING = (Phase.CONSENT, Phase.CHANGE)  # yes/no questions: never the model's words
-_SCRIPTED_SLOTS = frozenset(PHASE_SLOT.values()) - {"recording_consent"} | {"speaker_role"}
+_SCRIPTED_SLOTS = frozenset(PHASE_SLOT.values()) - {"recording_consent"}
+_SPEAKER_PHASES = (Phase.NAME, Phase.ROLE)  # a new speaker is asked both again (spec 0012 D4, spec 0034)
 
 _YES = re.compile(r"\b(yes|yeah|yep|yup|sure|correct|right|okay|ok|fine|absolutely|definitely|certainly|of course"
                   r"|go ahead|we did|i did|uh huh|affirmative)\b")
@@ -94,12 +95,12 @@ class State:
 
     @property
     def phase(self) -> Phase | None:
-        """The first question not yet answered. A new speaker means the name is asked again."""
+        """The first question not yet answered. A new speaker means name and role are asked again."""
         changed = max((a["turn_id"] for a in self.answers if a["slot"] == "flag" and a["value"] == "speaker_changed"),
                       default=-1)
         for phase in ORDER:
             slot = PHASE_SLOT[phase]
-            if not any(a["slot"] == slot and (phase is not Phase.NAME_ROLE or a["turn_id"] >= changed)
+            if not any(a["slot"] == slot and (phase not in _SPEAKER_PHASES or a["turn_id"] >= changed)
                        for a in self.answers):
                 return phase
         return None

@@ -43,8 +43,9 @@ def test_each_check_returns_its_own_code():
     assert pre_dial_refusal(_ok(demo_dataset=True, number_on_allowlist=False)) == NOT_ON_DIAL_ALLOWLIST
 
 
-def test_allowlist_is_required_only_for_a_demo_dataset():
-    assert pre_dial_refusal(_ok(demo_dataset=False, number_on_allowlist=False)) is None
+def test_allowlist_is_required_for_every_dataset():
+    # AGENTS.md: "Never call a phone number outside the team allowlist", whatever the dataset (spec 0030).
+    assert pre_dial_refusal(_ok(demo_dataset=False, number_on_allowlist=False)) == NOT_ON_DIAL_ALLOWLIST
     assert pre_dial_refusal(_ok(demo_dataset=True, number_on_allowlist=True)) is None
 
 

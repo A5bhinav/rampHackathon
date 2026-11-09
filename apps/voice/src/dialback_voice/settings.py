@@ -51,6 +51,18 @@ class Settings:
     # POST /calls auth (create_app): the shared internal token, read in both modes, since the core
     # authenticates to the text line too. Empty when unset, so create_app rejects every call (R7).
     internal_api_token: bytes = b""
+    # The database (spec 0029): read in both modes, because the Postgres call store serves POST /calls
+    # on the text line too and the lookup serves the Twilio routes. None when unset, so the service
+    # refuses to boot rather than serve half-wired (R7).
+    database_url: str | None = None
+    # The fixed disclosure context (one customer per deployment), read only in live mode; empty in text
+    # mode and when unset, so dial_from_row fails a half-known call closed (R7, R8).
+    customer_name: str = ""
+    callback_number: str = ""
+    # The team dial allowlist (comma-separated E.164; empty: nobody is called, in any dataset) and the
+    # calling-hours time zone, read in both modes (spec 0029).
+    dial_allowlist: frozenset[str] = frozenset()
+    calling_tz: str = "America/Los_Angeles"
 
 
 def load_settings(env: Mapping[str, str] | None = None) -> Settings:
@@ -58,10 +70,24 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
     mode = env.get("DIALBACK_VOICE", "text")
     if mode not in ("text", "live"):
         mode = "text"  # any unknown value takes the safe default
-    key = env.get("ANTHROPIC_API_KEY") if mode == "live" else None
-    return Settings(voice_mode=mode, twilio=_load_twilio(env) if mode == "live" else None,
+    live = mode == "live"
+    key = env.get("ANTHROPIC_API_KEY") if live else None
+    twilio = _load_twilio(env) if live else None
+    customer = env.get("DIALBACK_CUSTOMER_NAME", "").strip() if live else ""
+    callback = env.get("DIALBACK_AP_CALLBACK_NUMBER", "").strip() if live else ""
+    if twilio is not None and not (customer and callback):
+        # The disclosure names the customer and a callback number (R8). Without them a call would ring
+        # and then fail to fetch its instructions, so the live path stays off (spec 0029).
+        log.warning("DIALBACK_VOICE=live without DIALBACK_CUSTOMER_NAME and DIALBACK_AP_CALLBACK_NUMBER; "
+                    "running the text line.")
+        twilio = None
+    return Settings(voice_mode=mode, twilio=twilio,
                     anthropic_api_key=key.encode() if key else None,
-                    internal_api_token=env.get("DIALBACK_INTERNAL_TOKEN", "").encode())
+                    internal_api_token=env.get("DIALBACK_INTERNAL_TOKEN", "").encode(),
+                    database_url=env.get("DATABASE_URL") or None,
+                    customer_name=customer, callback_number=callback,
+                    dial_allowlist=frozenset(n.strip() for n in env.get("DIALBACK_DIAL_ALLOWLIST", "").split(",") if n.strip()),
+                    calling_tz=env.get("DIALBACK_CALLING_TZ", "").strip() or "America/Los_Angeles")
 
 
 def _load_twilio(env: Mapping[str, str]) -> TwilioConfig | None:

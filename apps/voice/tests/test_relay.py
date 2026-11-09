@@ -118,8 +118,9 @@ def test_the_websocket_route_runs_a_call_and_reports():
     from dialback_policy.script import Script
     from dialback_voice.app import CallDial, TwilioDeps, run_relay_call
 
+    pick = uuid.UUID("7d0c1f3e-2a4b-4c5d-8e6f-9a0b1c2d3e4f")
     dial = CallDial(case_id=CASE, attempt=ATTEMPT, number_e164=NUMBER, customer_name="Northwind Traders",
-                    callback_number="(415) 555-0100", vendor_names=("Acme Fasteners",))
+                    callback_number="(415) 555-0100", vendor_names=("Acme Fasteners",), contact_point_id=pick)
     token = tokens.mint(KEY, case_id=CASE, attempt=ATTEMPT, number_e164=NUMBER)
     reported: list[dict] = []
 
@@ -130,7 +131,9 @@ def test_the_websocket_route_runs_a_call_and_reports():
                       public_base_url="https://voice.example", from_number="+14155550100", originator=None,
                       lookup_call=lambda cid: dial if cid == CALL else None, report_ended=report,
                       agent_for=ScriptedAgent, clock=lambda: dt.datetime(2026, 11, 1, 17, 0, tzinfo=dt.UTC))
-    ws = FakeWS([_setup(token), {"type": "prompt", "voicePrompt": "No, I'd rather not.", "last": True}])
+    setup = _setup(token) | {"direction": "outbound-api"}
+    setup["customParameters"]["answered_by"] = "human"   # from machine detection, via our TwiML
+    ws = FakeWS([setup, {"type": "prompt", "voicePrompt": "No, I'd rather not.", "last": True}])
 
     asyncio.run(run_relay_call(deps, CALL, ws))
 
@@ -140,6 +143,12 @@ def test_the_websocket_route_runs_a_call_and_reports():
     assert sent[0] == script.consent_question()          # the first token over the socket is the consent ask
     assert reported and reported[0]["result"] == "answers_recorded"
     assert reported[0]["call_id"] == str(CALL) and reported[0]["case_id"] == str(CASE)
+    assert reported[0]["contact_point_id"] == str(pick)  # spec 0030: decide() needs the pick dialed
+    # Spec 0029: the facts decide() checks (V02, V03, V10, V11), from code, never the model.
+    assert reported[0]["direction"] == "outbound" and reported[0]["dialed_number_is_pick"] is True
+    assert reported[0]["answered_by"] == "human"
+    assert set(reported[0]["checks"]) == {"disclosure_first", "answers_grounded", "agent_spoke_account_digits",
+                                          "new_number_accepted", "policy_violations", "speech_guard_trips"}
 
 
 def test_a_forged_setup_reports_failed_to_the_core():
@@ -167,3 +176,5 @@ def test_a_forged_setup_reports_failed_to_the_core():
     assert ws.closed is True
     assert reported and reported[0]["result"] == "failed"
     assert "answers" not in reported[0]                  # a rejected setup records nothing
+    for fact in ("dialed_number_is_pick", "direction", "answered_by", "checks"):
+        assert fact not in reported[0], fact             # nothing vouched for on a socket we didn't place

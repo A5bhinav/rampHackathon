@@ -3,7 +3,9 @@ import { OutcomeBadge, StateBadge } from "@/components/badges";
 import { PageHead, Stats } from "@/components/page-head";
 import type { CaseState, CaseSummary } from "@/lib/api-types";
 import { core } from "@/lib/core";
-import { ago, datasetNow, date, dueLabel, relative, when } from "@/lib/format";
+import { stationCounts } from "@/lib/flow";
+import { demoStory } from "@/lib/story";
+import { ago, brief, datasetNow, date, dueLabel, relative, when } from "@/lib/format";
 
 // Case queue: unfinished cases by state and age, and held bills near their due date (design,
 // "Dashboard"). Cases waiting on a person come first, soonest saved payment date first, then
@@ -17,14 +19,19 @@ function bySoonestPayment(a: CaseSummary, b: CaseSummary): number {
   return ka === kb ? a.opened_at.localeCompare(b.opened_at) : ka.localeCompare(kb);
 }
 
-export default async function CaseQueue({ params }: { params: Promise<{ datasetId: string }> }) {
+export default async function CaseQueue({ params, searchParams }: {
+  params: Promise<{ datasetId: string }>;
+  searchParams: Promise<{ missing?: string }>;
+}) {
   const { datasetId } = await params;
+  const asked = demoStory((await searchParams).missing ?? "");
   const [cases, datasets] = await Promise.all([core.cases(datasetId), core.datasets()]);
   const now = datasetNow(datasets.find((d) => d.id === datasetId)?.sim_now);
   const waiting = cases.filter((c) => NEEDS_A_PERSON.includes(c.state)).sort(bySoonestPayment);
   const working = cases.filter((c) => !NEEDS_A_PERSON.includes(c.state)).sort(bySoonestPayment);
   const dueSoon = cases.filter((c) => dueLabel(c.next_payment_date, now)?.soon).length;
   const unconfirmed = cases.filter((c) => c.hold_status === "failed").length;
+  const missing = asked && !cases.some((c) => c.vendor.legal_name === asked.legal_name) ? asked : undefined;
 
   return (
     <main>
@@ -45,6 +52,14 @@ export default async function CaseQueue({ params }: { params: Promise<{ datasetI
   );
 }
 
+// A stripe on the vendor cell for what needs eyes first: an unconfirmed hold, a payment due soon, a block.
+function stripe(c: CaseSummary, soon: boolean): string {
+  if (c.hold_status === "failed" || soon || c.state === "blocked") return "is-bad";
+  if (c.state === "needs_review") return "is-warn";
+  if (c.state === "awaiting_release") return "is-ok";
+  return "";
+}
+
 function QueueTable({ title, cases, datasetId, now }: { title: string; cases: CaseSummary[]; datasetId: string; now: Date }) {
   return (
     <section className="card table-wrap queue-group" aria-label={title}>
@@ -57,21 +72,21 @@ function QueueTable({ title, cases, datasetId, now }: { title: string; cases: Ca
           {cases.map((c) => {
             const due = dueLabel(c.next_payment_date, now);
             return (
-              <tr key={c.id}>
+              <tr key={c.id} className={stripe(c, Boolean(due?.soon))}>
                 <td>
                   <Link href={`/d/${datasetId}/cases/${c.id}`}>{c.vendor.legal_name}</Link>
                   {c.unknown_changer ? <div className="cell-note"><span className="badge tone-warn">two approvers</span></div> : null}
                 </td>
-                <td><StateBadge state={c.state} />{c.version > 1 ? <div className="muted sub">change {c.version}</div> : null}</td>
+                <td><StateBadge state={c.state} />{c.version > 1 ? <div className="muted sub cell-note">change {c.version}</div> : null}</td>
                 <td><OutcomeBadge outcome={c.outcome} /></td>
                 <td className="num">{c.hold_status === "failed" ? <span className="badge tone-bad">hold not confirmed</span> : c.bills_held}</td>
                 <td>
                   {date(c.next_payment_date)}
                   {due ? <div className="cell-note"><span className={`badge ${due.soon ? "tone-bad" : "tone-muted"}`}>{due.text}</span></div> : null}
                 </td>
-                <td>{when(c.opened_at)}<div className="muted sub">{ago(c.opened_at, now)}</div></td>
-                <td>
-                  {when(c.deadline_at)}
+                <td className="nowrap"><span title={when(c.opened_at)}>{brief(c.opened_at)}</span><div className="muted sub">{ago(c.opened_at, now)}</div></td>
+                <td className="nowrap">
+                  <span title={when(c.deadline_at)}>{brief(c.deadline_at) || "—"}</span>
                   {c.deadline_at && c.state !== "releasing" ? (  // as on the case page: no countdown once a release is under way
                     <div className="muted sub">{Date.parse(c.deadline_at) < now.getTime() ? "passed" : relative(c.deadline_at, now)}</div>
                   ) : null}
@@ -81,6 +96,7 @@ function QueueTable({ title, cases, datasetId, now }: { title: string; cases: Ca
           })}
         </tbody>
       </table>
+      </div>
     </section>
   );
 }

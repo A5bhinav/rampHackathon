@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ChainBadge, OutcomeBadge, StateBadge } from "@/components/badges";
+import { ChainBadge, StateBadge } from "@/components/badges";
 import { DecisionConsole } from "@/components/console";
 import { DecisionDetail } from "@/components/decision";
 import { PageHead } from "@/components/page-head";
@@ -18,6 +18,8 @@ const NOTICES: Record<string, string> = {
   already_applied: "That was already recorded.",
   awaiting_second_approver: "Your approval is recorded. A second approver must release this change.",
 };
+
+const EDGE: Record<string, string> = { verified: "edge-ok", not_verified: "edge-bad", needs_review: "edge-warn" };
 
 export default async function CaseDetailPage({ params, searchParams }: {
   params: Promise<{ datasetId: string; caseId: string }>;
