@@ -151,3 +151,23 @@ def test_a_call_on_the_default_clock_records_the_callee_answer():
     result = run_call(ctx, ScriptedAgent(), ScriptedVendor(VendorScript(consent="no")), clock=_default_clock())
     assert (result.end.result, result.end.reason) == ("answers_recorded", "consent_refused")
     assert [a["value"] for a in result.answers["answers"] if a["slot"] == "recording_consent"] == ["no"]
+
+
+def test_uvicorn_has_a_websocket_backend():
+    # Spec 0034, B4: ConversationRelay is a WebSocket. With no backend installed uvicorn logs "No
+    # supported WebSocket library detected" and answers the upgrade 404. The image installs only the
+    # declared runtime dependencies (uv sync --no-dev --package dialback-voice), so the backend must
+    # be declared, not just present in a dev venv.
+    import tomllib
+    from pathlib import Path
+
+    from uvicorn.config import Config
+    pyproject = Path(__file__).resolve().parents[1] / "pyproject.toml"
+    deps = [d.replace(" ", "") for d in tomllib.loads(pyproject.read_text())["project"]["dependencies"]]
+    assert any(d.startswith(("uvicorn[standard]", "websockets", "wsproto")) for d in deps), deps
+
+    async def asgi(scope, receive, send):  # pragma: no cover - never served
+        pass
+    config = Config(asgi, ws="auto")
+    config.load()
+    assert config.ws_protocol_class is not None
