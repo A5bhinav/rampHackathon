@@ -71,7 +71,8 @@ curl -s -i --http1.1 --max-time 5 -H "Connection: Upgrade" -H "Upgrade: websocke
 Expect `HTTP/1.1 101 Switching Protocols`: the ConversationRelay socket opens through Railway.
 The call id is unknown, so the service closes the socket at once, and nothing is called or
 recorded. `404` here, after a `401` above, means the image has no WebSocket library
-(`specs/0034-live-call-blockers.md`, B4).
+(`specs/0034-live-call-blockers.md`, B4). `403` goes with a `404` above: the library is there,
+but the text line has no relay route (seen on the deployed service on Nov 8).
 
 The pre-flight cannot see a missing `ANTHROPIC_API_KEY`. Check the voice deploy log for "wired
 with the ScriptedAgent placeholder": if it is there, the key is missing.
