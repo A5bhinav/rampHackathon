@@ -3,6 +3,8 @@ import { CoreError, core } from "@/lib/core";
 import { phone } from "@/lib/lineage";
 import { counts, statusLabel, statusTone } from "@/lib/risk";
 
+const STRIPE = { near_miss: "is-bad", unproven: "is-warn", missing: "", provable: "is-ok" } as const;
+
 // The vendor risk list (spec 0026, owner Inesh), the demo's opening screen: is each vendor's number
 // on file one the Trust Ledger can prove? Every explanation is the ledger's status_text.
 export default async function RiskPage({ params }: { params: Promise<{ datasetId: string }> }) {
@@ -14,6 +16,7 @@ export default async function RiskPage({ params }: { params: Promise<{ datasetId
 
   return (
     <main>
+      <p className="eyebrow">Trust Ledger</p>
       <h1>Vendor risk</h1>
       <p style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         {counts(vendors).map(([status, n]) => (
@@ -24,9 +27,9 @@ export default async function RiskPage({ params }: { params: Promise<{ datasetId
         <section className="card"><p className="muted">The Trust Ledger has no documents for this dataset&apos;s vendors yet.</p></section>
       ) : (
         <section className="card" aria-label="Vendors">
-          <ul className="plain" style={{ listStyle: "none", paddingLeft: 0, margin: 0 }}>
+          <ul className="striped-list">
             {vendors.map((v) => (
-              <li key={v.vendor_id} style={{ padding: "12px 0", borderBottom: "1px solid var(--line)" }}>
+              <li key={v.vendor_id} className={STRIPE[v.status]}>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
                   <strong>{v.legal_name}</strong>
                   <span className={`badge ${statusTone(v.status)}`}>{statusLabel(v.status)}</span>

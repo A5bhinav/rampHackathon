@@ -20,7 +20,8 @@ export default async function LineagePage({ params }: { params: Promise<{ datase
 
   return (
     <main>
-      <p><Link href={back}>← {detail.case.vendor.legal_name}</Link></p>
+      <p className="back"><Link href={back}><span className="arrow" aria-hidden="true">←</span> {detail.case.vendor.legal_name}</Link></p>
+      <p className="eyebrow">Trust Ledger</p>
       <h1>Number lineage</h1>
       {!s ? (
         <section className="card">
@@ -31,9 +32,9 @@ export default async function LineagePage({ params }: { params: Promise<{ datase
           <Chosen view={view} />
           <section className="card" aria-labelledby="all-h">
             <h2 id="all-h">Every number considered</h2>
-            <ul className="plain" style={{ listStyle: "none", paddingLeft: 0, margin: 0 }}>
+            <ul className="striped-list">
               {s.candidates.map((c) => (
-                <li key={c.contact_point_id} style={{ padding: "12px 0", borderBottom: "1px solid var(--line)" }}>
+                <li key={c.contact_point_id} className={c.contact_point_id === chosen ? "is-ok" : c.eligible ? "is-info" : "is-bad"}>
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
                     <span className="mono" style={{ whiteSpace: "nowrap", fontSize: "1.05rem" }}>{phone(c.e164)}</span>
                     {c.eligible
@@ -77,7 +78,7 @@ function Chosen({ view }: { view: SelectionView }) {
   return (
     <section className="card" aria-labelledby="pick-h">
       <h2 id="pick-h">The number Dialback will call</h2>
-      <p className="mono" style={{ fontSize: "1.4rem", margin: "4px 0" }}>{phone(pick.e164)}</p>
+      <p className="figure">{phone(pick.e164)}</p>
       <dl className="facts">
         <dt>Seen in</dt><dd><Sources candidate={pick} /></dd>
         <dt>First seen</dt><dd>{seenBefore(pick.first_seen_at, s.cutoff)} ({when(pick.first_seen_at)})</dd>
@@ -96,5 +97,5 @@ function Sources({ candidate }: { candidate: Candidate }) {
 }
 
 function Reasons({ candidate, text }: { candidate: Candidate; text: SelectionView["reason_text"] }) {
-  return <ul style={{ margin: "8px 0 0", paddingLeft: 20 }}>{candidate.reasons.map((r) => <li key={r}>{text[r]}</li>)}</ul>;
+  return <ul className="reasons">{candidate.reasons.map((r) => <li key={r}>{text[r]}</li>)}</ul>;
 }

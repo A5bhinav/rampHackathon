@@ -27,6 +27,7 @@ export default async function CaseQueue({ params }: { params: Promise<{ datasetI
 
   return (
     <main>
+      <p className="eyebrow">Held payments</p>
       <h1>Case queue</h1>
       <p className="muted">Every vendor whose bank details changed. Payments stay on hold until a different person releases them.</p>
       <div className="summary" role="group" aria-label="Summary">
