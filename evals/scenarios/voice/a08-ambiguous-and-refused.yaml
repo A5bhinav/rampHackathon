@@ -3,6 +3,7 @@ class: hijacked_thread_new_number
 is_attack: true
 customer_name: Northwind Traders
 vendor_name: Acme Fasteners
+expect_rule: NR09_change_unsure            # the defense under test (spec 0017, F4)
 caller:
   consent: 'yes'
   company: Acme Fasteners

@@ -25,6 +25,9 @@ _CONSENT = frozenset({"yes", "no"})
 _CHANGE = frozenset({"yes", "no", "unsure"})
 _ANSWERED_BY = frozenset({"human", "machine"})
 _DIRECTIONS = frozenset({"outbound", "inbound"})
+_ENDS = frozenset({"answers_recorded", "voicemail", "failed", "no_answer"})
+LEGIT_CLASSES = frozenset({"legit_bank_switch", "legit_odd_contact"})
+_RULE_ID = re.compile(r"(V|NV|NR|S)[0-9]{2}_[a-z_]+")
 _FOUR_DIGITS = re.compile(r"[0-9]{4}")
 
 
@@ -70,6 +73,8 @@ class Scenario:
     vendor_name: str            # the real vendor being verified (company_matches compares to this)
     caller: CallerBehavior
     facts: DeclaredFacts
+    expect_rule: str | None = None      # the decision rule that must fire (the defense under test)
+    expect_end: str = "answers_recorded"  # how the call must end
 
 
 def load_scenarios(directory: str | Path) -> list[Scenario]:
@@ -127,14 +132,23 @@ def _parse(path: Path) -> Scenario:
         line_risk=_tri(path, f.get("line_risk")),
         direction=one_of(f.get("direction", "outbound"), _DIRECTIONS, "direction"),
     )
+    scenario_class = one_of(need("class", raw), CLASSES, "class")
+    is_attack = bool(need("is_attack", raw))
+    if is_attack == (scenario_class in LEGIT_CLASSES):
+        raise ValueError(f"{path.name}: is_attack {is_attack} disagrees with class '{scenario_class}'")
+    expect_rule = raw.get("expect_rule")
+    if expect_rule is not None and not _RULE_ID.fullmatch(str(expect_rule)):
+        raise ValueError(f"{path.name}: expect_rule '{expect_rule}' is not a decision rule id")
     return Scenario(
         id=str(need("id", raw)),
-        scenario_class=one_of(need("class", raw), CLASSES, "class"),
-        is_attack=bool(need("is_attack", raw)),
+        scenario_class=scenario_class,
+        is_attack=is_attack,
         customer_name=str(need("customer_name", raw)),
         vendor_name=str(need("vendor_name", raw)),
         caller=caller,
         facts=facts,
+        expect_rule=None if expect_rule is None else str(expect_rule),
+        expect_end=one_of(raw.get("expect_end", "answers_recorded"), _ENDS, "expect_end"),
     )
 
 

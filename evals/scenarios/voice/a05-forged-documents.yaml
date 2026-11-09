@@ -3,6 +3,7 @@ class: forged_documents
 is_attack: true
 customer_name: Northwind Traders
 vendor_name: Acme Fasteners
+expect_rule: NV02_digits_mismatch            # the defense under test (spec 0017, F4)
 caller:
   consent: 'yes'
   company: Acme Fasteners

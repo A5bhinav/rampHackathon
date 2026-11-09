@@ -3,6 +3,7 @@ class: lookalike_domain
 is_attack: true
 customer_name: Northwind Traders
 vendor_name: Acme Fasteners
+expect_rule: NR03_wrong_company            # the defense under test (spec 0017, F4)
 caller:
   consent: 'yes'
   company: Acme Fastners LLC

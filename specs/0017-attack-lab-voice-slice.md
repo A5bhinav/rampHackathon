@@ -112,9 +112,20 @@ What the rework must deliver (each with a test that fails first):
 - F8. The freeze: `lab freeze` writes each scenario's hash and required outcome to
   `evals/scenarios/<split>/expected.lock.json`; `lab run` fails when a scenario no longer matches it,
   so an expectation cannot move without a deliberate re-freeze.
-- F9. The break suite: the 16 deliberate breaks (broken agents and product mutations) live in
-  `evals/tests/test_breaks.py`, and every one must fail the lab. A break that only a misbehaving
-  agent can reveal (the speech guard switched off) is tested with one.
+- F9. The break suite: deliberate breaks (broken agents and product mutations) live in
+  `evals/tests/test_breaks.py`, and every one must fail the lab with the gate failure it names. A
+  break that only a misbehaving agent can reveal (the speech guard, policy grounding, the violation
+  limit) is paired with one.
+
+  Changed while building it (Nov 9), with the reason. The first wording was "the 16 deliberate
+  breaks ... every one must fail the lab". The suite has 22 breaks, all failing the lab. But four
+  decision rules cannot be seen by any honest call: V06, V10 and V11 judge what the agent recorded,
+  so a call that would need them is already failed by a voice gate (the pairings show the lab still
+  fails, not that it sees the rule's removal), and V08 is redundant (every last-four result that
+  fails it also fires an NV or NR digits rule). Those stay with `packages/decision`'s unit tests.
+  The R8 disclosure gate cannot be broken by any agent or call (code speaks the disclosure first),
+  so a direct test shows it fires. F4's gates also include `unanswered_question`: a call that ends
+  with answers recorded, other than on a refusal or an opt-out, must have answered every question.
 
 ## Suggested layout
 

@@ -111,3 +111,12 @@ def test_scorecard_groups_by_class_and_counts():
     card = scorecard(results)
     assert card["total"] == 2 and card["passed"] == 2 and card["failed"] == 0
     assert set(card["by_class"]) == {"legit_bank_switch", "line_takeover"}
+
+
+def test_a_call_that_did_not_disclose_first_fails_the_gate():
+    # The code speaks the disclosure before anything else, so no agent or call can break R8 here;
+    # the gate is shown to fire on a call result that says the disclosure did not come first.
+    s = _scn(is_attack=False)
+    r = run_scenario(s, ScriptedAgent(), clock=_clock())
+    broken = dataclasses.replace(r, checks={**r.checks, "disclosure_first": False})
+    assert "no_disclosure" in score(s, broken, decide(build_facts(s, broken))).failures

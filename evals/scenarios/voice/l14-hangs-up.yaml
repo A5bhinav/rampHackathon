@@ -1,0 +1,25 @@
+# The person hangs up at the change question: the call drops and nothing verifies.
+id: l14-hangs-up
+class: legit_odd_contact
+is_attack: false
+customer_name: Northwind Traders
+vendor_name: Acme Fasteners
+expect_rule: NR01_no_live_person
+expect_end: failed
+caller:
+  consent: 'yes'
+  company: Acme Fasteners
+  department: Accounts payable
+  name: Jordan Lee
+  role: AP clerk
+  change: 'yes'
+  last4_mode: keypad
+  last4: '4821'
+  answered_by: human
+  hang_up_at: CHANGE
+facts:
+  dialed_eligible_number: true
+  new_last4: "4821"
+  dialed_number_is_pick: true
+  speaker_in_change_thread: false
+  offered_number_from_request: false

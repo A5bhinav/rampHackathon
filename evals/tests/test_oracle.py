@@ -29,9 +29,10 @@ def test_reachable_legit_must_verify():
     assert required(_scn(is_attack=False)).verdict_must_be == "verified"
 
 
-def test_legit_but_refused_requires_nothing_strict():
+def test_legit_that_cannot_verify_must_not_verify():
+    # Review fix F5: this test used to require nothing here, so a fail-open digits rule passed the lab.
     r = required(_scn(is_attack=False, last4_mode="refuse", new_last4="4821"))
-    assert r.verdict_must_be is None and r.verdict_must_not_be == ()
+    assert r.verdict_must_be is None and r.verdict_must_not_be == ("verified",)
 
 
 def test_legit_speaker_from_change_thread_is_not_reachable():
