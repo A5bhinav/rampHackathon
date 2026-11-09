@@ -19,8 +19,7 @@ export function DecisionDetail({ decision }: { decision: DecisionInfo }) {
         <span className="muted sub">{when(decision.decided_at)}</span>
         <span className="muted sub">Engine <span className="mono">{decision.engine_version}</span></span>
       </div>
-      {decision.effect ? <p className="effect">{decision.effect}</p> : null}
-      {groups ? groups.filter((g) => !(g.key === "met" && listed.size)).map((g) => (
+      {groups ? groups.map((g) => (
         <div key={g.key} className="rule-group">
           <h3 className={`tone-text-${g.tone}`}>{g.title}</h3>
           <ul className="plain">
