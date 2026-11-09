@@ -9,7 +9,7 @@
     "typecheck": "tsc --noEmit",
     "test": "node --test 'tests/*.test.ts'",
     "gen:api": "openapi-typescript ../../packages/contracts/openapi/dialback.yaml -o ../../packages/contracts/generated/ts/dialback.ts",
-    "check:api": "openapi-typescript ../../packages/contracts/openapi/dialback.yaml -o node_modules/.cache/dialback-api-check.ts && diff -q node_modules/.cache/dialback-api-check.ts ../../packages/contracts/generated/ts/dialback.ts"
+    "check:api": "openapi-typescript ../../packages/contracts/openapi/dialback.yaml -o node_modules/.cache/dialback-api-check.ts && node scripts/same-file.mjs node_modules/.cache/dialback-api-check.ts ../../packages/contracts/generated/ts/dialback.ts"
   },
   "dependencies": {
     "@supabase/ssr": "0.12.7",
