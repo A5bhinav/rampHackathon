@@ -13,6 +13,7 @@ dependencies = [
   "pyjwt[crypto]>=2.10.1",  # crypto: Supabase signs with EC or RSA keys (spec 0010); 2.10.0 matched issuers partially
   "dialback-decision",
   "dialback-ledger",
+  "dialback-policy",  # the call's fixed text, shown on the case page (spec 0035)
 ]
 
 [project.scripts]
@@ -27,6 +28,7 @@ dev = ["pytest>=8", "anyio>=4", "dialback-ramp-mock", "jsonschema>=4.23", "pyyam
 dialback-ramp-mock = { workspace = true }
 dialback-decision = { workspace = true }
 dialback-ledger = { workspace = true }
+dialback-policy = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]

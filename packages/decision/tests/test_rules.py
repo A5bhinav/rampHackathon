@@ -166,3 +166,13 @@ def test_an_earlier_callback_call_is_valid_and_counts_against():
     assert decide(replace(GOOD, earlier_calls=(asked_back,))).outcome == "verified", "a callback alone is no concern"
     said_no = EarlierCall(result="callback_requested", recording_consent=CONSENTED, change_requested=("no",))
     assert decide(replace(GOOD, earlier_calls=(said_no,))).rules_fired == ("NV01_vendor_denied_change",)
+
+
+def test_every_rule_an_answer_feeds_exists():
+    """Spec 0035: the slot table names only real rules, and every recordable slot."""
+    from dialback_decision.engine import _all_rules
+    from dialback_decision.rules import SLOT_RULES
+    ids = {r.id for r in _all_rules()}
+    assert set(SLOT_RULES) == {"recording_consent", "company_named", "department", "speaker_name", "speaker_role",
+                               "change_requested", "account_last4", "offered_number", "flag"}
+    assert {i for feeds in SLOT_RULES.values() for i in feeds} <= ids
