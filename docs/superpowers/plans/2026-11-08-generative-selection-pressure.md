@@ -126,9 +126,11 @@ def test_generator_covers_every_reason_and_knob():
         out = run(world)
         seen.update({r for c in out["candidates"] for r in c["reasons"]})
         seen.update(k for k, v in profile(world).items() if v)
+        seen["some_eligible"] += any(c["eligible"] for c in out["candidates"])
     sample()
     low = {k: seen[k] / n[0] for k in REASONS | KNOBS if seen[k] / n[0] < (0.05 if k in REASONS else 0.03)}
     assert low == {}, low   # every reason fires in >= 5% of worlds, every knob path in >= 3%
+    assert seen["some_eligible"] / n[0] >= 0.5   # safety invariants are trivially true with nothing eligible
 
 def test_clean_worlds_have_no_attacker_knob():
     from dialback_evals.worldgen import clean_worlds   # local import: the RED run needs only profile()
