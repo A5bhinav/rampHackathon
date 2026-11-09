@@ -89,7 +89,7 @@ def test_generator_covers_every_reason_and_knob():
         seen["context_label_on_provable"] += len(ok) >= 2 and bool(labeled)
     sample()
     # I12 needs a second provable number for the call to move to, and its removal half needs a context
-    # label on a provable number (floors set Nov 8 before measuring; the old mix gave about 5% and 0%).
+    # label on a provable number (floors set Nov 8 before measuring; the old mix gave 3.7% and 1.2% on this sample).
     floors = {"two_provable": 0.20, "context_label_on_provable": 0.05}
     short = {k: round(seen[k] / n[0], 3) for k, bar in floors.items() if seen[k] / n[0] < bar}
     assert short == {}, short

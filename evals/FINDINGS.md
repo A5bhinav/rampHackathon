@@ -124,7 +124,9 @@ These are not reachable today, but each is frozen as a regression.
 
 ### B1. I12 never probes the change-request email itself
 
-- **Status:** confirmed (ran). Being fixed (Nov 9).
+- **Status:** confirmed (ran). **Fixed Nov 9** (b5da22e, d54397c): the probe covers the request email,
+  own-domain thread replies and ingestion's label shapes; the generator puts labels in the request
+  email; `planted-number-picked-after-bare-mention-in-request` is frozen from real ingestion.
 - **What is wrong:**
   - Real ingestion puts the attacker's label in the request email's own body.
   - The generator never puts a sighting on the request document, and I12's addition half probes
@@ -135,7 +137,8 @@ These are not reachable today, but each is frozen as a regression.
 
 ### B2. The lab's stand-in for the fail-closed fix is wrong
 
-- **Status:** confirmed (read). Being fixed.
+- **Status:** confirmed (read). **Fixed Nov 9** (704f91b): the stand-in is narrow and schema-valid,
+  and the whole oracle finds nothing new against it over 200 worlds.
 - **What is wrong:** `_fail_closed` in `evals/tests/test_invariants.py` has three problems:
   - it emits schema-invalid output (it keeps `contact_point_id`, `alternates` and `source_types`,
     and has no `reason`);
@@ -152,7 +155,8 @@ These are not reachable today, but each is frozen as a regression.
 
 ### B4. Frozen-case history was overwritten
 
-- **Status:** confirmed (ran). Being fixed.
+- **Status:** confirmed (ran). **Fixed Nov 9**: the original labels are restored, and the README says
+  `labels` is never rewritten.
 - **What is wrong:**
   - Refreshing the notes on `planted-number-picked-after-in-thread-bank-label` and
     `fuzz-seed0-m-incontext-label-blocked-7de35644` rewrote their `labels` field.
@@ -179,7 +183,7 @@ These are not reachable today, but each is frozen as a regression.
 - **Status:** reported.
 - **Items:**
   - `context_label_on_provable` counts a label on any provable number, not only on the pick.
-  - A test comment's "about 5% and 0%" contradicts the measured 3.7% and 1.2%.
+  - A test comment's "about 5% and 0%" contradicted the measured 3.7% and 1.2% (fixed Nov 9).
   - The acceptance clause "the first-cut generator fails this check" has no test.
 
 ### B7. Deferred minors from the first review

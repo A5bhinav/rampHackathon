@@ -1,7 +1,9 @@
 {
   "label": "fuzz-seed0-m-incontext-label-blocked-7de35644",
-  "labels": [],
-  "why": "Found by lab fuzz at seed 0 within 2000 examples under I12's first wording (a label in the change context must not make a number ineligible). Passes since I12 was narrowed the same day (Nov 8) to 'never moves the call': this world has one eligible number, so refusing the case is allowed. Kept as a regression for that boundary.",
+  "labels": [
+    "M_incontext_label_blocked"
+  ],
+  "why": "Found by lab fuzz at seed 0 within 2000 examples under I12's first wording (a label in the change context must not make a number ineligible). Passes since I12 was narrowed the same day (Nov 8) to 'never moves the call': this world has one eligible number, so refusing the case is allowed. Kept as a regression for that boundary. The labels field keeps the check that failed when this case was frozen; it passes today.",
   "case_id": "00000000-0000-0000-0000-000000000001",
   "dataset_id": "00000000-0000-0000-0000-000000000002",
   "vendor_id": "00000000-0000-0000-0000-000000000003",

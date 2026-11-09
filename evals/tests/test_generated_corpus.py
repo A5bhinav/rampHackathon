@@ -3,12 +3,16 @@ and every case the lab has frozen is re-run against the real rule (a found case 
 from __future__ import annotations
 
 import dataclasses
+import datetime as dt
 import re
+import uuid
 from pathlib import Path
 
 import pytest
-from dialback_evals.gencorpus import freeze, fuzz, load_all, load_world, rerun
-from dialback_evals.worldgen import NumberSpec, SightingSpec, make_world, run
+from dialback_evals.gencorpus import freeze, fuzz, load_all, load_world, rerun, world_digest
+from dialback_evals.worldgen import NumberSpec, SightingSpec, World, make_world, run
+from dialback_ledger.ingest import ingest_all
+from dialback_ledger.select import ChangeRequest, DocumentRef, Settings, Sighting
 
 ROOT = Path(__file__).resolve().parents[2]
 GENERATED = ROOT / "evals" / "corpus-generated"
@@ -105,3 +109,56 @@ def test_rerun_reports_frozen_cases_the_rule_still_fails(tmp_path, monkeypatch):
 def test_frozen_findings_rerun_against_the_rule():
     failing = rerun(GENERATED)
     assert failing == [], failing   # each frozen finding must pass on the rule; red until select() is fixed
+
+
+# Review 2, B1: the production attack as real ingestion shapes it. The frozen case is rebuilt here from
+# documents through the ledger's own ingest_all (stub reader), so it cannot drift from what ingestion does.
+INGESTED = "planted-number-picked-after-bare-mention-in-request"
+REAL_LINE, PLANTED_LINE = "+14155550142", "+16455550177"
+
+
+def _ingested_world() -> World:
+    """The vendor's real number in a contract and a listing 200 days back, a planted number in a contract
+    and a listing 150 days back, and a change request whose own body mentions the real number with no
+    label the reader can place, the classic wording of a fraudulent request."""
+    t0 = dt.datetime(2026, 10, 1, 16, tzinfo=dt.UTC)
+
+    def doc(doc_id, channel, days, sender, thread, subject, *texts):
+        when = (t0 - dt.timedelta(days=days)).isoformat()
+        spans = [{"text": t, "x": 72, "y": 100 + 20 * n, "size": 11, "color": "#000000"} for n, t in enumerate(texts)]
+        return {"id": doc_id, "kind": "email" if channel == "email" else "pdf",
+                "custody": {"channel": channel, "received_at": when, "sender": sender, "thread_id": thread,
+                            "subject": subject},
+                "pages": [{"width": 612, "height": 792, "spans": spans}]}
+
+    ingested = ingest_all([
+        doc("c1", "contract", 200, None, None, None, "Accounts receivable: (415) 555-0142"),
+        doc("l1", "listing", 200, None, None, None, "Accounts receivable: (415) 555-0142"),
+        doc("c2", "contract", 150, None, None, None, "Accounts receivable: (645) 555-0177"),
+        doc("l2", "listing", 150, None, None, None, "Accounts receivable: (645) 555-0177"),
+        doc("req", "email", 0, "ap@acme.example", "req", "Updated banking details",
+            "Hello, please update our banking details for future payments.",
+            "Please stop using our old number (415) 555-0142."),
+    ], extractor_version="lab-0033")
+    req = next(d for d in ingested.documents if d["id"] == "req")
+    settings = Settings()
+    kwargs = {
+        "case_id": uuid.UUID(int=1), "dataset_id": uuid.UUID(int=2), "vendor_id": uuid.UUID(int=3),
+        "vendor_domains": ("acme.example",),
+        "request": ChangeRequest("req", req["received_at"], "req", req["subject"], req["sender"]),
+        "requested_cutoff": t0, "case_opened_at": t0 + dt.timedelta(hours=1),
+        "documents": [DocumentRef(d["id"], d["custody_channel"], d["received_at"], d["sender"], d["thread_id"],
+                                  d["subject"], d["received_at"]) for d in ingested.documents],
+        "sightings": [Sighting(o["value_normalized"], o["document_id"], o["source_type"], o["seen_at"], o["visibility"],
+                               o["role"], o["party"], o["seen_at"]) for o in ingested.observations],
+        "settings": settings,
+    }
+    return World(kwargs=kwargs, poison=frozenset({PLANTED_LINE}), settings=settings)
+
+
+def test_ingested_case_is_still_what_real_ingestion_produces():
+    world = _ingested_world()
+    req = world.kwargs["request"]
+    assert [(s.e164, s.party) for s in world.kwargs["sightings"] if s.document_id == req.document_id] == [
+        (REAL_LINE, "unknown")]                      # the bare mention, in the request email itself
+    assert world_digest(world) == world_digest(load_world(GENERATED / INGESTED))
