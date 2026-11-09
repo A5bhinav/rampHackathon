@@ -77,6 +77,20 @@ def test_a_pinned_pick_that_is_gone_fails_closed(database_url):
     assert _lookup(database_url)(s["call_id"]) is None
 
 
+def test_a_pick_for_another_vendor_fails_closed(database_url):
+    # Defense in depth for R2: contact_point_id has no FK yet, so a pin at a contact point that is
+    # not the case's vendor's must resolve to None, never dial a number proven for someone else.
+    s = _seed(database_url)
+    with psycopg.connect(database_url, autocommit=True, row_factory=dict_row) as c:
+        ds = c.execute("select dataset_id from voice.calls where id = %s", (s["call_id"],)).fetchone()["dataset_id"]
+        other = c.execute("insert into app.vendors (dataset_id, ramp_vendor_id, legal_name) "
+                          "values (%s,%s,'Other Co') returning id", (ds, f"ven_{uuid.uuid4().hex[:8]}")).fetchone()["id"]
+        other_cp = c.execute("insert into ledger.contact_points (dataset_id, vendor_id, e164, first_seen_at, status) "
+                             "values (%s,%s,'+14155550199', now(), 'eligible') returning id", (ds, other)).fetchone()["id"]
+        c.execute("update voice.calls set contact_point_id = %s where id = %s", (other_cp, s["call_id"]))
+    assert _lookup(database_url)(s["call_id"]) is None
+
+
 def test_an_empty_disclosure_name_fails_closed(database_url):
     # customer_name and callback_number are config; an empty one is caught by dial_from_row (R8, R7).
     s = _seed(database_url)

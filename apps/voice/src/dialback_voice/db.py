@@ -16,15 +16,18 @@ from psycopg.rows import dict_row
 
 from .store import CallDial, dial_from_row
 
-# One row per call_id: the case and its vendor, and the number from the pinned contact point (a left
-# join, so a call with no pick yields a null number and dial_from_row fails it closed). Reading
-# app.cases is a select, never a write, so the money-path "one door" is untouched.
+# One row per call_id: the case and its vendor, and the number from the pinned contact point. The
+# left join ties the pick to the case's own vendor and dataset, so a pin at any other contact point
+# yields a null number and dial_from_row fails it closed (defense in depth for R2: contact_point_id
+# has no FK yet, Q40). Reading app.cases is a select, never a write, so the money-path "one door" is
+# untouched.
 _SQL = """
     select c.case_id, c.attempt, cp.e164 as number_e164, v.legal_name, v.trade_names
     from voice.calls c
     join app.cases ca on ca.id = c.case_id
     join app.vendors v on v.id = ca.vendor_id
-    left join ledger.contact_points cp on cp.id = c.contact_point_id
+    left join ledger.contact_points cp
+        on cp.id = c.contact_point_id and cp.vendor_id = ca.vendor_id and cp.dataset_id = ca.dataset_id
     where c.id = %(call_id)s
 """
 

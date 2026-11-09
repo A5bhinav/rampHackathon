@@ -32,7 +32,9 @@ the callee).
 2. **The number is the one pinned on the call.** `voice.calls.contact_point_id` is the pick
    recorded when the call was created (R2). `lookup_call` reads `ledger.contact_points.e164` by
    that id; it never re-runs selection. A call with no pinned contact point, or whose contact point
-   is gone, resolves to `None`.
+   is gone, resolves to `None`. The join also ties the pinned contact point to the case's own vendor
+   and dataset, so a mismatched pin fails closed rather than dial another vendor's number (defense in
+   depth; `contact_point_id` has no FK yet, Q40).
 3. **`customer_name` and `callback_number` come from settings, not the database.** Dialback is one
    customer per deployment and the README describes these as context the service holds, so they are
    new voice settings (`DIALBACK_CUSTOMER_NAME`, `DIALBACK_AP_CALLBACK_NUMBER`), read in live mode.
@@ -62,6 +64,8 @@ None. `dial_from_row` and `CallDial` are unchanged; no `packages/contracts` chan
 - [ ] `vendor_names` is the vendor's `legal_name` followed by its `trade_names`.
 - [ ] A missing call row, a null or absent pinned contact point, or any missing required field
       resolves to `None` (fail closed, R2/R7).
+- [ ] A pin whose contact point is not the case's own vendor and dataset resolves to `None`, never
+      dialing a number proven for someone else (defense in depth for R2).
 - [ ] `customer_name` and `callback_number` come from settings; an empty setting resolves the call
       to `None` through `dial_from_row`.
 - [ ] `Settings` gains `database_url`, `customer_name`, `callback_number`, read in live mode; text
