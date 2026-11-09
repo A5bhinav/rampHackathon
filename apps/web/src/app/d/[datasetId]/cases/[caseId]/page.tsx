@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChainBadge, StateBadge } from "@/components/badges";
+import { CallCard } from "@/components/call";
 import { DecisionConsole } from "@/components/console";
 import { DecisionDetail } from "@/components/decision";
 import { CaseRail } from "@/components/flow";
@@ -124,6 +125,19 @@ export default async function CaseDetailPage({ params, searchParams }: {
           {can.reasons.length > 0 ? (
             <section className="note" aria-label="Why no action is offered">
               <ul className="plain">{can.reasons.map((r) => <li key={r}>{r}</li>)}</ul>
+            </section>
+          ) : null}
+
+          {(detail.calls ?? []).map((call) => (
+            <CallCard key={call.call_id} call={call} script={detail.call_script} decision={decision} total={detail.calls?.length ?? 0} />
+          ))}
+          {detail.calls && detail.calls.length === 0 && c.state !== "open" ? (
+            <section className="card empty" aria-label="The call">
+              <p>
+                No call has been placed for this case.{" "}
+                {["held", "calling"].includes(c.state) ? "Dialback places it once it has a provable number and the calling window is open."
+                  : lastStep ? <>The last step: {lastStep.summary}</> : null}
+              </p>
             </section>
           ) : null}
 
