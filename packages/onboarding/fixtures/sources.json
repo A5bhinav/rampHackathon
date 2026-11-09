@@ -1,0 +1,23 @@
+{
+  "_about": "Stand-ins for a business registry and each vendor's website (spec 0041), keyed by the vendor's name in Ramp. All fictional: every number is in 555-0100 to 555-0199 and every tax ID starts with 00. `tax_id` stands in for the tax ID the vendor gave at onboarding, which the Ramp mock does not return.",
+  "vendors": {
+    "Acme Fasteners LLC": {
+      "tax_id": "00-0000101",
+      "registry": {"legal_name": "Acme Fasteners LLC", "state": "CA", "tax_id": "00-0000101", "status": "active",
+                   "filed_at": "2012-04-17", "phone": "(415) 555-0133"},
+      "website": {"domain": "acme-fasteners.example", "registered_at": "2012-05-01", "phone": "(415) 555-0133"}
+    },
+    "Brightline Office Supply Inc": {
+      "tax_id": "00-0000102",
+      "registry": {"legal_name": "Brightline Office Supply, Inc.", "state": "CA", "tax_id": "00-0000102",
+                   "status": "active", "filed_at": "2009-09-09", "phone": "(415) 555-0148"},
+      "website": {"domain": "brightline.example", "registered_at": "2010-01-01", "phone": "415.555.0148"}
+    },
+    "Cobalt Freight LLC": {
+      "tax_id": "00-0000103",
+      "registry": {"legal_name": "Cobalt Freight LLC", "state": "CA", "tax_id": "00-0000103", "status": "active",
+                   "filed_at": "2018-02-20", "phone": "(415) 555-0162"},
+      "website": {"domain": "cobalt-freight.example", "registered_at": "2026-08-01", "phone": "(415) 555-0162"}
+    }
+  }
+}

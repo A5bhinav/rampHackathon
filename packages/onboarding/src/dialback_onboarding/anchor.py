@@ -56,7 +56,7 @@ def _text(raw: object) -> str | None:
     return raw.strip() if isinstance(raw, str) and raw.strip() else None
 
 
-def _name(raw: object) -> str | None:
+def normalize_name(raw: object) -> str | None:
     """Case, punctuation and spacing don't count; every word does ("ACME FASTENERS, LLC" is
     "Acme Fasteners LLC", but "Acme Fasteners" is not)."""
     text = _text(raw)
@@ -104,8 +104,8 @@ def _active(f: Facts) -> bool:
 def _matches(f: Facts) -> bool:
     if f.registry is None:
         return False
-    name, state = _name(f.vendor.get("name")), _state(f.vendor.get("state"))
-    return (name is not None and name == _name(f.registry.get("legal_name"))
+    name, state = normalize_name(f.vendor.get("name")), _state(f.vendor.get("state"))
+    return (name is not None and name == normalize_name(f.registry.get("legal_name"))
             and state is not None and state == _state(f.registry.get("state")))
 
 
