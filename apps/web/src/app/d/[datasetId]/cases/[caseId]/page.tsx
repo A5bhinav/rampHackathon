@@ -39,10 +39,11 @@ export default async function CaseDetailPage({ params, searchParams }: {
 
   return (
     <main>
-      <p><Link href={`/d/${datasetId}/cases`}>← Case queue</Link></p>
+      <p className="back"><Link href={`/d/${datasetId}/cases`}><span className="arrow" aria-hidden="true">←</span> Case queue</Link></p>
       {done && NOTICES[done] ? (
         <p className="result ok" role="status">{NOTICES[done]}{to ? ` The case moved to ${words(to)}.` : ""}</p>
       ) : null}
+      <p className="eyebrow">Bank-detail change</p>
       <h1>{c.vendor.legal_name}</h1>
       <p style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
         <StateBadge state={c.state} />

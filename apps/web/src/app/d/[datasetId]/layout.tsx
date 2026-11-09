@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AlertBanners } from "@/components/alerts";
+import { BrandMark, NavLinks } from "@/components/nav";
 import { core } from "@/lib/core";
 
 // The shell: who is signed in, which dataset, navigation, and the alert banners on every page.
@@ -13,12 +14,11 @@ export default async function DatasetShell({ children, params }: { children: Rea
     <div className="shell">
       <header className="topbar">
         <nav className="nav" aria-label="Main">
-          <Link className="brand" href={`/d/${datasetId}/cases`}>Dialback</Link>
-          <Link href={`/d/${datasetId}/cases`}>Case queue</Link>
-          <Link href={`/d/${datasetId}/risk`}>Vendor risk</Link>
+          <Link className="brand" href={`/d/${datasetId}/cases`}><BrandMark />Dialback</Link>
+          <NavLinks links={[{ href: `/d/${datasetId}/cases`, label: "Case queue" }, { href: `/d/${datasetId}/risk`, label: "Vendor risk" }]} />
         </nav>
         <div className="who">
-          <span>
+          <span className="chip" title={current?.sim_now ? "This dataset runs on simulated time" : undefined}>
             {current ? `${current.label} (${current.kind})` : "Unknown dataset"}
             {current?.sim_now ? ` · simulated time` : ""}
           </span>
@@ -30,7 +30,10 @@ export default async function DatasetShell({ children, params }: { children: Rea
               </ul>
             </details>
           ) : null}
-          <span>{me.display_name} · {me.roles.join(", ") || "no role"}</span>
+          <span className="person">
+            <span className="avatar" aria-hidden="true">{initials(me.display_name)}</span>
+            <span><strong>{me.display_name}</strong> · {me.roles.join(", ") || "no role"}</span>
+          </span>
           <form action="/sign-out" method="post"><button type="submit">Sign out</button></form>
         </div>
       </header>
@@ -38,4 +41,8 @@ export default async function DatasetShell({ children, params }: { children: Rea
       {children}
     </div>
   );
+}
+
+function initials(name: string): string {
+  return name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join("");
 }

@@ -1,6 +1,7 @@
 import { authMode } from "@/lib/auth-mode";
 import { devUsers } from "@/lib/dev-auth";
 import { signIn, signInAsDevUser } from "./actions";
+import { BrandMark } from "@/components/nav";
 
 type Notice = { expired?: string; failed?: string; slow?: string; unavailable?: string };
 
@@ -17,6 +18,7 @@ export default async function SignIn({ searchParams }: { searchParams: Promise<N
   return (
     <main className="shell">
       <div className="card signin">
+        <p className="brand"><BrandMark />Dialback</p>
         <h1>Sign in to Dialback</h1>
         {NOTICES.filter(([key]) => params[key]).map(([key, text]) => (
           <p key={key} className="result error" role="alert">{text}</p>
