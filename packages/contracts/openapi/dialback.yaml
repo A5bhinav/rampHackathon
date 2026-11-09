@@ -537,7 +537,7 @@ components:
         sentence: { type: string }
         block:
           type: string
-          enum: [earlier_call, input, not_verified, needs_review, verified, not_met, engine, retired]
+          enum: [input, not_verified, needs_review, verified, not_met, engine, retired]
 
     ChecklistItem:
       type: object

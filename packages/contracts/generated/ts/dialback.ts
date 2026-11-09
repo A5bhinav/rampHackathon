@@ -346,7 +346,7 @@ export interface components {
             id: string;
             sentence: string;
             /** @enum {string} */
-            block: "earlier_call" | "input" | "not_verified" | "needs_review" | "verified" | "not_met" | "engine" | "retired";
+            block: "input" | "not_verified" | "needs_review" | "verified" | "not_met" | "engine" | "retired";
         };
         ChecklistItem: {
             /** @description The condition, e.g. V08_digits_match. */
