@@ -30,8 +30,13 @@ from .agent import AgentReply, last_callee
 # The pinned model and decoding params (Q41). Frozen here and snapshot by the lab as a config_version;
 # lab-smoke pins the hash. Revisable, lab-gated.
 MODEL_PIN = "claude-sonnet-5-5"
-TEMPERATURE = 0.0
-MAX_TOKENS = 16  # the model returns one short value from a fixed set, nothing more
+# Sonnet 5.5 rejects any non-default temperature/top_p/top_k with a 400, so none is sent, and it thinks
+# by default with thinking counted against max_tokens. A live turn is dead air while the model runs,
+# so thinking is at its lowest setting (`between_tools`, Sonnet 5.5 only: revisit on a new pin) at low
+# effort, with room for the one-word answer (spec 0034, D1).
+THINKING = {"type": "between_tools"}
+EFFORT = "low"
+MAX_TOKENS = 256
 
 SYSTEM_PROMPT = (
     "You classify one answer on a recorded verification phone call. You are given the goal of the "
@@ -137,8 +142,8 @@ class AnthropicVoiceModel:
             _API_URL,
             headers={"x-api-key": self.api_key.decode(), "anthropic-version": _API_VERSION,
                      "content-type": "application/json"},
-            json={"model": MODEL_PIN, "system": SYSTEM_PROMPT, "temperature": TEMPERATURE,
-                  "max_tokens": MAX_TOKENS,
+            json={"model": MODEL_PIN, "system": SYSTEM_PROMPT, "max_tokens": MAX_TOKENS,
+                  "thinking": THINKING, "output_config": {"effort": EFFORT},
                   "messages": [{"role": "user", "content": _user_prompt(goal, allowed, callee_text)}]})
         resp.raise_for_status()
         return _answer(resp.json())
