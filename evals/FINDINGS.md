@@ -145,6 +145,8 @@ These are not reachable today, but each is frozen as a regression.
   (`packages/policy/.../step.py`, `_appears_unnegated`) sees nothing before the name;
   `every_name_matches` (`apps/core/src/dialback_core/company.py`) only checks that the vendor's words
   appear somewhere; and only the company answer is matched, not the others.
+- **Owners:** `company.py` is in `apps/core` (Abhi, with Sami as partner, per AGENTS.md and
+  CODEOWNERS); the agent and the policy are Sami's.
 - **Related to A8.**
 
 ### A11. The scripted agent's yes/no reading disagrees with the policy's
@@ -158,6 +160,41 @@ These are not reachable today, but each is frozen as a regression.
   grounds it, so what live calls record for "We did." depends on the model and is untested by the
   lab (see C10). The double still runs live when `ANTHROPIC_API_KEY` is unset (`wire.py` logs a
   warning).
+- **Also (ran, Nov 9):** "Sure, no problem." to the consent question is recorded "no" by the double
+  (its "no" pattern matches "no problem"; the policy strips that phrase, the double does not), so the
+  call ends as consent refused.
+
+### A12. An unclear answer is never asked again
+
+- **Status:** confirmed (read), Nov 9, on origin/main da057f8.
+- **What happens:** the call re-asks only on silence ("are you still there?"), a rejected tool call
+  (once, then the call ends), an empty keypad entry, a callback with no time, and a new speaker
+  (name and role again). An unclear answer is recorded and the call moves on:
+  - consent: the live agent's model is told to give the cautious answer, which is "no", and a
+    model error also records "no", so a garbled "yes" ends the call as consent refused;
+  - the change question: "unsure", so NR09 sends it to a person;
+  - the last four with no digits heard: `dont_know` or `refused`, so NR06;
+  - company, name, role: the words are kept as heard, and a garbled company is unknown (no V05).
+- **Keep:** a wrong answer must never be re-asked (it would tell an attacker they were wrong and let
+  them guess), and the voice service cannot know a wrong answer anyway: the digits are compared in
+  the core after the call. Only "could not tell" should earn one more try.
+- **Where to fix:** the agent would need an `unclear` value and `policy.step` a one-time re-ask;
+  `apps/voice` and `packages/policy`.
+
+### A13. The keypad has no reset, and a slip cannot be corrected
+
+- **Status:** confirmed (read), Nov 9, `apps/voice/src/dialback_voice/twilio/relay.py`, `_next_event`.
+- **What happens:**
+  - `*` is ignored ("keep collecting"). A caller who types 4, 8, then `*` to start over, then
+    4, 8, 2, 1 is recorded as 4848.
+  - The fourth digit submits at once, so a mistyped fourth digit cannot be fixed.
+  - `#` submits whatever is in hand: 1 to 3 digits are recorded and become `not_provided` (NR06)
+    with no re-ask; only an empty `#` is re-asked.
+  - The question never mentions `#` or `*`.
+- **Why it matters:** a wrong four is NV02 (not verified), and NV02 also fires on every redial of
+  the same generation (its `earlier` test), so one slip blocks an honest vendor's change for good.
+- **Common practice:** Amazon Lex defaults to `*` to clear and `#` to end, with an end timeout.
+- **Where to fix:** `relay.py` and the last-four wording in `packages/policy/.../script.py`.
 
 ### A8. The company-name check accepts names that contain the vendor's
 
