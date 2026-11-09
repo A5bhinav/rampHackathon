@@ -25,6 +25,7 @@ from .auth import Principal, current_user
 from .db import person_tx
 from .events import NotAllowed, TransitionRefused, VersionConflict, apply_event, person
 from .timeline import alert_message, summary
+from .views import call_script, calls, checklist, effect, fired
 
 router = APIRouter(prefix="/api")
 UserDep = Annotated[Principal, Depends(current_user)]
@@ -181,6 +182,52 @@ async def dataset_chain(dataset_id: UUID, request: Request, user: UserDep):
         return await chain_status(conn, d["chain_id"])
 
 
+EVIDENCE = """
+with e as (
+  select seq, type, case_id, occurred_at, actor_kind, prev_hash, content_hash, hash, body_jcs,
+         lag(hash) over (order by seq) as prior
+    from audit.evidence_events where chain_id = %s)
+select e.seq, e.type, e.case_id, e.occurred_at, e.actor_kind, e.prev_hash, e.content_hash, e.hash, v.legal_name as vendor,
+       audit.content_hash(e.body_jcs) = e.content_hash as content_ok,
+       e.prev_hash = coalesce(e.prior, audit.genesis_hash())
+         and audit.chain_hash(e.prev_hash, e.content_hash) = e.hash as link_ok
+  from e left join app.cases c on c.id = e.case_id left join app.vendors v on v.id = c.vendor_id
+ order by e.seq desc limit %s
+"""
+
+
+def _last_check(job: dict[str, Any]) -> dict[str, Any]:
+    """What the verify job found (its last_result), not whether the job itself ran without error."""
+    found = job["last_result"] or {}
+    seq, detail = found.get("first_bad_seq"), found.get("detail")
+    return {"finished_at": ts(job["last_finished_at"]),
+            "ok": found["ok"] if isinstance(found.get("ok"), bool) else None,
+            "first_bad_seq": seq if isinstance(seq, int) and not isinstance(seq, bool) and seq >= 1 else None,
+            "detail": detail if isinstance(detail, str) else None}
+
+
+@router.get("/datasets/{dataset_id}/evidence")
+async def evidence_log(dataset_id: UUID, request: Request, user: UserDep, limit: Annotated[int, Query(ge=1, le=1000)] = 500):
+    """The evidence chain row by row (spec 0035). Postgres checks each row with the chain's own
+    hash functions; the page only shows the answers."""
+    async with person_tx(request.app.state.pool, user.user_id, user.claims) as conn:
+        d = await (await conn.execute("select chain_id from app.datasets where id = %s", (dataset_id,))).fetchone()
+        if d is None:
+            return problem(404, "not_found", "No such dataset.")
+        chain = await chain_status(conn, d["chain_id"])
+        rows = await (await conn.execute(EVIDENCE, (d["chain_id"], limit))).fetchall()
+        total = (await (await conn.execute("select count(*) as n from audit.evidence_events where chain_id = %s",
+                                           (d["chain_id"],))).fetchone())["n"]
+        job = await (await conn.execute("select last_finished_at, last_result from app.job_runs "
+                                        "where dataset_id = %s and job = 'verify_chain'", (dataset_id,))).fetchone()
+    return {"chain": chain, "total": total,
+            "last_check": None if job is None else _last_check(job),
+            "events": [{"seq": r["seq"], "type": r["type"], "case_id": str(r["case_id"]) if r["case_id"] else None,
+                        "vendor": r["vendor"], "occurred_at": ts(r["occurred_at"]), "actor_kind": r["actor_kind"],
+                        "prev_hash": r["prev_hash"], "content_hash": r["content_hash"], "hash": r["hash"],
+                        "content_ok": bool(r["content_ok"]), "link_ok": bool(r["link_ok"])} for r in rows]}
+
+
 @router.get("/datasets/{dataset_id}/vendor-risk")
 async def vendor_risk(dataset_id: UUID, request: Request, user: UserDep):
     """The vendor risk list (spec 0026): the ledger decides each status, read under the person's token."""
@@ -255,11 +302,17 @@ async def get_case(case_id: UUID, request: Request, user: UserDep):
         ids = {c["entered_by"], c["reviewed_by"], change["changed_by"], *(r["actor_id"] for r in releases),
                *(e["actor_id"] for e in events)} - {None}
         names = await people(conn, ids)
+        voice = {r["id"]: r for r in await (await conn.execute(
+            "select id::text as id, provider, reason from voice.calls where case_id = %s", (case_id,))).fetchall()}
 
     approved = any(r["actor_id"] == user.user_id and r["action"] == "approve" and r["case_version"] == c["version"] for r in releases)
-    timeline = []
+    timeline, call_events, strict = [], [], False
     for e in events:
         envelope = json.loads(e["body_jcs"])
+        if e["type"] == "decision_made":
+            strict = (envelope.get("body") or {}).get("strict_mode") is True  # the latest decision's mode
+        if e["type"] in ("call_started", "call_ended", "call_timeout"):
+            call_events.append((e["type"], ts(e["occurred_at"]), envelope.get("body") or {}))
         actor_name = "Dialback" if e["actor_kind"] == "system" else names.get(e["actor_id"], "Unknown user")
         timeline.append({
             "seq": e["seq"], "type": e["type"], "occurred_at": ts(e["occurred_at"]),
@@ -287,13 +340,24 @@ async def get_case(case_id: UUID, request: Request, user: UserDep):
             "outcome": decision["outcome"], "rules_fired": list(decision["rules_fired"]), "engine_version": decision["engine_version"],
             "last_four_result": decision["last_four_result"], "decided_at": ts(decision["decided_at"]),
             "explanation": [TEMPLATES[r] for r in decision["rules_fired"] if r in TEMPLATES],
+            **_decision_views(decision, c["has_unknown_changer"], strict),
         },
         "releases": [{"actor": person_json(r["actor_id"], names), "action": r["action"], "reason": r["reason"],
                       "case_version": r["case_version"], "created_at": ts(r["created_at"])} for r in releases],
         "timeline": timeline,
         "chain": chain,
         "permissions": permissions(c, user.user_id, roles, approved),
+        "calls": calls(call_events, voice),
+        "call_script": call_script(),
     }
+
+
+def _decision_views(decision: dict[str, Any], unknown_changer: bool, strict: bool) -> dict[str, Any]:
+    """The checklist and rule groups, read from the recorded rules (spec 0035)."""
+    ids = list(decision["rules_fired"])
+    items, note = checklist(decision["outcome"], ids, decision["engine_version"], strict)
+    return {"fired": fired(ids), "checklist": items, "checklist_note": note,
+            "effect": effect(decision["outcome"], unknown_changer)}
 
 
 def action_result(raw: dict[str, Any]) -> dict[str, Any]:
