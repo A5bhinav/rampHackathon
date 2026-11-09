@@ -162,6 +162,7 @@ The whole first call, step by step, is `docs/live-call.md`.
    - Vercel detects Next.js.
    - `apps/web/vercel.json` installs only the dashboard's packages from the pnpm workspace, and fails the build if the generated API types are stale.
    - Keep "Include files outside the root directory" on (the default), because the generated types live in `packages/contracts`.
+   - `apps/web/vercel.json`'s `ignoreCommand` (`apps/web/scripts/vercel-ignore-build.sh`) cancels the build when nothing the dashboard reads (`apps/web`, `packages/contracts`, the root `package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`, `.npmrc`) changed since the branch's last successful deployment. A branch's first deployment, a redeploy of the same commit, and anything the script can't check all build. A canceled build still counts toward the Hobby plan's 100 deployments a day ([Vercel's docs](https://vercel.com/docs/project-configuration/project-settings#ignored-build-step)): it saves build time and the build slot, not quota. To force a build of a commit it skipped, redeploy with "Use project's Ignore Build Step" unchecked.
 2. **Variables** (Settings → Environment Variables):
 
 | Variable | Preview | Production | Meaning |
