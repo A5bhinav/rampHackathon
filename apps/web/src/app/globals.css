@@ -584,3 +584,8 @@ table.chain-table tr { scroll-margin-top: 100px; }
 .bad-note { color: var(--bad); font-weight: 600; font-size: 0.75rem; }
 @media (max-width: 720px) { .chain-how { grid-template-columns: 1fr; } }
 figure.card { margin: 0 0 20px; }
+/* One-click demo accounts (spec 0034). */
+.demo-sign-in { padding: 16px; margin-bottom: 18px; border: 1px solid color-mix(in srgb, var(--accent) 25%, var(--line));
+  border-radius: var(--radius-sm); background: var(--accent-soft); }
+.demo-sign-in h2 { font-size: 0.9375rem; margin-bottom: 6px; }
+.demo-buttons { display: flex; flex-wrap: wrap; gap: 8px; }

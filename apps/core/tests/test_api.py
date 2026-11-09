@@ -390,3 +390,20 @@ async def test_the_evidence_log_points_at_a_hand_edited_row(world, database_url)
     bad = [e["seq"] for e in full["events"] if not e["content_ok"]]
     assert bad == [1] and all(e["link_ok"] for e in full["events"]), "only the edited row's body fails; the links still hold"
     await get(world, f"/api/datasets/{uuid.uuid4()}/evidence", "approver1", spec, status=404)
+
+
+async def test_a_demo_account_is_refused_outside_demo_data(world, database_url):
+    """Spec 0034: a demo account can't see a dev dataset's cases, so it can't act on them either. (The database's
+    own refusal, for a caller that gets past this, is supabase/tests/015_demo_accounts.sql.)"""
+    case = await verified_case(world)
+    async with await psycopg.AsyncConnection.connect(database_url, autocommit=True) as owner:  # the team, as the owner
+        await owner.execute("insert into app.demo_accounts (user_id) values (%s)", (world.users["approver1"],))
+    cid = str(case["id"])
+    await get(world, f"/api/cases/{cid}", "approver1", "/api/cases/{case_id}", status=404)  # it can't even see the case
+    for action in ("approve", "reject"):
+        await post(world, f"/api/cases/{cid}/release", "approver1", "/api/cases/{case_id}/release",
+                   {"expected_version": 1, "action": action, "reason": "Demo."}, status=404)
+    assert (await case_of(world))["state"] == "awaiting_release"
+    seen = {d["id"] for d in (await get(world, "/api/datasets", "approver1", "/api/datasets"))["datasets"]}
+    assert str(world.dataset.id) not in seen, "a dev dataset is hidden from a demo account"
+    assert (await get(world, f"/api/cases/{cid}", "approver2", "/api/cases/{case_id}"))["case"]["state"] == "awaiting_release"

@@ -25,12 +25,16 @@ from .app import create_app
 from .datasets import create_dataset, retire_dataset
 from .db import open_pool, system_tx
 from .detection import Keys, import_all
+from .flags import RampMode
 from .jobs import JOBS, Jobs
 from .ramp import RampConnector
 from .settings import Settings
 
 
 async def _new_dataset(settings: Settings, kind: str, label: str, sim_now: str | None) -> None:
+    if kind == "demo" and settings.ramp_mode is RampMode.SANDBOX:
+        # Spec 0034: shared demo accounts may act on any demo dataset, so none may sit on Ramp's sandbox.
+        raise SystemExit("refused: a demo dataset can't be made against Ramp's sandbox (use DIALBACK_RAMP=mock)")
     pool = await open_pool(settings.database_url, max_size=2)
     try:
         d = await create_dataset(pool, kind, label, dt.datetime.fromisoformat(sim_now) if sim_now else None)

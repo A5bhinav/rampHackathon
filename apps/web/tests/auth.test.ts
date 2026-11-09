@@ -1,7 +1,7 @@
 // Sign-in rules that don't need a browser or a Supabase project (spec 0010). `pnpm test`.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { MIN_NEW_PASSWORD, PASSWORD_RULE, SESSION_HOURS, Throttle, authMode, cleanEmail, cleanName, cleanNewPassword, cleanPassword, sessionFresh, signedInAt, signUpNotice } from "../src/lib/auth-mode.ts";
+import { MIN_NEW_PASSWORD, PASSWORD_RULE, SESSION_HOURS, Throttle, authMode, cleanEmail, cleanName, cleanNewPassword, cleanPassword, demoAccounts, sessionFresh, signedInAt, signUpNotice } from "../src/lib/auth-mode.ts";
 
 const SUPABASE = { SUPABASE_URL: "https://abcdefghijklmnop.supabase.co", SUPABASE_PUBLISHABLE_KEY: "sb_publishable_x" };
 
@@ -99,4 +99,18 @@ test("each sign-up answer maps to one notice, and only a session signs someone i
   assert.equal(signUpNotice({ status: 400, code: "validation_failed" }, false), "failed");
   assert.equal(signUpNotice({ status: 422, code: "signup_disabled" }, false), "failed");
   assert.equal(signUpNotice({ status: 400, code: "anything" }, true), "failed", "an error wins over a session");
+});
+
+test("one-click demo accounts: only with the flag, Supabase, and both accounts' credentials", () => {
+  const full = { SUPABASE_URL: "u", SUPABASE_PUBLISHABLE_KEY: "k", DIALBACK_DEMO_SIGN_IN: "on",
+    DIALBACK_DEMO_CLERK_EMAIL: "Demo.Clerk@Example.test ", DIALBACK_DEMO_CLERK_PASSWORD: "a-long-password-1",
+    DIALBACK_DEMO_APPROVER_EMAIL: "demo.approver@example.test", DIALBACK_DEMO_APPROVER_PASSWORD: "a-long-password-2" };
+  const on = demoAccounts(full);
+  assert.deepEqual(on && Object.keys(on), ["clerk", "approver"]);
+  assert.equal(on?.clerk.email, "demo.clerk@example.test");
+  for (const off of [
+    { ...full, DIALBACK_DEMO_SIGN_IN: undefined }, { ...full, DIALBACK_DEMO_SIGN_IN: "yes" },
+    { ...full, DIALBACK_DEMO_APPROVER_PASSWORD: "" }, { ...full, DIALBACK_DEMO_CLERK_EMAIL: "not an email" },
+    { ...full, SUPABASE_URL: undefined }, { ...full, DIALBACK_AUTH_MODE: "dev" },
+  ]) assert.equal(demoAccounts(off), null);
 });

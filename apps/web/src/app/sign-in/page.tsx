@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { authMode } from "@/lib/auth-mode";
+import { authMode, demoAccounts } from "@/lib/auth-mode";
 import { devUsers } from "@/lib/dev-auth";
-import { signIn, signInAsDevUser } from "./actions";
+import { signIn, signInAsDemo, signInAsDevUser } from "./actions";
 import { BrandMark } from "@/components/nav";
 import { safeNext } from "@/lib/story";
 
@@ -26,6 +26,20 @@ export default async function SignIn({ searchParams }: { searchParams: Promise<N
         {NOTICES.filter(([key]) => params[key]).map(([key, text]) => (
           <p key={key} className="result error" role="alert">{text}</p>
         ))}
+        {mode === "supabase" && demoAccounts(process.env) ? (
+          <form action={signInAsDemo} className="demo-sign-in">
+            <input type="hidden" name="next" value={next} />
+            <h2>Look around with a demo account</h2>
+            <p className="muted">
+              Shared accounts on fictional demo data only; the database refuses them anywhere else. The clerk entered the demo&apos;s
+              bank changes, so the clerk can&apos;t release them (R5). The approver can.
+            </p>
+            <div className="demo-buttons">
+              <button className="primary" type="submit" name="role" value="approver">Sign in as the demo approver</button>
+              <button type="submit" name="role" value="clerk">Sign in as the demo clerk</button>
+            </div>
+          </form>
+        ) : null}
         {mode === "supabase" ? (
           <form action={signIn}>
             <input type="hidden" name="next" value={next} />

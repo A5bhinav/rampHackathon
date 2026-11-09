@@ -73,6 +73,9 @@ cd apps/web && CORE_URL=http://127.0.0.1:8001 DIALBACK_AUTH_MODE=dev DIALBACK_JW
 | `DIALBACK_AUTH_MODE` | `dev` for the local sign-in; ignored when `VERCEL_ENV=production` |
 | `DIALBACK_JWT_SECRET` | Dev mode only: the same secret the core verifies with |
 | `DIALBACK_DEV_USERS` | Dev mode only: `uuid:Name,uuid:Name` |
+| `DIALBACK_DEMO_SIGN_IN` | `on` shows one-click demo accounts on the sign-in page (spec 0034); anything else hides them |
+| `DIALBACK_DEMO_CLERK_EMAIL`, `DIALBACK_DEMO_CLERK_PASSWORD` | The shared demo clerk's Supabase sign-in. Server-only; never in the repo |
+| `DIALBACK_DEMO_APPROVER_EMAIL`, `DIALBACK_DEMO_APPROVER_PASSWORD` | The shared demo approver's. Both accounts are marked `--demo-only` with `scripts/db/add_user.py`, so the database lets them act only on demo datasets |
 
 ### Setting up the Supabase project for sign-in
 
