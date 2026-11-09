@@ -118,6 +118,9 @@ These are not reachable today, but each is frozen as a regression.
 - **What happens:** only `packages/decision` defines and reads `line_risk`; no production code sets
   it. So a real line takeover can verify. The voice lab's a07 scenario passes only because it
   declares `line_risk: true`.
+- **Spec:** 0044 on `sami/line-risk` (draft): a Twilio Lookup before dialing refuses a line that
+  was recently ported, SIM-swapped or reassigned. It cannot see forwarding set inside the vendor's
+  own phone system.
 
 ### A9. A caller who refuses to give a role can still be verified
 
@@ -576,8 +579,9 @@ F1 to F9 hold as built (verified). But the lab still claims more than it shows:
     `0029-voice-call-lookup-and-store.md`, Q65 in `0034-live-call-blockers.md`. A4 above cites
     "spec 0033, Q65", meaning the lab's.
   - Main uses up to Q68. PR #91 takes Q69 to Q75, the `sami/onboarding-anchors` branch takes
-    Q76 and Q77, and spec 0043 (`sami/keypad-only-digits`) takes Q78 to Q82, so the next free
-    number is Q83. Renumber before this branch merges.
+    Q76 and Q77, spec 0043 (`sami/keypad-only-digits`) takes Q78 to Q82, and spec 0044
+    (`sami/line-risk`) takes Q83 to Q86, so the next free number is Q87. Renumber before this
+    branch merges.
 
 ## F. How other services verify a bank change (Nov 9)
 
