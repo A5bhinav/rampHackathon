@@ -56,17 +56,6 @@ def test_a_naive_cutoff_is_refused():
     raise AssertionError("a cutoff without a time zone must be refused, not guessed")
 
 
-def test_change_context_is_unknown():
-    out = dialback_ledger.change_context(case_id=uuid4(), dataset_id=uuid4(), vendor_id=uuid4(), cutoff=CUTOFF,
-                                         speaker_names=("Jordan Lee",), offered_numbers=("+14155550143",))
-    assert out == {}
-
-
-def test_no_real_select_number_yet():
-    # DIALBACK_RESOLVER=ledger must keep failing closed until ledger-select-v1 lands.
-    assert not hasattr(dialback_ledger, "select_number")
-
-
 def test_each_case_gets_its_own_selection_id():
     case = uuid4()
     assert call(case_id=case)[1]["number_selection_id"] == call(case_id=case)[1]["number_selection_id"]

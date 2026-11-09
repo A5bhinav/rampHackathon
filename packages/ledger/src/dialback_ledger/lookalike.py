@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from email.utils import parseaddr
 
 HOMOGLYPHS = (("rn", "m"), ("vv", "w"), ("1", "l"), ("0", "o"), ("5", "s"))
 MAX_EDITS = 2
@@ -58,4 +59,6 @@ def is_lookalike(domain: str, vendor_domains: Iterable[str]) -> bool:
 
 
 def sender_domain(sender: str | None) -> str | None:
-    return sender.rsplit("@", 1)[1].strip().lower() if sender and "@" in sender else None
+    """The domain of a sender, with or without a display name ("Dana <ar@acme.example>")."""
+    address = parseaddr(sender or "")[1]
+    return address.rsplit("@", 1)[1].strip().lower() if "@" in address else None

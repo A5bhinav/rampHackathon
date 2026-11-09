@@ -5,8 +5,7 @@ file so the package works without the contracts folder; a test checks the copy h
 with the case's own ids and cutoff. It is a labeled stub: `rule_version` says `ledger-stub-v0`,
 and its contact point exists in no table.
 
-`change_context` answers nothing yet. The core reads every missing key as unknown, and the
-decision engine treats unknown as "not shown" (R7).
+The real `change_context` and `select_number` are in store.py (spec 0024).
 """
 from __future__ import annotations
 
@@ -36,7 +35,3 @@ def select_number_stub(*, case_id: UUID, dataset_id: UUID, vendor_id: UUID, cuto
                      number_selection_id=str(uuid5(STUB_NAMESPACE, f"{case_id}:{STUB_RULE_VERSION}")))
     return selection
 
-
-def change_context(*, case_id: UUID, dataset_id: UUID, vendor_id: UUID, cutoff: dt.datetime,
-                   speaker_names: tuple[str, ...], offered_numbers: tuple[str, ...]) -> dict[str, bool]:
-    return {}

@@ -98,25 +98,15 @@ def _subject(s: str | None) -> str:
     return " ".join(s.split())
 
 
-def select(*, case_id: uuid.UUID, dataset_id: uuid.UUID, vendor_id: uuid.UUID, vendor_domains: Iterable[str],
-           request: ChangeRequest | None, requested_cutoff: dt.datetime, case_opened_at: dt.datetime,
-           documents: Sequence[DocumentRef], sightings: Sequence[Sighting], settings: Settings = DEFAULT) -> dict:
-    domains = tuple(d.strip().lower().rstrip(".") for d in vendor_domains)
+def _frame(*, documents: Sequence[DocumentRef], request: ChangeRequest | None, requested_cutoff: dt.datetime,
+           case_opened_at: dt.datetime, domains: tuple[str, ...], settings: Settings):
+    """The documents recorded before the case opened, the cutoff, and the change context."""
     docs: dict[str, DocumentRef] = {}
     conflicted: set[str] = set()  # two different documents under one id: both count against (R7)
     for d in sorted((d for d in documents if d.recorded_at < case_opened_at), key=repr):          # replay
         if d.id in docs and docs[d.id] != d:
             conflicted.add(d.id)
         docs.setdefault(d.id, d)
-    rows = sorted((s for s in sightings if s.recorded_at < case_opened_at and s.document_id in docs), key=repr)
-
-    def counts(d: DocumentRef) -> bool:
-        """A source type that counts: a known channel, and for email the vendor's own domain."""
-        if d.channel not in SOURCE_TYPES:
-            return False
-        sd = sender_domain(d.sender) if d.channel == "email" else None
-        return d.channel != "email" or (sd is not None and any(sd == v or sd.endswith("." + v) for v in domains))
-
     look_ids = {d.id for d in docs.values() if (sd := sender_domain(d.sender)) and is_lookalike(sd, domains)}
     starts = [requested_cutoff, *(docs[i].received_at for i in look_ids)] + ([request.received_at] if request else [])
     cutoff = min(starts)
@@ -129,6 +119,34 @@ def select(*, case_id: uuid.UUID, dataset_id: uuid.UUID, vendor_id: uuid.UUID, v
             return True  # unknown change context: everything counts against (R7)
         return ((request.thread_id is not None and d.thread_id == request.thread_id) or d.id == request.document_id
                 or (_subject(d.subject) == _subject(request.subject) != "" and cutoff - d.received_at <= window))
+
+    return docs, cutoff, in_context
+
+
+def change_context_documents(*, vendor_domains: Iterable[str], request: ChangeRequest | None, requested_cutoff: dt.datetime,
+                             case_opened_at: dt.datetime, documents: Sequence[DocumentRef],
+                             settings: Settings = DEFAULT, **_: object) -> list[DocumentRef]:
+    """The documents in the change context, by the same definition `select()` uses."""
+    domains = tuple(d.strip().lower().rstrip(".") for d in vendor_domains)
+    docs, _cutoff, in_context = _frame(documents=documents, request=request, requested_cutoff=requested_cutoff,
+                                       case_opened_at=case_opened_at, domains=domains, settings=settings)
+    return [d for d in docs.values() if in_context(d)]
+
+
+def select(*, case_id: uuid.UUID, dataset_id: uuid.UUID, vendor_id: uuid.UUID, vendor_domains: Iterable[str],
+           request: ChangeRequest | None, requested_cutoff: dt.datetime, case_opened_at: dt.datetime,
+           documents: Sequence[DocumentRef], sightings: Sequence[Sighting], settings: Settings = DEFAULT) -> dict:
+    domains = tuple(d.strip().lower().rstrip(".") for d in vendor_domains)
+    docs, cutoff, in_context = _frame(documents=documents, request=request, requested_cutoff=requested_cutoff,
+                                      case_opened_at=case_opened_at, domains=domains, settings=settings)
+    rows = sorted((s for s in sightings if s.recorded_at < case_opened_at and s.document_id in docs), key=repr)
+
+    def counts(d: DocumentRef) -> bool:
+        """A source type that counts: a known channel, and for email the vendor's own domain."""
+        if d.channel not in SOURCE_TYPES:
+            return False
+        sd = sender_domain(d.sender) if d.channel == "email" else None
+        return d.channel != "email" or (sd is not None and any(sd == v or sd.endswith("." + v) for v in domains))
 
     numbers: dict[str, list[tuple[Sighting, DocumentRef, bool]]] = {}
     for s in rows:
