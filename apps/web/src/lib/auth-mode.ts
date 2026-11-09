@@ -81,8 +81,22 @@ export function cleanPassword(raw: unknown): string | null {
 /** A new password: at least this long, and at most 72 characters (Supabase's limit). */
 export const MIN_NEW_PASSWORD = 8;
 
+/** The symbols Supabase counts, exactly as its `password_required_characters` setting lists them
+ *  (spec 0033), so the form and Supabase agree on what a symbol is. */
+export const PASSWORD_SYMBOLS = "!@#$%^&*()_+-=[]{};'\\:\"|<>?,./`~";
+
+/** The rule in words, for the form. */
+export const PASSWORD_RULE =
+  `${MIN_NEW_PASSWORD} to 72 characters, with at least one lowercase letter, one uppercase letter, one number and one symbol`;
+
+/** A new password, kept as typed, if it meets the rule Supabase enforces: 8 to 72 characters with a
+ *  lowercase and an uppercase letter, a digit and a symbol (spec 0033). Otherwise null. */
 export function cleanNewPassword(raw: unknown): string | null {
-  return typeof raw === "string" && raw.length >= MIN_NEW_PASSWORD && raw.length <= 72 ? raw : null;
+  if (typeof raw !== "string" || raw.length < MIN_NEW_PASSWORD || raw.length > 72) return null;
+  const has = (chars: (c: string) => boolean) => [...raw].some(chars);
+  const ok = has((c) => c >= "a" && c <= "z") && has((c) => c >= "A" && c <= "Z")
+    && has((c) => c >= "0" && c <= "9") && has((c) => PASSWORD_SYMBOLS.includes(c));
+  return ok ? raw : null;
 }
 
 /** The name a person signs up with: trimmed, 1 to 80 characters, no control characters. */

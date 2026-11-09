@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { OutcomeBadge, StateBadge } from "@/components/badges";
-import { PaymentLanes, QueueRail } from "@/components/flow";
-import { PageHead, Stats } from "@/components/page";
+import { PageHead, Stats } from "@/components/page-head";
 import type { CaseState, CaseSummary } from "@/lib/api-types";
 import { core } from "@/lib/core";
 import { stationCounts } from "@/lib/flow";
+import { demoStory } from "@/lib/story";
 import { ago, brief, datasetNow, date, dueLabel, relative, when } from "@/lib/format";
 
 // Case queue: unfinished cases by state and age, and held bills near their due date (design,
@@ -19,26 +19,32 @@ function bySoonestPayment(a: CaseSummary, b: CaseSummary): number {
   return ka === kb ? a.opened_at.localeCompare(b.opened_at) : ka.localeCompare(kb);
 }
 
-export default async function CaseQueue({ params }: { params: Promise<{ datasetId: string }> }) {
+export default async function CaseQueue({ params, searchParams }: {
+  params: Promise<{ datasetId: string }>;
+  searchParams: Promise<{ missing?: string }>;
+}) {
   const { datasetId } = await params;
+  const asked = demoStory((await searchParams).missing ?? "");
   const [cases, datasets] = await Promise.all([core.cases(datasetId), core.datasets()]);
   const now = datasetNow(datasets.find((d) => d.id === datasetId)?.sim_now);
   const waiting = cases.filter((c) => NEEDS_A_PERSON.includes(c.state)).sort(bySoonestPayment);
   const working = cases.filter((c) => !NEEDS_A_PERSON.includes(c.state)).sort(bySoonestPayment);
   const dueSoon = cases.filter((c) => dueLabel(c.next_payment_date, now)?.soon).length;
   const unconfirmed = cases.filter((c) => c.hold_status === "failed").length;
+  const missing = asked && !cases.some((c) => c.vendor.legal_name === asked.legal_name) ? asked : undefined;
 
   return (
     <main>
-      <PageHead title="Case queue" lead="Every vendor whose bank details changed in Ramp, and where each change stands. Dialback holds their payments, calls the vendor on a number it can prove, and a different person signs off." />
-      <QueueRail counts={stationCounts(cases)} />
-      <Stats label="Held payments" items={[
-        { label: "Bills on hold", value: cases.filter((c) => c.hold_status === "confirmed" || c.hold_status === "releasing").reduce((n, c) => n + c.bills_held, 0) },
-        { label: "Waiting on a person", value: waiting.length, tone: "warn" },
-        { label: "Payment overdue or due within 3 days", value: dueSoon, tone: "bad" },
-        { label: "Hold not confirmed", value: unconfirmed, tone: "bad" },
+      <PageHead
+        title="Case queue"
+        lead="Every vendor whose bank details changed. Payments stay on hold until a different person releases them."
+      />
+      <Stats label="Summary" items={[
+        { n: waiting.length, label: "Waiting on a person", tone: "tone-warn" },
+        { n: working.length, label: "In progress", tone: "tone-info" },
+        { n: dueSoon, label: "Payment due within 3 days or overdue", tone: "tone-bad" },
+        { n: unconfirmed, label: "Hold not confirmed", tone: "tone-bad" },
       ]} />
-      <PaymentLanes cases={cases} now={now} datasetId={datasetId} />
       {cases.length === 0 ? <div className="card empty"><p>No open cases. A case opens here when a vendor&apos;s bank details change in Ramp.</p></div> : null}
       {waiting.length > 0 ? <QueueTable title="Waiting on a person" cases={waiting} datasetId={datasetId} now={now} /> : null}
       {working.length > 0 ? <QueueTable title="In progress" cases={working} datasetId={datasetId} now={now} /> : null}
@@ -56,9 +62,8 @@ function stripe(c: CaseSummary, soon: boolean): string {
 
 function QueueTable({ title, cases, datasetId, now }: { title: string; cases: CaseSummary[]; datasetId: string; now: Date }) {
   return (
-    <section className="card queue-group" aria-label={title}>
+    <section className="card table-wrap queue-group" aria-label={title}>
       <h2>{title} <span className="count">{cases.length}</span></h2>
-      <div className="table-wrap">
       <table>
         <thead>
           <tr><th className="w-vendor">Vendor</th><th>State</th><th>Decision</th><th className="num">Held bills</th><th>Next payment</th><th>Opened</th><th>Deadline</th></tr>

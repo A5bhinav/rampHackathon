@@ -5,13 +5,14 @@ import { redirect } from "next/navigation";
 import { Throttle, authMode, cleanEmail, cleanPassword } from "@/lib/auth-mode";
 import { DEV_TOKEN_SECONDS, devAuthEnabled, mintDevToken } from "@/lib/dev-auth";
 import { markSignedIn, setSession } from "@/lib/session";
+import { safeNext } from "@/lib/story";
 import { supabaseServer } from "@/lib/supabase";
 
 export async function signInAsDevUser(formData: FormData): Promise<void> {
   if (!devAuthEnabled()) redirect("/sign-in");
   const userId = String(formData.get("user_id") ?? "");
   await setSession(await mintDevToken(userId), DEV_TOKEN_SECONDS);
-  redirect("/");
+  redirect(safeNext(formData.get("next")));
 }
 
 // Ten tries per client per five minutes (spec 0010, decision 8). The client is the address
@@ -36,5 +37,5 @@ export async function signIn(formData: FormData): Promise<void> {
     redirect("/sign-in?failed=1");
   }
   await markSignedIn();
-  redirect("/");
+  redirect(safeNext(formData.get("next")));
 }

@@ -17,11 +17,12 @@ export default async function DatasetShell({ children, params }: { children: Rea
         <nav className="nav" aria-label="Main">
           <Link className="brand" href={`/d/${datasetId}/cases`}><BrandMark />Dialback</Link>
           <NavLinks links={[{ href: `/d/${datasetId}/cases`, label: "Case queue" }, { href: `/d/${datasetId}/risk`, label: "Vendor risk" }]} />
+          <Link href="/">How it works</Link>
         </nav>
         <div className="who">
           <span className="chip" title={current?.sim_now ? "This dataset runs on simulated time" : undefined}>
             {current ? current.label : "Unknown dataset"}
-            {current ? <span className="chip-kind">{current.kind}{current.sim_now ? ", simulated time" : ""}</span> : null}
+            <span className="chip-kind">{current ? current.kind : ""}{current?.sim_now ? ", simulated time" : ""}</span>
           </span>
           {datasets.length > 1 ? (
             <details className="switch">
@@ -34,13 +35,14 @@ export default async function DatasetShell({ children, params }: { children: Rea
           <span className="person">
             <span className="avatar" aria-hidden="true">{initials(me.display_name)}</span>
             <span className="person-text">
-              <span><strong>{me.display_name}</strong> <span className="person-role">{me.roles.join(", ") || "no role"}</span></span>
+              <strong>{me.display_name}</strong>
               {/* The team grants approver by this id (spec 0027), so the person can read it here. */}
-              <span className="mono muted" title="Your user ID: give it to the team to be made an approver">ID {me.user_id}</span>
+              <span title="Your user ID: give it to the team to be made an approver">
+                {me.roles.join(", ") || "no role"} <span className="mono">ID {me.user_id}</span>
+              </span>
             </span>
           </span>
           <form action="/sign-out" method="post"><button type="submit" className="quiet">Sign out</button></form>
-        </div>
         </div>
       </header>
       <div className="shell">

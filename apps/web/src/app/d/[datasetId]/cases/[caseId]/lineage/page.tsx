@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { PageHead } from "@/components/page";
 import type { Candidate, SelectionView } from "@/lib/api-types";
+import { PageHead } from "@/components/page-head";
 import { CoreError, core } from "@/lib/core";
 import { when } from "@/lib/format";
 import { phone, seenBefore, sourceLabel, split } from "@/lib/lineage";
@@ -23,35 +24,35 @@ export default async function LineagePage({ params }: { params: Promise<{ datase
       <PageHead
         back={{ href: back, label: detail.case.vendor.legal_name }}
         title="Number lineage"
-        lead="The number Dialback will call for this case, where the Trust Ledger saw it, and every number it refused."
+        lead="The number this case will call, where the Trust Ledger saw it, and every number it refused."
       />
       {!s ? (
         <section className="card lead-card"><p>{view.notes.no_selection}</p></section>
       ) : (
         <>
           <Chosen view={view} />
-          <section className="card flush" aria-labelledby="all-h">
-            <h2 id="all-h" className="card-head">Every number considered <span className="count">{s.candidates.length}</span></h2>
-            <ul className="candidates">
-              {s.candidates.map((c) => {
-                const isPick = c.contact_point_id === chosen;
-                return (
-                  <li key={c.contact_point_id} className={`candidate ${isPick ? "is-ok" : c.eligible ? "is-info" : "is-bad"}`}>
-                    <span className="mono candidate-number">{phone(c.e164)}</span>
-                    <span>
-                      {c.eligible
-                        ? <span className={`badge ${isPick ? "tone-ok" : "tone-info"}`}>{isPick ? "chosen" : `alternate ${(c.rank ?? 1) - 1}`}</span>
-                        : <span className="badge tone-bad">refused</span>}
-                    </span>
-                    <span className="candidate-sources"><Sources candidate={c} />{c.on_file ? <span className="muted sub">on the old vendor master</span> : null}</span>
-                    <span className="muted sub candidate-seen" title={when(c.first_seen_at)}>First seen {seenBefore(c.first_seen_at, s.cutoff)}</span>
-                    {c.reasons.length ? <div className="candidate-reasons"><Reasons candidate={c} text={view.reason_text} /></div> : null}
-                  </li>
-                );
-              })}
+          <section className="card" aria-labelledby="all-h">
+            <h2 id="all-h">Every number considered</h2>
+            <ul className="striped-list">
+              {s.candidates.map((c) => (
+                <li key={c.contact_point_id} className={`candidate ${c.contact_point_id === chosen ? "is-ok" : c.eligible ? "is-info" : "is-bad"}`}>
+                  <span className="mono candidate-number">{phone(c.e164)}</span>
+                  <span>
+                    {c.eligible
+                      ? <span className={`badge ${c.contact_point_id === chosen ? "tone-ok" : "tone-info"}`}>
+                          {c.contact_point_id === chosen ? "chosen" : `alternate ${(c.rank ?? 1) - 1}`}</span>
+                      : <span className="badge tone-bad">refused</span>}
+                  </span>
+                  <span className="candidate-sources"><Sources candidate={c} /></span>
+                  <span className="muted sub candidate-seen" title={when(c.first_seen_at)}>
+                    First seen {seenBefore(c.first_seen_at, s.cutoff)}{c.on_file ? ", on the old vendor master" : ""}
+                  </span>
+                  {c.reasons.length ? <div className="candidate-reasons"><Reasons candidate={c} text={view.reason_text} /></div> : null}
+                </li>
+              ))}
             </ul>
           </section>
-          <dl className="rule-meta" aria-label="The rule that chose">
+          <dl className="rule-meta">
             <div><dt>Rule</dt><dd className="mono">{s.rule_version}</dd></div>
             <div><dt>Cutoff</dt><dd>{when(s.cutoff)}</dd></div>
             <div><dt>Minimum</dt><dd>{s.rule_settings.min_source_types} source types, {s.rule_settings.min_age_days} days</dd></div>
@@ -76,12 +77,11 @@ function Chosen({ view }: { view: SelectionView }) {
     );
   }
   return (
-    <section className="card lead-card edge-ok" aria-labelledby="pick-h">
-      <div className="pick">
-        <div>
-          <h2 id="pick-h">The number Dialback will call</h2>
-          <p className="figure">{phone(pick.e164)}</p>
-        </div>
+    <section className="card lead-card edge-ok pick" aria-labelledby="pick-h">
+      <div>
+        <h2 id="pick-h">The number Dialback will call</h2>
+        <p className="figure">{phone(pick.e164)}</p>
+      </div>
       <dl className="facts">
         <dt>Seen in</dt><dd className="candidate-sources"><Sources candidate={pick} /></dd>
         <dt>First seen</dt><dd>{seenBefore(pick.first_seen_at, s.cutoff)} ({when(pick.first_seen_at)})</dd>

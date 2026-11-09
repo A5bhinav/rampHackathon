@@ -29,5 +29,5 @@ export async function signUp(formData: FormData): Promise<void> {
   const notice = signUpNotice(error ? { status: error.status, code: error.code } : null, Boolean(data?.session));
   if (notice) redirect(`/sign-up?${notice}=1`);
   await markSignedIn();
-  redirect("/");
+  redirect("/app");
 }

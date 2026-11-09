@@ -13,6 +13,7 @@ on:
       - "packages/ledger/**"
       - "supabase/migrations/**"
       - "scripts/db/**"
+      - "scripts/ci/ws_probe.py"
       - "pyproject.toml"
       - "uv.lock"
       - ".dockerignore"
@@ -70,6 +71,19 @@ jobs:
             for i in $(seq 1 30); do curl -fsS "http://localhost:$svc/healthz" && break; sleep 1; done
             curl -fsS "http://localhost:$svc/healthz" > /dev/null
           done
+      # /healthz passes without a WebSocket library, so a second voice container runs in live mode (dummy
+      # Twilio settings, nothing is ever dialled) and the probe checks the relay upgrade (spec 0034, B4).
+      - name: The voice image answers the ConversationRelay WebSocket upgrade
+        run: |
+          docker run -d --name voice-live --network host -e DATABASE_URL -e PORT=8081 -e DIALBACK_VOICE=live \
+            -e TWILIO_ACCOUNT_SID=ACci000000000000000000000000000000 -e TWILIO_AUTH_TOKEN=ci-twilio-auth-token \
+            -e TWILIO_FROM_NUMBER=+14155550100 -e DIALBACK_CALL_TOKEN_KEY=ci-call-token-key-0123456789abcdef \
+            -e DIALBACK_CORE_URL=http://localhost:8001 -e DIALBACK_INTERNAL_TOKEN=ci-internal-token-0123456789 \
+            -e DIALBACK_PUBLIC_BASE_URL=http://localhost:8081 -e DIALBACK_WS_BASE_URL=ws://localhost:8081 \
+            -e "DIALBACK_CUSTOMER_NAME=CI Customer" -e DIALBACK_AP_CALLBACK_NUMBER=+14155550100 dialback-voice
+          for i in $(seq 1 30); do curl -fsS http://localhost:8081/healthz && break; sleep 1; done
+          curl -fsS http://localhost:8081/healthz > /dev/null
+          python3 scripts/ci/ws_probe.py http://localhost:8081
       - name: Service logs
         if: always()
-        run: docker logs mock; docker logs core; docker logs voice
+        run: docker logs mock; docker logs core; docker logs voice; docker logs voice-live

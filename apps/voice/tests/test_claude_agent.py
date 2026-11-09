@@ -17,7 +17,6 @@ from dialback_voice.claude_agent import (
     MAX_TOKENS,
     MODEL_PIN,
     SYSTEM_PROMPT,
-    TEMPERATURE,
     AnthropicVoiceModel,
     ClaudeAgent,
 )
@@ -65,7 +64,8 @@ def _record(reply) -> dict:
     (Phase.LAST4, "it's four eight two one", None, "4821"),            # code reads the digits, not the model
     (Phase.COMPANY, "Acme Supply Co", None, "Acme Supply Co"),        # free text: code records what they said
     (Phase.DEPARTMENT, "accounts receivable", None, "accounts receivable"),
-    (Phase.NAME_ROLE, "I'm Jane Doe, the AP manager", None, "I'm Jane Doe, the AP manager"),
+    (Phase.NAME, "I'm Jane Doe", None, "I'm Jane Doe"),
+    (Phase.ROLE, "the AP manager", None, "the AP manager"),          # role is its own question (spec 0034)
 ])
 def test_clear_answers_record_the_phase_value(phase, callee, model_value, expected):
     model = FakeModel(value=model_value or "x")
@@ -104,7 +104,7 @@ def test_last4_records_the_caller_digits_or_dont_know():
 
 @pytest.mark.parametrize("phase, callee", [
     (Phase.CONSENT, "sure"), (Phase.CHANGE, "no"), (Phase.LAST4, "four eight two one"),
-    (Phase.COMPANY, "Acme"), (Phase.NAME_ROLE, "Jane Doe"),
+    (Phase.COMPANY, "Acme"), (Phase.NAME, "Jane Doe"), (Phase.ROLE, "AP manager"),
 ])
 def test_the_reply_never_carries_spoken_text(phase, callee):
     reply = ClaudeAgent(model=FakeModel(value="no")).reply(_req(phase, callee))
@@ -156,8 +156,7 @@ def test_empty_free_text_records_nothing_and_fails_closed():
 def test_model_pin_and_prompt_are_frozen():
     assert MODEL_PIN == "claude-sonnet-5-5"
     assert isinstance(SYSTEM_PROMPT, str) and SYSTEM_PROMPT.strip()
-    assert TEMPERATURE == 0
-    assert isinstance(MAX_TOKENS, int) and MAX_TOKENS > 0
+    assert MAX_TOKENS == 256   # room for the one-word answer (spec 0034, D1)
 
 
 def test_anthropic_model_posts_the_pinned_call_and_returns_the_word():
@@ -179,11 +178,58 @@ def test_anthropic_model_posts_the_pinned_call_and_returns_the_word():
     assert seen["key"] == "sk-test-123"
     assert seen["version"]                                   # the API version is pinned in a header
     body = seen["body"]
-    assert body["model"] == MODEL_PIN and body["temperature"] == 0 and body["max_tokens"] == MAX_TOKENS
+    assert body["model"] == MODEL_PIN and body["max_tokens"] == MAX_TOKENS
     assert body["system"] == SYSTEM_PROMPT
     content = body["messages"][0]["content"]
     assert "sure, go ahead" in content                      # the caller's turn, quoted as data (R9)
     assert "yes" in content and "no" in content             # the allowed answers are offered
+
+
+def _classify_against(response_json: dict) -> tuple[str, dict]:
+    """Run one classify call against a mock Messages API; return the answer and the request body."""
+    seen = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["body"] = json.loads(request.content.decode())
+        return httpx.Response(200, json=response_json)
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as http:
+        value = AnthropicVoiceModel(http, api_key=b"sk-test").classify(
+            goal="ask consent", allowed=("yes", "no"), callee_text="sure")
+    return value, seen["body"]
+
+
+def test_the_request_sends_no_sampling_params_and_turns_thinking_off():
+    # claude-sonnet-5-5 rejects any non-default temperature/top_p/top_k with a 400, and thinks by
+    # default with thinking counted against max_tokens. So: no sampling params, the lowest thinking
+    # setting, low effort, and room for the answer (spec 0034, B1 and D1).
+    _, body = _classify_against({"content": [{"type": "text", "text": "yes"}]})
+    assert not {"temperature", "top_p", "top_k"} & set(body)
+    assert body["thinking"] == {"type": "between_tools"}
+    assert body["output_config"] == {"effort": "low"}
+    assert body["max_tokens"] == 256
+
+
+def test_a_thinking_block_before_the_text_still_yields_the_answer():
+    # The answer is read by block type, not position: a leading (empty) thinking block is skipped.
+    value, _ = _classify_against({"content": [{"type": "thinking", "thinking": ""},
+                                              {"type": "text", "text": " No \n"}]})
+    assert value == "no"
+
+
+@pytest.mark.parametrize("reply, expected", [("Yes.", "yes"), (" no! ", "no"), ("Unsure.", "unsure"),
+                                             ('"refused"', "refused")])
+def test_a_punctuated_one_word_answer_is_still_read(reply, expected):
+    # A live model may punctuate its one-word answer; "yes." is not in the allowed set, so without this
+    # every consent would fail closed to "no" and end the call (spec 0034, D5).
+    value, _ = _classify_against({"content": [{"type": "text", "text": reply}]})
+    assert value == expected
+
+
+def test_an_answer_that_is_more_than_one_word_still_fails_closed():
+    # Normalizing punctuation must not turn a sentence into a pass: it is still outside the set.
+    agent = ClaudeAgent(model=FakeModel(value="yes, but no"))
+    assert _record(agent.reply(_req(Phase.CONSENT, "yes, but no")))["value"] == "no"
 
 
 def test_anthropic_model_raises_when_there_is_no_text_to_read():

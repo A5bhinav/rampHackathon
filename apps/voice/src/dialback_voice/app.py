@@ -92,15 +92,18 @@ class TwilioDeps:
 async def _verified_twilio_params(twilio: TwilioDeps, request: Request) -> dict[str, str] | None:
     """The request's parameters if its X-Twilio-Signature checks out, else None. The signed URL is
     this service's public URL (what Twilio fetched), rebuilt from the configured base so a proxy in
-    front of us does not change what is signed."""
-    url = f"{twilio.public_base_url}{request.url.path}"
+    front of us does not change what is signed, with the query string Twilio requested. A POST signs
+    every form field, blank ones included (`CalledCity=`); a GET signs the URL alone (spec 0034, B3)."""
+    query = request.url.query
+    url = f"{twilio.public_base_url}{request.url.path}" + (f"?{query}" if query else "")
     if request.method == "POST":
-        raw = await request.body()
-        params = {k: v[-1] for k, v in urllib.parse.parse_qs(raw.decode()).items()}
+        pairs = urllib.parse.parse_qsl((await request.body()).decode(), keep_blank_values=True)
     else:
-        params = dict(request.query_params)
+        pairs = []
     signature = request.headers.get("X-Twilio-Signature", "")
-    return params if valid_twilio_signature(twilio.twilio_auth_token, signature, url, params) else None
+    if not valid_twilio_signature(twilio.twilio_auth_token, signature, url, pairs):
+        return None
+    return dict(pairs) if request.method == "POST" else dict(request.query_params)
 
 
 def _report_body(result: CallResult, call_id: UUID, dial: CallDial) -> dict[str, Any]:

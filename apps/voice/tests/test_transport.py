@@ -2,6 +2,8 @@
 scripted vendor, no Twilio. This is the same step() the Twilio adapter and the lab will call."""
 from __future__ import annotations
 
+from dialback_decision import decide
+from dialback_decision.facts import CallChecks, facts_from_answers
 from dialback_policy.script import Phase
 from dialback_voice.agent import ScriptedAgent
 from dialback_voice.transport import ScriptedVendor, VendorScript, run_call
@@ -65,6 +67,26 @@ def test_hangup_before_consent_is_declined(make_ctx, clock):
 def test_machine_gets_one_voicemail(make_ctx, clock):
     r = _run(make_ctx, clock, VendorScript(answered_by="machine"))
     assert r.end.result == "voicemail"
+
+
+def test_a_clean_call_records_name_and_role_separately(make_ctx, clock):
+    # Spec 0034, B5: name and role are two questions, each answer recorded as said on its own turn,
+    # so a clean call carries the speaker_role V06 needs and can reach verified.
+    r = _run(make_ctx, clock, VendorScript(name="Jordan Lee", role="AP clerk"))
+    agent_lines = [t.text for t in r.transcript if t.speaker == "agent"]
+    assert "May I have your name?" in agent_lines and "And what's your role there?" in agent_lines
+    answers = r.answers["answers"]
+    name = [a for a in answers if a["slot"] == "speaker_name"]
+    role = [a for a in answers if a["slot"] == "speaker_role"]
+    assert [a["value"] for a in name] == ["Jordan Lee"] and [a["value"] for a in role] == ["AP clerk"]
+    assert name[0]["turn_id"] != role[0]["turn_id"]
+    assert r.checks["answers_grounded"] is True
+    # The facts the core adds from outside the call (the dialed pick, the keyed last-four comparison)
+    # are declared as a clean call has them; the rest come from this call's own answers and checks.
+    facts = facts_from_answers(answers, call_result=r.end.result, checks=CallChecks(**r.checks), dialed_out=True,
+                               dialed_eligible_number=True, dialed_number_is_pick=True, last_four_result="match",
+                               company_matches=True, answered_by="human", speaker_in_change_thread=False)
+    assert decide(facts).outcome == "verified"
 
 
 def test_refused_last_four_still_completes(make_ctx, clock):
