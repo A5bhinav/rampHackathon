@@ -10,6 +10,7 @@ its helpers; it never touches the rule's behavior.
 from __future__ import annotations
 
 import datetime as dt
+import re
 import uuid
 from collections import Counter
 from dataclasses import dataclass, field
@@ -26,6 +27,11 @@ VENDOR_DOMAIN = "acme.example"
 REQUEST_SUBJECT = "Updated banking details"
 REPLY_PREFIXES = ("Re: ", "Fwd: ", "[EXTERNAL] ")
 SUBJECT_PREFIX = {"re": "Re: ", "fwd": "Fwd: ", "external": "[EXTERNAL] "}
+# Every number the lab writes is in the NANP block reserved for fiction (NPA-555-0100 to 0199).
+FICTIONAL = re.compile(r"^\+1\d{3}55501\d{2}$")
+# Area codes whose digits differ pairwise in all three places: two numbers in different ones differ in
+# at least three digits, so unrelated numbers are never near misses (at most 2 digits, or a swap).
+FAR_NPAS = ("201", "312", "423", "534", "645", "756", "867", "978")
 
 COUNTING = ["email", "contract", "vendor_portal", "listing", "paper_mail"]  # vendor_master never counts
 CHANNELS = [*COUNTING, "vendor_master"]
@@ -170,26 +176,29 @@ def profile(world: World) -> Counter[str]:
     return p
 
 
-def _e164(n: int) -> str:
-    return f"+1{n:010d}"
+def fictional(e164: str) -> bool:
+    return bool(FICTIONAL.match(e164))
 
 
-def _sibling(e164: str, mode: str, pos: int, bump: int) -> str:
-    """A near-miss of `e164`: one digit changed, two adjacent digits swapped, or two digits changed."""
-    digits = list(e164[2:])
-    p = pos % (len(digits) - 1)
+def _fictional_e164(npa: str, line: int) -> str:
+    """A number in the block reserved for fiction: NPA-555-0100 to NPA-555-0199."""
+    return f"+1{npa}55501{line:02d}"
 
-    def shift(k: int) -> None:
-        digits[k] = str((int(digits[k]) + 1 + bump % 9) % 10)
 
-    if mode == "swap" and digits[p] != digits[p + 1]:
-        digits[p], digits[p + 1] = digits[p + 1], digits[p]
+def _sibling(e164: str, mode: str, which: int, bump: int) -> str:
+    """A near miss of `e164` that stays in the fictional block: only its last two digits move. One of
+    them changes (`which` picks which one), the two swap, or both change."""
+    head, a, b = e164[:-2], int(e164[-2]), int(e164[-1])
+    step = 1 + bump % 9
+    if mode == "swap" and a != b:
+        a, b = b, a
     elif mode == "two":
-        shift(p)
-        shift((p + 3) % len(digits))
+        a, b = (a + step) % 10, (b + step) % 10
+    elif which % 2:
+        b = (b + step) % 10
     else:
-        shift(p)
-    return e164[:2] + "".join(digits)
+        a = (a + step) % 10
+    return f"{head}{a}{b}"
 
 
 SETTINGS = st.one_of(st.just(DEFAULT), st.builds(
@@ -233,15 +242,15 @@ def worlds(draw, settings: Settings | None = None) -> World:
     established vendor line, so the rule always has a legitimate pick to rank against."""
     chosen = settings if settings is not None else draw(SETTINGS)
     count = draw(st.integers(1, 5))
-    seeds = draw(st.lists(st.integers(2015550000, 2019559999), min_size=count, max_size=count, unique=True))
-    specs = [draw(_number(_e164(s))) for s in seeds]
-    real = _e164(2025550100)
+    npas = draw(st.lists(st.sampled_from(FAR_NPAS[:-1]), min_size=count, max_size=count, unique=True))
+    specs = [draw(_number(_fictional_e164(npa, draw(st.integers(0, 99))))) for npa in npas]
+    real = _fictional_e164(FAR_NPAS[-1], 0)
     specs.append(_real(real))
     others = [s.e164 for s in specs[:-1]]
     taken = {s.e164 for s in specs}
     for _ in range(draw(st.integers(0, 2))):
         base = draw(st.sampled_from([real] * len(others) + others))   # half the siblings shadow the real line
-        sib = _sibling(base, draw(st.sampled_from(["one", "swap", "two"])), draw(st.integers(0, 8)),
+        sib = _sibling(base, draw(st.sampled_from(["one", "swap", "two"])), draw(st.integers(0, 1)),
                        draw(st.integers(0, 8)))
         if sib not in taken:
             taken.add(sib)
@@ -260,11 +269,13 @@ def clean_worlds(draw, settings: Settings | None = None) -> World:
     """Draw a world with no attacker knob set (the L1 liveness floor), plus one number built to meet
     the L1 premise: the first `min_source_types` counting channels, at least `min_age_days + 30` old."""
     chosen = settings if settings is not None else draw(SETTINGS)
-    ks = draw(st.lists(st.integers(0, 60), max_size=3, unique=True))
-    specs = [NumberSpec(e164=_e164(2015550000 + k * 1111), channels=[], lead_days=0,
-                        sightings=tuple(draw(st.lists(_CLEAN_SIGHTING, min_size=1, max_size=3)))) for k in ks]
+    count = draw(st.integers(0, 3))
+    npas = draw(st.lists(st.sampled_from(FAR_NPAS), min_size=count + 1, max_size=count + 1, unique=True))
+    specs = [NumberSpec(e164=_fictional_e164(npa, draw(st.integers(0, 99))), channels=[], lead_days=0,
+                        sightings=tuple(draw(st.lists(_CLEAN_SIGHTING, min_size=1, max_size=3)))) for npa in npas[:-1]]
     lead = chosen.min_age_days + 30 + draw(st.integers(0, 400))
-    specs.append(NumberSpec(e164="+19875550123", channels=COUNTING[:chosen.min_source_types], lead_days=lead))
+    specs.append(NumberSpec(e164=_fictional_e164(npas[-1], 23), channels=COUNTING[:chosen.min_source_types],
+                            lead_days=lead))
     numbers = [s.e164 for s in specs]
-    assume(not any(near_miss(a, b, 2) for i, a in enumerate(numbers) for b in numbers[i + 1:]))
+    assume(not any(near_miss(a, b, 2) for i, a in enumerate(numbers) for b in numbers[i + 1:]))   # true by construction
     return make_world(numbers=specs, settings=chosen)

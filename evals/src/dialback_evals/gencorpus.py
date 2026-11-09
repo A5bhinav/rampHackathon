@@ -19,7 +19,7 @@ from hypothesis import HealthCheck, given, settings
 from hypothesis import seed as pin_seed
 
 from .invariants import all_violations
-from .worldgen import World, worlds
+from .worldgen import World, fictional, worlds
 
 FILE = "world.json"
 
@@ -63,7 +63,11 @@ def _load(data: dict) -> World:
 
 
 def freeze(world: World, label: str, out_dir: Path, *, labels: list[str] | tuple[str, ...] = (), why: str = "") -> Path:
-    """Write `world` as `<out_dir>/<label>/world.json` and return the case directory."""
+    """Write `world` as `<out_dir>/<label>/world.json` and return the case directory. Refuses a world
+    holding any real-looking number: the lab writes only the fictional NPA-555-0100 to 0199 block."""
+    numbers = {s.e164 for s in world.kwargs["sightings"]} | set(world.poison)
+    if bad := sorted(n for n in numbers if not fictional(n)):
+        raise ValueError(f"refusing to freeze real-looking numbers {bad}: the lab writes only NPA-555-0100 to 0199")
     case = Path(out_dir) / label
     case.mkdir(parents=True, exist_ok=True)
     body = {"label": label, "labels": list(labels), "why": why, **_dump(world)}

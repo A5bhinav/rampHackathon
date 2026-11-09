@@ -2,6 +2,7 @@
 and every case the lab has frozen is re-run against the real rule (a found case stays found)."""
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -10,6 +11,8 @@ from dialback_evals.worldgen import NumberSpec, SightingSpec, make_world, run
 
 ROOT = Path(__file__).resolve().parents[2]
 GENERATED = ROOT / "evals" / "corpus-generated"
+FICTIONAL = re.compile(r"^\+1\d{3}55501\d{2}$")   # NANP 555-0100 to 555-0199, reserved for fiction
+E164 = re.compile(r"\+1\d{10}")
 HARD = NumberSpec("+14695550199", [], 0, is_poison=True, sightings=(
     SightingSpec("email", 30, sender="lookalike", recorded_late=True),
     SightingSpec("listing", 200, visibility="tiny", shared_id=True),
@@ -24,6 +27,24 @@ def test_frozen_world_round_trips(tmp_path):
         back = load_world(case)
         assert back.poison == w.poison and back.settings == w.settings
         assert run(back) == run(w)                 # identical output, so identical inputs_sha256
+
+
+def test_freeze_refuses_a_real_looking_number(tmp_path):
+    # Review finding C1: a real-looking number must never reach a committed fixture, whatever produced it.
+    real_looking = "+1201" + "5551234"   # built in pieces so the file scan below does not see it
+    with pytest.raises(ValueError, match="real-looking"):
+        freeze(make_world(numbers=[NumberSpec(real_looking, ["contract", "listing"], 500)]), "x", tmp_path)
+    assert load_all(tmp_path) == []
+
+
+def test_lab_files_hold_only_fictional_numbers():
+    found = {}
+    for path in [*(ROOT / "evals" / "src").rglob("*.py"), *(ROOT / "evals" / "tests").rglob("*.py"),
+                 *GENERATED.rglob("*.json")]:
+        bad = sorted({n for n in E164.findall(path.read_text(encoding="utf-8")) if not FICTIONAL.match(n)})
+        if bad:
+            found[str(path.relative_to(ROOT))] = bad
+    assert found == {}, found
 
 
 def test_fuzz_against_a_broken_rule_freezes_a_case(tmp_path, monkeypatch):

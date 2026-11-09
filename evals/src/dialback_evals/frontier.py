@@ -21,7 +21,7 @@ from .worldgen import DEFAULT, NumberSpec, SightingSpec, World, make_world, run
 DEFAULT_GRID = {"channels": [1, 2, 3], "lead_days": [0, 30, 60, 90, 180, 365]}
 POISON_CHANNELS = ("contract", "listing", "vendor_portal")
 K01_REAL = "+19715550142"
-POISON = "+19715550169"
+POISON = "+13125550169"   # another area code: unrelated to the vendor line
 K01_EMAIL_DAYS = (700, 400, 100)
 
 
@@ -75,7 +75,7 @@ def frontier_table(cells: list[dict]) -> dict:
 # The over-block sweep.
 REAL = "+14155550142"
 SIBLING = "+14155550143"
-UNRELATED = "+19995550001"
+UNRELATED = "+18675550188"
 REAL_LEAD = 200
 NOISE = ("lookalike_email", "in_thread_copy", "same_subject_copy", "near_miss_sibling", "hidden_copy",
          "bank_label_copy", "fax_label_copy", "shared_id_duplicate", "late_copy")

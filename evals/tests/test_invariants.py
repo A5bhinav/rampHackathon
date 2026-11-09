@@ -170,7 +170,7 @@ def test_oracle_tries_a_shared_id_twin_that_sorts_first():
     # A second document under a lookalike email's id, sorting ahead of it, becomes the copy the rule
     # reads: the lookalike stops pulling the cutoff back and the attacker's number becomes provable.
     world = make_world(numbers=[
-        NumberSpec("+19995550000", [], 0, sightings=(SightingSpec("email", 300, visibility="white",
+        NumberSpec("+18675550120", [], 0, sightings=(SightingSpec("email", 300, visibility="white",
                                                                   sender="lookalike"),)),
         NumberSpec("+12065550169", ["contract", "listing"], 200, is_poison=True)])
     assert run(world).get("e164") is None

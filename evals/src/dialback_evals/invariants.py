@@ -25,7 +25,7 @@ from jsonschema import Draft202012Validator
 from .worldgen import World, _address, run
 
 COUNTING = frozenset({"email", "contract", "vendor_portal", "listing", "paper_mail"})  # not vendor_master
-FRESH = "+19990000001"   # a number no generated world uses, for probes when a world has no candidate
+FRESH = "+10895550199"   # fictional, at least 3 digits from every generated number; a probe target
 LOOKALIKE_PROBE_DAYS = (30, 100, 400)   # a lookalike email this many days before the request
 _SCHEMA = Path(__file__).resolve().parents[3] / "packages/contracts/schemas/selection.schema.json"
 _PREFIX = re.compile(r"^((re|fwd?|aw|sv)\s*:|\[[^\]]*\])\s*")

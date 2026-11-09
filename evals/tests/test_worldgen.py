@@ -3,14 +3,17 @@ the generator actually reaches every rejection reason and knob path, and clean w
 from __future__ import annotations
 
 import json
+import re
 from collections import Counter
 from pathlib import Path
 
 from dialback_evals.worldgen import NumberSpec, clean_worlds, make_world, profile, run, worlds
 from hypothesis import given, settings
+from hypothesis import strategies as st
 from jsonschema import Draft202012Validator
 
 ROOT = Path(__file__).resolve().parents[2]
+FICTIONAL = re.compile(r"^\+1\d{3}55501\d{2}$")   # NANP 555-0100 to 555-0199, reserved for fiction
 SCHEMA = json.loads((ROOT / "packages/contracts/schemas/selection.schema.json").read_text())
 REASONS = {"first_seen_in_change_context", "too_few_source_types", "younger_than_minimum_age",
            "near_miss_of_older_number", "hidden_text_only", "not_vendor_party", "fax_line"}
@@ -33,6 +36,17 @@ def test_make_world_is_deterministic():
                       in_thread=False, subject_in_context=False, near_miss_of=None, is_poison=False)
     a, b = make_world(numbers=[spec]), make_world(numbers=[spec])
     assert run(a)["inputs_sha256"] == run(b)["inputs_sha256"]
+
+
+def test_generated_numbers_are_fictional():
+    # Review finding C1: every number a generated world holds (and so anything lab fuzz can freeze)
+    # must be in the block reserved for fiction, never a real-looking number.
+    @given(st.one_of(worlds(), clean_worlds()))
+    @settings(max_examples=400, deadline=None, derandomize=True, database=None)
+    def check(world):
+        numbers = {s.e164 for s in world.kwargs["sightings"]}
+        assert numbers and all(FICTIONAL.match(n) for n in numbers), sorted(n for n in numbers if not FICTIONAL.match(n))
+    check()
 
 
 def test_generator_covers_every_reason_and_knob():
