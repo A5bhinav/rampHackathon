@@ -44,6 +44,11 @@ async def write_ingest(conn: psycopg.AsyncConnection, *, dataset_id: UUID, vendo
     stored: set[str] = set()
     docs = sorted(result.documents, key=lambda d: d["parent_document_id"] is not None)  # emails before attachments
     sid = lambda x: stored_id(dataset_id, x) if x else None
+    # Skip documents already stored, before inserting: the custody triggers run before any
+    # ON CONFLICT, so a re-load at another time would trip them.
+    have = {str(r["id"] if isinstance(r, dict) else r[0]) for r in await (await conn.execute(
+        "select id from ledger.documents where id = any(%s)", ([sid(d["id"]) for d in docs],))).fetchall()}
+    docs = [d for d in docs if str(sid(d["id"])) not in have]
     for d in docs:
         row = await (await conn.execute(
             """insert into ledger.documents (id, dataset_id, vendor_id, kind, sha256, custody_channel, received_at,
