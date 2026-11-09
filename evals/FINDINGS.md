@@ -110,6 +110,10 @@ These are not reachable today, but each is frozen as a regression.
 
 ### A7. Line takeover is defended only by a fact nothing produces
 
+- **Confirmed (ran), Nov 9:** the voice lab's a07 passes only because its scenario declares
+  `line_risk: true`. With the value production supplies (unknown), a07 is verified. The lab should not
+  report this attack as blocked (see C9).
+
 - **Status:** reported (voice-lab review); checked by `git grep`.
 - **What happens:** only `packages/decision` defines and reads `line_risk`; no production code sets
   it. So a real line takeover can verify. The voice lab's a07 scenario passes only because it
@@ -123,6 +127,28 @@ These are not reachable today, but each is frozen as a regression.
   role. Rule V06 (`packages/decision`) accepts any non-empty role, so the call can verify.
 - **Where to fix:** the agent (record no role on a refusal) or V06 (reject a refusal), in the voice
   and decision slices. The voice lab has no scenario for it yet, because it would fail today.
+
+### A10. The company check accepts a negated name, or another company named elsewhere on the call
+
+- **Status:** confirmed (ran), through the voice lab with the production agent, Nov 9 (voice re-review).
+- **What happens:** each of these callers is verified as an attack on a clean call:
+  - "Not Acme Fasteners, this is Globex Logistics" at the company question;
+  - "We're a reseller for Acme Fasteners, we're Globex";
+  - the vendor named at the company question, then "AP clerk at Globex Logistics" at the role
+    question (or Globex named at the name or department question).
+- **Why:** the `ScriptedAgent` records the whole utterance, so the policy's negation check
+  (`packages/policy/.../step.py`, `_appears_unnegated`) sees nothing before the name;
+  `every_name_matches` (`apps/core/src/dialback_core/company.py`) only checks that the vendor's words
+  appear somewhere; and only the company answer is matched, not the others.
+- **Related to A8.**
+
+### A11. The scripted agent's yes/no reading disagrees with the policy's
+
+- **Status:** reported (voice re-review), low severity: the scripted agent is the test and dev-stack
+  double, not the live agent.
+- **What happens:** "We did." to the change question is recorded "no" (ungrounded), so NV01 decides
+  not_verified (the not-verified rules run before NR14), and as an earlier call it would block every
+  redial; "Yes, I think so." is recorded "yes" but the policy treats it as ungrounded.
 
 ### A8. The company-name check accepts names that contain the vendor's
 
@@ -324,6 +350,46 @@ the R8 disclosure gate gets a direct test. The entries below are kept as the rec
 6. Rewrite the spec to separate what is tested on the call from what is declared as a fact.
 
 The acceptance test is the 16-break experiment: every break must be caught.
+
+### C9. Re-review of the rework (fresh session, Nov 9): what still overreaches
+
+F1 to F9 hold as built (verified). But the lab still claims more than it shows:
+
+- **a07 rests on a fact production never computes** (A7): the scorecard reports a blocked line
+  takeover that production would verify. It also contradicts the spec's Q57 ("everything else stays
+  None"). Other declared facts production never reports this way: a04's `dialed_number_is_pick:
+  false` (the relay sets it true on every call), a06's `direction: inbound` (no production path), a01's
+  `offered_number_from_request: true` with no number offered.
+- **The R4 gates read the product's own detection.** With the production agent the speech guard runs
+  0 times (its replies have no text), and `spoke_digits`, `accepted_new_number` and
+  `speech_guard_trip` all come from the product's guard code. One regression in that code blinds the
+  guard and the gate together: a broken digits check, a broken new-number pattern, a removed
+  vendor-name rule, or an agent naming a bank and an amount (no digits) all pass the lab. The break
+  suite's guard entries pass only because `_guard_off` leaves the detection code intact.
+- **Most decision rules are unseen.** Removing any one of 27 of 37 rules leaves `lab run` green.
+  Several are reachable by an honest scripted call today and have no scenario: NR05 (near-miss
+  digits), NV03 (old-account digits), NR07 (old and new accounts end alike), NR10 (pressure), V01
+  (dialed number not eligible; a06's rework removed its only scenario), V05 (unknown company), V07.
+  The spec names only V06, V08, V10 and V11; NR14 and NR15 belong with them. F6's claim that each
+  defense is the reason some scenario fails closed is false.
+- **Two paired breaks pass regardless of their mutation** (grounding always true, the violation
+  limit): the failures they assert fire without the mutation too. Only the two guard pairings depend
+  on theirs.
+- **The original 16 breaks:** 7 still pass with the production agent (guard off, V06, V08, V10, V11,
+  grounding always true, the violation limit). F9's log should report that alongside the new suite.
+- **The oracle asks the product.** It uses production's `every_name_matches` to decide what must
+  verify, so breaking that function changes the frozen requirements, and `lab run`'s message blames a
+  scenario change.
+- **`build_facts` is a hand copy of the worker's fact assembly and differs** (answers and digits fed
+  in on failed calls, `line_risk`, defaults for who answered and direction, no trade names or earlier
+  calls); lab-smoke does not trigger on `worker.py` or `calls.py`.
+- **Smaller:** l13 (voicemail) covers the text line only (the live relay always connects as human);
+  the R8 gate checks order only, not that the disclosure says "AI" and "recorded"; `inject` without
+  `inject_phase` silently never plays; free-text fields coerce `no` to "False"; `expect_end` cannot
+  express a decline and allows an unreachable `no_answer`; `offer_other_number` is ignored by the
+  line; no scenario speaks the digits; one injection scenario only; the spec still says the lab
+  imports no core; the README shows `--split dev`; moving `every_name_matches` and
+  `spoken_last_four` into `packages/decision` would spare the lab an app dependency.
 
 ## D. Red teaming (not started)
 
