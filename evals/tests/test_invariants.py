@@ -259,12 +259,18 @@ def _fail_closed(world):
 
 
 _PATHS = {   # each way a document lands in the change context, other than arriving after the cutoff
-    "thread": lambda d, req: d.thread_id == req.thread_id and d.id != req.document_id,
+    # The request email itself: where real ingestion puts the attacker's own words (review 2, B1).
+    "request": lambda d, req: d.id == req.document_id,
+    "thread": lambda d, req: (d.thread_id == req.thread_id and d.id != req.document_id
+                              and sender_domain(d.sender) != VENDOR_DOMAIN),
+    # A reply in the thread from the vendor's own domain: a hijacked mailbox.
+    "thread_own": lambda d, req: (d.thread_id == req.thread_id and d.id != req.document_id
+                                  and sender_domain(d.sender) == VENDOR_DOMAIN),
     "subject": lambda d, req: d.subject == req.subject and d.thread_id != req.thread_id,
     "lookalike": lambda d, req: bool((sd := sender_domain(d.sender)) and is_lookalike(sd, (VENDOR_DOMAIN,))),
 }
 _KINDS = {"bank": lambda s: s.party == "bank", "fax": lambda s: s.role == "fax",
-          "unlabeled": lambda s: s.party == "unknown"}
+          "unlabeled": lambda s: s.party == "unknown", "customer": lambda s: s.party == "customer"}
 
 
 def _partial_fix(kind: str, path: str):

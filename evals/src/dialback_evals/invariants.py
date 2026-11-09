@@ -265,9 +265,11 @@ def metamorphic(world: World, base: dict | None = None) -> list[str]:
     return found
 
 
-# I12's attacker text, as ingestion labels it: a bank's line, a fax line, and a bare mention with no
-# label the reader can place (role and party "unknown"; spec 0022), which the rule also refuses.
-LABEL_KINDS = (("ar", "bank"), ("fax", "vendor"), ("unknown", "unknown"))
+# I12's attacker text, in the shapes ingestion emits (spec 0022's stub reader): a bank's line ("Bank
+# verification line: ..." gives role unknown, party bank), a fax line, a bare mention with no label
+# the reader can place (role and party "unknown"), which the rule also refuses, and a customer's line,
+# which a model reader may emit.
+LABEL_KINDS = (("unknown", "bank"), ("fax", "vendor"), ("unknown", "unknown"), ("unknown", "customer"))
 
 
 def _context_labels_removed(world: World) -> World:
@@ -301,15 +303,24 @@ def _label_probe(world: World, base: dict) -> str | None:
     if number is None or not any(r.document_id not in f.in_context_ids and f.docs[r.document_id].received_at < when
                                  for r in number.visible):
         return None
-    other, look = "ar@other.example", _address("lookalike", kw["vendor_domains"][0])
+    domain = kw["vendor_domains"][0]
+    other, own, look = "ar@other.example", f"ar@{domain}", _address("lookalike", domain)
+    # The request email itself first: real ingestion puts the attacker's words in its body (review 2,
+    # B1). Then a reply in its thread from another domain and from the vendor's own (a hijacked
+    # mailbox), a same-subject email, and a lookalike sender.
+    paths: list[tuple[str, list[DocumentRef]]] = []
+    if request.document_id in f.docs:
+        paths.append((request.document_id, kw["documents"]))
     for doc in (DocumentRef("m_lbl_thread", "email", when, other, request.thread_id, "Doc m_lbl_thread", when),
+                DocumentRef("m_lbl_thread_own", "email", when, own, request.thread_id, "Doc m_lbl_thread_own", when),
                 DocumentRef("m_lbl_subject", "email", when, other, "t_m_lbl_subject", request.subject, when),
                 DocumentRef("m_lbl_look", "email", when, look, "t_m_lbl_look", "Doc m_lbl_look", when)):
-        documents = [*kw["documents"], doc]
-        if doc.id not in _frame(_with(world, documents=documents)).in_context_ids:
+        paths.append((doc.id, [*kw["documents"], doc]))
+    for doc_id, documents in paths:
+        if doc_id not in _frame(_with(world, documents=documents)).in_context_ids:
             continue                                   # a path this world's request does not open
         for role, party in LABEL_KINDS:
-            row = Sighting(pick, doc.id, "email", when, "visible", role, party, when)
+            row = Sighting(pick, doc_id, "email", when, "visible", role, party, when)
             now = run(_with(world, documents=documents, sightings=[*kw["sightings"], row])).get("e164")
             if now is not None and now != pick:
                 return "M_incontext_label_moved_pick"
