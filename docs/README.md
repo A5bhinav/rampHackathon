@@ -5,6 +5,7 @@
 | `Dialback_System_Design.pdf` | The design document (Oct 31, 2026). The source of truth for every README in this repo. |
 | `BBS_x_Ramp_Hackathon_Info.pdf` | The hackathon deck: prompt, rounds, dates, rubric. |
 | `state-machine.md` | The case state machine, generated from `app.case_transitions` by `scripts/db/render_state_machine.py`. Never edit by hand. |
+| `live-call.md` | The first live test call: setup, pre-flight, what the person answering says, and what each failure looks like. |
 | `threat-model.md` | STRIDE and OWASP LLM Top 10 tables, and the prompt-injection design. |
 | `adr/` | Architecture decision records in Michael Nygard's format. Numbered once, never reused; a reversed decision is marked superseded, never deleted. |
 | `c4/` | The container view: six parts we build, four outside systems. |
