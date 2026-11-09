@@ -24,7 +24,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from .auth import Principal, current_user
 from .db import person_tx
 from .events import NotAllowed, TransitionRefused, VersionConflict, apply_event, person
-from .timeline import summary
+from .timeline import alert_message, summary
 
 router = APIRouter(prefix="/api")
 UserDep = Annotated[Principal, Depends(current_user)]
@@ -196,12 +196,21 @@ async def dataset_alerts(dataset_id: UUID, request: Request, user: UserDep):
     async with person_tx(request.app.state.pool, user.user_id, user.claims) as conn:
         if await (await conn.execute("select 1 from app.datasets where id = %s", (dataset_id,))).fetchone() is None:
             return problem(404, "not_found", "No such dataset.")
+        # A stuck place_call carries the case's latest refusal, so the banner can say why (spec 0031).
         rows = await (await conn.execute(
-            "select id, case_id, kind, severity::text as severity, message, raised_at from app.alerts "
-            "where dataset_id = %s and resolved_at is null order by (severity = 'critical') desc, raised_at desc",
+            "select a.id, a.case_id, a.kind, a.severity::text as severity, a.message, a.raised_at, f.body as failed "
+            "from app.alerts a left join lateral ("
+            "  select e.body_jcs::jsonb -> 'body' as body from audit.evidence_events e"
+            "   where a.kind = 'command_stuck' and a.message like 'Command place\\_call %%'"
+            "     and e.case_id = a.case_id and e.type = 'command_failed'"
+            "     and e.body_jcs::jsonb -> 'body' ->> 'command' = 'place_call'"
+            "   order by e.seq desc limit 1) f on true "
+            "where a.dataset_id = %s and a.resolved_at is null "
+            "order by (a.severity = 'critical') desc, a.raised_at desc",
             (dataset_id,))).fetchall()
     return {"alerts": [{"id": r["id"], "case_id": str(r["case_id"]) if r["case_id"] else None, "kind": r["kind"],
-                        "severity": r["severity"], "message": r["message"], "raised_at": ts(r["raised_at"])} for r in rows]}
+                        "severity": r["severity"], "message": alert_message(r["message"], r["failed"]),
+                        "raised_at": ts(r["raised_at"])} for r in rows]}
 
 
 @router.get("/cases")
