@@ -64,7 +64,8 @@ def _record(reply) -> dict:
     (Phase.LAST4, "it's four eight two one", None, "4821"),            # code reads the digits, not the model
     (Phase.COMPANY, "Acme Supply Co", None, "Acme Supply Co"),        # free text: code records what they said
     (Phase.DEPARTMENT, "accounts receivable", None, "accounts receivable"),
-    (Phase.NAME_ROLE, "I'm Jane Doe, the AP manager", None, "I'm Jane Doe, the AP manager"),
+    (Phase.NAME, "I'm Jane Doe", None, "I'm Jane Doe"),
+    (Phase.ROLE, "the AP manager", None, "the AP manager"),          # role is its own question (spec 0034)
 ])
 def test_clear_answers_record_the_phase_value(phase, callee, model_value, expected):
     model = FakeModel(value=model_value or "x")
@@ -103,7 +104,7 @@ def test_last4_records_the_caller_digits_or_dont_know():
 
 @pytest.mark.parametrize("phase, callee", [
     (Phase.CONSENT, "sure"), (Phase.CHANGE, "no"), (Phase.LAST4, "four eight two one"),
-    (Phase.COMPANY, "Acme"), (Phase.NAME_ROLE, "Jane Doe"),
+    (Phase.COMPANY, "Acme"), (Phase.NAME, "Jane Doe"), (Phase.ROLE, "AP manager"),
 ])
 def test_the_reply_never_carries_spoken_text(phase, callee):
     reply = ClaudeAgent(model=FakeModel(value="no")).reply(_req(phase, callee))

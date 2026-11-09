@@ -96,7 +96,7 @@ class ClaudeAgent:
             if digits:
                 return digits[-4:]
             return self._judge(request.goal, ("refused", "dont_know"), text, "dont_know")
-        said = text.strip()[:200]  # free-text phases: record the caller's own words (company, department, name)
+        said = text.strip()[:200]  # free-text phases: the caller's own words (company, department, name, role)
         return said or None
 
     def _judge(self, goal: str, allowed: tuple[str, ...], text: str, fail: str) -> str:
