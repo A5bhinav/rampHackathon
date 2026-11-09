@@ -275,7 +275,8 @@ git commit  # "lab: the selection invariant oracle (spec 0033, Task 2)"
 **Interfaces:**
 - Consumes: `World`, `make_world`, `run` (Task 1); `all_violations` (Task 2).
 - Produces:
-  - `freeze(world: World, label: str, out_dir: Path) -> Path` - writes the world as corpus-shaped JSON (`documents.json`-style plus a `meta.json` holding `poison`, `settings`, `label`) under `out_dir/<label>/`.
+  - `freeze(world: World, label: str, out_dir: Path, *, labels=(), why="") -> Path` - writes `out_dir/<label>/world.json` (the select() inputs field for field, plus `poison`, `settings`, `labels`, `why`) and returns the case directory. (Ruling: the corpus's documents.json shape has no `recorded_at`, so it cannot round-trip a late-recorded document.)
+  - `rerun(out_dir: Path) -> list[tuple[str, list[str]]]` - every frozen case the rule still fails, with what the oracle finds now.
   - `load_world(case_dir: Path) -> World` - the inverse; `run(load_world(freeze(w,...)))` equals `run(w)` by `inputs_sha256`.
   - `load_all(out_dir: Path) -> list[tuple[str, World]]`.
   - `fuzz(strategy=worlds(), *, examples: int, seed: int, out_dir: Path) -> list[str]` - drives Hypothesis at the pinned `seed`/`examples`; on the first shrunk violating world, calls `freeze` and returns its labels; returns `[]` when clean. Uses a `@given(strategy) @settings(max_examples=examples, derandomize via seed)` inner function whose `AssertionError` carries the shrunk world.
@@ -304,7 +305,7 @@ def test_frozen_findings_rerun_against_the_rule():  # in test_generated_corpus.p
 Run: `cd evals && uv run pytest tests/test_generated_corpus.py -v`
 Expected: FAIL (`ModuleNotFoundError: dialback_evals.gencorpus`).
 
-- [ ] **Step 3: Implement `gencorpus.py`.** JSON uses the same `documents.json` span/custody shape as `corpus/` so a frozen world is human-readable next to the hand-authored corpus; `meta.json` carries `poison`, `settings` (as `asdict`), `label`. `fuzz` catches the Hypothesis-shrunk `AssertionError`, extracts the world from it, freezes once, returns labels.
+- [ ] **Step 3: Implement `gencorpus.py`.** `world.json` is indented, with ISO timestamps, so a frozen world is readable next to the hand-authored corpus. `fuzz` catches the Hypothesis-shrunk `AssertionError`, extracts the world from it, freezes once, returns labels.
 
 - [ ] **Step 4: Run to verify they pass**
 
