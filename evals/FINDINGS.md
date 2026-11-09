@@ -229,6 +229,32 @@ These are not reachable today, but each is frozen as a regression.
   Fasteners, by design (spec 0005, D7).
 - **Open question:** whether a caller naming a related-but-different company should pass.
 
+### A15. A young vendor's bank change gets no call, and a vendor's first numbers are never checked
+
+- **Status:** confirmed (read), Nov 9, origin/main da057f8. Not measured on any customer's data.
+- **Where:** `packages/ledger/src/dialback_ledger/select.py`, lines 173-175 (`min_source_types` 2,
+  `min_age_days` 90). When nothing qualifies, the worker emits `no_provable_number`, and the
+  timeline says a person must verify.
+- **What happens:**
+  1. A number qualifies only once 2 source types show it and it was seen cleanly at least 90 days
+     before the change's cutoff.
+  2. A vendor added in the last 90 days usually has no such number. Every bank change it makes gets
+     no call: the payment stays held until a person verifies it by hand.
+  3. Once a number has 2 source types and 90 days, it is trusted, whatever its origin. Nothing
+     checks where a vendor's first numbers came from (spec 0002, Q2, still open).
+- **Why it matters:**
+  - Right after onboarding, Dialback verifies nothing on its own, which is when a vendor's details
+    are newest and least checked. How many vendors fall in that window is unknown.
+  - Point 3 is K01 from the start: whoever supplies a vendor's first records owns its provable
+    number after 90 days.
+- **Considered, not built:** calling a young number anyway and still sending the case to review.
+  The answer is lopsided: a "no" is strong evidence of fraud, but a "yes" proves nothing, because
+  the number itself is unproven. `decide()` lets any "no" make a case not verified (NV01) but
+  verifies only on the ledger's pick (V01), so this would need a decision-rule change.
+- **Proposed:** specs 0041 and 0042 (PR #91, Sami). They find a new vendor's number in sources the
+  vendor did not supply (a business registry, its website), then call that number once to confirm.
+  Shadow mode first: a report nothing else reads, with no change to the pipeline.
+
 ## B. The fuzz lab (spec 0033)
 
 ### B1. I12 never probes the change-request email itself
@@ -497,3 +523,11 @@ F1 to F9 hold as built (verified). But the lab still claims more than it shows:
 - Scratch worktrees exist under `/private/tmp/claude-501/...` (`fixtrial`, `voicereview`,
   `mainrun`). They are temporary, and the reproduction scripts in them may disappear.
 - The 44 Postgres-backed ledger tests can't run on this machine; CI's `py` job runs them.
+- **Spec and question numbers collide with main** (checked Nov 9 against origin/main da057f8):
+  - `0033` is taken twice on main already (`0033-how-it-works-page`, `0033-stricter-passwords`).
+    The lab's `0033-generative-selection-pressure` would be the third. Main also has two `0034`s.
+  - The lab spec's open questions Q60, Q61 and Q65 are already used on main: Q60 and Q61 in
+    `0029-voice-call-lookup-and-store.md`, Q65 in `0034-live-call-blockers.md`. A4 above cites
+    "spec 0033, Q65", meaning the lab's.
+  - Main uses up to Q68, and PR #91 takes Q69 to Q75, so the next free number is Q76. Renumber
+    before this branch merges.
