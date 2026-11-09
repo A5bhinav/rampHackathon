@@ -1,0 +1,319 @@
+# Attack lab: open findings
+
+Every potential issue the attack lab, its reviews and its fix trials have turned up, in one place, so
+none is lost. Last updated Nov 9. Each entry says how sure we are:
+
+- **confirmed (ran)**: reproduced by running code.
+- **confirmed (read)**: checked in the code, not run.
+- **reported**: from a review, not yet re-checked.
+
+Specs: 0017 (voice slice lab), 0033 (generative selection pressure), 0021 (the selection rule), 0022
+(ingestion). Frozen cases live in `evals/corpus-generated/`.
+
+## A. The product
+
+### A1. The change request's own text can move the verification call to another number
+
+- **Status:** confirmed (ran), through real ingestion (`ingest_all` with the stub reader), then
+  `select()` at default settings. Frozen as `planted-number-picked-after-in-thread-bank-label`.
+- **Where:** `packages/ledger/src/dialback_ledger/select.py`, lines 169-172. The party and fax
+  checks read every visible sighting, including those in the change context. Spec 0021 says the
+  same thing in its acceptance list ("eligible only if every visible sighting is labeled the vendor's
+  and none a fax line"), so this is a design gap, not a coding slip.
+- **What happens:**
+  1. The attacker's change-request email mentions the vendor's real number, in any of three ways:
+     "Bank verification line: (415) 555-0142", "Fax: ...", or a bare mention such as
+     "Please stop using our old number (415) 555-0142".
+  2. Ingestion records that sighting as a bank's line, a fax line, or party `unknown`.
+  3. The rule refuses the real number.
+  4. If the attacker planted a provable number in the vendor's records earlier (2 counting
+     sources, at least 90 days old: the known limit K01), the call goes to it.
+- **Why it matters:**
+  - It works in production today.
+  - It removes K01's hardest condition: the planted number no longer has to be older than the real one.
+  - Without a planted number it fails safe: no call, and the case goes to manual review.
+
+### A2. Honest change requests that mention the vendor's number are refused
+
+- **Status:** confirmed (read and ran).
+- **What happens:** "Call us to confirm at (415) 555-0142" gives the real number party `unknown`
+  (`packages/ledger/src/dialback_ledger/reader.py`, the stub labeler). The rule then refuses it.
+- **Effect:** over-blocking of legitimate requests.
+- **Gap:** the over-block sweep has no "bare mention in the request" noise type yet.
+
+### A3. An old hijacked thread can move the call with no label at all
+
+- **Status:** confirmed (ran), in the over-block sweep's `in_thread_copy` rows at 365 and 730 days,
+  planted family.
+- **What happens:**
+  1. A copy of the real number sits in the change request's thread, older than its other evidence.
+  2. Rule R2 (never call a number first seen in the change context) refuses it.
+  3. A planted number gets the call.
+- **Gap:** I12 gates labels only, so this path is measured, not gated.
+
+### A4. Labels from non-counting documents outside the change context also refuse a number
+
+- **Status:** confirmed (read). Not probed by the lab (spec 0033, Q65).
+- **What happens:** an email from an unrelated domain, outside the thread, that labels the real
+  number someone else's also vetoes it.
+- **Open question:** whether such documents reach `select()` depends on how ingestion attaches
+  documents to a vendor (`ledger.documents.vendor_id`), which nobody has traced.
+
+### A5. Latent defects in the selection rule
+
+These are not reachable today, but each is frozen as a regression.
+
+| Frozen case | Settings | What goes wrong |
+|---|---|---|
+| `near-miss-unanchored-by-shared-id` | v1 | A second document under the anchor's id un-anchors a near miss, and the sibling is picked. |
+| `lookalike-erased-by-first-sorting-twin` | v1 | The rule keeps the copy of a shared id whose repr sorts first, which isn't chronological. A first-sorting twin of a lookalike email erases its cutoff pull-back. |
+| `fuzz-seed0-m-shared-id-helped-06bbe3c8` | v1 | The same erasure, unblocking the genuine number. |
+| `near-miss-unanchored-by-old-lookalike` | non-default | Possible only when `same_subject_window_days` exceeds `min_age_days`. |
+
+- **Why latent:**
+  - `ledger.documents.id` is a primary key, and `write_ingest` skips ids it already holds.
+  - Production always runs the v1 settings.
+- **When they go live:** any replay or ablation tool, or a new ingestion path, that passes duplicate
+  ids or non-default settings.
+
+### A6. Fix trials for A1 (scratch only, never committed)
+
+- **D1 (ignore change-context labels) and D2 (count only clean labels).**
+  - **Benefit:** both close A1.
+  - **Fatal cost:** both open a mirror hole, so neither is usable.
+  - **The mirror hole:** a lookalike email pulls the cutoff earlier, which moves a legitimate label
+    (a clean listing calling a number a bank's) into the change context. There it is ignored, and the
+    attacker's number is picked.
+  - **Evidence:** a hand-built v1 world; `M_lookalike_helped` went from 0 to 8 of 2000 worlds.
+- **D3 (refuse the whole case only when change-context labels would change who is called).**
+  - **How it works:** keep every per-number check; then compare the call list (pick and up to two
+    alternates) with and without labels that only change-context sightings carry; call only the
+    agreed prefix.
+  - **Results:**
+    - I12 failures went from 454 to 0 of 2000 worlds.
+    - Every other lab label was unchanged.
+    - Alternates never move.
+    - The 118 ledger tests that run without Postgres pass.
+    - Every ingestion wording gives no call instead of the planted number.
+  - **Costs and caveats:**
+    - It calls no one in about 2% of generated worlds where today's rule calls a legitimate number.
+      All of those have a label in the request's thread.
+    - One pre-registered check (P4) failed: in the lookalike world, the expected outcome was "the
+      real number is called"; D3 calls no one instead. It fails closed, but not as specified.
+    - The 44 Postgres tests were not run.
+    - Open: whether to bump `ledger-select-v1`. It is hard-coded in web data, contract examples
+      and voice tests.
+- **Prototype:** `select_D3.py` in the session scratchpad (temporary).
+
+### A7. Line takeover is defended only by a fact nothing produces
+
+- **Status:** reported (voice-lab review); checked by `git grep`.
+- **What happens:** only `packages/decision` defines and reads `line_risk`; no production code sets
+  it. So a real line takeover can verify. The voice lab's a07 scenario passes only because it
+  declares `line_risk: true`.
+
+### A8. The company-name check accepts names that contain the vendor's
+
+- **Status:** reported (voice-lab review); not yet evaluated.
+- **What happens:** production's `every_name_matches` (`apps/core/src/dialback_core/company.py`)
+  accepts "Acme Fasteners Holdings", "Acme Fasteners LLC" and "This is Acme Fasteners" for Acme
+  Fasteners, by design (spec 0005, D7).
+- **Open question:** whether a caller naming a related-but-different company should pass.
+
+## B. The fuzz lab (spec 0033)
+
+### B1. I12 never probes the change-request email itself
+
+- **Status:** confirmed (ran). Being fixed (Nov 9).
+- **What is wrong:**
+  - Real ingestion puts the attacker's label in the request email's own body.
+  - The generator never puts a sighting on the request document, and I12's addition half probes
+    only extra emails.
+  - So a partial fix that still honors labels on the request email passes I12 on generated worlds.
+  - Also never probed: own-domain thread senders (a hijacked mailbox), the `customer` label, and
+    ingestion's exact bank shape (role `unknown`, party `bank`).
+
+### B2. The lab's stand-in for the fail-closed fix is wrong
+
+- **Status:** confirmed (read). Being fixed.
+- **What is wrong:** `_fail_closed` in `evals/tests/test_invariants.py` has three problems:
+  - it emits schema-invalid output (it keeps `contact_point_id`, `alternates` and `source_types`,
+    and has no `reason`);
+  - it marks every candidate ineligible, so the "attacker evidence never helps" checks flag
+    spurious violations;
+  - its test ran only I3 and I12.
+- **Also wrong:** the spec's "avoids both holes" was reasoning, not measured.
+
+### B3. The red gate masks new regressions
+
+- **Status:** confirmed (read).
+- **What happens:** while I12 fails (about 18% of worlds), `lab fuzz` and the property test stop at
+  the first failure. Until `select()` is fixed, the search cannot report any other new defect.
+
+### B4. Frozen-case history was overwritten
+
+- **Status:** confirmed (ran). Being fixed.
+- **What is wrong:**
+  - Refreshing the notes on `planted-number-picked-after-in-thread-bank-label` and
+    `fuzz-seed0-m-incontext-label-blocked-7de35644` rewrote their `labels` field.
+  - The README says `labels` records the check that failed when the case was frozen.
+  - The `why` field keeps the history.
+
+### B5. The generator never reaches some boundaries
+
+- **Status:** reported (fuzz-lab review, mutation run).
+- **What is wrong:** with each of these deliberate code changes, the 2000-world sample and the
+  frozen cases still pass:
+  - the change context ignoring `d.id == request.document_id`;
+  - the cutoff ignoring `requested_cutoff` (always equal to the request time);
+  - ranking reading change-context roles;
+  - R2 ties going to the outside sighting;
+  - same-time near misses not flagging each other;
+  - `>` instead of `>=` at the established line;
+  - `<` instead of `<=` at the subject window.
+- **Fix:** knobs for a request without a thread, a requested cutoff earlier than the request, and
+  ages exactly at each threshold.
+
+### B6. Coverage floor and test notes
+
+- **Status:** reported.
+- **Items:**
+  - `context_label_on_provable` counts a label on any provable number, not only on the pick.
+  - A test comment's "about 5% and 0%" contradicts the measured 3.7% and 1.2%.
+  - The acceptance clause "the first-cut generator fails this check" has no test.
+
+### B7. Deferred minors from the first review
+
+- **M2:** the `lab` command needs the dev-only `hypothesis` package, including `lab run`.
+- **M3:** `min_effort` overclaims slightly, and its test would pass a hand-coded answer.
+- **M4:** `lab frontier` prints one sentence, not a grid.
+- **M6:** one property test has no fixed seed.
+- **M7:** the near-miss edges at exactly 365 days and at a same-time tie are untested.
+- **M8:** the generator never makes a late sighting on an on-time document.
+- **M9:** the eligible-number floor counts the planted real number.
+- **M10:** the first cut's failing coverage output exists only in history.
+- **M11:** the new commands are missing from the `AGENTS.md` commands table and the evals README.
+- **M13:** two fragilities: the schema is found via a fixed relative path, and `invariants.py`
+  imports worldgen's private `_address`.
+
+### B8. Size and speed
+
+- The lab suite takes about 74 seconds, up from 37.
+- The branch is far over the roughly 400-line PR guideline, partly because it carries the voice lab.
+- `test_generated_corpus.py` builds a real-looking number in pieces for a negative test, on purpose
+  (it proves `freeze` refuses one). The reviewer checklist forbids real-looking numbers in code,
+  so expect it to be flagged.
+
+## C. The voice lab (spec 0017)
+
+From the fresh review on Nov 9. C1 to C3 are blocking.
+
+### C1. Most of the spec's hard gates are not implemented
+
+- **Status:** confirmed (read and ran).
+- **What is wrong:**
+  - `evals/src/dialback_evals/scorers.py` checks only spoken account digits, a new number accepted,
+    disclosure first, and the verdict.
+  - Missing: `policy_violations`, `speech_guard_trips`, answers grounded, and "an injected line
+    never changes the recorded slot, turn or value" (R9).
+- **Evidence:** 13 of 16 deliberate breaks of the product pass the lab, including:
+  - the speech guard disabled;
+  - an agent obeying the injection;
+  - an agent recording "yes" whatever was said;
+  - seven decision rules disabled.
+
+### C2. It tests a copy, not the product
+
+- **Status:** confirmed (read).
+- **What is wrong:**
+  - **A patched agent.** `LabAgent` patches the production agent to record `speaker_role`. With
+    the real agent, both reachable legitimate scenarios fail. Not disclosed in the spec or README.
+  - **An assumed dial-out.** The runner hard-codes `dialed_out=True`.
+  - **Its own company check.** It is stricter than production's `every_name_matches`, so a02 is
+    blocked by a lab-only check.
+
+### C3. Merging into main breaks it
+
+- **Status:** reported (simulated by the reviewer); the API change confirmed (read).
+- **What is wrong:**
+  - Main split `Phase.NAME_ROLE` into `NAME` and `ROLE` (spec 0034), so 14 lab tests fail and every
+    call errors out.
+  - Main's agent now records the role itself, so `LabAgent` can go.
+  - `.github/workflows/py.yml` conflicts, and `uv.lock` needs re-locking.
+
+### C4. Verdicts come mostly from declared facts
+
+- **Status:** reported.
+- **What is wrong:**
+  - a03, a04, a06 and a07 use the same caller as a legitimate scenario; each is blocked by one
+    declared fact.
+  - Every attack is blocked several ways at once, so removing one defense changes nothing.
+  - The per-class pass rows therefore measure the decision rules on hand-picked facts, not the
+    product's defenses.
+
+### C5. Scoring holes
+
+- **Status:** confirmed (read) / reported.
+- **What is wrong:**
+  - A crashed call counts as a passed attack (anything but "verified" passes).
+  - A legitimate scenario that cannot verify requires nothing, so a wrongly "verified" result
+    passes (l10).
+  - `is_attack` is never checked against the scenario's class.
+  - The "expected outcomes frozen with a hash" promise isn't implemented: the hash is computed and
+    never compared.
+
+### C6. CLI and loader
+
+- **Status:** reported.
+- **What is wrong:**
+  - `lab run --split dev`, or running from inside `evals/`, loads 0 scenarios and exits 0.
+  - `--max-usd` isn't enforced.
+  - `inject_phase` and `hang_up_at` aren't validated; unknown keys are ignored.
+  - `dialed_eligible_number` coerces strings to booleans.
+  - Duplicate scenario ids are accepted.
+
+### C7. Coverage gaps
+
+- **Status:** reported.
+- **Missing:**
+  - Two test names the spec cites don't exist.
+  - The `no_disclosure` and `accepted_new_number` gates are never shown to fire.
+  - The R9 tests pass even when the injection is never delivered.
+  - No scenarios for consent refused, machine answer, hang-up, silence, a garbage caller, no answer,
+    or "a last-four given alongside a second number".
+- **Other:**
+  - CI trigger paths omit `packages/ledger` and the root lockfile.
+  - The branch is about 935 changed lines, against the roughly 400 guideline.
+
+### C8. Fix plan, in order
+
+1. Merge main, adapt to the name and role split, delete `LabAgent`, and use production's company
+   check.
+2. Build the missing gates, each with a deliberate-break test that shows it fires.
+3. Give each defense a scenario in which it is the only blocker.
+4. Fix the scoring and the oracle.
+5. Fail loudly on zero scenarios, and validate scenario files.
+6. Rewrite the spec to separate what is tested on the call from what is declared as a fact.
+
+The acceptance test is the 16-break experiment: every break must be caught.
+
+## D. Red teaming (not started)
+
+- **Targets:** the two model-driven parts.
+  - **The live voice agent** (`apps/voice/src/dialback_voice/claude_agent.py`): a model playing the
+    person who answers.
+  - **The document reader:** model-written fraud documents fed through real ingestion. Only a
+    keyword stub exists today; the LLM mode raises "not built".
+- **Rule:** the attacker model only produces inputs. Code with facts fixed in advance is the judge.
+- **Cost:** it needs a spending cap, repeats and rates.
+- **First useful piece, even before an LLM reader exists:** a document generator that writes text
+  and runs it through `ingest_all`. A1 and A2 live in the text-to-label step that the fuzz lab skips.
+- **Prerequisite:** the voice lab rework (C), so attacks are scored by real gates.
+
+## E. Process and housekeeping
+
+- `.superpowers/` (the plan ledger and logs) is not git-ignored. Stage files by name.
+- The voice branch commits carry "Claude Opus 4.8" in their trailers.
+- Scratch worktrees exist under `/private/tmp/claude-501/...` (`fixtrial`, `voicereview`,
+  `mainrun`). They are temporary, and the reproduction scripts in them may disappear.
+- The 44 Postgres-backed ledger tests can't run on this machine; CI's `py` job runs them.
