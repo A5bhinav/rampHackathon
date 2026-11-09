@@ -24,7 +24,7 @@ export default async function SignUp({ searchParams }: { searchParams: Promise<P
     <main className="shell">
       <div className="card signin">
         <p className="brand"><BrandMark />Dialback</p>
-        <h1>Create your account</h1>
+        <h1>Create your Dialback account</h1>
         {NOTICES.filter(([key]) => params[key]).map(([key, text]) => (
           <p key={key} className="result error" role="alert">{text}</p>
         ))}

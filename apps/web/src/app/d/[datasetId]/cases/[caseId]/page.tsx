@@ -3,12 +3,11 @@ import { notFound } from "next/navigation";
 import { ChainBadge, StateBadge } from "@/components/badges";
 import { DecisionConsole } from "@/components/console";
 import { DecisionDetail } from "@/components/decision";
-import { CaseRail } from "@/components/flow";
-import { PaymentPath } from "@/components/path";
-import { PageHead } from "@/components/page";
+import { PageHead } from "@/components/page-head";
+import { Progress } from "@/components/progress";
 import { CoreError, core } from "@/lib/core";
-import { brief, datasetNow, date, dueLabel, relative, when, words } from "@/lib/format";
-import { progress, visitedThisVersion } from "@/lib/progress";
+import { datasetNow, date, dueLabel, relative, when, words } from "@/lib/format";
+import { progress } from "@/lib/progress";
 import { releaseAction, reviewAction } from "./actions";
 
 // Case detail and the release console: the timeline from the evidence log, the chain badge,
@@ -43,15 +42,8 @@ export default async function CaseDetailPage({ params, searchParams }: {
     ? detail.releases.find((r) => r.action === "approve" && r.case_version === c.version) : undefined;
   const lastStep = detail.timeline.at(-1);  // its summary is the core's template, so the reason is never guessed here
 
-  const visited = visitedThisVersion(detail.timeline, c.version);
-  const steps = progress({ state: c.state, visited, holdStatus: hold?.status ?? null, hasDecision: Boolean(decision) }).map((s) => {
-    if (s.status !== "done") return s;
-    if (s.key === "hold") return { ...s, note: brief(hold?.confirmed_at) };
-    if (s.key === "call") return { ...s, note: "Answered" };
-    if (s.key === "decision" && decision) return { ...s, note: words(decision.outcome) };
-    if (s.key === "release") return { ...s, note: brief(hold?.released_at) || "Released" };
-    return s;
-  });
+  const steps = progress(c.state, c.version, detail.timeline);
+  const decisionTone = decision ? ({ verified: "ok", not_verified: "bad", needs_review: "warn" } as Record<string, string>)[decision.outcome] ?? "muted" : "muted";
 
   return (
     <main>
@@ -65,6 +57,7 @@ export default async function CaseDetailPage({ params, searchParams }: {
       >
         <div className="tags">
           <StateBadge state={c.state} />
+          <OutcomeBadge outcome={c.outcome} />
           <ChainBadge chain={detail.chain} />
           {c.unknown_changer ? <span className="badge tone-warn">Unknown changer: two approvers</span> : null}
           {c.deadline_at && !["released", "releasing"].includes(c.state) ? (
@@ -75,19 +68,17 @@ export default async function CaseDetailPage({ params, searchParams }: {
           <span className="muted sub">Version {c.version}</span>
         </div>
       </PageHead>
-
-      <CaseRail steps={steps} />
+      <Progress steps={steps} />
+      {firstApproval ? (
+        <p className="result ok" role="status">
+          {firstApproval.actor.display_name} approved this change {when(firstApproval.created_at)}. The change has no known author, so
+          a second, different approver must release it.
+        </p>
+      ) : null}
 
       <div className="case-layout">
         <div className="case-main">
-          {firstApproval ? (
-            <p className="result ok" role="status">
-              {firstApproval.actor.display_name} approved this change {when(firstApproval.created_at)}. The change has no known author, so
-              a second, different approver must release it.
-            </p>
-          ) : null}
-
-          <section className={`card lead-card ${decision ? EDGE[decision.outcome] ?? "" : ""}`} aria-labelledby="decision-h">
+          <section className={`card lead-card edge-${decisionTone}`} aria-labelledby="decision-h">
             <h2 id="decision-h">The decision</h2>
             {decision ? <DecisionDetail decision={decision} /> : (
               <p className="muted">
@@ -148,18 +139,21 @@ export default async function CaseDetailPage({ params, searchParams }: {
           </section>
         </div>
 
-        <aside className="case-side" aria-label="The change and the hold">
+        <aside className="case-side">
           <section className="panel" aria-labelledby="change-h">
             <h2 id="change-h">The change</h2>
-            <PaymentPath
-              bills={c.bills_held}
-              nextPayment={c.next_payment_date}
-              holdStatus={hold?.status ?? null}
-              newAccount={`${change.new_account.routing_number} ···${change.new_account.last4}`}
-              oldAccount={change.old_account ? `${change.old_account.routing_number} ···${change.old_account.last4}` : null}
-            />
+            <div className="accounts">
+              <div className="account">
+                <span className="account-label">Old account</span>
+                <span className="mono">{change.old_account ? `${change.old_account.routing_number} ···${change.old_account.last4}` : "none on file"}</span>
+              </div>
+              <div className="account is-new">
+                <span className="account-label">New account</span>
+                <span className="mono">{change.new_account.routing_number} ···{change.new_account.last4}</span>
+              </div>
+            </div>
             <dl className="facts">
-              <dt>Detected</dt><dd>{when(change.detected_at)}<div className="muted sub">via {change.detected_via}</div></dd>
+              <dt>Detected</dt><dd>{when(change.detected_at)} via {change.detected_via}</dd>
               <dt>Entered by</dt><dd>{change.changed_by?.display_name ?? "Unknown (vendor-supplied or synced)"}</dd>
             </dl>
           </section>
@@ -181,7 +175,7 @@ export default async function CaseDetailPage({ params, searchParams }: {
                         const due = hold.released_at ? null : dueLabel(s.payment_date, now);
                         return (
                           <li key={s.bill_id}>
-                            <span className="mono muted" title={s.bill_id}>{s.bill_id.slice(0, 8)}</span>
+                            <span className="mono muted">{s.bill_id.slice(0, 8)}</span>
                             <span>{date(s.payment_date)}</span>
                             {due ? <span className={`badge ${due.soon ? "tone-bad" : "tone-muted"}`}>{due.text}</span> : <span />}
                           </li>
