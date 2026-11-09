@@ -97,6 +97,32 @@ paths:
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /api/datasets/{dataset_id}/vendor-risk:
+    get:
+      operationId: getVendorRisk
+      summary: The vendor risk list (spec 0026) - is each vendor's number on file one the Trust Ledger can prove?
+      description: |
+        One row per vendor with ledger documents, worst first (near_miss, unproven, missing,
+        provable), then by name. The status is decided by code from `ledger-select-v1` as of now;
+        `status_text` is the ledger's sentence for it, so the dashboard writes none of its own.
+      parameters:
+        - $ref: '#/components/parameters/DatasetId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [vendors]
+                properties:
+                  vendors:
+                    type: array
+                    items: { $ref: '#/components/schemas/VendorRisk' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   /api/cases:
     get:
       operationId: listCases
@@ -595,6 +621,25 @@ components:
             no_selection: { type: string, description: 'When `selection` is null: what that means for the case.' }
             no_provable_number: { type: string, description: 'Under a no_provable_number selection: what happens next.' }
             alternates: { type: string, description: 'Beside the alternates: when they are used.' }
+
+    VendorRisk:
+      type: object
+      additionalProperties: false
+      required: [vendor_id, legal_name, status, number_on_file, provable_number, status_text]
+      properties:
+        vendor_id: { $ref: '../schemas/evidence-event.schema.json#/$defs/Uuid' }
+        legal_name: { type: string }
+        status:
+          type: string
+          enum: [near_miss, unproven, missing, provable]
+          description: provable - the number on file meets the rule; near_miss - it is a near miss of a number the rule can prove; unproven - the rule can't prove it; missing - no number on file.
+        number_on_file:
+          description: What the old vendor master says, in E.164, or null.
+          oneOf: [{ type: string, pattern: '^\+[1-9][0-9]{1,14}$' }, { type: 'null' }]
+        provable_number:
+          description: The number ledger-select-v1 would pick today, in E.164, or null.
+          oneOf: [{ type: string, pattern: '^\+[1-9][0-9]{1,14}$' }, { type: 'null' }]
+        status_text: { type: string, description: "The ledger's sentence for the status." }
 
     Error:
       type: object

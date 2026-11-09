@@ -72,6 +72,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/datasets/{dataset_id}/vendor-risk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The vendor risk list (spec 0026) - is each vendor's number on file one the Trust Ledger can prove?
+         * @description One row per vendor with ledger documents, worst first (near_miss, unproven, missing,
+         *     provable), then by name. The status is decided by code from `ledger-select-v1` as of now;
+         *     `status_text` is the ledger's sentence for it, so the dashboard writes none of its own.
+         */
+        get: operations["getVendorRisk"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/cases": {
         parameters: {
             query?: never;
@@ -384,6 +406,21 @@ export interface components {
                 /** @description Beside the alternates: when they are used. */
                 alternates: string;
             };
+        };
+        VendorRisk: {
+            vendor_id: components["schemas"]["Uuid"];
+            legal_name: string;
+            /**
+             * @description provable - the number on file meets the rule; near_miss - it is a near miss of a number the rule can prove; unproven - the rule can't prove it; missing - no number on file.
+             * @enum {string}
+             */
+            status: "near_miss" | "unproven" | "missing" | "provable";
+            /** @description What the old vendor master says, in E.164, or null. */
+            number_on_file: string | null;
+            /** @description The number ledger-select-v1 would pick today, in E.164, or null. */
+            provable_number: string | null;
+            /** @description The ledger's sentence for the status. */
+            status_text: string;
         };
         Error: {
             /** @enum {string} */
@@ -737,6 +774,32 @@ export interface operations {
                 content: {
                     "application/json": {
                         alerts: components["schemas"]["Alert"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getVendorRisk: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dataset_id: components["parameters"]["DatasetId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        vendors: components["schemas"]["VendorRisk"][];
                     };
                 };
             };
