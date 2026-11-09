@@ -3,8 +3,9 @@ import { authMode } from "@/lib/auth-mode";
 import { devUsers } from "@/lib/dev-auth";
 import { signIn, signInAsDevUser } from "./actions";
 import { BrandMark } from "@/components/nav";
+import { safeNext } from "@/lib/story";
 
-type Notice = { expired?: string; failed?: string; slow?: string; unavailable?: string };
+type Notice = { expired?: string; failed?: string; slow?: string; unavailable?: string; next?: string };
 
 const NOTICES: [keyof Notice, string][] = [
   ["expired", "Your session ended. Sign in again."],
@@ -16,6 +17,7 @@ const NOTICES: [keyof Notice, string][] = [
 export default async function SignIn({ searchParams }: { searchParams: Promise<Notice> }) {
   const params = await searchParams;
   const mode = authMode(process.env);
+  const next = safeNext(params.next);  // a demo link to return to (spec 0033); anything else is dropped
   return (
     <main className="shell">
       <div className="card signin">
@@ -26,6 +28,7 @@ export default async function SignIn({ searchParams }: { searchParams: Promise<N
         ))}
         {mode === "supabase" ? (
           <form action={signIn}>
+            <input type="hidden" name="next" value={next} />
             <p className="muted">Sign in with your Dialback account.</p>
             <label htmlFor="email">Email</label>
             <input id="email" name="email" type="email" autoComplete="username" required />
@@ -34,7 +37,7 @@ export default async function SignIn({ searchParams }: { searchParams: Promise<N
             <button className="primary" type="submit">Sign in</button>
             <p className="muted">New to Dialback? <Link href="/sign-up">Create an account</Link></p>
           </form>
-        ) : mode === "dev" ? <DevSignIn /> : (
+        ) : mode === "dev" ? <DevSignIn next={next} /> : (
           <p className="muted">
             Sign-in is not configured. Set <span className="mono">SUPABASE_URL</span> and{" "}
             <span className="mono">SUPABASE_PUBLISHABLE_KEY</span>, or for local development{" "}
@@ -46,10 +49,11 @@ export default async function SignIn({ searchParams }: { searchParams: Promise<N
   );
 }
 
-function DevSignIn() {
+function DevSignIn({ next }: { next: string }) {
   const users = devUsers();
   return users.length > 0 ? (
     <form action={signInAsDevUser}>
+      <input type="hidden" name="next" value={next} />
       <p className="muted">Local development: choose a seeded user. The core accepts this token only when it has no Supabase project.</p>
       <label htmlFor="user_id">User</label>
       <select id="user_id" name="user_id" required>
