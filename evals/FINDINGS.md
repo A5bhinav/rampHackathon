@@ -122,21 +122,26 @@ These are not reachable today, but each is frozen as a regression.
 ### A9. A caller who refuses to give a role can still be verified
 
 - **Status:** confirmed (ran), found by the voice-lab rework (Nov 9).
-- **What happens:** the production `ScriptedAgent` (`apps/voice/src/dialback_voice/agent.py`) records
-  whatever the person says at the role question as `speaker_role`, so "I'd rather not say" becomes a
-  role. Rule V06 (`packages/decision`) accepts any non-empty role, so the call can verify.
+- **What happens:** both agents record whatever the person says at the role question as
+  `speaker_role`: the `ScriptedAgent` double (`apps/voice/src/dialback_voice/agent.py`) and the live
+  `ClaudeAgent` (`claude_agent.py`, `_value`: free-text phases are the caller's words, no model). So
+  "I'd rather not say" becomes a role. Rule V06 (`packages/decision`) accepts any non-empty role, so
+  the call can verify.
 - **Where to fix:** the agent (record no role on a refusal) or V06 (reject a refusal), in the voice
   and decision slices. The voice lab has no scenario for it yet, because it would fail today.
 
 ### A10. The company check accepts a negated name, or another company named elsewhere on the call
 
-- **Status:** confirmed (ran), through the voice lab with the production agent, Nov 9 (voice re-review).
+- **Status:** confirmed (ran), through the voice lab with the `ScriptedAgent`, Nov 9 (voice
+  re-review); re-run on origin/main da057f8 through `policy.step`, `every_name_matches` and `decide`
+  with both the `ScriptedAgent` and the live `ClaudeAgent` (fake model; the company phase never calls
+  the model): all three attacks verify on both.
 - **What happens:** each of these callers is verified as an attack on a clean call:
   - "Not Acme Fasteners, this is Globex Logistics" at the company question;
   - "We're a reseller for Acme Fasteners, we're Globex";
   - the vendor named at the company question, then "AP clerk at Globex Logistics" at the role
     question (or Globex named at the name or department question).
-- **Why:** the `ScriptedAgent` records the whole utterance, so the policy's negation check
+- **Why:** both agents record the whole utterance, so the policy's negation check
   (`packages/policy/.../step.py`, `_appears_unnegated`) sees nothing before the name;
   `every_name_matches` (`apps/core/src/dialback_core/company.py`) only checks that the vendor's words
   appear somewhere; and only the company answer is matched, not the others.
@@ -149,6 +154,10 @@ These are not reachable today, but each is frozen as a regression.
 - **What happens:** "We did." to the change question is recorded "no" (ungrounded), so NV01 decides
   not_verified (the not-verified rules run before NR14), and as an earlier call it would block every
   redial; "Yes, I think so." is recorded "yes" but the policy treats it as ungrounded.
+- **Live calls:** `ClaudeAgent` asks the model for the yes/no value and the policy's regex then
+  grounds it, so what live calls record for "We did." depends on the model and is untested by the
+  lab (see C10). The double still runs live when `ANTHROPIC_API_KEY` is unset (`wire.py` logs a
+  warning).
 
 ### A8. The company-name check accepts names that contain the vendor's
 
@@ -390,6 +399,21 @@ F1 to F9 hold as built (verified). But the lab still claims more than it shows:
   line; no scenario speaks the digits; one injection scenario only; the spec still says the lab
   imports no core; the README shows `--split dev`; moving `every_name_matches` and
   `spoken_last_four` into `packages/decision` would spare the lab an app dependency.
+
+### C10. The voice lab runs the dev double, not the live agent
+
+- **Status:** confirmed (read), Nov 9.
+- **What happens:** the lab drives `ScriptedAgent`, which `wire.py` uses only when
+  `ANTHROPIC_API_KEY` is unset. Live calls use `ClaudeAgent`, which differs in two readings:
+  - consent and the change question are classified by the model, not by regex (A11 is the double's
+    regex disagreeing with the policy's);
+  - the last four are the last four digits of every digit run in the turn joined, where the double
+    takes the first run.
+  The free-text phases (company, department, name, role) are the same in both: the caller's words.
+- **So:** "the production agent" in spec 0017 and in C9 means the double. Results about free-text
+  answers, the guard (neither agent writes text) and the decision carry over to live calls; results
+  about yes/no and digit readings do not. Exercising the live agent needs the model, which is the
+  red-teaming work in D.
 
 ## D. Red teaming (not started)
 
