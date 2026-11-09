@@ -1,7 +1,7 @@
 // Sign-in rules that don't need a browser or a Supabase project (spec 0010). `pnpm test`.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { SESSION_HOURS, Throttle, authMode, cleanEmail, cleanPassword, sessionFresh, signedInAt } from "../src/lib/auth-mode.ts";
+import { MIN_NEW_PASSWORD, SESSION_HOURS, Throttle, authMode, cleanEmail, cleanName, cleanNewPassword, cleanPassword, sessionFresh, signedInAt, signUpNotice } from "../src/lib/auth-mode.ts";
 
 const SUPABASE = { SUPABASE_URL: "https://abcdefghijklmnop.supabase.co", SUPABASE_PUBLISHABLE_KEY: "sb_publishable_x" };
 
@@ -55,4 +55,38 @@ test("the sign-in throttle allows a few tries per client per window", () => {
   assert.equal(throttle.allow("5.6.7.8"), true, "another client is counted apart");
   now += 60_001;
   assert.equal(throttle.allow("1.2.3.4"), true, "the window moves on");
+});
+
+// Self sign-up (spec 0027).
+
+test("a new account's name is trimmed and 1 to 80 characters, without control characters", () => {
+  assert.equal(cleanName("  Sam Clerk  "), "Sam Clerk");
+  assert.equal(cleanName("Zoë O'Neil-Ng"), "Zoë O'Neil-Ng");
+  for (const bad of ["", "   ", "x".repeat(81), "line\nbreak", "tab\there", null, undefined, 42]) {
+    assert.equal(cleanName(bad), null, JSON.stringify(bad));
+  }
+});
+
+test(`a new password is ${MIN_NEW_PASSWORD} to 72 characters, kept as typed`, () => {
+  assert.equal(MIN_NEW_PASSWORD, 8);
+  assert.equal(cleanNewPassword(" 8 chars"), " 8 chars", "never trimmed");
+  assert.equal(cleanNewPassword("x".repeat(72)), "x".repeat(72));
+  for (const bad of ["", "7 chars", "x".repeat(73), null, 42]) {
+    assert.equal(cleanNewPassword(bad), null, JSON.stringify(bad));
+  }
+});
+
+test("each sign-up answer maps to one notice, and only a session signs someone in", () => {
+  assert.equal(signUpNotice(null, true), null, "created and signed in");
+  assert.equal(signUpNotice(null, false), "confirm", "created without a session: nobody is signed in");
+  assert.equal(signUpNotice({ status: 422, code: "user_already_exists" }, false), "exists");
+  assert.equal(signUpNotice({ status: 422, code: "email_exists" }, false), "exists");
+  assert.equal(signUpNotice({ status: 422, code: "weak_password" }, false), "weak");
+  assert.equal(signUpNotice({ status: 429, code: "over_request_rate_limit" }, false), "slow");
+  assert.equal(signUpNotice({ status: 0, code: undefined }, false), "unavailable", "the request never reached Supabase");
+  assert.equal(signUpNotice({ status: undefined, code: undefined }, false), "unavailable");
+  assert.equal(signUpNotice({ status: 503, code: "unexpected_failure" }, false), "unavailable");
+  assert.equal(signUpNotice({ status: 400, code: "validation_failed" }, false), "failed");
+  assert.equal(signUpNotice({ status: 422, code: "signup_disabled" }, false), "failed");
+  assert.equal(signUpNotice({ status: 400, code: "anything" }, true), "failed", "an error wins over a session");
 });

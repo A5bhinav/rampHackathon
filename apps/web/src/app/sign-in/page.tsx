@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { authMode } from "@/lib/auth-mode";
 import { devUsers } from "@/lib/dev-auth";
 import { signIn, signInAsDevUser } from "./actions";
@@ -23,12 +24,13 @@ export default async function SignIn({ searchParams }: { searchParams: Promise<N
         ))}
         {mode === "supabase" ? (
           <form action={signIn}>
-            <p className="muted">Use the account the Dialback team gave you.</p>
+            <p className="muted">Sign in with your Dialback account.</p>
             <label htmlFor="email">Email</label>
             <input id="email" name="email" type="email" autoComplete="username" required />
             <label htmlFor="password">Password</label>
             <input id="password" name="password" type="password" autoComplete="current-password" required />
             <button className="primary" type="submit">Sign in</button>
+            <p className="muted">New to Dialback? <Link href="/sign-up">Create an account</Link></p>
           </form>
         ) : mode === "dev" ? <DevSignIn /> : (
           <p className="muted">

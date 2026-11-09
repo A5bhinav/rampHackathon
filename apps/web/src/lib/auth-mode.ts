@@ -76,6 +76,37 @@ export function cleanPassword(raw: unknown): string | null {
   return typeof raw === "string" && raw.length > 0 && raw.length <= 256 ? raw : null;
 }
 
+// Self sign-up (spec 0027) ---------------------------------------------------------------------
+
+/** A new password: at least this long, and at most 72 characters (Supabase's limit). */
+export const MIN_NEW_PASSWORD = 8;
+
+export function cleanNewPassword(raw: unknown): string | null {
+  return typeof raw === "string" && raw.length >= MIN_NEW_PASSWORD && raw.length <= 72 ? raw : null;
+}
+
+/** The name a person signs up with: trimmed, 1 to 80 characters, no control characters. */
+export function cleanName(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const name = raw.trim();
+  return name.length >= 1 && name.length <= 80 && !/\p{Cc}/u.test(name) ? name : null;
+}
+
+export type SignUpNotice = "exists" | "weak" | "slow" | "unavailable" | "failed" | "confirm";
+
+/** What the sign-up page says about Supabase's answer, or null when the person is now signed in.
+ *  Only a returned session signs anyone in; an account created without one is left alone. */
+export function signUpNotice(error: { status?: number; code?: string } | null, hasSession: boolean): SignUpNotice | null {
+  if (error) {
+    if (error.code === "user_already_exists" || error.code === "email_exists") return "exists";
+    if (error.code === "weak_password") return "weak";
+    if (error.status === 429) return "slow";
+    if (!error.status || error.status >= 500) return "unavailable";
+    return "failed";
+  }
+  return hasSession ? null : "confirm";
+}
+
 export function cleanEmail(raw: unknown): string | null {
   if (typeof raw !== "string") return null;
   const email = raw.trim().toLowerCase();
