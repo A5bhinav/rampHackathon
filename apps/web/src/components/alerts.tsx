@@ -22,14 +22,11 @@ export function AlertBanners({ alerts, datasetId }: { alerts: Alert[]; datasetId
     <section className="banners" aria-label="Alerts">
       {shown.map((a) => (
         <div key={a.id} className={`banner ${a.severity}`} role={a.severity === "critical" ? "alert" : "status"}>
-          <div className="banner-text">
-            <strong>{TITLES[a.kind] ?? a.kind}</strong>
-            <span>{a.message}</span>
-          </div>
-          <div className="banner-meta">
+          <span className="banner-text"><strong>{TITLES[a.kind] ?? a.kind}</strong> <span>{a.message}</span></span>
+          <span className="banner-meta">
             <span>{when(a.raised_at)}</span>
             {a.case_id ? <Link href={`/d/${datasetId}/cases/${a.case_id}`}>Open the case</Link> : null}
-          </div>
+          </span>
         </div>
       ))}
     </section>

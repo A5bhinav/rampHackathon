@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { OutcomeBadge, StateBadge } from "@/components/badges";
-import { PageHead, Stats } from "@/components/page-head";
+import { PaymentLanes, QueueRail } from "@/components/flow";
+import { PageHead, Stats } from "@/components/page";
 import type { CaseState, CaseSummary } from "@/lib/api-types";
 import { core } from "@/lib/core";
 import { stationCounts } from "@/lib/flow";
@@ -35,16 +36,21 @@ export default async function CaseQueue({ params, searchParams }: {
 
   return (
     <main>
-      <PageHead
-        title="Case queue"
-        lead="Every vendor whose bank details changed. Payments stay on hold until a different person releases them."
-      />
-      <Stats label="Summary" items={[
-        { n: waiting.length, label: "Waiting on a person", tone: "tone-warn" },
-        { n: working.length, label: "In progress", tone: "tone-info" },
-        { n: dueSoon, label: "Payment due within 3 days or overdue", tone: "tone-bad" },
-        { n: unconfirmed, label: "Hold not confirmed", tone: "tone-bad" },
+      <PageHead title="Case queue" lead="Every vendor whose bank details changed in Ramp, and where each change stands. Dialback holds their payments, calls the vendor on a number it can prove, and a different person signs off." />
+      {missing ? (
+        <p className="note" role="status">
+          {missing.legal_name} has no case on this dataset yet. Its case opens when the team makes the demo&apos;s bank change for it
+          (<span className="mono">dialback-core demo change --vendor {missing.ref}</span>).
+        </p>
+      ) : null}
+      <QueueRail counts={stationCounts(cases)} />
+      <Stats label="Held payments" items={[
+        { label: "Bills on hold", value: cases.filter((c) => c.hold_status === "confirmed" || c.hold_status === "releasing").reduce((n, c) => n + c.bills_held, 0) },
+        { label: "Waiting on a person", value: waiting.length, tone: "warn" },
+        { label: "Payment overdue or due within 3 days", value: dueSoon, tone: "bad" },
+        { label: "Hold not confirmed", value: unconfirmed, tone: "bad" },
       ]} />
+      <PaymentLanes cases={cases} now={now} datasetId={datasetId} />
       {cases.length === 0 ? <div className="card empty"><p>No open cases. A case opens here when a vendor&apos;s bank details change in Ramp.</p></div> : null}
       {waiting.length > 0 ? <QueueTable title="Waiting on a person" cases={waiting} datasetId={datasetId} now={now} /> : null}
       {working.length > 0 ? <QueueTable title="In progress" cases={working} datasetId={datasetId} now={now} /> : null}
@@ -62,8 +68,9 @@ function stripe(c: CaseSummary, soon: boolean): string {
 
 function QueueTable({ title, cases, datasetId, now }: { title: string; cases: CaseSummary[]; datasetId: string; now: Date }) {
   return (
-    <section className="card table-wrap queue-group" aria-label={title}>
+    <section className="card queue-group" aria-label={title}>
       <h2>{title} <span className="count">{cases.length}</span></h2>
+      <div className="table-wrap">
       <table>
         <thead>
           <tr><th className="w-vendor">Vendor</th><th>State</th><th>Decision</th><th className="num">Held bills</th><th>Next payment</th><th>Opened</th><th>Deadline</th></tr>
