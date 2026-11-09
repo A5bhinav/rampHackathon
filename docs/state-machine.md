@@ -42,8 +42,8 @@ stateDiagram-v2
     awaiting_release --> awaiting_release: release_co_approved [first_approver] (person)
     awaiting_release --> blocked: release_rejected [four_eyes_reject] (person)
     needs_review --> held: change_detected
-    needs_review --> blocked: review_blocked [reason_given] (person)
-    needs_review --> awaiting_release: review_cleared [reason_given_not_changer] (person)
+    needs_review --> blocked: review_blocked [approver_reason] (person)
+    needs_review --> awaiting_release: review_cleared [approver_reason_not_changer] (person)
     blocked --> held: change_detected
     releasing --> held: change_detected
     releasing --> needs_review: command_failed
@@ -88,8 +88,8 @@ stateDiagram-v2
 | awaiting_release | `release_co_approved` | **person** | `first_approver` | awaiting_release | Unknown changer: first of two approvers (ADR-10) |
 | awaiting_release | `release_rejected` | **person** | `four_eyes_reject` | blocked | Approver rejects with a written reason |
 | needs_review | `change_detected` | system | `always` | held | Another change: back to held, version + 1 |
-| needs_review | `review_blocked` | **person** | `reason_given` | blocked | Written reason |
-| needs_review | `review_cleared` | **person** | `reason_given_not_changer` | awaiting_release | Not the changer; written reason |
+| needs_review | `review_blocked` | **person** | `approver_reason` | blocked | Approver; written reason |
+| needs_review | `review_cleared` | **person** | `approver_reason_not_changer` | awaiting_release | Approver; not the changer; written reason |
 | blocked | `change_detected` | system | `always` | held | Another change: back to held, version + 1, decision void |
 | releasing | `change_detected` | system | `always` | held | Another change during release: back to held, version + 1 |
 | releasing | `command_failed` | system | `always` | needs_review | Release kept failing; hold stays on |
