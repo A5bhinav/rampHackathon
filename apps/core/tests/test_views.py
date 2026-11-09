@@ -2,7 +2,7 @@
 never re-run. Unit tests, no database."""
 from __future__ import annotations
 
-from dialback_core.views import answer_view, checklist, effect, fired
+from dialback_core.views import answer_view, calls, checklist, effect, fired
 from dialback_decision import rules
 from dialback_decision.engine import ENGINE_VERSION
 
@@ -65,4 +65,48 @@ def test_an_answer_never_carries_the_digits_hash():
     assert (view["value"], view["digit_count"]) == (None, 4) and "digits_hmac" not in str(view)
     assert answer_view({**stored, "value": "refused"})["value"] == "refused"
     assert answer_view({**stored, "value": {"digit_count": 9}})["digit_count"] is None, "out-of-range counts are dropped"
-    assert "NR13_another_number" in answer_view({**stored, "slot": "offered_number", "value": "+14155550100"})["feeds"]
+    offered = answer_view({**stored, "slot": "offered_number", "value": "+14155550100"})
+    assert "NR13_another_number" in offered["feeds"] and offered["value"] == "A phone number (not shown)"
+    assert answer_view({**stored, "value": "1234"})["value"] is None, "no string but dont_know / refused passes for the digits"
+
+
+def test_invalid_facts_and_earlier_denials_mean_not_checked():
+    items, note = checklist("needs_review", [rules.INVALID], ENGINE_VERSION)
+    assert {i["status"] for i in items} == {"not_checked"} and "unreadable" in note
+    items, note = checklist("not_verified", ["NV01_vendor_denied_change"], ENGINE_VERSION)  # an earlier consented "no"
+    assert {i["status"] for i in items} == {"not_checked"} and "Not verified" in note
+
+
+def test_strict_mode_keeps_s01_when_another_condition_fails():
+    items, _ = checklist("needs_review", [rules.NOT_MET, "V08_digits_match_unmet"], ENGINE_VERSION, strict=True)
+    assert items[-1]["id"] == "S01_known_contact" and items[-1]["status"] == "passed"
+    assert next(i for i in items if i["id"] == "V08_digits_match")["status"] == "not_met"
+
+
+def test_unknown_changer_needs_two_approvers():
+    assert "two different approvers" in effect("verified", unknown_changer=True)
+
+
+def _ans(slot, value, turn):
+    return {"slot": slot, "value": value, "turn_id": turn, "tool_call_id": f"t{turn}", "captured_at": "x", "capture_method": "speech"}
+
+
+def test_attempts_from_evidence_a_timeout_and_a_redial():
+    first, second = "11111111-1111-4111-8111-111111111111", "22222222-2222-4222-8222-222222222222"
+    events = [
+        ("call_started", "t1", {"call_id": first, "attempt": 1}),
+        ("call_ended", "t2", {"call_id": first, "attempt": 1, "result": "callback_requested",
+                              "answers": {"answers": [_ans("recording_consent", "yes", 1), _ans("change_requested", "yes", 3)]}}),
+        ("call_started", "t3", {"call_id": second, "attempt": 2}),
+        ("call_ended", "t4", {"call_id": second, "attempt": 2, "result": "answers_recorded", "answered_by": "human",
+                              "answers": {"answers": [_ans("recording_consent", "yes", 1), _ans("change_requested", "yes", 5)]}}),
+        ("call_started", "t5", {"call_id": "33333333-3333-4333-8333-333333333333", "attempt": 3}),
+        ("call_timeout", "t6", {"attempt": 3}),  # no call_id: closes the open attempt
+    ]
+    one, two, three = calls(events, {second: {"provider": "twilio"}})
+    assert (one["result"], two["result"], three["result"]) == ("callback_requested", "answers_recorded", "timed_out")
+    assert three["ended_at"] == "t6" and "a person must review" in three["reason"] and two["provider"] == "twilio"
+    early = {a["slot"]: a["feeds"] for a in one["answers"]}
+    assert early["change_requested"] == ["NV01_vendor_denied_change", "NR19_earlier_call_concern"], "an earlier call counts only against"
+    assert "V07_right_person_confirmed" in {a["slot"]: a["feeds"] for a in two["answers"]}["change_requested"]
+    assert calls([("call_ended", "t", {"call_id": first, "result": "failed"})], {}) == [], "no start, no attempt"

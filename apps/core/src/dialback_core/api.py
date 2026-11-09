@@ -296,9 +296,11 @@ async def get_case(case_id: UUID, request: Request, user: UserDep):
             "select id::text as id, provider, reason from voice.calls where case_id = %s", (case_id,))).fetchall()}
 
     approved = any(r["actor_id"] == user.user_id and r["action"] == "approve" and r["case_version"] == c["version"] for r in releases)
-    timeline, call_events = [], []
+    timeline, call_events, strict = [], [], False
     for e in events:
         envelope = json.loads(e["body_jcs"])
+        if e["type"] == "decision_made":
+            strict = (envelope.get("body") or {}).get("strict_mode") is True  # the latest decision's mode
         if e["type"] in ("call_started", "call_ended", "call_timeout"):
             call_events.append((e["type"], ts(e["occurred_at"]), envelope.get("body") or {}))
         actor_name = "Dialback" if e["actor_kind"] == "system" else names.get(e["actor_id"], "Unknown user")
@@ -328,7 +330,7 @@ async def get_case(case_id: UUID, request: Request, user: UserDep):
             "outcome": decision["outcome"], "rules_fired": list(decision["rules_fired"]), "engine_version": decision["engine_version"],
             "last_four_result": decision["last_four_result"], "decided_at": ts(decision["decided_at"]),
             "explanation": [TEMPLATES[r] for r in decision["rules_fired"] if r in TEMPLATES],
-            **_decision_views(decision),
+            **_decision_views(decision, c["has_unknown_changer"], strict),
         },
         "releases": [{"actor": person_json(r["actor_id"], names), "action": r["action"], "reason": r["reason"],
                       "case_version": r["case_version"], "created_at": ts(r["created_at"])} for r in releases],
@@ -340,11 +342,12 @@ async def get_case(case_id: UUID, request: Request, user: UserDep):
     }
 
 
-def _decision_views(decision: dict[str, Any]) -> dict[str, Any]:
+def _decision_views(decision: dict[str, Any], unknown_changer: bool, strict: bool) -> dict[str, Any]:
     """The checklist and rule groups, read from the recorded rules (spec 0035)."""
     ids = list(decision["rules_fired"])
-    items, note = checklist(decision["outcome"], ids, decision["engine_version"])
-    return {"fired": fired(ids), "checklist": items, "checklist_note": note, "effect": effect(decision["outcome"])}
+    items, note = checklist(decision["outcome"], ids, decision["engine_version"], strict)
+    return {"fired": fired(ids), "checklist": items, "checklist_note": note,
+            "effect": effect(decision["outcome"], unknown_changer)}
 
 
 def action_result(raw: dict[str, Any]) -> dict[str, Any]:
