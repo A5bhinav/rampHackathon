@@ -1,5 +1,6 @@
 """Spec 0024: the ledger in the database, on a real migrated Postgres (scripts/db/pgtemp.py)."""
 import asyncio
+import datetime as dt
 import json
 import uuid
 
@@ -176,3 +177,49 @@ def test_the_same_documents_load_into_two_datasets(database_url):
             n = c.execute("select count(*) from ledger.documents where dataset_id = %s", (v["dataset_id"],)).fetchone()[0]
         assert n == len(json.loads((ROOT / "corpus" / truth["documents"]).read_text()))
     assert picks == [truth["expected"]["pick"]] * 2
+
+
+def _doc(doc_id, channel, days_ago, sender=None, thread=None, subject=None, lines=()):
+    when = (dt.datetime(2026, 10, 1, 16, tzinfo=dt.UTC) - dt.timedelta(days=days_ago)).isoformat()
+    return {"id": str(uuid.uuid5(uuid.NAMESPACE_URL, doc_id)), "kind": "email" if channel == "email" else "contract",
+            "claimed_date": None, "header_date": None, "scan": False,
+            "custody": {"channel": channel, "received_at": when, "sender": sender, "thread_id": thread, "subject": subject,
+                        "parent_document_id": None},
+            "pages": [{"width": 612, "height": 792, "spans": [{"text": t, "x": 72, "y": 72 + 14 * i, "size": 10, "color": "#000000"}
+                                                             for i, t in enumerate(lines)]}]}
+
+
+def _speaker_world(url, request_sender, thread_sender):
+    """A vendor proven by a contract and email, and a request in a thread with one earlier message."""
+    docs = [_doc("contract", "contract", 900, lines=["Accounts receivable: (415) 555-0142"]),
+            _doc("email-1", "email", 800, "Acme AR <ar@acme.example>", "inv", "Invoice 1001", ["Accounts receivable: (415) 555-0142"]),
+            _doc("thread-1", "email", 40, thread_sender, "inv-9", "Invoice 1009", ["Invoice attached."]),
+            _doc("request", "email", 0, request_sender, "inv-9", "Re: Invoice 1009", ["We have moved our banking."])]
+    v = new_vendor(url, "Speaker test")
+    result = ingest_all(docs, extractor_version="test")
+
+    async def go():
+        async with await psycopg.AsyncConnection.connect(url) as conn, conn.transaction():
+            await write_ingest(conn, dataset_id=v["dataset_id"], vendor_id=v["vendor_id"], result=result)
+            await add_vendor_domain(conn, dataset_id=v["dataset_id"], vendor_id=v["vendor_id"], domain="acme.example")
+            await mark_change_request(conn, dataset_id=v["dataset_id"], vendor_id=v["vendor_id"], document_id=docs[-1]["id"])
+    run(go())
+    case = open_case(url, v)
+    return lambda *names: run(change_context(case_id=case, dataset_id=v["dataset_id"], vendor_id=v["vendor_id"],
+                                             cutoff=at("2026-10-01T18:00:00Z"), speaker_names=names, offered_numbers=(),
+                                             database_url=url))
+
+
+def test_the_speaker_is_checked_against_the_change_contexts_senders(database_url):
+    ctx = _speaker_world(database_url, "Dana Whitfield <ar@acme.example>", "Acme AR <ar@acme.example>")
+    assert ctx("Dana Whitfield") == {"speaker_in_change_thread": True}       # the requester is on the line
+    assert ctx("dana whitfield") == {"speaker_in_change_thread": True}
+    assert ctx("Jordan Lee") == {"speaker_in_change_thread": False}          # someone else confirms
+    assert ctx("Jordan Lee", "Dana Whitfield") == {"speaker_in_change_thread": True}
+    assert ctx() == {}                                                        # no name given: unknown
+
+
+def test_an_unnamed_sender_in_the_change_context_leaves_the_speaker_unknown(database_url):
+    ctx = _speaker_world(database_url, "Dana Whitfield <ar@acme.example>", "ar@acme.example")
+    assert ctx("Jordan Lee") == {}                     # the earlier thread message could be anyone's
+    assert ctx("Dana Whitfield") == {"speaker_in_change_thread": True}
