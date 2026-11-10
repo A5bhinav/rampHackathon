@@ -3,11 +3,10 @@
 **Status:** Proposed, Nov 9, 2026. Nothing is built. It changes ADR-8 in one way: one fingerprint
 key for every customer, held in a key-management service, and the fingerprint computed inside Ramp
 over the full number. Until a spec implements that, today's fingerprint stays (spec 0002, D4).
-**Changed by spec 0045 (PR #93):** shared trust for **phone numbers** is no longer deferred. A shared
-vendor profile keeps an ordered list of trusted numbers, which a bank-change case calls in order.
-Trust enters that list only through an onboarding anchor or a call to a number already on it, never
-by counting customers. Item 4 below says what that answers. Trust in bank accounts and Ramp-signed
-identity stay deferred.
+**Narrowed on Nov 9:** the network shares **warnings** across customers (item 3) and nothing else.
+Sharing **trust** across customers, tried as a shared vendor profile in spec 0045 (PR #93, closed),
+is rejected until onboarding is verified (item 4 says why and what would change it). Cold start for
+one customer's new vendors goes through spec 0047 (PR #94) instead, per customer and never shared.
 **Needs sign-off from:** Inesh (Trust Ledger), Abhi (core, evidence, ADR-8, decision engine), and
 every contract owner (decision item 3 adds a `network` facts block).
 
@@ -97,8 +96,7 @@ Why Dialback should not hold the full numbers:
 
 - **The ledger keeps its rule.** A number is callable because it reached this customer through the
   customer's own channels, by our own clock, before the cutoff (spec 0021). The network never adds
-  sightings to a customer's ledger. Spec 0045's shared profile can supply the number a case calls,
-  but as its own labeled selection (`profile-select-v1`), with the ledger's own pick kept beside it.
+  sightings to a customer's ledger, and never changes which number the ledger picks.
 - **The network gives the decision labeled inputs:** a `network` facts block, read by code (R3).
 - **Combine evidence, never trust.** Pooling "this account was seen at another customer" is
   evidence. Pooling "another customer trusted this" is the attack.
@@ -141,29 +139,40 @@ Rules for every signal:
   alarm affects the next case for that vendor at each customer; it never holds a customer that has
   no case, because there would be nothing to release through `release_case()`.
 
-### 4. Deferred: signals that would make a case easier
+### 4. Rejected for now: sharing trust across customers
 
-These would solve cold start, which is the main reason to share at all. Each has a problem with no
-answer yet, so none is part of this decision. Each needs its own record.
+Sharing trust would let one customer's knowledge make another customer's case easier: a shared
+phone number to call, "paid into for months", or Ramp-signed identity instead of a call. It is
+rejected until the conditions below hold.
 
-- **"Paid into for months with no returns."** An earlier fraud looks exactly like this. Customers
-  fooled months ago are still paying the mule account, and mule accounts rarely produce returns.
-  It also pools other customers' decisions to trust the account, which item 2 calls the attack.
-- **"Phone number proven at long-standing customers", offered to a cold-start customer.** Adopted
-  in a different form by spec 0045, which answers the three problems below:
-  - Independent customers do not mean independent sources. The design doc's known limit (page 21)
-    is that someone who has controlled a vendor's mailbox and a public listing for 90 days gets
-    their number picked. Every customer of that vendor sees those same channels, so "proven at 4
-    customers" can be one compromise seen 4 times. *Spec 0045 never counts customers.* A shared
-    number comes from an onboarding anchor (registry and website, spec 0041) or from a call to a
-    number already trusted.
-  - Today those customers go straight to a person; this would call instead. *Spec 0045 calls, and a
-    profile change or new link in the last 7 days sends the case to review (NR22).*
-  - It also can't be dialed without changing V01 ("We dialed the number the Trust Ledger chose")
-    and the voice service's dial guard, which dials only the ledger's pick. *Spec 0045 writes the
-    pick as a selection in the ledger's table and has the voice service dial the selection the case
-    names, so V01 holds as written.*
-- **Ramp-signed identity** instead of a call (the design doc's plug-in), for the same reasons.
+**Why.** Spec 0045 (PR #93) designed a shared vendor profile: one ordered list of trusted phone
+numbers per vendor, shared by every customer that pays it, with onboarding numbers assumed honest.
+Two builder checks and three red-team rounds each found new ways for it to be weaker than today.
+Every way that lost money needed one thing: a number no one had verified, on a list that speaks
+for every customer. Examples:
+
+- a sham Ramp business listing its own number for a real vendor;
+- a customer with history falling through to that number after one unanswered call;
+- a change email getting the real number refused, so the case moved to the shared list;
+- an insider re-pointing a vendor record onto a profile the attacker built;
+- inflating the customer count with several sham businesses.
+
+Each fix closed one path and left a sibling, because the shared list itself was the weak point.
+Within one customer, the same assumption is safe. A bad onboarding hurts only the customer that
+made it, and that customer already has the bad vendor. That is spec 0047.
+
+"Paid into for months with no returns" fails on its own: an earlier, undetected fraud looks exactly
+like it, because mule accounts rarely produce returns.
+
+**What would change this:**
+
+1. Onboarding that verifies the phone number against sources the onboarding form can't touch: the
+   registry looked up by tax ID inside Ramp, the vendor's website and a business listing agreeing,
+   and a confirming call (specs 0041 and 0042).
+2. A tenant model, so customers can't read each other's data.
+3. Linking rules that an insider can't game by editing a tax ID or a name.
+
+Until then, sharing stays warnings-only (item 3).
 
 ### 5. Customers see derived facts, never another customer's data
 
@@ -190,8 +199,8 @@ answer yet, so none is part of this decision. Each needs its own record.
 2. **The warning signals in item 3,** behind a new flag `DIALBACK_NETWORK` with values `off` and
    `warn`, safe default `off`. They need the `network` facts block in the contracts and the new
    Needs review rule in the decision engine.
-3. **Anything from item 4** only through its own record, after attack-lab scenarios with sham
-   customers.
+3. **Anything from item 4** only after its conditions hold, through its own record, and after
+   attack-lab scenarios with sham customers.
 
 ## Consequences
 
@@ -204,8 +213,9 @@ Good:
 
 Costs and risks:
 
-- **Cold start stays.** This record shares warnings only. Spec 0041's anchors remain the path for a
-  vendor's first sight.
+- **Cold start isn't solved here.** This record shares warnings only. Spec 0047 covers one
+  customer's new vendors, from their onboarding numbers. A new customer's existing vendors need
+  mailbox intake, so today's rule has history to work with.
 - **Honest shared accounts look like mule accounts.** Factoring companies, lockboxes, payment
   processors and parent companies all collect for more than one vendor. They trip the linked-account
   signal and go to review. A reviewed list of known shared-account holders is open question 6.
@@ -228,7 +238,7 @@ Costs and risks:
 | Give Dialback full account numbers and tax IDs, and merge profiles in the Trust Ledger | Item 1 gives the same linking without readable numbers; item 2 explains why merging breaks the selection rule |
 | Fingerprint inside Dialback as each number arrives, then discard it | The full number still passes through Dialback's memory, logs and traces, and Dialback can't re-fingerprint after a key rotation |
 | Link vendors by name, email domain and phone with today's data | Weak, and the easiest identifiers to fake |
-| Share trust as well as warnings now | Item 4: each friction-lowering signal has a known way to fail |
+| Share trust as well as warnings now (a shared vendor profile, spec 0045) | Item 4: without verified onboarding, every shared trusted number is a path a sham or an insider can use for every customer at once |
 | Do nothing | Every customer has to catch a takeover that hits many customers on its own |
 
 ## Open questions
@@ -245,5 +255,5 @@ Costs and risks:
 6. **Shared-account holders:** how factoring companies, lockboxes and processors are recognized,
    and who maintains that list.
 7. **Expiry:** how long a network fact lasts.
-8. **One model for the first trusted number:** how item 4, if it ever ships, meets spec 0041's
-   anchors and any shared vendor profile or portal (none is in the repo yet).
+8. **Verified onboarding:** who builds the phone check in item 4's first condition, Ramp or
+   Dialback, and with which data providers.
