@@ -5,8 +5,8 @@ import { when, words } from "@/lib/format";
 // One call as a conversation (specs 0036, 0041): the fixed disclosure, each scripted question,
 // what the callee said as code recorded it, and the rules each answer fed. Nothing here is
 // decided: the chips carry the core's status words, and the last four digits never reach the page.
-export function CallCard({ call, script, decision, total }: {
-  call: CallAttempt; script: CallScript | undefined; decision: DecisionInfo | null; total: number;
+export function CallCard({ call, script, decision, total, watchHref }: {
+  call: CallAttempt; script: CallScript | undefined; decision: DecisionInfo | null; total: number; watchHref?: string;
 }) {
   const talked = call.answers.length > 0;
   const turns = conversation(script, call.answers);
@@ -20,7 +20,10 @@ export function CallCard({ call, script, decision, total }: {
         <span className={`badge ${call.result === "answers_recorded" ? "tone-ok" : call.result ? "tone-warn" : "tone-info"}`}>
           {call.result ? words(call.result) : "in progress"}
         </span>
-        <span className="card-meta"><span className="badge tone-muted">AI agent: collects answers only</span></span>
+        <span className="card-meta">
+          <span className="badge tone-muted">AI agent: collects answers only</span>
+          {watchHref ? <a className="button-link" href={watchHref}>Watch the call</a> : null}
+        </span>
       </div>
       <div className="card-body">
         <dl className="call-meta">

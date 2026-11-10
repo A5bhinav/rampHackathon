@@ -14,6 +14,7 @@ import { CoreError, core } from "@/lib/core";
 import { brief, datasetNow, date, dueLabel, relative, when, words } from "@/lib/format";
 import { phone, seenBefore, sourceLabel, split } from "@/lib/lineage";
 import { REFRESH_STATES, stations } from "@/lib/stations";
+import { canWatchCall } from "@/lib/live-call";
 import { stateLabel } from "@/lib/states";
 import { releaseAction, reviewAction } from "./actions";
 
@@ -82,6 +83,10 @@ export default async function CaseDetailPage({ params, searchParams }: {
           ) : null}
           <span className="muted sub">Version {c.version}</span>
         </div>
+        <p className="present-links">
+          {canWatchCall(detail.timeline) ? <Link className="button-link primary" href={`${path}/call`}>Watch the call</Link> : null}
+          <Link className="button-link" href={`${path}/flow`}>Flow mode</Link>
+        </p>
       </PageHead>
 
       {done && NOTICES[done] ? (
@@ -116,7 +121,7 @@ export default async function CaseDetailPage({ params, searchParams }: {
           <NumberCard view={view} path={path} />
 
           {(detail.calls ?? []).map((call) => (
-            <CallCard key={call.call_id} call={call} script={detail.call_script} decision={decision} total={detail.calls?.length ?? 0} />
+            <CallCard key={call.call_id} call={call} script={detail.call_script} decision={decision} total={detail.calls?.length ?? 0} watchHref={`${path}/call`} />
           ))}
           {detail.calls && detail.calls.length === 0 && c.state !== "open" ? (
             <section className="card" aria-labelledby="call-none-h">
