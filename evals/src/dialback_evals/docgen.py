@@ -717,9 +717,10 @@ def without_context_numbers(plan: WorldPlan) -> WorldPlan:
 
 
 def check_world(plan: WorldPlan, *, reader, rule=None) -> list[Violation]:
-    """G7 on one world plan, each failure keyed by the change-context number that caused it: the sighting
-    whose label alone moves the call when relabeled (or, if none does alone, every one that could), and
-    for I1 the number's first change-context mention."""
+    """G7 on one world plan, each failure keyed by the change-context number that caused it: every sighting
+    whose label alone moves the call when relabeled, or, if none does alone, a minimal set of them whose
+    labels together do (so a label that moves nothing is never blamed); for I1, the number's first
+    change-context mention."""
     from dialback_ledger.select import change_context_documents
 
     from .invariants import _frame
@@ -739,9 +740,16 @@ def check_world(plan: WorldPlan, *, reader, rule=None) -> list[Violation]:
         ctx = {d.id for d in context(**world.kwargs)}
         suspects = [s for s in world.kwargs["sightings"] if s.document_id in ctx and s.visibility == "visible"
                     and (s.party != "vendor" or str(s.role).strip().lower() == "fax")]
-        alone = [s for s in suspects
-                 if base != _calls(run_rule(_relabeled(world, lambda r, s=s: r == s, rule), rule))[:len(base)]]
-        for s in alone or suspects:
+        def moves(chosen: list) -> bool:
+            return base != _calls(run_rule(_relabeled(world, lambda r: r in chosen, rule), rule))[:len(base)]
+
+        culprits = [s for s in suspects if moves([s])]
+        if not culprits:   # no label moves it alone: a minimal set of them that still does, in sighting order
+            culprits = list(suspects)
+            for s in suspects:
+                if moves([r for r in culprits if r != s]):
+                    culprits.remove(s)
+        for s in culprits:
             n = number(s.document_id, s.e164)
             out.append(Violation("G7", n.phrasing, n.placement, plan.id, s.e164,
                                  f"{G7_MOVED}: {s.document_id} labels it {s.role}, {s.party}; calls {base}"))

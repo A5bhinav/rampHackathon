@@ -3,6 +3,7 @@ ingestion (with a named reader) and select(), held to checks any reader must pas
 from __future__ import annotations
 
 import dataclasses
+import datetime as dt
 import json
 from functools import lru_cache
 from pathlib import Path
@@ -300,6 +301,22 @@ def test_g7_fails_today_and_passes_context_blind(_today_rule):
         out = docgen.run_rule(quiet)
         assert any(c["e164"] == world.real and c["eligible"] for c in out["candidates"]), world.id
 
+
+
+
+def test_g7_blames_only_the_labels_that_move_the_call(_today_rule):
+    # Two refusing mentions of the real number in the change context: neither alone moves the call, both
+    # together do. An attacker's own number, unlabeled in the context, moves nothing and is never blamed.
+    plan = _a1_world_plan()
+    def mention(e164, owner, phrasing, placement):
+        return docgen.NumberPlan(e164, owner, *docbank.claim(phrasing, "attacker"), phrasing, placement, "paren", "visible")
+    follow_up = docgen.DocPlan(f"{plan.id}-f9", "email_body", "attacker", "email", "ar@acme.example", f"{plan.id}-t9",
+                               "One more thing", (docgen.T0 + dt.timedelta(minutes=20)).isoformat(),
+                               ("Regards,",), (mention("+12015550111", "attacker", "accounts_receivable", "table_row"),
+                                               mention(plan.real, "vendor", "main", "number_label")))
+    world = dataclasses.replace(plan, documents=(*plan.documents, follow_up))
+    found = sorted(v.pattern for v in docgen.check_world(world, reader=StubReader()))
+    assert found == ["G7/bank_verification_line/label_number", "G7/main/number_label"]
 
 # --- Known failures by pattern (decision 6) ----------------------------------------------------------
 
