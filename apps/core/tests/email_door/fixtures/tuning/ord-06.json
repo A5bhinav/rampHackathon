@@ -1,0 +1,8 @@
+{
+  "subject": "Statement of account - Acme Fasteners LLC",
+  "sender": "Acme AR <ar@acme.example>",
+  "text": "Dear customer,\n\nAttached is your statement. Current balance $6,300.00. Items past due: invoice 1699 (45 days).\nPlease remit to our account ending 2222 at your earliest convenience.",
+  "label": "ordinary",
+  "vendor": "acme",
+  "note": "Statement/dunning notice with on-file last four."
+}

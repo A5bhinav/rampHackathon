@@ -1,0 +1,8 @@
+{
+  "subject": "Pelican IT services invoice 5512",
+  "sender": "Billing <invoices@pelican-it.example>",
+  "text": "Monthly managed services, $3,200. Net 30. Pay via the payment link on our portal.",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Invoice w/ portal link for pay; not a change."
+}

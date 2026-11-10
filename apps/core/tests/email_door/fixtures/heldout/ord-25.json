@@ -1,0 +1,8 @@
+{
+  "subject": "Away this week",
+  "sender": "Dana Whitfield <ar@acme.example>",
+  "text": "I'm traveling this week and will reply to emails on Monday.",
+  "label": "ordinary",
+  "vendor": "acme",
+  "note": "OOO."
+}

@@ -1,0 +1,8 @@
+{
+  "subject": "How do I update my address?",
+  "sender": "Marisol Vega <mvega@brightline.example>",
+  "text": "Hi, we moved offices. What's the right way to update our mailing address in your vendor\nportal? No other changes.",
+  "label": "ordinary",
+  "vendor": "brightline",
+  "note": "Near miss: address only, asks how; no payment destination change."
+}

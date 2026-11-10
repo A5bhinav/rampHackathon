@@ -1,0 +1,8 @@
+{
+  "subject": "Automatic reply: Out of office",
+  "sender": "Dana Whitfield <ar@acme.example>",
+  "text": "I am out of the office until Nov 16 with limited access to email. For urgent matters\ncontact ar-backup@acme.example.",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "OOO reply."
+}

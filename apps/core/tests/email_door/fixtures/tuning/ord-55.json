@@ -1,0 +1,8 @@
+{
+  "subject": "Invoice 1751",
+  "sender": "Dana Whitfield <ar@acme.example>",
+  "text": "Invoice 1751 is attached, $1,090.00 due in 30 days. Pay as usual to the account on your vendor record.",
+  "label": "ordinary",
+  "vendor": "acme",
+  "note": "Invoice."
+}

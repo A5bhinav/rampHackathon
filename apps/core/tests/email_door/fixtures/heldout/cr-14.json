@@ -1,0 +1,8 @@
+{
+  "subject": "Re: Invoice 3410 - remit to",
+  "sender": "Brightline AR <ar@brightline.example>",
+  "text": "> Can you confirm the bank for invoice 3410?\n\nNot the one in the invoice PDF. Use ours at Evergreen Bank, routing 2100 0002 1 and acct 000-0555-6001.",
+  "label": "change_request",
+  "vendor": "brightline",
+  "note": "Reply to a question; routing written with spaces/odd, non-standard; new account."
+}

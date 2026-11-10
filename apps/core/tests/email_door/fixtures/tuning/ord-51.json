@@ -1,0 +1,8 @@
+{
+  "subject": "Price list update",
+  "sender": "Brightline Billing <billing@brightline.example>",
+  "text": "Our new price list is effective Jan 1. Attached. Prices on copy paper rose 4 percent.",
+  "label": "ordinary",
+  "vendor": "brightline",
+  "note": "Price list; 'update' word, not bank."
+}

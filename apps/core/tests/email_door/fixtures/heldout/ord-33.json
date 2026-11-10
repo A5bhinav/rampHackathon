@@ -1,0 +1,8 @@
+{
+  "subject": "Audit PBC list",
+  "sender": "Controller <controller@ourco.example>",
+  "text": "External auditors want the list of vendor master changes for Q3. Please pull it from the log.",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Internal; mentions vendor master changes but asks for a report."
+}

@@ -1,0 +1,8 @@
+{
+  "subject": "Your Tuesday evening trip",
+  "sender": "Uber <receipts@uber-mail.example>",
+  "text": "Thanks for riding. Total: $23.18.",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Receipt."
+}

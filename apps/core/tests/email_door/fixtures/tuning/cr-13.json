@@ -1,0 +1,8 @@
+{
+  "subject": "Re: Re: Invoice 2104",
+  "sender": "Sam Ortiz <ar@brightline.example>",
+  "text": "Thanks for the reminder.\n\nBy the way, please redirect the payment for this invoice to our new bank. Same company,\ndifferent account. Bank name is Pacific Western and the account ends 6073. Full details\nwill come from our accounting manager by phone.",
+  "label": "change_request",
+  "vendor": "brightline",
+  "note": "Redirect one payment and future ones; partial digits and details by phone."
+}

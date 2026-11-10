@@ -1,0 +1,8 @@
+{
+  "subject": "Cobalt Freight remit-to update",
+  "sender": "Dana Okafor <dokafor@cobalt.example>",
+  "text": "Please change our remit to as follows effective with invoice 2307:\n\nBeneficiary: Cobalt Freight, LLC\nBank: Lakeshore Commerce Bank\nABA 071000013\nAcct: 0001-2345-4821\n\nQuestions, call our new treasury line (617) 555-0166.",
+  "label": "change_request",
+  "vendor": "cobalt",
+  "note": "Uses 'remit to' phrasing, grouped with hyphens, new phone for confirmation."
+}

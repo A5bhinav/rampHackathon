@@ -1,0 +1,8 @@
+{
+  "subject": "Your electric bill is available",
+  "sender": "Utilities <billing@citypower.example>",
+  "text": "Amount due $812.04 by Nov 25. Autopay is enabled on your account.",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Utility bill."
+}

@@ -1,0 +1,8 @@
+{
+  "subject": "Cobalt: switch to wire only",
+  "sender": "Morgan Pryce <ar@cobalt.example>",
+  "text": "Effective now we accept wire transfers only. Wires: Bank of the Plains, SWIFT BPLNUS44,\naccount 000066670001. ACH to the old account will be rejected.",
+  "label": "change_request",
+  "vendor": "cobalt",
+  "note": "Switch to wire to a new bank; SWIFT instead of ABA."
+}

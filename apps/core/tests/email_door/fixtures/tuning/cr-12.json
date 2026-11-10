@@ -1,0 +1,8 @@
+{
+  "subject": "Acme Fasteners - bank account change notification",
+  "sender": "ar@acme.example",
+  "text": "Dear Valued Customer,\n\nThis is to inform you that effective October 15, Acme Fasteners LLC has changed its\nbanking relationship. Our new payment details are as follows:\n  Routing Number: 021000089\n  Account Number: 00-3341-87\nPlease update your accounts payable records accordingly and discard prior details.\nSincerely,\nAcme Finance Dept",
+  "label": "change_request",
+  "vendor": "acme",
+  "note": "Formal template style notice; routing number valid, account short and hyphenated."
+}

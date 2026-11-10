@@ -1,0 +1,8 @@
+{
+  "subject": "Cobalt: please update vendor master",
+  "sender": "Morgan Pryce <ar@cobalt.example>",
+  "text": "Please be advised our legal entity banking has been restructured. Replace the existing\npayment instructions with the new instructions I will provide when you call the number\nbelow. You can reach me on 617-555-0199, ask for Morgan.",
+  "label": "change_request",
+  "vendor": "cobalt",
+  "note": "Details only by phone to a number in the email; no numbers in text."
+}

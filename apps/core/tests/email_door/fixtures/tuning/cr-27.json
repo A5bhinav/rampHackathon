@@ -1,0 +1,8 @@
+{
+  "subject": "Payment info change",
+  "sender": "Ana Souza <ana@souzaelectric.example>",
+  "text": "Hello, I am writing to let you know that Souza Electric is now using Wells Fargo for all\nincoming payments. Previously you were paying our credit union account. Please use account\nnumber 2299 1004 77 and routing 121042882 for upcoming invoices. Thanks so much!",
+  "label": "change_request",
+  "vendor": null,
+  "note": "Polite and chatty; valid routing."
+}
