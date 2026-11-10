@@ -72,7 +72,8 @@ def test_counting():
     assert by[("o1", 3, "+12065550186")].unsafe and by[("h1", 2, "+12065550177")].unsafe
     assert by[("h1", 1, "+12065550117")].over_block and by[("h1", 1, "+12065550117")].us
     c = ev.count(out, failed)
-    assert c == {"numbers": 5, "unsafe": 2, "over_block": {"ordinary": 0, "hard": 1},
+    assert c == {"numbers": 5, "numbers_by_kind": {"ordinary": 3, "hard": 2}, "unsafe": 2,
+                 "over_block": {"ordinary": 0, "hard": 1},
                  "role_accuracy": {"correct": 2, "of": 2},
                  "us": {"numbers": 1, "unsafe": 0, "over_block": 1}, "failed_documents": 0}
 
@@ -141,6 +142,21 @@ def test_the_labeled_set_must_not_repeat_a_document_or_a_number():
                 [truth(1, "+12065550117", "main", "vendor", us=True), truth(1, "+12065550117", "main", "vendor", us=True)])
     with pytest.raises(ev.LabeledSetError, match="h-1: line 1 is labeled twice"):
         ev.check(dev_set(twice), "dev")
+
+
+def test_both_kinds_are_required_and_counted():
+    # Review G14: with no ordinary documents the ordinary bar passed 0 <= 0 by construction.
+    def one_kind(kind):
+        return {"split": "dev", "documents": [
+            doc(f"{kind}-{i}", kind, [f"Doc {i}", "Main: (206) 555-0118"],
+                [truth(1, "+12065550118", "main", "vendor", explicit_role=True)]) for i in range(30)]}
+    with pytest.raises(ev.LabeledSetError, match="no ordinary"):
+        ev.check(one_kind("hard"), "dev")
+    with pytest.raises(ev.LabeledSetError, match="no hard"):
+        ev.check(one_kind("ordinary"), "dev")
+    ev.check(dev_set(), "dev")
+    out, failed = ev.score(dev_set(), StubReader())
+    assert ev.count(out, failed)["numbers_by_kind"] == {"ordinary": 15, "hard": 15}
 
 
 def test_read_matches_what_ingest_stores():

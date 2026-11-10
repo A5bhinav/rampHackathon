@@ -44,7 +44,8 @@ The labeled set, one JSON file (a provisional format: spec 0049 doesn't fix one)
                                  "explicit_role": <a role word names it>, "us": <an "us" mention>}]}]}
 
 The set must be complete and unique: every visible phone candidate code finds has exactly one label,
-every label is such a candidate, and no document id appears twice. Held-out: 70
+every label is such a candidate, and no document id appears twice. Both kinds must hold labeled
+numbers, and the report counts numbers per kind. Held-out: 70
 documents holding at least 30 numbers that aren't the vendor's, and its SHA-256 must match the one
 committed in `reader_heldout.sha256` beside this script (`sha256sum` format; there is no command-line
 hash, so the frozen set can't be swapped by typing another). Dev: 30 documents.
@@ -72,6 +73,7 @@ HELDOUT_SHA256 = Path(__file__).with_name("reader_heldout.sha256")   # committed
 SIZES = {"dev": 30, "heldout": 70}
 MIN_NOT_VENDOR = 30                                        # held-out numbers that aren't the vendor's
 HELDOUT_RUNS = 3                                           # the model's output varies
+KINDS = ("ordinary", "hard")
 ALPHA = Fraction(5, 100)
 ROLES = {"main", "ar", "billing", "fax", "unknown"}
 PARTIES = {"vendor", "customer", "bank", "unknown"}
@@ -129,8 +131,10 @@ def score(labeled: dict, reader: Reader) -> tuple[list[Outcome], int]:
 def count(outcomes: Sequence[Outcome], failed: int) -> dict:
     explicit = [o for o in outcomes if o.role_correct is not None]
     us = [o for o in outcomes if o.us]
-    return {"numbers": len(outcomes), "unsafe": sum(o.unsafe for o in outcomes),
-            "over_block": {kind: sum(o.over_block for o in outcomes if o.kind == kind) for kind in ("ordinary", "hard")},
+    return {"numbers": len(outcomes),
+            "numbers_by_kind": {kind: sum(o.kind == kind for o in outcomes) for kind in KINDS},
+            "unsafe": sum(o.unsafe for o in outcomes),
+            "over_block": {kind: sum(o.over_block for o in outcomes if o.kind == kind) for kind in KINDS},
             "role_accuracy": {"correct": sum(bool(o.role_correct) for o in explicit), "of": len(explicit)},
             "us": {"numbers": len(us), "unsafe": sum(o.unsafe for o in us), "over_block": sum(o.over_block for o in us)},
             "failed_documents": failed}
@@ -203,7 +207,7 @@ def check(labeled: dict, split: str) -> None:
         if doc_id in seen:
             raise LabeledSetError(f"{doc_id}: the document is listed twice")
         seen.add(doc_id)
-        if entry.get("kind") not in ("ordinary", "hard"):
+        if entry.get("kind") not in KINDS:
             raise LabeledSetError(f"{doc_id}: kind must be ordinary or hard")
         found = {(c.line, c.e164) for c in find_phones(lines(entry["document"])) if c.visibility == "visible"}
         keys = [(n["line"], n["e164"]) for n in entry["numbers"]]
@@ -221,6 +225,9 @@ def check(labeled: dict, split: str) -> None:
                 raise LabeledSetError(f"{doc_id}: line {n['line']} has a label off spec 0049's lists")
     if len(docs) != SIZES[split]:
         raise LabeledSetError(f"the {split} split needs {SIZES[split]} documents, not {len(docs)}")
+    for kind in KINDS:     # each bar needs numbers of its kind, or it passes by construction (review G14)
+        if not any(entry["kind"] == kind and entry["numbers"] for entry in docs):
+            raise LabeledSetError(f"the set holds no {kind} documents with labeled numbers; it needs both kinds")
     if split == "heldout":
         not_vendor = sum(n["party"] != "vendor" for entry in docs for n in entry["numbers"])
         if not_vendor < MIN_NOT_VENDOR:
