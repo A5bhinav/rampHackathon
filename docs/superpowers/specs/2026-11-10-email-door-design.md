@@ -358,6 +358,39 @@ request. To change your payment details, contact your account contact at <compan
 you already have for them. We will never ask you to confirm by replying to an email or calling a
 number someone sent you."
 
+## Flagging: the rule plus a model (decided by Sami after Task 6's stop)
+
+Task 6's word-list rule met the bar on its tuning emails (30/30 change requests, 0/62 ordinary
+flagged) but not on the sealed held-out half: the clean result was 25/35 and 1/65; two allowed
+revisions reached 30/35 and 2/65, exploratory because they were designed knowing which files the
+first run missed. The misses were phrasings a word list can't anticipate: "start sending our
+payments to my husband's company", "Use ours at Evergreen Bank", a company sale, Spanish, and an
+IBAN-only wire instruction. **Sami's decision 11: an email is flagged when the rule OR a quarantined
+model says it is a change request.**
+
+- **Monotone by design.** The model can only add flags. An attacker who writes "this is not a bank
+  change" can at most suppress the model's yes; the rule still catches the usual wording. A false yes
+  costs a fixed reply, and a case only when a vendor matches and bank details are present.
+- **Quarantined.** The model sees only the redacted subject and text (the same `redact()` the
+  ledger gets, so no full account number leaves Dialback) and returns schema-checked JSON
+  `{change_request, quote}`. No tools. The email text is data, never instructions (R9). Code makes
+  every decision that follows.
+- **Only when needed.** The model is asked only when the rule doesn't flag.
+- **Failure is retried, never guessed.** If the model can't answer (timeout, API error, refusal,
+  bad output), handling the email fails and the inbox's existing retry schedule tries again; after
+  five tries the email is listed as `failed` for a person (R7).
+- **Behind a flag.** `DIALBACK_EMAIL_CLASSIFIER` = `rule` (safe default, no external call) or
+  `rule+model`. With `rule+model`, the core refuses to start without Anthropic credentials.
+- **Model.** Pinned in one place, following the LLM reader (PR #113): the Anthropic SDK, a pinned API
+  host, a JSON schema, a 30 s timeout. Claude's API reference defaults new code to `claude-opus-5-5`
+  with server-side refusal fallbacks; Sami may choose Haiku 5.5 (the reader's model) if the
+  evaluation shows it holds the bar.
+- **Judged on fresh data.** The current held-out half is spent (its misses are known), so it becomes
+  a development set. A new held-out set is written by a different author on a different model, who
+  sees neither the existing emails nor the rule nor the prompt, and is sealed by hash. The bar is
+  unchanged: every change request flagged, at most 3 ordinary emails flagged. The rule-only numbers
+  above stay recorded as the original result.
+
 ## Open questions (team)
 
 1. **Should red flags feed `decide()`?** That changes decision logic (Abhi and Inesh's area).

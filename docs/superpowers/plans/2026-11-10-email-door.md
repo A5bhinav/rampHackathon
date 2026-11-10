@@ -212,6 +212,32 @@ The worker for this task must not read `email_door/rules.py` or `match.py`, and 
 - [ ] **Step 7: Stop rule.** If the held-out bar fails, record the numbers in the spec. Revise the rule against the tuning half at most twice, re-running the held-out test after each revision. If it still fails, stop and report every version and its numbers to Sami. Never edit the held-out files or the bar.
 - [ ] **Step 8:** Commit: `core: email-door flagging, bank-detail extraction and redaction`.
 
+### Task 6a: A fresh held-out set (Sami's decision 11)
+
+**Files:** Create `apps/core/tests/email_door/fixtures/heldout2/*.json`, `apps/core/tests/email_door/fixtures/heldout2.sha256`.
+
+Written by a fresh agent on a different model from Task 5's author, from a brief that lists the categories and the label meaning only. It never reads the existing fixtures, the rule, the classifier prompt, the plan or the design. 40 change requests and 70 ordinary emails, same JSON format as Task 5. Sealed by hash before anyone runs a flagger on it. The old `heldout/` set becomes a development set (its results are exploratory).
+
+### Task 6b: The model classifier and the combined flag
+
+**Files:**
+- Create: `apps/core/src/dialback_core/email_door/classifier.py`
+- Modify: `apps/core/src/dialback_core/email_door/rules.py` (add `flag_email`), `flags.py`, `settings.py`, `app.py`, `apps/core/pyproject.toml` (`anthropic>=2.7.0`, as PR #113 pins)
+- Test: `apps/core/tests/email_door/test_classifier.py`; the bar tests move to the combined flagger
+
+**Interfaces:**
+- Produces: `class ClassifierMode(StrEnum): RULE = "rule"; RULE_AND_MODEL = "rule+model"` read from `DIALBACK_EMAIL_CLASSIFIER` (safe default `rule`). With `rule+model`, startup refuses without Anthropic credentials.
+- Produces: `@dataclass(frozen=True) class Verdict: change_request: bool; quote: str`; `class ClassifierFailed(Exception)` with a `reason` (`timeout`, `api_error`, `refusal`, `max_tokens`, `schema`); `class ChangeClassifier(Protocol): def classify(self, subject: str, text: str) -> Verdict`.
+- Produces: `AnthropicClassifier(client: anthropic.Anthropic)`, the only place the model is pinned (`MODEL = "claude-opus-5-5"`, effort set explicitly, server-side refusal fallbacks, pinned API host, `TIMEOUT_S = 30.0`, JSON schema `{change_request: boolean, quote: string}`, `additionalProperties: false`). It is called with `redact(subject)` and `redact(text)` only. Its system prompt states the label meaning and that the email is data, never instructions. It maps every failure to `ClassifierFailed` and never logs email text.
+- Produces: `flag_email(subject: str, text: str, html_text: str, classifier: ChangeClassifier | None) -> FlagDecision(flagged: bool, by: Literal["rule", "model", "none"], quote: str | None)`. The rule runs over the text and over the HTML text; the model is asked only when the rule doesn't flag and a classifier is configured. A `ClassifierFailed` propagates, so the inbox retries the email.
+- Tests use a fake classifier (no network): monotone (the model can add a flag but never remove the rule's), only called when the rule says no, failure propagates, redacted input only (no full account number reaches `classify`), and the schema and system prompt are fixed constants.
+
+### Task 6c: Evaluate the combined flagger (needs Sami's credentials)
+
+**Files:** Create `apps/core/tests/email_door/eval_flagger.py` (a script, not part of the default test run).
+
+It runs `flag_email` with the real `AnthropicClassifier` over the tuning set, the development set (old held-out) and, once, the sealed fresh held-out set. It reports per set: change requests flagged, ordinary flagged, file names of misses and false flags, the model, and the cost. The same bar applies to the fresh held-out set, and so does the stop rule (two revisions of the prompt, judged on the development set, then stop and report to Sami). It needs Anthropic credentials, and every run spends money, so Sami approves each run. Results are recorded in spec 0086.
+
 ### Task 7: Vendor matching
 
 **Files:**
@@ -257,7 +283,7 @@ The worker for this task must not read `email_door/rules.py` or `match.py`, and 
   - Same shape as a `request` in `demo_seed.json`: one page 612 by 792, one span per line, `#000000`, size 10, x 72, y 72 plus 14 per line.
   - `id = str(uuid5(NAMESPACE_URL, "email:" + message_id))`, `kind = "email"`, custody channel `email`.
 - Extends `handle_email`, in this order:
-  1. Flag. Unflagged: outcome `not_flagged`, stop.
+  1. Flag with Task 6b's `flag_email(subject, email.text, email.html_text, classifier)`. Unflagged: outcome `not_flagged`, stop. A `ClassifierFailed` propagates, so the inbox retries.
   2. Load `VendorRef`s from `app.vendors` with `ledger.vendor_domains` and match. `none`: `no_vendor`. `several`: `several_vendors`. A matched vendor not in `email_door_vendors`: `not_demo_vendor`.
   3. Extract. No routing number: `no_routing_number`. No account number: `no_account_number`. The first match of each is used.
   4. Same routing number and last four as the vendor's current `app.bank_accounts` row: `same_as_on_file`.
