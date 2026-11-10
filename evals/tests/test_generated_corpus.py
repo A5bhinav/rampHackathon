@@ -13,6 +13,7 @@ import pytest
 from dialback_evals.gencorpus import freeze, fuzz, load_all, load_world, rerun, world_digest
 from dialback_evals.worldgen import NumberSpec, SightingSpec, World, make_world, run
 from dialback_ledger.ingest import ingest_all
+from dialback_ledger.reader import StubReader
 from dialback_ledger.select import ChangeRequest, DocumentRef, Settings, Sighting
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -165,7 +166,7 @@ def _ingest(request_lines: list[str], extra: list[tuple]) -> World:
         doc("req", "email", 0, "ap@acme.example", "req", "Updated banking details", *request_lines),
         *(doc(i, ch, days, sender, thread, subject, *texts, minutes=minutes)
           for i, ch, days, sender, thread, subject, texts, minutes in extra),
-    ], extractor_version="lab-0083")
+    ], extractor_version="lab-0083", reader=StubReader())   # named, never from the environment (spec 0049, D8)
     req = next(d for d in ingested.documents if d["id"] == "req")
     settings = Settings()
     kwargs = {

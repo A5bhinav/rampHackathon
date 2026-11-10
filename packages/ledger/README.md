@@ -7,7 +7,7 @@ A Python package that runs inside the core service, so the attack lab imports an
 the exact same code. Models do one job here, labeling; code does everything else,
 including the decision of which number to call.
 
-## What's built (Nov 9)
+## What's built (Nov 10)
 
 | Piece | Where | Spec |
 |---|---|---|
@@ -20,11 +20,13 @@ including the decision of which number to call.
 | In the database: `select_number`, `change_context`, writing ingestion | `store.py` | 0024 |
 | The demo's ledger and `dialback-ledger demo` | `demo.py`, `demo_seed.json` | 0025 |
 | Vendor risk list | `risk.py`, `apps/web/…/risk` | 0026 |
+| The LLM reader (`DIALBACK_READER=llm`, default `stub`) | `llm_reader.py` | 0049 |
 
-Not built yet: the LLM reader (`DIALBACK_READER=llm`), reading real PDFs and scans, entity
-resolution, `lineage()` as its own call (the panel reads the stored selection), the ledger's
-nightly evals and ablations, and the 100 hand-checked documents. Open questions for the team are
-in specs 0024 to 0026 (Q45, Q46, Q51 to Q53).
+Not built yet: the LLM reader's prompt work against real documents and its scored run (the
+100-document labeled set, spec 0049; the reader is built and tested on a faked API only), reading
+real PDFs and scans, entity resolution, `lineage()` as its own call (the panel reads the stored
+selection), the ledger's nightly evals and ablations. Open questions for the team are in specs
+0024 to 0026 (Q45, Q46, Q51 to Q53) and 0049 (Q107, Q108, Q110, Q123).
 
 ## Job
 
