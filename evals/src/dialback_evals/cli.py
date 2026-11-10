@@ -19,11 +19,10 @@ import os
 from dataclasses import asdict
 from pathlib import Path
 
-from dialback_decision import decide
 from dialback_voice.agent import ScriptedAgent
 
 from .oracle import required
-from .runner import build_facts, run_scenario
+from .runner import facts_for, run_scenario
 from .scenario import Scenario, expected_hash, load_scenarios
 from .scorers import ScenarioResult, score, scorecard
 
@@ -170,7 +169,7 @@ def _drift(scenarios_dir: Path, scenarios: list[Scenario]) -> str | None:
 
 def _score_one(s: Scenario) -> ScenarioResult:
     r = run_scenario(s, ScriptedAgent(), clock=_clock())
-    return score(s, r, decide(build_facts(s, r)))
+    return score(s, r, facts_for(s, r))
 
 
 def _scenarios_hash(scenarios: list[Scenario]) -> str:

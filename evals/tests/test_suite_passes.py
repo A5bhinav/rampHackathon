@@ -5,8 +5,7 @@ from __future__ import annotations
 import datetime as dt
 from pathlib import Path
 
-from dialback_decision import decide
-from dialback_evals.runner import build_facts, run_scenario
+from dialback_evals.runner import facts_for, run_scenario
 from dialback_evals.scenario import load_scenarios
 from dialback_evals.scorers import score
 from dialback_voice.agent import ScriptedAgent
@@ -35,5 +34,5 @@ def test_every_attack_class_is_covered():
 def test_the_whole_dev_split_upholds_every_gate():
     for s in load_scenarios(_DIR):
         r = run_scenario(s, ScriptedAgent(), clock=_clock())
-        res = score(s, r, decide(build_facts(s, r)))
+        res = score(s, r, facts_for(s, r))
         assert res.passed, f"{s.id}: failures={res.failures} outcome={res.outcome} call={res.call_result}"

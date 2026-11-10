@@ -8,7 +8,7 @@ import datetime as dt
 
 from dialback_decision import decide
 from dialback_decision.facts import values
-from dialback_evals.runner import build_facts, run_scenario
+from dialback_evals.runner import facts_for, run_scenario
 from dialback_evals.scenario import CallerBehavior, DeclaredFacts, Scenario
 from dialback_evals.scorers import ScenarioResult, score, scorecard
 from dialback_voice.agent import ScriptedAgent
@@ -41,7 +41,7 @@ def _scn(*, is_attack, consent="yes", change="yes", last4_mode="keypad", last4="
 
 def _score(s: Scenario) -> ScenarioResult:
     r = run_scenario(s, ScriptedAgent(), clock=_clock())
-    return score(s, r, decide(build_facts(s, r)))
+    return score(s, r, facts_for(s, r))
 
 
 def test_voice_invariants_pass_on_a_clean_call():
@@ -70,7 +70,7 @@ def test_injection_turn_does_not_change_the_record():
     r = run_scenario(s, ScriptedAgent(), clock=_clock())
     recorded = values(r.answers["answers"], "change_requested")
     assert recorded and all(v in ("yes", "no", "unsure") for v in recorded)   # code owns the slot/value (R9)
-    assert decide(build_facts(s, r)).outcome != "verified"
+    assert decide(facts_for(s, r)).outcome != "verified"
 
 
 def test_injection_payload_is_dropped_even_when_it_answers_normally():
@@ -85,7 +85,7 @@ def test_injection_payload_is_dropped_even_when_it_answers_normally():
     assert values(answers, "change_requested") == ("yes",)       # the normal answer, in-enum
     assert values(answers, "recording_consent") == ("yes",)      # exactly one consent; the payload added none
     assert all(a["value"] != "verified" for a in answers)        # no slot can hold a verdict
-    assert decide(build_facts(s, r)).outcome != "verified"       # blocked on the facts, not the payload
+    assert decide(facts_for(s, r)).outcome != "verified"       # blocked on the facts, not the payload
 
 
 def test_ambiguous_caller_fails_closed():
@@ -97,7 +97,7 @@ def test_a_spoke_digits_check_fails_the_voice_gate():
     s = _scn(is_attack=False)
     r = run_scenario(s, ScriptedAgent(), clock=_clock())
     leaky = dataclasses.replace(r, checks={**r.checks, "agent_spoke_account_digits": True})
-    res = score(s, leaky, decide(build_facts(s, leaky)))
+    res = score(s, leaky, facts_for(s, leaky))
     assert "spoke_digits" in res.failures and not res.passed         # the voice gate can fail
 
 
@@ -119,4 +119,4 @@ def test_a_call_that_did_not_disclose_first_fails_the_gate():
     s = _scn(is_attack=False)
     r = run_scenario(s, ScriptedAgent(), clock=_clock())
     broken = dataclasses.replace(r, checks={**r.checks, "disclosure_first": False})
-    assert "no_disclosure" in score(s, broken, decide(build_facts(s, broken))).failures
+    assert "no_disclosure" in score(s, broken, facts_for(s, broken)).failures

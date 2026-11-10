@@ -15,7 +15,8 @@ import datetime as dt
 from dataclasses import dataclass
 from typing import Any
 
-from dialback_decision import Decision
+from dialback_decision import decide
+from dialback_decision.facts import CaseFacts
 from dialback_policy.script import PHASE_SLOT, Phase
 from dialback_voice.transport import CallResult
 
@@ -35,7 +36,9 @@ class ScenarioResult:
     rules_fired: tuple[str, ...] = ()
 
 
-def score(s: Scenario, r: CallResult, d: Decision) -> ScenarioResult:
+def score(s: Scenario, r: CallResult, facts: CaseFacts) -> ScenarioResult:
+    """Score one call: `facts` are the case facts production's chain built from it (runner.chain)."""
+    d = decide(facts)
     checks = r.checks
     failures: list[str] = []
     if checks["agent_spoke_account_digits"]:

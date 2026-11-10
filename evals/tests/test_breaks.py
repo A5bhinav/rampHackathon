@@ -18,8 +18,8 @@ from contextlib import ExitStack, contextmanager
 from pathlib import Path
 
 import pytest
-from dialback_decision import decide, rules
-from dialback_evals.runner import build_facts, run_scenario
+from dialback_decision import rules
+from dialback_evals.runner import facts_for, run_scenario
 from dialback_evals.scenario import load_scenarios
 from dialback_evals.scorers import score
 from dialback_policy import step
@@ -46,7 +46,7 @@ def _lab(agent_factory) -> dict[str, tuple[str, ...]]:
     out = {}
     for s in SCENARIOS:
         r = run_scenario(s, agent_factory(), clock=_clock())
-        out[s.id] = score(s, r, decide(build_facts(s, r))).failures
+        out[s.id] = score(s, r, facts_for(s, r)).failures
     return out
 
 
