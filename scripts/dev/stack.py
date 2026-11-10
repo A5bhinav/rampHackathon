@@ -29,6 +29,7 @@ from pathlib import Path
 
 import httpx
 import uvicorn
+from psycopg.types.json import Jsonb
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts" / "db"))
@@ -175,6 +176,11 @@ async def seed(pool, settings: Settings) -> tuple[uuid.UUID, dict, dict]:
                                (uid, name, refs.get(ramp_ref) if ramp_ref else None))
             await conn.execute("insert into app.user_roles (user_id, role) values (%s, %s)", (uid, role))
             users[key] = (uid, name)
+        # Like `demo reset`: record the seeded Ramp users and vendors, so the dashboard's Ramp (mock)
+        # portal knows Pat Clerk is this demo's clerk (spec 0077).
+        vendors = {v["ref"]: refs[v["ref"]] for v in seed_body(dataset.id)["vendors"]}
+        await conn.execute("update app.datasets set demo_refs = %s where id = %s",
+                           (Jsonb({"users": {"clerk": refs["clerk"]}, "vendors": vendors}), dataset.id))
     async with httpx.AsyncClient(timeout=10.0) as http:
         await import_all(pool, RampConnector(settings, http).for_dataset(dataset.id),
                          Keys(settings.fingerprint_key, settings.fingerprint_key_version), dataset.id)

@@ -45,6 +45,12 @@ export async function Shell({ app, datasetId, children }: { app: AppKey; dataset
         <div className="side-desk"><DatasetCard current={current} datasets={datasets} app={app} /></div>
         <nav className="side-nav" aria-label={app === "ap" ? "AP workspace" : "Control"}>
           <NavLinks links={navFor(app, datasetId)} />
+          {app === "ap" && current?.kind === "demo" ? (
+            <>
+              <p className="side-group">Demo</p>
+              <NavLinks links={[{ href: `/d/${datasetId}/ramp`, label: "Ramp (mock)", icon: "card" }]} />
+            </>
+          ) : null}
         </nav>
         <div className="side-foot side-desk">
           {current ? <p className="side-status"><span className="dot" aria-hidden="true" />Ramp Bill Pay · {current.kind} dataset</p> : null}

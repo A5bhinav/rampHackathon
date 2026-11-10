@@ -966,3 +966,13 @@ ol.slots li.is-filled { animation: slot-in 360ms var(--ease) both; }
   ol.slots li { grid-template-columns: 1fr; gap: 4px; }
   .flow-mode { padding: 20px 16px; }
 }
+
+/* The demo's Ramp (mock) portal (spec 0077): plain and white, so it reads as another product. ---- */
+.ramp-head { padding: 28px 0 4px; display: grid; gap: 6px; }
+.ramp-head h1 { font-size: 32px; line-height: 38px; letter-spacing: -0.03em; }
+.ramp-head .muted { margin: 0; max-width: 72ch; }
+.ramp-head .back { margin: 0; }
+.ramp-form { display: grid; gap: 8px; max-width: 420px; }
+.ramp-form input { font-family: var(--mono); letter-spacing: 0.04em; }
+.ramp-form .actions { margin-top: 8px; }
+.ramp-watch .stepper-card { border: 0; padding: 0; margin-bottom: 12px; }
