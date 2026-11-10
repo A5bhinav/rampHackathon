@@ -61,6 +61,8 @@ class StubReader:
     rule refuses (R7). So text the stub can't place never counts for a number.
     """
 
+    version = "stub"   # the stored extractor_version (spec 0049, decision 7)
+
     def label(self, visible_text: str) -> list[dict]:
         out = []
         for line in visible_text.splitlines():

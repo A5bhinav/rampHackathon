@@ -7,6 +7,7 @@ live. No test calls the API: conftest.py removes the key and blocks the real tra
 import copy
 import json
 import logging
+import re
 
 import anthropic
 import httpx2
@@ -25,6 +26,7 @@ from dialback_ledger.llm_reader import (
     USER_BEFORE,
     AnthropicLabelModel,
     LlmReader,
+    llm_version,
 )
 from dialback_ledger.reader import ReaderFailed, ReaderUnavailable, StubReader, reader_for
 from jsonschema import Draft202012Validator
@@ -261,3 +263,18 @@ def test_no_text_in_logs(caplog):
     # What it does log: counts and the API's request id.
     ours = [r.getMessage() for r in caplog.records if r.name == "dialback_ledger.llm_reader"]
     assert any("req_test_ok" in m for m in ours) and any("req_test_500" in m for m in ours)
+
+
+# Version -----------------------------------------------------------------------------------------
+
+def test_extractor_version_tracks_model_prompt_and_schema():
+    v = llm_version()
+    assert re.fullmatch(r"llm-[0-9a-f]{12}", v) and llm_version() == v
+    assert llm_version(model="claude-sonnet-5-5") != v
+    assert llm_version(system=SYSTEM_PROMPT + " ") != v
+    assert llm_version(user=(USER_BEFORE, USER_AFTER + " ")) != v
+    schema = copy.deepcopy(SCHEMA)
+    schema["properties"]["labels"]["items"]["properties"]["role"]["enum"].append("sales")
+    assert llm_version(schema=schema) != v
+    assert reader_for(ReaderMode.LLM, env=KEY).version == v       # the reader names its configuration
+    assert StubReader().version == "stub"

@@ -6,6 +6,7 @@ every number, grounding.py checks every quote, and the value always comes from t
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 from dataclasses import dataclass
@@ -13,6 +14,7 @@ from typing import Protocol
 
 import anthropic
 import httpx2
+import rfc8785
 
 from .reader import ReaderFailed
 
@@ -92,6 +94,13 @@ def user_turn(text: str) -> str:
     return USER_BEFORE + text + USER_AFTER
 
 
+def llm_version(*, model: str = MODEL, system: str = SYSTEM_PROMPT, user: tuple[str, str] = (USER_BEFORE, USER_AFTER),
+                schema: dict = SCHEMA) -> str:
+    """The stored `extractor_version`: the reader mode plus a short hash of the model id, the prompt
+    (the system prompt and the user turn around the document) and the schema (spec 0049, decision 7)."""
+    return "llm-" + hashlib.sha256(rfc8785.dumps([model, system, list(user), schema])).hexdigest()[:12]
+
+
 def matches_schema(data: object) -> bool:
     """`data` is exactly SCHEMA's shape: {"labels": [{quote, role, party}]}, nothing more or less."""
     if not isinstance(data, dict) or set(data) != {"labels"} or not isinstance(data["labels"], list):
@@ -108,7 +117,11 @@ class Reply:
 
 class LabelModel(Protocol):
     """The model seam. Given the text to label, return the model's parsed reply, or raise
-    `ReaderFailed` (an API error, a timeout, a refusal, a `max_tokens` stop, or no JSON)."""
+    `ReaderFailed` (an API error, a timeout, a refusal, a `max_tokens` stop, or no JSON). `version`
+    names the configuration that labels."""
+
+    @property
+    def version(self) -> str: ...
 
     def label(self, text: str) -> Reply: ...
 
@@ -123,6 +136,10 @@ class AnthropicLabelModel:
 
     def __post_init__(self) -> None:
         quiet_sdk_logs()
+
+    @property
+    def version(self) -> str:
+        return llm_version()
 
     def label(self, text: str) -> Reply:
         quiet_sdk_logs()   # again, in case something raised them since
@@ -158,6 +175,10 @@ class LlmReader:
     It logs counts and the API's request id only, never document text or model output."""
 
     model: LabelModel
+
+    @property
+    def version(self) -> str:
+        return self.model.version
 
     def label(self, visible_text: str) -> list[dict]:
         try:
