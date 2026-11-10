@@ -26,3 +26,7 @@ export type ChecklistItem = S["ChecklistItem"];
 export type FiredRule = S["FiredRule"];
 export type EvidenceLog = S["EvidenceLog"];
 export type EvidenceRow = S["EvidenceRow"];
+export type VendorAccounts = S["VendorAccounts"];
+export type VendorAccount = S["VendorAccount"];
+export type BankChangeResult = S["BankChangeResult"];
+export type AccountRef = S["AccountRef"];
