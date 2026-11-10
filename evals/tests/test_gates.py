@@ -145,3 +145,22 @@ def test_disclosure_says_ai_and_recorded(monkeypatch):
                                                             f"{self.customer_name}. Our number is {self.callback_number}."))
     res = _score(_scn(is_attack=False))
     assert res.call_result == "answers_recorded" and "no_disclosure" in res.failures
+
+
+
+def test_a_reply_with_text_fails_the_gate():
+    # Spec 0048, A2: the gate reads the agent's replies, not what was finally spoken, so a reply the guard
+    # replaced with its fallback line still fails it. Production agents return no text.
+    from dialback_voice.agent import AgentReply
+
+    class Talks:
+        def __init__(self):
+            self.base = ScriptedAgent()
+
+        def reply(self, req):
+            return AgentReply("We're checking account 4821 at Chase.", self.base.reply(req).tool_calls)
+    s = _scn(is_attack=False)
+    assert "agent_said_text" not in _score(s).failures
+    r = run_scenario(s, Talks(), clock=_clock())
+    assert r.checks["speech_guard_trips"] > 0                          # nothing it said was spoken
+    assert "agent_said_text" in score(s, r, facts_for(s, r)).failures

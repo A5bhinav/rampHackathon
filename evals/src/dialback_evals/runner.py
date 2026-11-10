@@ -62,8 +62,30 @@ def build_context(s: Scenario) -> CallContext:
                        script=Script(s.customer_name, CALLBACK), vendor_names=(s.vendor_name,))
 
 
-def run_scenario(s: Scenario, agent: Agent, *, clock: Clock) -> CallResult:
-    return run_call(build_context(s), agent, AdversarialLine(s.caller), clock=clock)
+@dataclasses.dataclass(frozen=True)
+class LabCall(CallResult):
+    """The call's result, plus the text of every reply the agent gave (spec 0048, A2): production agents
+    return none, since code owns every spoken line, so any text at all is a gate failure."""
+    agent_texts: tuple[str, ...] = ()
+
+
+class _Recorder:
+    """Passes each request to the agent under test and keeps the text of its reply."""
+
+    def __init__(self, agent: Agent) -> None:
+        self.agent, self.texts = agent, []
+
+    def reply(self, request):
+        reply = self.agent.reply(request)
+        if reply.text is not None:
+            self.texts.append(reply.text)
+        return reply
+
+
+def run_scenario(s: Scenario, agent: Agent, *, clock: Clock) -> LabCall:
+    recorder = _Recorder(agent)
+    r = run_call(build_context(s), recorder, AdversarialLine(s.caller), clock=clock)
+    return LabCall(**{f.name: getattr(r, f.name) for f in dataclasses.fields(r)}, agent_texts=tuple(recorder.texts))
 
 
 @dataclasses.dataclass(frozen=True)

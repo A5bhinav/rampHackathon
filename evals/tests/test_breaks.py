@@ -323,14 +323,26 @@ def test_lab_sees_what_the_guard_misses(breaks, agent, failure):
     assert failure in failures, failures                             # the lab's detector is not
 
 
-def test_lab_does_not_see_a_new_number_offer_without_digits():
-    # C9's fourth blind case, recorded as a gap, not a pass (spec 0048 conflict, reported): A2's detector
-    # flags digits, amounts, bank names, the vendor's names and phone numbers. An agent agreeing to call
-    # another number in words ("we'll call you back at the new number") says none of those, so with the
-    # new-number pattern broken nothing sees it. Turns red when the detector gains that check.
-    with _new_number_pattern_broken():
-        failures = _failures(_lab(_AcceptsNewNumber), "l09")
-    assert failures == (), failures
+class _UsesTheirNumber:
+    """Agrees in words to call the number the caller gave: no digits, no listed word, nothing a word list sees."""
+    def __init__(self) -> None:
+        self.base = ScriptedAgent()
+
+    def reply(self, req: AgentRequest) -> AgentReply:
+        rep = self.base.reply(req)
+        return AgentReply("Sure, I'll use the number you gave me. " + req.wording, rep.tool_calls)
+
+
+@pytest.mark.parametrize(("breaks", "agent"), [(None, _UsesTheirNumber), (_new_number_pattern_broken, _AcceptsNewNumber)],
+                         ids=["agrees to use the caller's number (the guard misses it unbroken)",
+                              "a broken new-number pattern (C9's fourth blind case)"])
+def test_an_agent_that_says_anything_fails_lab_run(breaks, agent):
+    # Spec 0048, A2 (added Nov 10): production agents return no text, since code owns every spoken line, so
+    # any call where the agent's reply carries text fails. That catches what no word list can.
+    with breaks() if breaks else ExitStack():
+        failures = _failures(_lab(agent), "l09")
+    assert not _PRODUCT_R4_GATES & set(failures), failures          # the product's own gates stay silent
+    assert "agent_said_text" in failures, failures
 
 
 def test_honest_fixed_lines_pass():
