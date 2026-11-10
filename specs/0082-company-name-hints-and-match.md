@@ -204,6 +204,10 @@ say (Part B), and keeps the clear-mismatch signal.
     - **When D7a lands,** the lab's known-failures entries for negation, reseller and past
       connection should start passing and must come off (spec 0048, D3). Correction and "contains
       the vendor's name" stay listed.
+    - **Under D7b** (amendment, Nov 10), only `False` blocks, so over-blocking counts the answers that
+      name the vendor but come out `False`; those that come out `None` are reported apart, since they
+      block nothing. The lab's F3 then gates only negation, reseller and past connection, so the
+      correction and "contains the vendor's name" entries come off too (`evals/FINDINGS.md` C14).
 
 ### Considered and rejected
 
