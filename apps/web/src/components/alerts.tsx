@@ -1,8 +1,9 @@
 import Link from "next/link";
 import type { Alert } from "@/lib/api-types";
 import { when } from "@/lib/format";
+import { Icon } from "./icons";
 
-const TITLES: Record<string, string> = {
+export const TITLES: Record<string, string> = {
   hold_not_confirmed: "Hold not confirmed",
   vendor_not_held: "Vendor not held",
   chain_broken: "Evidence chain broken",
@@ -22,6 +23,7 @@ export function AlertBanners({ alerts, datasetId }: { alerts: Alert[]; datasetId
     <section className="banners" aria-label="Alerts">
       {shown.map((a) => (
         <div key={a.id} className={`banner ${a.severity}`} role={a.severity === "critical" ? "alert" : "status"}>
+          <Icon name="alert" size={18} />
           <span className="banner-text"><strong>{TITLES[a.kind] ?? a.kind}</strong> <span>{a.message}</span></span>
           <span className="banner-meta">
             <span>{when(a.raised_at)}</span>

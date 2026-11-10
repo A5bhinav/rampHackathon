@@ -170,3 +170,31 @@ def test_a_phone_number_the_callee_offered_is_never_read_back() -> None:
 @pytest.mark.parametrize("text", ["Sure, I'll call you back on your cell.", "We can reach you at that number instead."])
 def test_blocks_agreeing_to_call_another_number(text: str) -> None:
     assert "new_number" in check(text, CTX).reasons
+
+
+def test_pound_key_is_not_an_amount() -> None:  # spec 0043, D1
+    for text in ("Enter the last four digits, then press the pound key.", "Then press the pound sign.",
+                 "Press the POUND KEY when you're done."):
+        assert check(text, CTX).ok, text
+    for text in ("about 50 pounds", "the pound amount", "twelve pounds", "it's in pounds", "a pound"):
+        assert "amount" in check(text, CTX).reasons, text
+
+
+@pytest.mark.parametrize(("said", "model_sees"), [
+    ("Yes, the account ending four eight two one", "Yes, the account ending [digits]"),
+    ("It's 4821.", "It's [digits]."),
+    ("Forty-eight twenty-one, I think", "[digits], I think"),
+    ("4 8 2 1 and 5 5 5 5", "[digits]"),
+    ("Call me at (415) 555-0177 instead.", "Call me at ([digits] instead."),
+    ("Zero zero zero one, those are the last four.", "[digits], those are the last four."),
+    ("84 Lumber", "84 Lumber"),
+    ("3M", "3M"),
+    ("Oh, one moment", "Oh, one moment"),
+    ("Yes, at 3:30.", "Yes, at 3:30."),
+    ("4\u200b8\u200b2\u200b1", "[digits]"),
+])
+def test_redact_digits_hides_every_run_the_guard_reads(said: str, model_sees: str) -> None:  # spec 0043, D8
+    from dialback_policy.guard import digit_runs, redact_digits
+
+    assert redact_digits(said) == model_sees
+    assert all(len(run) < 3 for run in digit_runs(redact_digits(said)))

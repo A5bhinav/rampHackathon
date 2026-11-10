@@ -82,6 +82,16 @@ def _phones(given: dict[str, str], seed: dict) -> dict[str, str]:
     return out
 
 
+def check(phones: dict[str, str], requests: list[str]) -> dict[str, str]:
+    """Every check `load --phone` and `request --vendor` make, without touching a database, so a caller
+    (`dialback-core demo prepare`) can refuse before it resets anything. Returns the phones in E.164."""
+    seed = load_seed()
+    for ref in requests:
+        if ref not in seed["vendors"]:
+            raise DemoError(f"the demo seed has no vendor {ref!r} (it has {', '.join(seed['vendors'])})")
+    return _phones(phones, seed)
+
+
 async def _dataset(conn: psycopg.AsyncConnection, dataset_id: UUID | None, seed: dict) -> tuple[UUID, dict[str, UUID]]:
     if dataset_id is None:
         row = await (await conn.execute("select id, demo_refs from app.datasets where kind = 'demo' and retired_at is null "

@@ -7,11 +7,17 @@ hold intact, and legitimate prompts and keypresses reach the very outcome the te
 from __future__ import annotations
 
 import asyncio
+import inspect
+import time
 import uuid
 
+import pytest
+from dialback_policy import step as policy
+from dialback_policy.script import QUESTIONS, REASK, Phase
 from dialback_voice import tokens
 from dialback_voice.agent import ScriptedAgent
 from dialback_voice.transport import ScriptedVendor, VendorScript, run_call
+from dialback_voice.twilio import relay as relay_module
 from dialback_voice.twilio.relay import run_relay, verify_setup
 
 KEY = b"call-token-key-for-tests-0123456789abcd"
@@ -27,20 +33,27 @@ class WSClosed(Exception):
 
 class FakeWS:
     """A scripted ConversationRelay socket. `inbound` is the messages Twilio would send, in order;
-    once they run out, receive_json raises WSClosed, standing in for a dropped call."""
+    once they run out, receive_json raises WSClosed, standing in for a dropped call. An item
+    `{"pause": seconds}` stands for the caller doing nothing for that long. `delivered_at` is the
+    monotonic time each message was handed over."""
 
     def __init__(self, inbound: list[dict]) -> None:
         self._inbound = list(inbound)
         self._i = 0
         self.sent: list[dict] = []
         self.closed = False
+        self.delivered_at: list[float] = []
 
     async def receive_json(self) -> dict:
-        if self._i >= len(self._inbound):
-            raise WSClosed("no more messages")
-        msg = self._inbound[self._i]
-        self._i += 1
-        return msg
+        while True:
+            if self._i >= len(self._inbound):
+                raise WSClosed("no more messages")
+            msg = self._inbound[self._i]
+            self._i += 1
+            if "pause" not in msg:
+                self.delivered_at.append(time.monotonic())
+                return msg
+            await asyncio.sleep(msg["pause"])
 
     async def send_json(self, obj: dict) -> None:
         self.sent.append(obj)
@@ -86,8 +99,8 @@ def test_ws_messages_reach_the_same_outcome_as_the_text_line(make_ctx, clock):
         if turn.speaker != "callee":
             continue
         if turn.text == "[keypad]":
-            inbound += [{"type": "dtmf", "digit": d} for d in script.last4]  # one message per key, as Twilio sends
-        else:
+            inbound += [{"type": "dtmf", "digit": d} for d in script.last4 + "#"]  # one message per key, as
+        else:                                                                       # Twilio sends; '#' submits
             inbound.append({"type": "prompt", "voicePrompt": turn.text, "last": True})
 
     relay = asyncio.run(run_relay(ctx, ScriptedAgent(), FakeWS(inbound), verify=_verify, clock=clock()))
@@ -178,3 +191,196 @@ def test_a_forged_setup_reports_failed_to_the_core():
     assert "answers" not in reported[0]                  # a rejected setup records nothing
     for fact in ("dialed_number_is_pick", "direction", "answered_by", "checks"):
         assert fact not in reported[0], fact             # nothing vouched for on a socket we didn't place
+
+
+# --- spec 0043: the keys, and one more try on an unclear answer ------------------------------
+
+START_OVER_LINE = "Okay, let's start over. Please enter the last four digits, then press the pound key."
+SPOKEN = ("Yes, that's fine.", "Acme Fasteners", "Accounts payable", "Jordan Lee", "AP clerk", "Yes, we did.")
+BEFORE_DIGITS = ["recording_consent", "company_named", "department", "speaker_name", "speaker_role",
+                 "change_requested"]
+FAST = 0.2   # the keypad wait these tests run with, in seconds; a live call waits KEYPAD_TIMEOUT
+LONG = 2.0   # a pause well past FAST
+
+
+def _good_setup() -> dict:
+    return _setup(tokens.mint(KEY, case_id=CASE, attempt=ATTEMPT, number_e164=NUMBER))
+
+
+def _say(*lines: str) -> list[dict]:
+    return [{"type": "prompt", "voicePrompt": line, "last": True} for line in lines]
+
+
+def _keys(keys: str) -> list[dict]:
+    return [{"type": "dtmf", "digit": k} for k in keys]  # one message per key, as Twilio sends
+
+
+def _spy_on_keypad(monkeypatch, at: list[float] | None = None) -> list[str]:
+    """The digits of each Keypad event the relay hands to step, kept only inside the test, and, in
+    `at`, the monotonic time each one arrived."""
+    seen: list[str] = []
+    real = policy.step
+
+    def spy(state, event):
+        if isinstance(event, policy.Keypad):
+            seen.append(event.digits)
+            if at is not None:
+                at.append(time.monotonic())
+        return real(state, event)
+
+    monkeypatch.setattr(policy, "step", spy)
+    return seen
+
+
+def _relay(ctx, clock, inbound: list[dict], agent=None):
+    ws = FakeWS(inbound)
+    result = asyncio.run(run_relay(ctx, agent or ScriptedAgent(), ws, verify=_verify, clock=clock(),
+                                   keypad_timeout=FAST))
+    return result, [m["token"] for m in ws.sent]
+
+
+# The keys typed after the digits question; then what is recorded, how many re-asks and start-over
+# lines play, how the call ends, and the entries step is handed. A row that ends on a re-ask then
+# runs out of messages, which is a dropped call (failed).
+KEY_TABLE = {
+    "4 8 2 1 #": (_keys("4821#"), "4821", 0, 0, "answers_recorded", ["4821"]),
+    "4 8 * 4 8 2 1 #": (_keys("48*4821#"), "4821", 0, 1, "answers_recorded", ["4821"]),
+    "4 8 2 1, then no key": (_keys("4821") + [{"pause": LONG}], "4821", 0, 0, "answers_recorded", ["4821"]),
+    "4 8 #": (_keys("48#"), None, 1, 0, "failed", ["48"]),
+    "4 8 # then 4 8 #": (_keys("48#48#"), None, 1, 0, "answers_recorded", ["48", "48"]),
+    "4 8 2 1 5 #": (_keys("48215#"), None, 1, 0, "failed", ["48215"]),
+    "20 digits": (_keys("12345678901234567890#"), None, 1, 0, "failed", ["1234567890123456"]),
+}
+
+
+@pytest.mark.parametrize("row", list(KEY_TABLE))
+def test_keypad_sequences(row, make_ctx, clock, monkeypatch):
+    keys, recorded, reasks, start_overs, result, entries = KEY_TABLE[row]
+    seen = _spy_on_keypad(monkeypatch)
+    ctx = make_ctx()
+    r, sent = _relay(ctx, clock, [_good_setup(), *_say(*SPOKEN), *keys])
+
+    assert r.result == result
+    assert seen == entries                               # no auto-submit at four; at most 16 keys held
+    slots = [a["slot"] for a in r.answers["answers"]]
+    if recorded is None:
+        assert slots == BEFORE_DIGITS                    # nothing recorded for the digits
+    else:
+        assert slots == [*BEFORE_DIGITS, "account_last4"]
+        assert _by_value(r)["account_last4"] == (recorded, "keypad")
+    reask = f"{REASK} {QUESTIONS[Phase.LAST4].wording(ctx.script)}"
+    assert sum(line.startswith(REASK) for line in sent) == reasks
+    assert sent.count(reask) == reasks                   # the re-ask is the fixed keypad question
+    assert sent.count(START_OVER_LINE) == start_overs
+    # Typed digits never appear in any transcript turn, and the agent never says them.
+    assert not any(ch.isdigit() for t in r.transcript if t.speaker == "callee" for ch in t.text)
+    assert not any(e in t.text for t in r.transcript for e in seen if len(e) >= 3)
+    assert r.checks["agent_spoke_account_digits"] is False
+
+
+def test_keypad_timeout_submits(make_ctx, clock, monkeypatch):
+    # A live call waits 5 seconds after the last key (Q78).
+    assert relay_module.KEYPAD_TIMEOUT == 5
+    assert inspect.signature(run_relay).parameters["keypad_timeout"].default == relay_module.KEYPAD_TIMEOUT
+    seen = _spy_on_keypad(monkeypatch)
+    # With no digits in hand a long pause submits nothing; a pause shorter than the wait keeps one
+    # entry going; a pause past the wait submits what is typed as if '#' were pressed, whatever its
+    # length (three digits here, so only the wait can have submitted it).
+    inbound = [_good_setup(), {"pause": 3 * FAST}, *_say(*SPOKEN), *_keys("48"), {"pause": FAST / 10},
+               *_keys("2"), {"pause": 3 * FAST}, *_keys("4821"), {"pause": LONG}]
+    r, sent = _relay(make_ctx(), clock, inbound)
+    assert seen == ["482", "4821"]
+    assert sum(line.startswith(REASK) for line in sent) == 1   # the short entry used the one more try
+    assert r.result == "answers_recorded" and _by_value(r)["account_last4"] == ("4821", "keypad")
+
+
+@pytest.mark.parametrize("between", [_say("Hmm."), [{"type": "prompt", "voicePrompt": "", "last": True}]],
+                         ids=["spoken turn", "silence"])
+def test_a_spoken_turn_or_a_silence_clears_a_partial_entry(between, make_ctx, clock, monkeypatch):
+    seen = _spy_on_keypad(monkeypatch)
+    r, _ = _relay(make_ctx(), clock, [_good_setup(), *_say(*SPOKEN), *_keys("48"), *between, *_keys("4821#")])
+    assert seen == ["4821"]                              # the "48" before the turn was dropped, as today
+    assert _by_value(r)["account_last4"] == ("4821", "keypad")
+
+
+def test_unclear_consent_is_asked_again_over_the_relay(make_ctx, clock):
+    ctx = make_ctx()
+    r, sent = _relay(ctx, clock, [_good_setup(), *_say("Hello?", *SPOKEN), *_keys("4821#")])
+    assert f"{REASK} {ctx.script.consent_question()}" in sent
+    assert r.result == "answers_recorded" and _by_value(r)["recording_consent"] == ("yes", "speech")
+    assert r.checks["answers_grounded"] is True
+
+
+@pytest.mark.parametrize(("before", "unclear", "reason"), [
+    ((), "Hello?", "unclear:consent"),
+    (SPOKEN[:5], "Sorry?", "unclear:change"),
+])
+def test_a_second_unclear_reports_failed_without_answers(before, unclear, reason, make_ctx, clock):
+    import datetime as dt
+
+    from dialback_voice.app import CallDial, TwilioDeps, run_relay_call
+
+    dial = CallDial(case_id=CASE, attempt=ATTEMPT, number_e164=NUMBER, customer_name="Northwind Traders",
+                    callback_number="(415) 555-0100", vendor_names=("Acme Fasteners",))
+    reported: list[dict] = []
+
+    async def report(body: dict) -> None:
+        reported.append(body)
+
+    deps = TwilioDeps(call_token_key=KEY, twilio_auth_token=b"auth", ws_base_url="wss://voice.example",
+                      public_base_url="https://voice.example", from_number="+14155550100", originator=None,
+                      lookup_call=lambda cid: dial if cid == CALL else None, report_ended=report,
+                      agent_for=ScriptedAgent, clock=lambda: dt.datetime(2026, 11, 1, 17, 0, tzinfo=dt.UTC))
+    ws = FakeWS([_good_setup(), *_say(*before, unclear, unclear)])
+    asyncio.run(run_relay_call(deps, CALL, ws))
+
+    assert len(reported) == 1 and reported[0]["result"] == "failed"
+    assert "answers" not in reported[0] and "retry_at" not in reported[0]   # the core redials after its wait
+    assert sum(m["token"].startswith(REASK) for m in ws.sent) == 1
+    # The reason stays inside the voice service (End.reason); the same run names it.
+    again, _ = _relay(make_ctx(), clock, [_good_setup(), *_say(*before, unclear, unclear)])
+    assert (again.result, again.end.reason, again.end.retry_at) == ("failed", reason, None)
+
+
+def test_keys_past_the_cap_do_not_hold_the_entry_open(make_ctx, clock, monkeypatch):
+    # D2, bounded: a digit dropped past MAX_KEYS does not restart the wait, so the cap bounds how long
+    # an entry stays open as well as its size. The keys after the 16th come sooner than the wait,
+    # for three waits' worth of time.
+    at: list[float] = []
+    seen = _spy_on_keypad(monkeypatch, at)
+    more = [msg for _ in range(12) for msg in ({"pause": FAST / 4}, *_keys("9"))]
+    ws = FakeWS([_good_setup(), *_say(*SPOKEN), *_keys("1234567890123456"), *more, {"pause": LONG}])
+    asyncio.run(run_relay(make_ctx(), ScriptedAgent(), ws, verify=_verify, clock=clock(), keypad_timeout=FAST))
+    sixteenth = ws.delivered_at[1 + len(SPOKEN) + 15]    # after the setup and the spoken answers
+    assert seen[0] == "1234567890123456"
+    assert 0.8 * FAST <= at[0] - sixteenth < 2 * FAST    # about one wait after the 16th key, not the last
+    assert len(seen) == 2 and set(seen[1]) == {"9"}      # keys after the entry went in start a new one
+
+
+def test_the_wait_restarts_on_every_kept_key(make_ctx, clock, monkeypatch):
+    # Each gap is shorter than the wait and the whole entry is longer than it: still one entry.
+    seen = _spy_on_keypad(monkeypatch)
+    gap = {"pause": 0.6 * FAST}
+    keys = [*_keys("4"), gap, *_keys("8"), gap, *_keys("2"), gap, *_keys("1#")]
+    r, _ = _relay(make_ctx(), clock, [_good_setup(), *_say(*SPOKEN), *keys])
+    assert seen == ["4821"]
+    assert _by_value(r)["account_last4"] == ("4821", "keypad")
+
+
+def test_two_short_entries_finish_without_digits_and_decide_gives_nr06(make_ctx, clock):
+    from dialback_decision import decide
+    from dialback_decision.facts import CallChecks, facts_from_answers
+    from dialback_decision.last_four import compare_last_four
+
+    r, _ = _relay(make_ctx(), clock, [_good_setup(), *_say(*SPOKEN), *_keys("48#48#")])
+    answers = r.answers["answers"]
+    typed = [a["value"] for a in answers if a["slot"] == "account_last4"]
+    assert r.result == "answers_recorded" and typed == []
+    # The facts the core adds from outside the call, declared as a clean call has them; the last four
+    # are compared the way the core compares them.
+    facts = facts_from_answers(answers, call_result=r.result, checks=CallChecks(**r.checks), dialed_out=True,
+                               dialed_eligible_number=True, dialed_number_is_pick=True,
+                               last_four_result=compare_last_four(typed, "4821", "4444"), company_matches=True,
+                               answered_by="human", speaker_in_change_thread=False)
+    decision = decide(facts)
+    assert decision.outcome == "needs_review" and "NR06_digits_not_provided" in decision.rules_fired

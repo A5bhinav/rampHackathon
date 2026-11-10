@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { MIN_NEW_PASSWORD, PASSWORD_RULE, authMode, type SignUpNotice } from "@/lib/auth-mode";
 import { signUp } from "./actions";
-import { BrandMark } from "@/components/nav";
+import { FrontDoor } from "@/components/front-door";
 
 type Params = Partial<Record<SignUpNotice, string>>;
 
@@ -21,10 +21,7 @@ export default async function SignUp({ searchParams }: { searchParams: Promise<P
   const params = await searchParams;  // first, so the page renders per request, never at build
   if (authMode(process.env) !== "supabase") redirect("/sign-in");
   return (
-    <main className="shell">
-      <div className="card signin">
-        <p className="brand"><BrandMark />Dialback</p>
-        <h1>Create your account</h1>
+    <FrontDoor title="Create your account">
         {NOTICES.filter(([key]) => params[key]).map(([key, text]) => (
           <p key={key} className="result error" role="alert">{text}</p>
         ))}
@@ -40,7 +37,6 @@ export default async function SignUp({ searchParams }: { searchParams: Promise<P
           <button className="primary" type="submit">Create account</button>
         </form>
         <p className="muted">Already have an account? <Link href="/sign-in">Sign in</Link></p>
-      </div>
-    </main>
+    </FrontDoor>
   );
 }

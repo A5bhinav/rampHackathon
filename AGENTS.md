@@ -75,6 +75,7 @@ second owner (the partner) who reviews it.
 | Rehearse the demo beats (reset, change, release, tamper) on the local stack | `uv run python scripts/dev/demo_rehearsal.py` |
 | Demo commands (core shell) | `dialback-core demo reset [--link clerk=<email>]`, `demo change --vendor acme [--unknown]`, `demo tamper --yes-break-the-chain`, `demo status`, `demo chaos on\|off` |
 | Demo ledger (after `demo reset`; team phone given at run time, never committed) | `dialback-ledger demo load [--phone acme=+1...]`, then before each `demo change`: `dialback-ledger demo request --vendor acme` |
+| Get the demo ready for a clerk's change in the dashboard: reset, Trust Ledger, request email, in that order (spec 0077) | `dialback-core demo prepare --link clerk=<email> [--phone acme=+1...]`; hosted, with the team phone read from the voice allowlist: `scripts/demo/prepare_hosted.sh <clerk email>` |
 | Dashboard checks | `cd apps/web && pnpm check:api && pnpm typecheck && pnpm build` |
 | No imports between apps | `python3 scripts/ci/boundaries.py` |
 

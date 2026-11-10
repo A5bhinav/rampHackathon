@@ -7,8 +7,11 @@ feed back `AgentReplied`, and report `end` to the core with `answers_object()` a
 Code owns the order of questions, what gets recorded, and every way a call ends. The model only
 words the open questions and proposes tool calls, which are validated (tools.py), grounded in
 the transcript, and guarded (guard.py) before anything is spoken or kept. The two yes/no
-questions are always code's fixed wording, so a "yes" can only answer the question code asked.
-Anything unexpected ends the call `failed`, and the hold stays (R7).
+questions and the digits question are always code's fixed wording, so a "yes" can only answer the
+question code asked. The last four come only from the keypad: exactly four keys, never speech
+(spec 0043). An answer the call could not make out is asked once more; a second one at consent or
+the change question ends the call `failed`, and at the digits question the call finishes without
+digits. Anything unexpected ends the call `failed`, and the hold stays (R7).
 """
 from __future__ import annotations
 
@@ -19,7 +22,18 @@ from typing import Any, Literal
 from zoneinfo import ZoneInfo
 
 from .guard import NEW_NUMBER, GuardContext, check, clean, digit_runs, guard, words
-from .script import FALLBACK_LINE, ORDER, PHASE_SLOT, QUESTIONS, REASK, STILL_THERE, Phase, Script
+from .script import (
+    FALLBACK_LINE,
+    KEYPAD_ONLY,
+    ORDER,
+    PHASE_SLOT,
+    QUESTIONS,
+    REASK,
+    START_OVER,
+    STILL_THERE,
+    Phase,
+    Script,
+)
 from .tools import NO_DIGITS, ToolCall, ToolError, validate
 
 MAX_CALLEE_TURNS = 30
@@ -30,7 +44,9 @@ REDIAL_AFTER = dt.timedelta(minutes=5)
 CALLBACK_HOUR = 10
 CALLBACK_TIME_QUESTION = "What time would work best for us to call you back?"
 AGENT_TOOLS = ("record_answer", "schedule_callback", "end_call")
-FIXED_WORDING = (Phase.CONSENT, Phase.CHANGE)  # yes/no questions: never the model's words
+FIXED_WORDING = (Phase.CONSENT, Phase.CHANGE, Phase.LAST4)  # yes/no and keypad questions: never the model's words
+ONE_MORE_TRY = (Phase.CONSENT, Phase.CHANGE, Phase.LAST4)  # an unclear answer here is asked once more (spec 0043)
+SPOKEN_DIGITS = 3  # a run this long in speech at the digits question is digits said, not typed (the guard's threshold)
 _SCRIPTED_SLOTS = frozenset(PHASE_SLOT.values()) - {"recording_consent"}
 _SPEAKER_PHASES = (Phase.NAME, Phase.ROLE)  # a new speaker is asked both again (spec 0012 D4, spec 0034)
 
@@ -83,6 +99,7 @@ class State:
     silences: int = 0
     callback_asked: bool = False
     pressure_flagged: bool = False
+    reasked: frozenset[Phase] = frozenset()  # questions whose one more try is used (spec 0043, D5)
     ended: End | None = None
 
     @property
@@ -143,8 +160,15 @@ class CalleeSaid:
 
 @dataclass(frozen=True)
 class Keypad:
+    """A finished keypad entry: the keys typed before '#', or before the transport's wait ran out."""
     at: dt.datetime
     digits: str
+
+
+@dataclass(frozen=True)
+class KeypadReset:
+    """The caller pressed '*': what they typed so far is gone (spec 0043, D2)."""
+    at: dt.datetime
 
 
 @dataclass(frozen=True)
@@ -152,6 +176,12 @@ class AgentReplied:
     at: dt.datetime
     text: str | None
     tool_calls: tuple[ToolCall, ...] = ()
+
+
+@dataclass(frozen=True)
+class AgentUnclear:
+    """The agent could not tell what the callee answered. Never an answer (spec 0043, D6)."""
+    at: dt.datetime
 
 
 @dataclass(frozen=True)
@@ -175,7 +205,22 @@ class TimedOut:
     at: dt.datetime
 
 
-Event = Connected | CalleeSaid | Keypad | AgentReplied | AgentFailed | Silence | Hangup | TimedOut
+Event = (Connected | CalleeSaid | Keypad | KeypadReset | AgentReplied | AgentUnclear | AgentFailed | Silence | Hangup
+         | TimedOut)
+
+
+def read_yes_no(text: str, allow_unsure: bool) -> Literal["yes", "no", "unsure", "unclear"]:
+    """How code reads a yes/no answer: the same patterns that ground one, so whatever this reads is
+    grounded at the question it answers ("Sure, no problem." is yes, "Hello?" is unclear). With
+    `allow_unsure=False` (consent), unsure is unclear (spec 0043, D9)."""
+    lowered = _NOT_A_NO.sub(" ", clean(text))
+    if _UNSURE.search(lowered):
+        return "unsure" if allow_unsure else "unclear"
+    if _NEGATION.search(lowered):
+        return "no"
+    if _YES.search(lowered):
+        return "yes"
+    return "unclear"
 
 
 def start(ctx: CallContext) -> State:
@@ -239,8 +284,12 @@ def _dispatch(state: State, event: Event) -> Step:
             return _callee_said(state, event)
         case Keypad():
             return _keypad(state, event)
+        case KeypadReset():
+            return _keypad_reset(state)
         case AgentReplied():
             return _agent_replied(state, event)
+        case AgentUnclear():
+            return _unclear(state, None)
         case AgentFailed():
             return _end(state, "failed", f"agent_error:{event.reason}", _goodbye(state))
         case Silence():
@@ -277,6 +326,8 @@ def _callee_said(state: State, event: CalleeSaid) -> Step:
         return _end(state, "failed", "turn_cap", state.ctx.script.goodbye())
     if state.consent == "yes":
         state = _flag_pressure(state, event.at)
+        if state.phase is Phase.LAST4 and any(len(run) >= SPOKEN_DIGITS for run in digit_runs(event.text)):
+            return _unclear(state, KEYPAD_ONLY)  # digits said, not typed: never recorded, never sent to the agent
     return Step(state, ask_agent=_request(state))
 
 
@@ -287,10 +338,38 @@ def _keypad(state: State, event: Keypad) -> Step:
     if _over_turn_cap(state):
         return _end(state, "failed", "turn_cap", state.ctx.script.goodbye())
     turn = state.turns[-1].id
-    if not re.fullmatch(r"[0-9]{1,4}", event.digits):
-        return _speak(state, f"{REASK} {QUESTIONS[Phase.LAST4].wording(state.ctx.script)}", Phase.LAST4)
+    if not re.fullmatch(r"[0-9]{4}", event.digits):
+        return _unclear(state, None)  # only exactly four keys are the last four (spec 0043, D3)
     state = _record(state, "account_last4", event.digits, turn, f"dtmf_{turn}", event.at, "keypad", grounded=True)
     return _advance(state, None)
+
+
+def _keypad_reset(state: State) -> Step:
+    """'*' at the digits question: start over. It does not use up the one more try, and each one is
+    a callee turn, so the turn cap bounds them (spec 0043, D3)."""
+    if state.phase is not Phase.LAST4 or state.consent != "yes":
+        return Step(state)
+    state = _add(state, "callee", "[keypad reset]")
+    if _over_turn_cap(state):
+        return _end(state, "failed", "turn_cap", state.ctx.script.goodbye())
+    return _speak(state, START_OVER, Phase.LAST4)
+
+
+def _unclear(state: State, line: str | None) -> Step:
+    """An answer the call could not make out (spec 0043, D5). Nothing is recorded. The first time
+    on a question it is asked once more, in code's wording (or `line`). The second time, the call
+    ends `failed` at consent or the change question, so the core redials or sends the case to a
+    person; at the digits question it finishes with every other answer and no digits (NR06)."""
+    phase = state.phase
+    script = state.ctx.script
+    if phase not in ONE_MORE_TRY:  # no agent says unclear at a free-text question: fail closed (R7)
+        return _end(state, "failed", f"unclear:{phase}", _goodbye(state))
+    if phase not in state.reasked:
+        state = replace(state, reasked=state.reasked | {phase})
+        return _speak(state, f"{REASK} {line or QUESTIONS[phase].wording(script)}", phase)
+    if phase is Phase.LAST4:
+        return _end(state, "answers_recorded", "unclear:last4", script.goodbye())
+    return _end(state, "failed", f"unclear:{phase}", script.goodbye())
 
 
 def _agent_replied(state: State, event: AgentReplied) -> Step:
@@ -305,6 +384,8 @@ def _agent_replied(state: State, event: AgentReplied) -> Step:
             if call.name == "record_answer":
                 if args["slot"] != "recording_consent" and state.consent != "yes":
                     raise ToolError("before_consent", "nothing is recorded before consent")
+                if args["slot"] == "account_last4" and args["value"] not in NO_DIGITS:
+                    raise ToolError("spoken_digits", "the last four come only from the keypad")
                 if len(state.answers) >= MAX_ANSWERS:
                     raise ToolError("too_many_answers", f"at most {MAX_ANSWERS} answers per call")
         except ToolError:
@@ -435,19 +516,11 @@ def _grounded(state: State, slot: str, value: str, turn_id: int) -> bool:
         asked = next((t.asked for t in reversed(state.turns[:turn_id]) if t.speaker == "agent"), None)
         if asked is not (Phase.CONSENT if slot == "recording_consent" else Phase.CHANGE):
             return False  # one "yes" can't answer a question that wasn't the one just asked
-        lowered = _NOT_A_NO.sub(" ", clean(text))
-        if value == "yes":
-            return bool(_YES.search(lowered)) and not _NEGATION.search(lowered) and not _UNSURE.search(lowered)
-        if value == "no":
-            return bool(_NEGATION.search(lowered)) and not _UNSURE.search(lowered)
-        return bool(_UNSURE.search(lowered))
+        return read_yes_no(text, allow_unsure=True) == value
     if slot in ("company_named", "department", "speaker_name", "speaker_role"):
         return _appears_unnegated(value, text)
     if slot == "account_last4":
-        if value in NO_DIGITS:
-            return True
-        runs = digit_runs(text)
-        return any(run == value or (len(value) == 4 and run.endswith(value)) for run in runs) or "".join(runs) == value
+        return value in NO_DIGITS  # spoken digits are refused before this (spec 0043, D1); keys skip it
     if slot == "offered_number":
         digits = "".join(ch for ch in value if ch.isdigit())
         return digits in "".join(digit_runs(text)) if digits else _appears_unnegated(value, text)

@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import re
+import time
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
@@ -24,6 +26,8 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from .auth import Principal, current_user
 from .db import person_tx
 from .events import NotAllowed, TransitionRefused, VersionConflict, apply_event, person
+from .flags import RampMode
+from .ramp.connector import MockRefused
 from .timeline import alert_message, summary
 from .views import call_script, calls, checklist, effect, fired
 
@@ -70,6 +74,12 @@ class ReleaseRequest(Reasoned):
 
 class ReviewRequest(Reasoned):
     action: Literal["clear", "block"]
+
+
+class BankChangeRequest(Strict):
+    # Plain strings, checked below: a malformed number is refused with a sentence, never echoed.
+    routing_number: str = Field(max_length=64)
+    account_number: str = Field(max_length=64)
 
 
 # Queries ----------------------------------------------------------------------------------------
@@ -432,3 +442,111 @@ async def review(case_id: UUID, body: ReviewRequest, request: Request, user: Use
         except TransitionRefused as exc:
             return await _refusal(conn, case_id, user.user_id, str(exc))
     return action_result(result.raw)
+
+
+# A clerk's bank change from the dashboard (spec 0077) ----------------------------------------------
+ROUTING = re.compile(r"^[0-9]{9}$")
+ACCOUNT = re.compile(r"^[0-9]{4,17}$")
+CHANGE_EVERY_SECONDS = 60  # one change a minute per dataset: a shared demo account can't set off a run of calls
+_last_sent: dict[UUID, float] = {}  # dataset -> when this process last sent a change (the core is one container)
+
+
+def aba_valid(routing: str) -> bool:
+    """The ABA routing-number checksum: 3, 7, 1 weights over the nine digits, a multiple of 10."""
+    if not ROUTING.match(routing):
+        return False
+    d = [int(c) for c in routing]
+    return sum(w * x for w, x in zip([3, 7, 1] * 3, d)) % 10 == 0
+
+
+async def change_access(conn: AsyncConnection, settings: Any, dataset: dict[str, Any]) -> tuple[str | None, str | None]:
+    """Whether the signed-in person can send a bank change here: (their Ramp user id, None), or
+    (None, the sentence that says why not). Demo datasets and the Ramp mock only."""
+    if settings.ramp_mode is not RampMode.MOCK:
+        return None, "Bank changes from the dashboard work only against the Ramp mock. With Ramp itself, make the change in Ramp."
+    if dataset["kind"] != "demo":
+        return None, "Bank changes from the dashboard are for demo datasets only. On this dataset, changes come from Ramp."
+    if dataset["retired_at"] is not None:
+        return None, "This demo has been replaced by a newer one. Bank changes from the dashboard work only on the current demo."
+    if "clerk" not in await roles_of(conn):
+        return None, "Bank changes are entered by a clerk. Sign in as the demo clerk to make one."
+    profile = await (await conn.execute("select ramp_user_id from app.user_profiles where user_id = auth.uid()")).fetchone()
+    ramp_user = profile["ramp_user_id"] if profile else None
+    seeded = set(((dataset["demo_refs"] or {}).get("users") or {}).values())
+    if not ramp_user or ramp_user not in seeded:
+        return None, ("Your account isn't linked to a Ramp user on this demo, so Ramp would record the change with no author. "
+                      "The team links it with `dialback-core demo reset --link clerk=<your email>`.")
+    return ramp_user, None
+
+
+async def demo_dataset(conn: AsyncConnection, dataset_id: UUID) -> dict[str, Any] | None:
+    return await (await conn.execute("select id, kind::text as kind, retired_at, demo_refs from app.datasets where id = %s",
+                                     (dataset_id,))).fetchone()
+
+
+@router.get("/datasets/{dataset_id}/vendor-accounts")
+async def vendor_accounts(dataset_id: UUID, request: Request, user: UserDep):
+    """Each vendor's current account (routing and last four only) and open case, for the demo's Ramp
+    (mock) portal, and whether this person can send a change here (spec 0077)."""
+    async with person_tx(request.app.state.pool, user.user_id, user.claims) as conn:
+        dataset = await demo_dataset(conn, dataset_id)
+        if dataset is None:
+            return problem(404, "not_found", "No such dataset.")
+        ramp_user, reason = await change_access(conn, request.app.state.settings, dataset)
+        rows = await (await conn.execute(
+            "select v.id, v.legal_name, a.routing_number, a.account_last4, "
+            "  (select c.id from app.cases c where c.vendor_id = v.id and c.state::text = any(%s) "
+            "    order by c.opened_at desc limit 1) as open_case_id "
+            "from app.vendors v left join lateral (select * from app.bank_accounts a where a.vendor_id = v.id and a.is_current "
+            "  order by a.last_seen_at desc limit 1) a on true "
+            "where v.dataset_id = %s order by v.legal_name", (UNFINISHED, dataset_id))).fetchall()
+    return {"vendors": [{"vendor_id": str(r["id"]), "legal_name": r["legal_name"],
+                         "account": {"routing_number": r["routing_number"], "last4": r["account_last4"]} if r["routing_number"] else None,
+                         "open_case_id": str(r["open_case_id"]) if r["open_case_id"] else None} for r in rows],
+            "can_change": ramp_user is not None, "reason": reason}
+
+
+@router.post("/datasets/{dataset_id}/vendors/{vendor_id}/bank-change")
+async def change_bank_account(dataset_id: UUID, vendor_id: UUID, body: BankChangeRequest, request: Request, user: UserDep):
+    """A clerk changes a vendor's bank details in the Ramp mock, as their linked Ramp user (spec 0077).
+    Dialback then detects it like any Ramp change. The account number is forwarded to the mock and
+    never stored, logged or returned (ADR-8); a refusal sends nothing to Ramp."""
+    if not aba_valid(body.routing_number):
+        return problem(422, "invalid_request", "The routing number must be nine digits with a valid checksum.")
+    if not ACCOUNT.match(body.account_number):
+        return problem(422, "invalid_request", "The account number must be 4 to 17 digits.")
+    settings = request.app.state.settings
+    async with person_tx(request.app.state.pool, user.user_id, user.claims) as conn:
+        dataset = await demo_dataset(conn, dataset_id)
+        if dataset is None:
+            return problem(404, "not_found", "No such dataset.")
+        ramp_user, reason = await change_access(conn, settings, dataset)
+        if ramp_user is None:
+            return problem(403, "forbidden", reason or "You can't send a bank change here.")
+        vendor = await (await conn.execute(
+            "select v.ramp_vendor_id, a.routing_number, a.account_last4 from app.vendors v "
+            "left join lateral (select * from app.bank_accounts a where a.vendor_id = v.id and a.is_current "
+            "  order by a.last_seen_at desc limit 1) a on true where v.id = %s and v.dataset_id = %s",
+            (vendor_id, dataset_id))).fetchone()
+        if vendor is None:
+            return problem(404, "not_found", "No such vendor on this dataset.")
+        if vendor["routing_number"] == body.routing_number and vendor["account_last4"] == body.account_number[-4:]:
+            return problem(422, "invalid_request", "That is already the vendor's account on file. Nothing was changed.")
+        recent = await (await conn.execute(
+            "select 1 from app.bank_change_events where dataset_id = %s and detected_at > now() - make_interval(secs => %s) limit 1",
+            (dataset_id, CHANGE_EVERY_SECONDS))).fetchone()
+        if recent is not None or time.monotonic() - _last_sent.get(dataset_id, -1e9) < CHANGE_EVERY_SECONDS:
+            return problem(409, "transition_refused",
+                           "A bank change on this demo was detected less than a minute ago. Wait a minute, then try again.")
+    try:
+        await request.app.state.connector.mock_bank_change(dataset_id, vendor["ramp_vendor_id"], body.routing_number,
+                                                           body.account_number, ramp_user)
+        _last_sent[dataset_id] = time.monotonic()
+    except MockRefused as refused:
+        if refused.sent:
+            _last_sent[dataset_id] = time.monotonic()  # it may have been made: count it
+            return problem(502, "upstream_unavailable",
+                           "The Ramp mock didn't confirm the change. It may have been made: check the vendor's account before trying again.")
+        return problem(502, "upstream_unavailable", "The Ramp mock could not be reached or refused the change. Nothing was changed; try again.")
+    return JSONResponse({"vendor_id": str(vendor_id), "account": {"routing_number": body.routing_number,
+                                                                  "last4": body.account_number[-4:]}}, status_code=202)

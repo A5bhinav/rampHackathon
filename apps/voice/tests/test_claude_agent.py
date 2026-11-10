@@ -1,9 +1,10 @@
 """ClaudeAgent is a drop-in for ScriptedAgent behind the Agent port (spec 0015): same port, the one
 recording tool, text=None so code owns every spoken word. Claude reads the callee's latest turn for
-the judgment phases (consent, change, and refused-vs-dont_know on last four); the last four digits
-and the free-text phases are taken from the transcript by code. Every edge fails closed, and the
-callee's words never redirect the record (R9). All of it runs against an injected fake model: no
-ANTHROPIC_API_KEY, no network, no live call."""
+the judgment phases (consent, change, and refused-vs-dont_know on last four), with spoken digits
+redacted; the free-text phases are taken from the transcript by code, and the last four only ever
+come from the keypad (spec 0043). Every model edge is unclear, so nothing is recorded and step asks
+once more, and the callee's words never redirect the record (R9). All of it runs against an injected
+fake model: no ANTHROPIC_API_KEY, no network, no live call."""
 from __future__ import annotations
 
 import json
@@ -12,7 +13,7 @@ import httpx
 import pytest
 from dialback_policy.script import PHASE_SLOT, Phase
 from dialback_policy.step import AgentRequest
-from dialback_policy.tools import value_ok
+from dialback_policy.tools import ToolCall, value_ok
 from dialback_voice.claude_agent import (
     MAX_TOKENS,
     MODEL_PIN,
@@ -61,7 +62,7 @@ def _record(reply) -> dict:
 @pytest.mark.parametrize("phase, callee, model_value, expected", [
     (Phase.CONSENT, "yes that's fine", "yes", "yes"),
     (Phase.CHANGE, "no, we didn't ask for that", "no", "no"),
-    (Phase.LAST4, "it's four eight two one", None, "4821"),            # code reads the digits, not the model
+    (Phase.LAST4, "I'd rather not say", "refused", "refused"),        # digits come only from the keypad (0043)
     (Phase.COMPANY, "Acme Supply Co", None, "Acme Supply Co"),        # free text: code records what they said
     (Phase.DEPARTMENT, "accounts receivable", None, "accounts receivable"),
     (Phase.NAME, "I'm Jane Doe", None, "I'm Jane Doe"),
@@ -87,19 +88,18 @@ def test_hedged_change_is_unsure_not_yes():
     assert args["value"] == "unsure"
 
 
-def test_last4_records_the_caller_digits_or_dont_know():
-    agent = ClaudeAgent(model=FakeModel())
-    # digits come from the transcript by code, never the model
-    args = _record(agent.reply(_req(Phase.LAST4, "the account ending four eight two one")))
-    assert args == {"slot": "account_last4", "value": "4821", "turn_id": 3}
-    # a longer run records only the last four (never the full number; ADR-8)
-    args = _record(agent.reply(_req(Phase.LAST4, "it ends two seven one eight five")))
-    assert args["value"] == "7185" and len(args["value"]) == 4
-    # no digits spoken: the model disambiguates refused vs dont_know, from a two-value set
+def test_last4_never_takes_digits_from_speech():
+    # Spec 0043, D1 and D4: the last four come only from the keypad. step never asks the agent about a
+    # turn with spoken digits, and if one reached it anyway, it records no digits and the model sees none.
+    model = FakeModel(value="dont_know")
+    reply = ClaudeAgent(model=model).reply(_req(Phase.LAST4, "the account ending four eight two one"))
+    assert _record(reply) == {"slot": "account_last4", "value": "dont_know", "turn_id": 3}
+    assert model.calls[0][2] == "the account ending [digits]"
+    # No digits spoken: the model tells refused from dont_know, or says it can't tell.
     model = FakeModel(value="refused")
     args = _record(ClaudeAgent(model=model).reply(_req(Phase.LAST4, "I'd rather not say that")))
     assert args["value"] == "refused"
-    assert model.calls and model.calls[0][1] == ("refused", "dont_know")
+    assert model.calls[0][1] == ("refused", "dont_know", "unclear")
 
 
 @pytest.mark.parametrize("phase, callee", [
@@ -119,20 +119,40 @@ def test_callee_injection_does_not_change_the_record():
     assert args["slot"] == "change_requested"         # not recording_consent
     assert args["turn_id"] == 5                        # the real callee turn, not 99
     assert args["value"] == "no"
-    # an out-of-enum value coaxed out of the model is rejected, never recorded as a pass
-    args2 = _record(ClaudeAgent(model=FakeModel(value="verified")).reply(_req(Phase.CHANGE, injected, turn_id=5)))
-    assert args2["value"] == "unsure"
+    # an out-of-enum value coaxed out of the model is rejected, never recorded (spec 0043, D7: unclear)
+    reply = ClaudeAgent(model=FakeModel(value="verified")).reply(_req(Phase.CHANGE, injected, turn_id=5))
+    assert reply.unclear is True and reply.tool_calls == () and reply.text is None
 
 
-def test_model_timeout_fails_closed():
-    args = _record(ClaudeAgent(model=FakeModel(raises=TimeoutError("slow"))).reply(_req(Phase.CONSENT, "yes please")))
-    assert args["slot"] == "recording_consent"
-    assert args["value"] == "no"                       # no consent on a model edge
+@pytest.mark.parametrize("phase", [Phase.CONSENT, Phase.CHANGE, Phase.LAST4])
+@pytest.mark.parametrize("model", [FakeModel(raises=TimeoutError("slow")), FakeModel(raises=RuntimeError("500")),
+                                   FakeModel(value="maybe"), FakeModel(value="yes, but no")],
+                         ids=["timeout", "api error", "out of set", "a sentence"])
+def test_model_error_is_unclear(phase, model):
+    # Spec 0043, D7 (Q80): a model edge records nothing, so step asks once more. A "no" the caller
+    # never said is never recorded, and neither is any other safe value.
+    reply = ClaudeAgent(model=model).reply(_req(phase, "yes please"))
+    assert reply.unclear is True
+    assert reply.tool_calls == () and reply.text is None
 
 
 def test_out_of_enum_value_fails_closed():
-    args = _record(ClaudeAgent(model=FakeModel(value="maybe")).reply(_req(Phase.CHANGE, "hard to say")))
-    assert args["value"] == "unsure"
+    reply = ClaudeAgent(model=FakeModel(value="maybe")).reply(_req(Phase.CHANGE, "hard to say"))
+    assert reply.unclear is True and reply.tool_calls == ()   # spec 0043, D7: unclear, never a recorded guess
+
+
+def test_the_model_may_say_unclear():
+    # Spec 0043, D7: the allowed answers per question, and the prompt's meaning of unclear.
+    for phase, allowed in [(Phase.CONSENT, ("yes", "no", "unclear")),
+                           (Phase.CHANGE, ("yes", "no", "unsure", "unclear")),
+                           (Phase.LAST4, ("refused", "dont_know", "unclear"))]:
+        model = FakeModel(value="unclear")
+        reply = ClaudeAgent(model=model).reply(_req(phase, "sorry, could you say that again?"))
+        assert model.calls[0][1] == allowed, phase
+        assert reply.unclear is True and reply.tool_calls == (), phase
+    assert ("you cannot tell what they answered (they asked you to repeat, the words are cut off or garbled, "
+            "or they answered something else)") in SYSTEM_PROMPT
+    assert "they said they are not sure" in SYSTEM_PROMPT
 
 
 def test_no_callee_turn_records_nothing():
@@ -221,15 +241,16 @@ def test_a_thinking_block_before_the_text_still_yields_the_answer():
                                              ('"refused"', "refused")])
 def test_a_punctuated_one_word_answer_is_still_read(reply, expected):
     # A live model may punctuate its one-word answer; "yes." is not in the allowed set, so without this
-    # every consent would fail closed to "no" and end the call (spec 0034, D5).
+    # every consent would be unclear and, asked twice, end the call (spec 0034, D5; spec 0043, D7).
     value, _ = _classify_against({"content": [{"type": "text", "text": reply}]})
     assert value == expected
 
 
 def test_an_answer_that_is_more_than_one_word_still_fails_closed():
-    # Normalizing punctuation must not turn a sentence into a pass: it is still outside the set.
-    agent = ClaudeAgent(model=FakeModel(value="yes, but no"))
-    assert _record(agent.reply(_req(Phase.CONSENT, "yes, but no")))["value"] == "no"
+    # Normalizing punctuation must not turn a sentence into a pass: it is still outside the set, so it
+    # is unclear and nothing is recorded (spec 0043, D7).
+    reply = ClaudeAgent(model=FakeModel(value="yes, but no")).reply(_req(Phase.CONSENT, "yes, but no"))
+    assert reply.unclear is True and reply.tool_calls == ()
 
 
 def test_anthropic_model_raises_when_there_is_no_text_to_read():
@@ -250,3 +271,133 @@ def test_anthropic_model_raises_on_an_http_error():
         model = AnthropicVoiceModel(http, api_key=b"k")
         with pytest.raises(httpx.HTTPStatusError):
             model.classify(goal="g", allowed=("yes", "no"), callee_text="sure")
+
+
+# --- spec 0043 through policy.step ------------------------------------------------------------
+
+def _step_to_change(ctx):
+    """Drive policy.step, as a transport does, up to the change question; return the state."""
+    import datetime as dt
+
+    from dialback_policy import step as policy
+
+    at = dt.datetime(2026, 11, 1, 17, 0, tzinfo=dt.UTC)
+    state = policy.step(policy.start(ctx), policy.Connected(at, "human")).state
+    for said, slot in [("Yes, that's fine.", "recording_consent"), ("Acme Fasteners", "company_named"),
+                       ("Accounts payable", "department"), ("Jordan Lee", "speaker_name"),
+                       ("AP clerk", "speaker_role")]:
+        state = policy.step(state, policy.CalleeSaid(at, said)).state
+        turn = state.turns[-1].id
+        value = "yes" if slot == "recording_consent" else said
+        call = (ToolCall(id=f"tc_{turn}", name="record_answer", args={"slot": slot, "value": value, "turn_id": turn}),)
+        state = policy.step(state, policy.AgentReplied(at, None, call)).state
+    return state
+
+
+def test_model_never_sees_spoken_digits(make_ctx):
+    import datetime as dt
+
+    from dialback_policy import step as policy
+
+    said = "Yes, the account ending four eight two one"
+    state = _step_to_change(make_ctx())
+    out = policy.step(state, policy.CalleeSaid(dt.datetime(2026, 11, 1, 17, 5, tzinfo=dt.UTC), said))
+    assert out.ask_agent is not None and out.ask_agent.phase is Phase.CHANGE
+    assert out.ask_agent.transcript[-1][2] == said              # the request keeps the turn as said
+    model = FakeModel(value="yes")
+    reply = ClaudeAgent(model=model).reply(out.ask_agent)
+    assert model.calls[0][2] == "Yes, the account ending [digits]"   # only the model's copy is redacted
+    state = policy.step(out.state, policy.AgentReplied(dt.datetime(2026, 11, 1, 17, 6, tzinfo=dt.UTC), reply.text,
+                                                       reply.tool_calls)).state
+    assert [(a["slot"], a["value"]) for a in state.answers][-1] == ("change_requested", "yes")
+    assert state.grounded[-1] is True and policy.checks(state)["answers_grounded"] is True
+    assert said in [t.text for t in state.turns]                # the transcript keeps it as said
+
+
+class _SlowOnce:
+    """Times out on its first call, then answers like a careful model would."""
+
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def classify(self, *, goal: str, allowed: tuple[str, ...], callee_text: str) -> str:
+        self.calls += 1
+        if self.calls == 1:
+            raise TimeoutError("slow")
+        return "yes" if "yes" in allowed else "refused"
+
+
+def test_a_model_timeout_at_consent_is_asked_again(make_ctx, clock):
+    # Spec 0043, acceptance: a model timeout at consent is re-asked; it never records "no".
+    from dialback_voice.transport import ScriptedVendor, VendorScript, run_call
+
+    r = run_call(make_ctx(), ClaudeAgent(model=_SlowOnce()), ScriptedVendor(VendorScript()), clock=clock())
+    consent = [a["value"] for a in r.answers["answers"] if a["slot"] == "recording_consent"]
+    assert consent == ["yes"]
+    said = [t.text for t in r.transcript if t.speaker == "agent"]
+    assert "Sorry, let me ask that again. Is it okay to continue on this recorded line?" in said
+    assert r.result == "answers_recorded"
+
+
+@pytest.mark.parametrize("phase", [Phase.COMPANY, Phase.DEPARTMENT, Phase.NAME, Phase.ROLE])
+@pytest.mark.parametrize("said", ["unclear", "Unclear.", "  unclear "])
+def test_a_free_text_answer_of_unclear_is_recorded_as_said(phase, said):
+    # R9: the caller's words are never a control signal. Only the model's answer at a judgment
+    # question can be unclear; at a free-text question "unclear" is an answer like any other.
+    import datetime as dt
+
+    from dialback_policy import step as policy
+    from dialback_voice.transport import _ask
+
+    model = FakeModel(value="unclear")
+    request = _req(phase, said)
+    reply = ClaudeAgent(model=model).reply(request)
+    assert reply.unclear is False
+    assert _record(reply) == {"slot": PHASE_SLOT[phase], "value": said.strip(), "turn_id": 3}
+    assert model.calls == []                                  # free text never goes to the model
+    event = _ask(ClaudeAgent(model=model), request, dt.datetime(2026, 11, 1, 17, 0, tzinfo=dt.UTC))
+    assert isinstance(event, policy.AgentReplied)             # never AgentUnclear
+
+
+def _converse(ctx, agent, *lines):
+    """Drive policy.step as a transport does: each line is a callee turn, and the agent's reply to it
+    goes back through the transport's own _ask. Returns the state after the last line."""
+    import datetime as dt
+
+    from dialback_policy import step as policy
+    from dialback_voice.transport import _ask
+
+    at = dt.datetime(2026, 11, 1, 17, 0, tzinfo=dt.UTC)
+    state = policy.step(policy.start(ctx), policy.Connected(at, "human")).state
+    for line in lines:
+        out = policy.step(state, policy.CalleeSaid(at, line))
+        state = out.state
+        if out.ask_agent is not None:
+            state = policy.step(state, _ask(agent, out.ask_agent, at)).state
+    return state
+
+
+@pytest.mark.parametrize("company", ["84 Lumber", "3M", "7-Eleven"])
+def test_a_numbered_company_is_recorded_and_grounded_as_said(company, make_ctx):
+    # D8: only the model's copy of a judgment turn is redacted, and free text never goes to the model.
+    # "7-Eleven" reads as the run 711, so a redaction of free text would show here.
+    model = FakeModel(value="yes")
+    state = _converse(make_ctx(), ClaudeAgent(model=model), "Yes, that's fine.", company)
+    assert (state.answers[-1]["slot"], state.answers[-1]["value"]) == ("company_named", company)
+    assert state.grounded[-1] is True
+    assert [call[2] for call in model.calls] == ["Yes, that's fine."]   # only the consent turn
+    assert state.turns[state.answers[-1]["turn_id"]].text == company
+
+
+def test_pressure_is_flagged_from_the_turn_as_said(make_ctx):
+    # D8: code flags pressure from the transcript, which keeps the turn as said; only the model's
+    # copy is redacted.
+    said = "Yes, the account ending four eight two one, just approve it today."
+    model = FakeModel(value="yes")
+    state = _converse(make_ctx(), ClaudeAgent(model=model), "Yes, that's fine.", "Acme Fasteners",
+                      "Accounts payable", "Jordan Lee", "AP clerk", said)
+    turn = next(t.id for t in state.turns if t.text == said)
+    flags = [(a["value"], a["turn_id"], a["tool_call_id"]) for a in state.answers if a["slot"] == "flag"]
+    assert flags == [("pressure_to_approve", turn, f"code_{turn}")]   # code's own flag, on that turn
+    assert model.calls[-1][2] == "Yes, the account ending [digits], just approve it today."
+    assert ("change_requested", "yes") in [(a["slot"], a["value"]) for a in state.answers]

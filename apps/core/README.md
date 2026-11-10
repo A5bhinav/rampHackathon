@@ -163,6 +163,7 @@ If this slice is behind at the Nov 4 checkpoint, `packages/decision` moves to In
 | Scheduled jobs on the dataset clock: the poller (incremental, with a nightly full sweep) and reconciliation (a missing hold goes back on, with a critical alert) | `jobs.py` | `abhi/poller-reconcile` |
 | The chain verify job: recomputes each dataset's evidence chain every five minutes; a broken row raises one critical `chain_broken` alert naming it | `jobs.py` | `abhi/chain-verify` |
 | The dashboard API per `dialback.yaml`: me, datasets, chain status, alerts, queue, case detail (timeline, decision, permissions), release and review, each run in Postgres as the signed-in person | `api.py`, `auth.py`, `timeline.py` | `abhi/core-api` |
+| The demo's Ramp (mock) portal (spec 0077): `vendor-accounts` and a clerk's `bank-change`, sent to the mock as the clerk's linked Ramp user; demo datasets and the mock only, the full account number never stored, logged or returned | `api.py`, `ramp/connector.py` | `core/0077-clerk-bank-change` |
 
 ### Configuration
 

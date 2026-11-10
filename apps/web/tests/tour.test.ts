@@ -25,3 +25,25 @@ test("after sign-in, a tour step is followed like a demo link", () => {
   assert.equal(safeNext("/tour/9"), "/app");
   assert.equal(safeNext("/tour/4/x"), "/app");
 });
+
+test("every step's link resolves to a page or a redirect (spec 0063)", async () => {
+  const { existsSync, readdirSync } = await import("node:fs");
+  const config = (await import("../next.config.ts")).default;
+  const redirects = await config.redirects!();
+  const app = new URL("../src/app/", import.meta.url);
+  // Walk the app directory the way the router does: route groups are skipped, [x] matches any segment.
+  const resolves = (dir: URL, segs: string[]): boolean => {
+    const kids = existsSync(dir) ? readdirSync(dir, { withFileTypes: true }).filter((d) => d.isDirectory()) : [];
+    if (segs.length === 0) return existsSync(new URL("page.tsx", dir)) || kids.some((k) => /^\(.+\)$/.test(k.name) && resolves(new URL(`${k.name}/`, dir), segs));
+    const [head, ...rest] = segs;
+    return kids.some((k) => (/^\(.+\)$/.test(k.name) && resolves(new URL(`${k.name}/`, dir), segs))
+      || ((k.name === head || /^\[[^.]+\]$/.test(k.name)) && resolves(new URL(`${k.name}/`, dir), rest)));
+  };
+  const redirected = (path: string) => redirects.some((r) => new RegExp(`^${r.source.replace(/:\w+/g, "[^/]+")}$`).test(path));
+  for (const ids of [{ dataset: "ds1", acme: "c1" }, { dataset: "ds1", acme: null }]) {
+    for (const s of TOUR) {
+      const path = tourHref(s, ids).split(/[?#]/)[0];
+      assert.ok(resolves(app, path.split("/").filter(Boolean)) || redirected(path), `${s.n}: ${path}`);
+    }
+  }
+});

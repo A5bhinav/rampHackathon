@@ -60,8 +60,12 @@ def build_connect_twiml(*, ws_url: str, call_token: str, disclosure: str, answer
     # interruptible="false" keeps the disclosure from being cut off (R8). Whether the greeting alone
     # can be non-interruptible while the rest of the call is interruptible is Q45; until that is
     # confirmed the whole call is non-interruptible, which is the safe side.
+    # reportInputDuringAgentSpeech="dtmf": keys pressed while the agent is still speaking reach the
+    # relay (spec 0043). Twilio's default has been "none" since May 2025, which drops them, and
+    # callers often start typing the last four before the question ends. Keys still don't cut the
+    # agent off, and speech during the agent's turn is still not reported.
     attrs = (f"url={quoteattr(ws_url)} welcomeGreeting={quoteattr(disclosure)} "
-             f'dtmfDetection="true" interruptible="false"')
+             f'dtmfDetection="true" interruptible="false" reportInputDuringAgentSpeech="dtmf"')
     return ('<?xml version="1.0" encoding="UTF-8"?>'
             "<Response><Connect>"
             f"<ConversationRelay {attrs}>"
