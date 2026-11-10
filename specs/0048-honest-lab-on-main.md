@@ -249,11 +249,11 @@ This tests the step after the call, the way the fuzz lab tests `select()`. No ca
      main now.
    - Checked Nov 10: main goes up to spec 0077 and Q116, and the open branches up to spec 0081 and
      Q135. Spec numbers 0017, 0046, 0048 and 0049 are free on main and stay.
-   - **Done when the lab landed (Nov 10).** Spec 0082 and Q136 to Q138 were taken meanwhile (spec
-     0082 on `sami/company-name-match`), so: the lab's 0033 is **spec 0083**; its Q60, Q61 and Q65
-     are **Q142, Q143 and Q144**; spec 0017's Q56, Q57 and Q58 are **Q139, Q140 and Q141**; spec
-     0046's Q87 to Q91 are **Q145 to Q149**. `evals/tests/test_numbering.py` checks that no other
-     spec defines a lab number.
+   - **Done when the lab landed (Nov 10).** Spec 0082 and Q136 to Q139 were taken meanwhile (spec
+     0082 on `sami/company-name-match`, PR #118; its Q139 came after the lab's PR 2 had used it), so:
+     the lab's 0033 is **spec 0083**; its Q60, Q61 and Q65 are **Q142, Q143 and Q144**; spec 0017's
+     Q56, Q57 and Q58 are **Q150, Q140 and Q141**; spec 0046's Q87 to Q91 are **Q145 to Q149**.
+     `evals/tests/test_numbering.py` checks that no other spec defines a lab number.
 2. **PR order.** Each PR is stacked on the one before, and kept as close to 400 changed lines as its
    parts allow. Any of them may be split further. The voice and fuzz labs never share a PR.
    1. `apps/core`: pull out `call_facts`, with no change in behavior. `apps/voice`:
