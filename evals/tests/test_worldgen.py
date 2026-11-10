@@ -2,19 +2,26 @@
 the generator actually reaches every rejection reason and knob path, and clean worlds stay clean."""
 from __future__ import annotations
 
-import datetime as dt
 import json
 import multiprocessing
 import re
 import subprocess
 import sys
-from collections import Counter
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
+from dialback_evals import coverage
 from dialback_evals.draws import world_digests
-from dialback_evals.invariants import _fax, _frame, _near_flagged
-from dialback_evals.worldgen import NumberSpec, clean_worlds, make_world, profile, run, worlds
+from dialback_evals.worldgen import (
+    REAL_LINE,
+    NumberSpec,
+    SightingSpec,
+    clean_worlds,
+    make_world,
+    profile,
+    run,
+    worlds,
+)
 from hypothesis import given, settings
 from hypothesis import strategies as st
 from jsonschema import Draft202012Validator
@@ -22,14 +29,7 @@ from jsonschema import Draft202012Validator
 ROOT = Path(__file__).resolve().parents[2]
 FICTIONAL = re.compile(r"^\+1\d{3}55501\d{2}$")   # NANP 555-0100 to 555-0199, reserved for fiction
 SCHEMA = json.loads((ROOT / "packages/contracts/schemas/selection.schema.json").read_text())
-REASONS = {"first_seen_in_change_context", "too_few_source_types", "younger_than_minimum_age",
-           "near_miss_of_older_number", "hidden_text_only", "not_vendor_party", "fax_line"}
-KNOBS = {"no_request", "late", "shared_id", "reply_subject", "subdomain", "lookalike", "near_miss_pair",
-         "mixed_visibility", "mixed_party", "mixed_timing", "non_default_settings", "twin_first",
-         "request_label", "follow_up", "early_cutoff",
-         # spec 0048, C2: the boundaries B5 found unreached
-         "no_thread", "bare_request", "late_sighting", "upper_fax", "same_time_near_miss", "age_at_min_age",
-         "age_at_established", "age_at_subject_window", "context_role_claim"}
+OTHER = "+13125550142"   # a second provable number, fictional
 
 
 def test_generated_world_runs_and_validates():
@@ -60,53 +60,64 @@ def test_generated_numbers_are_fictional():
     check()
 
 
-def _reference_provable(world) -> tuple[set[str], set[str]]:
-    """The numbers the oracle's reference frame finds nothing against (I1-I5, I7), read from raw inputs
-    rather than from the rule, so a fixed rule cannot move these floors; and those of them that also
-    carry a visible label in the change context (what I12's removal half needs)."""
-    f, s = _frame(world), world.settings
-    ok, labeled = set(), set()
-    for e164, n in f.numbers.items():
-        if n.first_seen_in_context or not n.visible or len(n.channels) < s.min_source_types:
-            continue
-        if n.first_clean is None or f.cutoff - n.first_clean < dt.timedelta(days=s.min_age_days):
-            continue
-        if any((r.party != "vendor" or _fax(r)) and r.document_id not in f.in_context_ids for r in n.visible):
-            continue
-        if _near_flagged(f, e164, s):
-            continue
-        ok.add(e164)
-        if any((r.party != "vendor" or _fax(r)) and r.document_id in f.in_context_ids for r in n.visible):
-            labeled.add(e164)
-    return ok, labeled
+def _coverage_sample(strategy) -> list:
+    """The fixed, seeded sample the coverage floor is read on: 600 worlds, derandomized, pinned draws."""
+    drawn = []
+
+    @given(strategy)
+    @settings(max_examples=600, deadline=None, derandomize=True, database=None)
+    def sample(world):
+        drawn.append(world)
+    sample()
+    return drawn
 
 
 def test_generator_covers_every_reason_and_knob():
-    seen, n = Counter(), [0]
+    # Every reason fires in >= 5% of worlds, every knob path in >= 3%; I12 needs a second provable number
+    # for the call to move to (>= 20%), and its removal half a context label on the pick (>= 5%); and the
+    # safety invariants are trivially true in a world with nothing eligible, so at least half the worlds
+    # must hold an eligible number (floors set Nov 8 before measuring; the old mix gave 3.7% and 1.2% on
+    # the two-provable floors). Spec 0048 C3 also leaves the planted real line out of that last floor (B7,
+    # M9); without it the floor reads 27%, so that change is held back for Sami (see the spec's report).
+    seen, n = coverage.measure(_coverage_sample(worlds()), REAL_LINE)
+    assert coverage.shortfalls(seen, n) == {}
 
-    @given(worlds())
-    @settings(max_examples=600, deadline=None, derandomize=True, database=None)
-    def sample(world):
-        n[0] += 1
-        out = run(world)
-        seen.update({r for c in out["candidates"] for r in c["reasons"]})
-        seen.update(k for k, v in profile(world).items() if v)
-        seen["some_eligible"] += any(c["eligible"] for c in out["candidates"])
-        ok, labeled = _reference_provable(world)
-        seen["two_provable"] += len(ok) >= 2
-        seen["context_label_on_provable"] += len(ok) >= 2 and bool(labeled)
-    sample()
-    # I12 needs a second provable number for the call to move to, and its removal half needs a context
-    # label on a provable number (floors set Nov 8 before measuring; the old mix gave 3.7% and 1.2% on this sample).
-    floors = {"two_provable": 0.20, "context_label_on_provable": 0.05}
-    short = {k: round(seen[k] / n[0], 3) for k, bar in floors.items() if seen[k] / n[0] < bar}
-    assert short == {}, short
-    low = {k: round(seen[k] / n[0], 3) for k in sorted(REASONS | KNOBS)
-           if seen[k] / n[0] < (0.05 if k in REASONS else 0.03)}
-    assert low == {}, low   # every reason fires in >= 5% of worlds, every knob path in >= 3%
-    # The safety invariants are trivially true in a world with nothing eligible, so at least half the
-    # worlds must hold an eligible number for them to scrutinize.
-    assert seen["some_eligible"] / n[0] >= 0.5, round(seen["some_eligible"] / n[0], 3)
+
+# Spec 0048, C3 (FINDINGS B6 and B7 M10).
+
+def test_context_label_counts_only_on_the_pick():
+    # Two provable numbers; the attacker's in-thread bank line names one of them. Only a label on the
+    # number the call would go to (the reference's pick: the older one here) counts for I12's floor.
+    label = SightingSpec("email", 10, party="bank", in_thread=True, sender="other")
+    on_other = make_world(numbers=[NumberSpec(REAL_LINE, ["contract", "listing"], 500),
+                                   NumberSpec(OTHER, [], 0, sightings=(SightingSpec("contract", 400),
+                                                                      SightingSpec("listing", 400), label))])
+    on_pick = make_world(numbers=[NumberSpec(OTHER, ["contract", "listing"], 400),
+                                  NumberSpec(REAL_LINE, [], 0, sightings=(SightingSpec("contract", 500),
+                                                                          SightingSpec("listing", 500), label))])
+    for world in (on_other, on_pick):
+        assert coverage.reference_provable(world)[0] == {REAL_LINE, OTHER}
+    assert coverage.measure([on_other], REAL_LINE)[0]["context_label_on_provable"] == 0
+    assert coverage.measure([on_pick], REAL_LINE)[0]["context_label_on_provable"] == 1
+
+
+def _first_cut():
+    """The first-cut generator (one shared profile per number), from history: tests/fixtures."""
+    import importlib.util
+    source = (ROOT / "evals" / "tests" / "fixtures" / "worldgen-first-cut.py.txt").read_text(encoding="utf-8")
+    module = importlib.util.module_from_spec(importlib.util.spec_from_loader("lab_worldgen_first_cut", loader=None))
+    sys.modules[module.__name__] = module                  # its dataclasses look their module up there
+    exec(compile(source, "worldgen-first-cut.py", "exec"), module.__dict__)   # noqa: S102
+    return module
+
+
+def test_first_cut_generator_fails_coverage():
+    # Spec 0033's acceptance: "the first-cut generator (one shared profile per number) fails this check".
+    first = _first_cut()
+    seen, n = coverage.measure(_coverage_sample(first.worlds()), first._e164(2025550100))
+    short = coverage.shortfalls(seen, n)
+    # One profile per number: no number is ever seen both visible and hidden, by two parties or at two times.
+    assert {"mixed_visibility", "mixed_party", "mixed_timing"} <= set(short), short
 
 
 def test_clean_worlds_have_no_attacker_knob():
