@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { phone, seenBefore, sourceLabel, split } from "../src/lib/lineage.ts";
+import { lanePoints, phone, seenBefore, sourceLabel, split } from "../src/lib/lineage.ts";
 
 const example = (name: string) =>
   JSON.parse(readFileSync(new URL(`../../../packages/contracts/examples/selection.${name}.json`, import.meta.url), "utf8"));
@@ -39,4 +39,30 @@ test("source types read as words", () => {
   assert.equal(sourceLabel("vendor_portal"), "vendor portal");
   assert.equal(sourceLabel("listing"), "public listing");
   assert.equal(sourceLabel("something_new"), "something new");
+});
+
+test("lanePoints places every candidate in each of its source lanes, on file in its own lane", () => {
+  const chart = lanePoints(example("picked"))!;
+  assert.deepEqual(chart.lanes.map((l) => l.key), ["contract", "vendor_portal", "listing", "email", "on_file"]);
+  assert.equal(chart.start, "2022-01-01");
+  const of = (e164: string) => chart.points.filter((p) => p.e164 === e164);
+  assert.deepEqual(of("+14155550142").map((p) => [p.lane, p.kind]).sort(), [["contract", "pick"], ["email", "pick"], ["listing", "pick"]]);
+  assert.deepEqual(of("+14155550117").map((p) => [p.lane, p.kind]).sort(), [["email", "alternate"], ["on_file", "alternate"], ["vendor_portal", "alternate"]]);
+  assert.deepEqual(of("+14155550143").map((p) => [p.lane, p.kind]), [["email", "refused"]]);
+  for (const p of chart.points) assert.ok(p.pct >= 0 && p.pct <= 100, p.e164);
+});
+
+test("lanePoints puts the cutoff after the minimum-age line, and years in order", () => {
+  const chart = lanePoints(example("picked"))!;
+  assert.ok(chart.minAge.pct < chart.cutoffPct && chart.cutoffPct < 100);
+  assert.equal(chart.minAge.days, 90);
+  const refused = chart.points.find((p) => p.kind === "refused")!;
+  assert.equal(refused.pct, chart.cutoffPct);  // first seen with the request
+  assert.deepEqual(chart.ticks.map((t) => t.label), ["2022", "2023", "2024", "2025", "2026"]);
+  assert.ok(chart.ticks.every((t, i) => i === 0 || t.pct > chart.ticks[i - 1].pct));
+});
+
+test("lanePoints with no candidates has nothing to draw", () => {
+  assert.equal(lanePoints({ ...example("picked"), candidates: [] }), null);
+  assert.equal(lanePoints(null), null);
 });

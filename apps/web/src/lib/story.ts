@@ -60,6 +60,8 @@ export const DEMO_STORIES: DemoStory[] = [
 export function safeNext(raw: unknown): string {
   if (typeof raw !== "string") return "/app";
   if (/^\/tour\/[1-8]$/.test(raw)) return raw;  // the guided demo (spec 0039)
+  // A dataset page, for "Viewing as" (spec 0041): a uuid, then plain lower-case path segments only.
+  if (/^\/d\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(\/[a-z0-9-]+)*$/.test(raw)) return raw;
   const m = /^\/demo\/([a-z]+)$/.exec(raw);
   return m && demoStory(m[1]) ? raw : "/app";
 }

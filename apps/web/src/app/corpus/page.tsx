@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { BrandMark } from "@/components/nav";
+import { Callout, Stats } from "@/components/page";
+import { PublicHeader } from "@/components/public-header";
+import { RingBand } from "@/components/ring-band";
 import { CHANNEL, CORPUS, REASON_SHORT, groups, numberVerdict, pickedPlanted, type CorpusCase } from "@/lib/corpus";
 import { phone } from "@/lib/lineage";
 
@@ -14,47 +16,50 @@ export default function CorpusPage() {
   const all = CORPUS.cases;
   const matched = all.filter((c) => c.matches).length;
   return (
-    <>
-      <header className="topbar">
-        <div className="topbar-inner">
-          <nav className="nav" aria-label="Main">
-            <Link className="brand" href="/"><BrandMark />Dialback</Link>
-            <Link href="/">How it works</Link>
-          </nav>
-          <div className="who"><Link className="button-link primary" href="/app">Open the dashboard</Link></div>
-        </div>
-      </header>
-      <main className="shell story">
-        <section className="story-hero" aria-labelledby="corpus-h">
-          <p className="eyebrow">The number-picking rule against {CORPUS.cases.length} frozen test cases</p>
-          <h1 id="corpus-h">Which number would Dialback call?</h1>
-          <p className="lead">
+    <div className="public">
+      <PublicHeader links={[{ href: "/", label: "How it works" }, { href: "/scorecard", label: "Scorecard" }]} />
+      <main>
+        <RingBand
+          eyebrow={`The number-picking rule against ${CORPUS.cases.length} frozen test cases`}
+          title="Which number would Dialback call?"
+          titleId="corpus-h"
+          lead={<>
             Before any call, the Trust Ledger picks a number it can prove is the vendor&apos;s (R2). These are the frozen test cases
             for that one step: a fraudster plants a number in an email thread, a lookalike domain, hidden PDF text, a fake listing,
             and the rule must not pick it. Each case&apos;s expected result is frozen and its hash pinned in the repo, so it can&apos;t drift to match the code without a reviewed change.
-          </p>
-          <p className="note">
+          </>}
+        />
+        <Callout>
+          <p>
             This is the selection rule only, run by <span className="mono">{CORPUS.generated_by}</span> with{" "}
             <span className="mono">{CORPUS.rule_version}</span>. It is not the attack lab, which would replay whole scams
             through calls and decisions; the lab isn&apos;t built, so there is no scorecard.
           </p>
-        </section>
+        </Callout>
 
-        <dl className="stats" aria-label="Results">
-          <div className="stat"><dt>Cases</dt><dd>{all.length}</dd></div>
-          <div className="stat"><dt>Rule did what the frozen truth says</dt><dd>{matched} of {all.length}</dd></div>
-          <div className="stat is-bad"><dt>Rule picked a planted number</dt><dd>{all.filter(pickedPlanted).length}</dd></div>
-        </dl>
+        <Stats label="Results" items={[
+          { label: "Cases", value: all.length },
+          { label: "Matches the frozen truth", value: `${matched} of ${all.length}`, tone: matched === all.length ? "ok" : undefined },
+          { label: "Picked a planted number", value: all.filter(pickedPlanted).length, tone: "bad" },
+        ]} />
 
         {groups(all).map((g) => (
-          <section key={g.kind} className="story-section" aria-labelledby={`g-${g.kind}`}>
-            <h2 id={`g-${g.kind}`}>{g.title} <span className="count">{g.cases.length}</span></h2>
-            <p className="muted story-intro">{g.lead}</p>
-            {g.cases.map((c) => <Case key={c.id} c={c} />)}
+          <section key={g.kind} className="corpus-group" aria-labelledby={`g-${g.kind}`}>
+            <div className="group-head">
+              <h2 id={`g-${g.kind}`}>{g.title} <span className="count">{g.cases.length}</span></h2>
+              <p className="muted">{g.lead}</p>
+            </div>
+            <div className="card flush corpus-list">
+              <div className="corpus-row corpus-cols" aria-hidden="true">
+                <span>ID</span><span>Pattern</span><span>Vendor</span><span>Expected</span><span>The rule</span><span>Result</span>
+              </div>
+              {g.cases.map((c) => <Case key={c.id} c={c} />)}
+            </div>
           </section>
         ))}
+        <p className="muted sub corpus-foot">Open a row for the numbers the rule saw. &ldquo;First seen&rdquo; is the rule&apos;s own reading; hover a reason for the ledger&apos;s own sentence.</p>
       </main>
-    </>
+    </div>
   );
 }
 
@@ -62,16 +67,22 @@ function Case({ c }: { c: CorpusCase }) {
   const planted = pickedPlanted(c);
   const limit = c.kind === "known_limit";
   return (
-    <article className={`card corpus-case ${planted ? "edge-bad lead-card" : ""}`} id={c.id} aria-labelledby={`${c.id}-h`}>
-      <div className="corpus-head">
-        <h3 id={`${c.id}-h`}><span className="mono muted">{c.id}</span> {c.title}</h3>
+    <details className={`corpus-case${limit ? " is-limit" : planted ? " is-bad" : ""}`} id={c.id}>
+      <summary className="corpus-row" id={`${c.id}-h`}>
+        <span className="mono muted">{c.id}</span>
+        <span className="corpus-title">{c.title}</span>
+        <span><span className="sr-only">Vendor: </span>{c.vendor}</span>
+        <span className="mono"><span className="sr-only">Expected: </span>{c.expected.pick ? phone(c.expected.pick) : "no number"}</span>
+        <span className="mono"><span className="sr-only">The rule: </span>{c.actual.pick ? phone(c.actual.pick) : "no number"}</span>
         <span className="tags">
-          {c.source === "proposed" ? <span className="badge tone-muted" title="Spec 0020, Q42">proposed, awaiting team sign-off</span> : null}
-          <span className={`badge ${c.matches ? "tone-ok" : "tone-bad"}`}>{c.matches ? "matches the truth" : "differs from the truth"}</span>
+          {limit ? <span className="badge tone-warn">Known limit</span> : null}
+          {c.source === "proposed" ? <span className="badge tone-muted" title="Spec 0020, Q42">proposed</span> : null}
+          <span className={`badge ${c.matches ? "tone-ok" : "tone-bad"}`}>{c.matches ? "matches the truth" : "differs"}</span>
         </span>
-      </div>
+      </summary>
+      <div className="corpus-detail">
       <p className="muted sub">
-        {c.vendor} · change request &ldquo;{c.request.subject}&rdquo; · expected:{" "}
+        Change request &ldquo;{c.request.subject}&rdquo; · expected:{" "}
         {c.expected.pick ? <span className="mono">{phone(c.expected.pick)}</span> : "no number (a person reviews)"} · the rule:{" "}
         {c.actual.pick ? <span className="mono">{phone(c.actual.pick)}</span> : "no provable number"}
       </p>
@@ -111,7 +122,8 @@ function Case({ c }: { c: CorpusCase }) {
           </tbody>
         </table>
       </div>
-      <p className="muted sub">The change request arrived {day(c.request.received_at)}. &ldquo;First seen&rdquo; is the rule&apos;s own reading. Hover a reason for the ledger&apos;s own sentence.</p>
-    </article>
+      <p className="muted sub">The change request arrived {day(c.request.received_at)}.</p>
+      </div>
+    </details>
   );
 }

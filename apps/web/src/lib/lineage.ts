@@ -42,3 +42,53 @@ const SOURCES: Record<string, string> = {
 export function sourceLabel(source: string): string {
   return SOURCES[source] ?? source.replaceAll("_", " ");
 }
+
+// The lineage chart (spec 0041): one dot per candidate per source type at its first sighting,
+// on a time axis from the January before the earliest sighting to just past the cutoff. Per-
+// sighting dots wait for the ledger's lineage endpoint (spec 0041, Q4).
+const LANE_ORDER: string[] = ["contract", "vendor_portal", "listing", "email", "paper_mail"];
+const LANE_NOTE: Record<string, string> = { email: "counts once", on_file: "never counts" };
+
+export type LanePoint = { lane: string; e164: string; kind: "pick" | "alternate" | "refused"; pct: number; at: string };
+export type LaneChart = {
+  start: string; end: string;
+  lanes: { key: string; label: string; note?: string }[];
+  points: LanePoint[];
+  ticks: { label: string; pct: number }[];
+  cutoffPct: number;
+  minAge: { pct: number; days: number };
+};
+
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+export function lanePoints(selection: Selection | null): LaneChart | null {
+  if (!selection || selection.candidates.length === 0) return null;
+  const pickId = split(selection).pick?.contact_point_id;
+  const cutoff = Date.parse(selection.cutoff);
+  const seen = selection.candidates.map((c) => Date.parse(c.first_seen_at)).filter(Number.isFinite);
+  const firstYear = new Date(Math.min(cutoff, ...seen)).getUTCFullYear();
+  const start = Date.UTC(firstYear, 0, 1);
+  const end = cutoff + Math.max((cutoff - start) * 0.025, 21 * DAY_MS);  // a sliver past the request
+  const pct = (ms: number) => Math.round(Math.min(Math.max((ms - start) / (end - start), 0), 1) * 1000) / 10;
+
+  const present = new Set<string>(selection.candidates.flatMap((c) => c.source_types));
+  const keys = [...LANE_ORDER.filter((k) => present.has(k)), ...[...present].filter((k) => !LANE_ORDER.includes(k)).sort()];
+  if (selection.candidates.some((c) => c.on_file)) keys.push("on_file");
+  const lanes = keys.map((key) => ({
+    key, label: key === "on_file" ? "Vendor master" : key === "contract" ? "Contract" : cap(sourceLabel(key)), note: LANE_NOTE[key],
+  }));
+
+  const points = selection.candidates.flatMap((c) => {
+    const kind: LanePoint["kind"] = c.contact_point_id === pickId ? "pick" : c.eligible ? "alternate" : "refused";
+    const at = pct(Date.parse(c.first_seen_at));
+    return [...c.source_types, ...(c.on_file ? ["on_file"] : [])].map((lane) => ({ lane, e164: c.e164, kind, pct: at, at: c.first_seen_at }));
+  });
+
+  const ticks: LaneChart["ticks"] = [];
+  for (let y = firstYear; Date.UTC(y, 0, 1) <= end; y++) ticks.push({ label: String(y), pct: pct(Date.UTC(y, 0, 1)) });
+  const days = selection.rule_settings.min_age_days;
+  return {
+    start: new Date(start).toISOString().slice(0, 10), end: new Date(end).toISOString().slice(0, 10),
+    lanes, points, ticks, cutoffPct: pct(cutoff), minAge: { pct: pct(cutoff - days * DAY_MS), days },
+  };
+}

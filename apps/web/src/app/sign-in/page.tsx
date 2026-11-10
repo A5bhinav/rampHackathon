@@ -2,7 +2,7 @@ import Link from "next/link";
 import { authMode, demoAccounts } from "@/lib/auth-mode";
 import { devUsers } from "@/lib/dev-auth";
 import { signIn, signInAsDemo, signInAsDevUser } from "./actions";
-import { BrandMark } from "@/components/nav";
+import { FrontDoor } from "@/components/front-door";
 import { safeNext } from "@/lib/story";
 
 type Notice = { expired?: string; failed?: string; slow?: string; unavailable?: string; next?: string };
@@ -19,10 +19,8 @@ export default async function SignIn({ searchParams }: { searchParams: Promise<N
   const mode = authMode(process.env);
   const next = safeNext(params.next);  // a demo link to return to (spec 0033); anything else is dropped
   return (
-    <main className="shell">
-      <div className="card signin">
-        <p className="brand"><BrandMark />Dialback</p>
-        <h1>Sign in</h1>
+    <FrontDoor title="Sign in">
+        <p className="muted front-lead">Payments to a vendor whose bank details changed stay held until the vendor confirms.</p>
         {NOTICES.filter(([key]) => params[key]).map(([key, text]) => (
           <p key={key} className="result error" role="alert">{text}</p>
         ))}
@@ -30,16 +28,16 @@ export default async function SignIn({ searchParams }: { searchParams: Promise<N
           <form action={signInAsDemo} className="demo-sign-in">
             <input type="hidden" name="next" value={next} />
             <h2>Look around with a demo account</h2>
-            <p className="muted">
-              Shared accounts on fictional demo data only; the database refuses them anywhere else. The clerk entered the demo&apos;s
-              bank changes, so the clerk can&apos;t release them (R5). The approver can.
-            </p>
             <div className="demo-buttons">
               <button className="primary" type="submit" name="role" value="approver">Sign in as the demo approver</button>
+              <p className="muted sub">Releases payments, with a written reason. Not the person who entered the change.</p>
               <button type="submit" name="role" value="clerk">Sign in as the demo clerk</button>
+              <p className="muted sub">Entered the demo&apos;s bank changes, so the database refuses their release (R5).</p>
             </div>
+            <p className="muted sub">Shared accounts on fictional demo data only; the database refuses them anywhere else.</p>
           </form>
         ) : null}
+        {mode === "supabase" && demoAccounts(process.env) ? <p className="or" role="separator"><span>or</span></p> : null}
         {mode === "supabase" ? (
           <form action={signIn}>
             <input type="hidden" name="next" value={next} />
@@ -58,8 +56,7 @@ export default async function SignIn({ searchParams }: { searchParams: Promise<N
             <span className="mono">DIALBACK_AUTH_MODE=dev</span>.
           </p>
         )}
-      </div>
-    </main>
+    </FrontDoor>
   );
 }
 

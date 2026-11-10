@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { CaseSummary } from "@/lib/api-types";
-import { STATIONS, dayWindow, heldLanes, place, type StationCount } from "@/lib/flow";
+import { dayWindow, heldLanes, miniRail, place, type StationCount } from "@/lib/flow";
+import type { CaseState } from "@/lib/api-types";
 import { date, dueLabel, when } from "@/lib/format";
 import type { Stage } from "@/lib/progress";
 import { Icon } from "./icons";
@@ -16,7 +17,7 @@ export function QueueRail({ counts }: { counts: StationCount[] }) {
       <ol className="rail">
         {counts.map((s) => (
           <li key={s.key} className={`station ${s.count ? "has-count" : "is-empty"}`}>
-            <span className="station-node"><Icon name={s.key} /></span>
+            <span className="station-node"><Icon name={s.key} size={15} /></span>
             <span className="station-label">{s.label}</span>
             <span className="station-meaning">{s.meaning}</span>
             <span className="station-count">{s.count}<span className="sr-only"> {s.count === 1 ? "change" : "changes"}</span></span>
@@ -35,26 +36,39 @@ export function QueueRail({ counts }: { counts: StationCount[] }) {
   );
 }
 
-const MARK: Record<Stage["status"], string> = { done: "✓", failed: "✕", current: "", skipped: "", todo: "" };
+/** A queue row's mini rail: one short bar per station, from the case's state alone. */
+export function MiniRail({ state }: { state: CaseState }) {
+  return (
+    <span className="mini-rail" aria-hidden="true">
+      {miniRail(state).map((seg, i) => <span key={i} className={`seg-${seg}`} />)}
+    </span>
+  );
+}
 
-/** A case's rail: this change's status at each station (spec 0031's progress rules). */
+/** A case's stepper: this change's status at each station (spec 0031's progress rules). */
 export function CaseRail({ steps }: { steps: Stage[] }) {
   return (
-    <section className="rail-card" aria-label="Progress">
-      <ol className="rail is-case">
-        {steps.map((s, i) => (
-          <li key={s.key} className={`station is-${s.status} st-${s.tone}`} aria-current={s.status === "current" ? "step" : undefined}>
-            <span className="station-node">
-              <Icon name={s.key} />
-              {MARK[s.status] ? <span className="station-mark" aria-hidden="true">{MARK[s.status]}</span> : null}
+    <section className="stepper-card" aria-label="Progress">
+      <ol className="stepper">
+        {steps.map((s) => (
+          <li key={s.key} className={`step is-${s.status} st-${s.tone}`} aria-current={s.status === "current" ? "step" : undefined}>
+            <span className="step-node" aria-hidden="true">
+              {s.status === "done" ? <Check /> : s.status === "failed" ? "✕" : null}
             </span>
-            <span className="station-label">{s.label}<span className="sr-only">: {s.status === "todo" ? "not reached" : s.status}</span></span>
-            <span className="station-meaning">{s.status === "failed" ? "A person must review this before anything else" : STATIONS[i].meaning}</span>
-            <span className="station-note">{s.note}</span>
+            <span className="step-label">{s.label}<span className="sr-only">: {s.status === "todo" ? "not reached" : s.status}</span></span>
+            <span className="step-note">{s.note || (s.status === "todo" ? "—" : "")}</span>
           </li>
         ))}
       </ol>
     </section>
+  );
+}
+
+function Check() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" focusable="false">
+      <path d="M2.5 6.2l2.3 2.3 4.7-4.8" />
+    </svg>
   );
 }
 
@@ -74,6 +88,7 @@ export function PaymentLanes({ cases, now, datasetId }: { cases: CaseSummary[]; 
   return (
     <figure className="card chart" aria-labelledby="lanes-h">
       <div className="chart-head">
+        <span className="section-marker">This week</span>
         <h2 id="lanes-h">Held payments by due date</h2>
         <ul className="legend" aria-label="Legend">
           <li><span className="key key-pay" aria-hidden="true" />Next saved payment</li>
