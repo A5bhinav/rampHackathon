@@ -480,7 +480,9 @@ def _company(truth: str) -> Callable[[ReportCase], ReportCase | None]:
 
 # Spec 0082 (Sami, Nov 10) changes three of spec 0048 B4's company moves:
 # - company_other stays, but never replaces a refusal: since D7b a refusal is the company answer's only evidence
-#   against the change (NR03), and dropping evidence against may help, as dropping a flag may (B4).
+#   against the change (NR03). This departs from B4, which says the company answer to another company must never
+#   help; B4's allowance covers dropping evidence against, and this is a replacement. It follows from D7b point 3
+#   (another company named passes) and is recorded in FINDINGS C14.
 # - company_partial and drop_company are retired. A short name is a match (D6), and the oracle expects a legit
 #   caller who gives one to verify, so it is no less certain than the full name. The company answer is no longer
 #   one of the confirming answers (D7b), so dropping it is not dropping one; it helps only where that answer was

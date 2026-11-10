@@ -1,4 +1,4 @@
-# 0006: The decision rules (engine `decision-1.0.0`)
+# 0006: The decision rules (engine `decision-1.0.0`; `decision-1.1.0` since spec 0082 D7b)
 
 **Owner:** Abhi  **Partner:** Inesh  **Slice:** money path  **Target day:** Wed Nov 4 (the checkpoint)
 

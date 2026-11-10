@@ -142,9 +142,10 @@ These are not reachable today, but each is frozen as a regression.
 
 - **Resolved by design (spec 0082, D7a and D7b; Sami, Nov 10).** A negation, a reseller, a past
   connection and the "I mean" correction now hold a refusal word, so the answer is False and NR03 sends
-  the case to a person (D7a). What still passes is accepted on purpose (D7b, D9): a correction with no
-  refusal word ("Acme? No, Globex"), another company named outright, and another company named at a
-  later question. The person who releases sees the answers on the call record.
+  the case to a person (D7a). What still passes: a correction with no refusal word ("Acme? No,
+  Globex") and another company named outright are accepted on purpose (D7b, D9). Another company
+  named at a later question (the role, name or department) also passes; D7b doesn't address that case,
+  and it was never checked on main either. The person who releases sees the answers on the call record.
   - **The lab now:** a09 passes without its expectation changing (NR03 fires), and every A10 entry is
     off the known-failures list. F1 asks for no refusal in the company answer, and F3 gates only
     negation, reseller and past connection, each of which must be False (C14).
@@ -960,14 +961,22 @@ F1 to F9 hold as built (verified). But the lab still claims more than it shows:
   False only (spec 0082, D10 as amended); other-company acceptance is printed too.
 - **F2**, which Sami's list didn't name, but which the decision broke:
   - `company_other` never replaces a refusal: a refusal is the company answer's only evidence against
-    the change now, and dropping evidence against may help (spec 0048, B4). No rule reads another
-    company now, so its double is NR03 firing on a match.
+    the change now. No rule reads another company now, so its double is NR03 firing on a match. This
+    is a deviation from spec 0048 B4, which lists "the company answer to another company" as a move
+    that must never help: B4's allowance is for *dropping* evidence against the change, and this is a
+    replacement. It follows from D7b point 3 (another company named passes).
   - `company_partial` and `drop_company` are retired: a short name is a match (D6), and the company
     answer is no longer a confirming answer (D7b).
   - Two attempts: the first kept both moves, with a refusal exemption. `drop_company` then flagged 20
     contract-only reports whose company answer was recorded before consent (NR02): dropping it verified.
     That was the check being too strong, not a product defect.
-  - **Open (Sami):** spec 0048's B4 still lists both moves.
+  - **Open (Sami):** spec 0048 is now stale in three places:
+    - B4 still lists the two retired moves, and lists `company_other` without the refusal narrowing;
+    - its F1 wording still asks for the company answer to name the vendor;
+    - its F3 wording still gates every class.
+  - **Open (Sami), latent:** F1 now accepts another company named (D7b), but the oracle still fails a
+    legit change whose company truth is `other`. No legit "another company named outright" scenario
+    exists today, so nothing shows it yet.
 - **The generator:** the contract-only `company_twice` adds a negation half the time. Otherwise the
   planted "first company answer only" bug no longer shows at all: only a refusing second answer changes
   the fact now. It shows as `F1:company=negation`, future-state. The reachable sample is unchanged; the
@@ -984,6 +993,9 @@ F1 to F9 hold as built (verified). But the lab still claims more than it shows:
   - other-company acceptance, True: 594 of 820 before (every refusal and correction was True, A10), 225
     after. Counting unknown too, which passes since D7b: 594 before, 443 after. That is 226 plain other
     companies that now pass, and 329 refusals and 48 "I mean" corrections that are now flagged.
+  - With the new generator, which `lab reports` now uses (re-run after merging main, Nov 10): 241 of
+    868 answers naming someone else read as the vendor (27.8%), and 175 more unknown, which pass too.
+    The denominators differ from the before-and-after above because the contract sample changed.
 - **Known failures now:** lab-smoke lists a02 (A28) and l16 (A29); lab-reports lists nothing; lab-fuzz
   is unchanged.
 

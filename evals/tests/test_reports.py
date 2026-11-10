@@ -125,6 +125,11 @@ def test_reference_matcher_passes_f3():
     found = reports.check_f3(_sample("reachable") + _sample("contract"), matcher=reports.strict_match)
     assert found.violations == []
     assert found.vendor_answers > 0
+    # Since spec 0082 D7b, F3 gates only the refusal classes, so the other classes' labels are checked here:
+    # the strict matcher reads none of them as the vendor, and each class is drawn (review fix, Nov 10).
+    for cls in ("other", "other_containing_vendor", "correction"):
+        assert sum(found.per_class.get(cls, {}).values()) > 0, f"{cls} is drawn"
+        assert found.per_class[cls]["true"] == 0, f"strict_match read a {cls} phrase as the vendor"
 
 
 def _added(found_broken, found_production) -> list:

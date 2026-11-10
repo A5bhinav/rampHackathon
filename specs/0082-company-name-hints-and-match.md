@@ -139,7 +139,9 @@ say (Part B), and keeps the clear-mismatch signal.
    - **Its cost:** an honest answer that happens to use one of these words goes to review ("Not
      sure, I think this is Acme"). That is the safe direction (R7).
    - **The list is exploratory.** It was chosen after reading the lab's phrase bank (spec 0048), so
-     its effect there proves nothing. D10's measurement is what confirms it.
+     its effect there proves nothing, and D10's run on that same bank is exploratory too.
+     Confirming it needs fresh data: real calls, or phrases written by someone who hasn't seen the
+     list.
 
    **7b. The decision (Sami, Nov 10): the company answer no longer has to match** (amendment). D7a
    stands as written. Where D7, D8, B2 to B5, "Contract touched", "Considered and rejected" or "Out
@@ -150,14 +152,16 @@ say (Part B), and keeps the clear-mismatch signal.
       ("acne") or missing answer does not block.
    2. **`NR03_wrong_company` keeps its id and its predicate** (`company_matches is False`), but now
       fires only for an answer with a refusal word or phrase (D7a). Its sentence becomes "The
-      company answer says the person is not with this vendor, or only works with it."
+      company answer did not name this vendor, or said the person is not with it or only works with
+      it." That is true under both meanings NR03 has had, so a `decision-1.0.0` decision that
+      recorded NR03 for a plain mismatch doesn't read as the vendor denying it (review fix).
       `SLOT_RULES["company_named"]` becomes `("NR03_wrong_company",)`.
    3. **The matcher** (`company.py`): an answer with readable words that neither matches nor holds a
       refusal word is `None`, not `False`. `every_name_matches` keeps its rule (any `False` gives
       `False`; otherwise any `None` gives `None`; otherwise `True`).
    4. **`ENGINE_VERSION` becomes `decision-1.1.0`.** A decision recorded by `decision-1.0.0` shows
-      its checklist as "not checked", with a note. Known limit: an old decision that recorded NR03
-      renders with the new sentence.
+      its checklist as "not checked", with a note. An old decision that recorded NR03 renders with
+      the new sentence, which point 2 keeps true for it.
 
    | Answer | `company_matches` | Engine |
    |---|---|---|
@@ -173,6 +177,20 @@ say (Part B), and keeps the clear-mismatch signal.
    - **What it gives up.** A clearly different company named with no refusal word, on a call that
      otherwise passes, is no longer flagged; only the releaser sees it. Conflicting companies across
      answers are not flagged either (D9).
+   - **R7 (unclear answers fail closed).** The company answer is now not required, like the
+     department answer, whose slot has no rule. So an unclear company answer is no longer a reason to
+     keep the hold. The cost, measured in the lab (exploratory):
+     - **A29:** a call whose free-text answers are all nonsense, but whose keypad digits match the
+       new account, now verifies. The company answer was the only check that read such a call;
+       V06 and grounding accept any words the caller said (A24).
+     - **A28:** a look-alike company name ("Acme Fastners LLC") verifies, through D6.
+     - Both still need the new account's last four typed on the keypad (V08), and a person to
+       release (R5) who sees the answers.
+   - **How D7a reads the vendor's own words.** A refusal word that is also a word of one of the
+     vendor's names is ignored anywhere in the answer, not only where the name is said. So for
+     "Never Summer Industries", "We never worked with Never Summer" is `True`. A refusal phrase is
+     ignored only when both its words are in the vendor's names. And the refusal check reads the
+     answer as the guard does (NFKC), so a fullwidth "Not Acme" is `False` too (review fix).
    - **The rule table changes, the contract doesn't.** `company_matches` stays `bool | None`, and
      `rules_fired` is still a list of ids.
    - **Q137 is answered:** decided: demote, with NR03 kept for refusal words; Sami, Nov 10.
@@ -204,9 +222,11 @@ say (Part B), and keeps the clear-mismatch signal.
     - **When D7a lands,** the lab's known-failures entries for negation, reseller and past
       connection should start passing and must come off (spec 0048, D3). Correction and "contains
       the vendor's name" stay listed.
-    - **Under D7b** (amendment, Nov 10), only `False` blocks, so over-blocking counts the answers that
-      name the vendor but come out `False`; those that come out `None` are reported apart, since they
-      block nothing. The lab's F3 then gates only negation, reseller and past connection, so the
+    - **Under D7b** (amendment, Nov 10, **added after the run**, so not a pre-registered metric),
+      only `False` blocks, so over-blocking counts the answers that name the vendor but come out
+      `False`; those that come out `None` are reported apart, since they block nothing. The run
+      reports both: under the original definition above ("not `True`"), 533 of 2,920 before and
+      332 of 2,920 (11.4%, all typos, which are unknown) after; under this one, 0 after. The lab's F3 then gates only negation, reseller and past connection, so the
       correction and "contains the vendor's name" entries come off too (`evals/FINDINGS.md` C14).
 
 ### Considered and rejected
