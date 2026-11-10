@@ -3,6 +3,11 @@
 **Status:** Proposed, Nov 9, 2026. Nothing is built. It changes ADR-8 in one way: one fingerprint
 key for every customer, held in a key-management service, and the fingerprint computed inside Ramp
 over the full number. Until a spec implements that, today's fingerprint stays (spec 0002, D4).
+**Changed by spec 0045 (PR #93):** shared trust for **phone numbers** is no longer deferred. A shared
+vendor profile keeps an ordered list of trusted numbers, which a bank-change case calls in order.
+Trust enters that list only through an onboarding anchor or a call to a number already on it, never
+by counting customers. Item 4 below says what that answers. Trust in bank accounts and Ramp-signed
+identity stay deferred.
 **Needs sign-off from:** Inesh (Trust Ledger), Abhi (core, evidence, ADR-8, decision engine), and
 every contract owner (decision item 3 adds a `network` facts block).
 
@@ -92,7 +97,8 @@ Why Dialback should not hold the full numbers:
 
 - **The ledger keeps its rule.** A number is callable because it reached this customer through the
   customer's own channels, by our own clock, before the cutoff (spec 0021). The network never adds
-  sightings to a customer's ledger, and never changes which number the ledger picks.
+  sightings to a customer's ledger. Spec 0045's shared profile can supply the number a case calls,
+  but as its own labeled selection (`profile-select-v1`), with the ledger's own pick kept beside it.
 - **The network gives the decision labeled inputs:** a `network` facts block, read by code (R3).
 - **Combine evidence, never trust.** Pooling "this account was seen at another customer" is
   evidence. Pooling "another customer trusted this" is the attack.
@@ -143,14 +149,20 @@ answer yet, so none is part of this decision. Each needs its own record.
 - **"Paid into for months with no returns."** An earlier fraud looks exactly like this. Customers
   fooled months ago are still paying the mule account, and mule accounts rarely produce returns.
   It also pools other customers' decisions to trust the account, which item 2 calls the attack.
-- **"Phone number proven at long-standing customers", offered to a cold-start customer.**
+- **"Phone number proven at long-standing customers", offered to a cold-start customer.** Adopted
+  in a different form by spec 0045, which answers the three problems below:
   - Independent customers do not mean independent sources. The design doc's known limit (page 21)
     is that someone who has controlled a vendor's mailbox and a public listing for 90 days gets
     their number picked. Every customer of that vendor sees those same channels, so "proven at 4
-    customers" can be one compromise seen 4 times.
-  - Today those customers go straight to a person; this would call instead.
+    customers" can be one compromise seen 4 times. *Spec 0045 never counts customers.* A shared
+    number comes from an onboarding anchor (registry and website, spec 0041) or from a call to a
+    number already trusted.
+  - Today those customers go straight to a person; this would call instead. *Spec 0045 calls, and a
+    profile change or new link in the last 7 days sends the case to review (NR22).*
   - It also can't be dialed without changing V01 ("We dialed the number the Trust Ledger chose")
-    and the voice service's dial guard, which dials only the ledger's pick.
+    and the voice service's dial guard, which dials only the ledger's pick. *Spec 0045 writes the
+    pick as a selection in the ledger's table and has the voice service dial the selection the case
+    names, so V01 holds as written.*
 - **Ramp-signed identity** instead of a call (the design doc's plug-in), for the same reasons.
 
 ### 5. Customers see derived facts, never another customer's data
