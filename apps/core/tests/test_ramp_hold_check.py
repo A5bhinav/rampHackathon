@@ -74,6 +74,24 @@ async def test_without_a_needed_scope_nothing_reaches_ramp():
     assert fake.requests == []
 
 
+async def test_a_scope_ramp_did_not_grant_stops_the_check_before_any_write():
+    # Found on the sandbox, 2026-11-10: the app lacked bills:write, so the hold and release went
+    # through and only setting the date back failed. Ramp's login answer lists what it granted.
+    fake = SandboxRamp()
+    fake.ungranted = {"bills:write"}
+    with pytest.raises(CheckRefused, match="bills:write"):
+        await checked(fake)
+    assert writes(fake) == [("POST", "/token")]
+
+
+async def test_a_login_answer_without_scopes_is_reported_and_the_check_goes_on():
+    fake = SandboxRamp()
+    fake.lists_scope = False
+    report = await checked(fake)
+    assert report.granted is None and report.dates_back
+    assert "Ramp's login answer listed no scopes" in render(report)
+
+
 async def test_a_vendor_already_on_hold_is_left_alone():
     fake = SandboxRamp()
     fake.events.append(event("ev-hand", "Vendor placed on hold", "2026-11-10T09:00:00+00:00"))  # a person's hold
@@ -88,12 +106,14 @@ async def test_a_round_trip_holds_releases_and_gives_every_date_back():
     fake = SandboxRamp()
     fake.hold_status = 202
     report = await checked(fake)
-    assert writes(fake) == [("POST", "/token"), ("POST", f"/vendors/{V}/hold"), ("POST", f"/vendors/{V}/release"),
-                            ("PATCH", "/bills/bill-1")]
+    # The second hold is the worker's retry on a vendor already held.
+    assert writes(fake) == [("POST", "/token"), ("POST", f"/vendors/{V}/hold"), ("POST", f"/vendors/{V}/hold"),
+                            ("POST", f"/vendors/{V}/release"), ("PATCH", "/bills/bill-1")]
     [patch] = [r for r in fake.requests if r.method == "PATCH"]
     assert json.loads(patch.content) == {"payment_date": "2026-11-12"}
-    assert report.writes == [("POST", f"/vendors/{V}/hold", 202), ("POST", f"/vendors/{V}/release", 202),
-                             ("PATCH", "/bills/bill-1", 200)]
+    assert report.writes == [("POST", f"/vendors/{V}/hold", 202), ("POST", f"/vendors/{V}/hold", 202),
+                             ("POST", f"/vendors/{V}/release", 202), ("PATCH", "/bills/bill-1", 200)]
+    assert report.granted == FIVE and report.second_hold == "accepted"
     # bill-3 is paid and bill-9 is another vendor's: neither is touched or reported.
     assert report.saved == {"bill-1": "2026-11-12", "bill-2": None}
     assert (report.held_after, report.held_reads) == (0.0, 1)
@@ -101,7 +121,10 @@ async def test_a_round_trip_holds_releases_and_gives_every_date_back():
     assert (report.cleared_after, report.cleared_reads) == (0.0, 1)
     assert report.after == {"bill-1": "2026-11-12", "bill-2": None} and report.dates_back
     text = render(report)
+    assert "Ramp granted: vendors:read vendors:write bills:read bills:write audit_logs:read" in text
+    assert "the worker's first read-back would have seen it: yes" in text
     assert "read-back would pass" in text and "every unpaid bill has its starting date back" in text
+    assert "A second hold on the held vendor" in text and "Ramp accepted it" in text
 
 
 async def test_a_hold_that_shows_late_is_waited_for_and_timed():
@@ -111,7 +134,13 @@ async def test_a_hold_that_shows_late_is_waited_for_and_timed():
     assert (report.held_after, report.held_reads) == (2.0, 3)
     assert (report.cleared_after, report.cleared_reads) == (2.0, 3)
     assert report.dates_back
-    assert "the worker's first read-back would have seen it: no" in render(report)
+    # The worker's three reads, 0.2 and 0.4 seconds apart, end before this check's third read starts,
+    # so a hold seen on read 2 or 3 may or may not have been seen by it; on read 4 or later, not.
+    assert "the worker's first read-back would have seen it: maybe" in render(report)
+    fake = SandboxRamp()
+    fake.lag = 4
+    report = await checked(fake)
+    assert report.held_reads == 4 and "the worker's first read-back would have seen it: no" in render(report)
 
 
 async def test_a_hold_that_never_shows_is_a_failure_and_the_release_and_dates_still_run():
@@ -120,8 +149,8 @@ async def test_a_hold_that_never_shows_is_a_failure_and_the_release_and_dates_st
     report = await checked(fake, wait=60.0)
     assert report.held_after is None and report.held_reads == 61 and not report.vendor_showed_hold
     assert writes(fake)[1:] == [("POST", f"/vendors/{V}/hold"), ("POST", f"/vendors/{V}/release"),
-                                ("PATCH", "/bills/bill-1")]
-    assert report.dates_back
+                                ("PATCH", "/bills/bill-1")], "no second hold: the first never showed"
+    assert report.dates_back and report.second_hold == ""
     text = render(report)
     assert "read-back did NOT pass within 60 seconds" in text and "never showed the hold" in text
 
@@ -148,7 +177,8 @@ async def test_a_refused_release_sets_no_date_and_says_how_to_remove_the_hold():
     fake = SandboxRamp()
     fake.release_error = 422
     report = await checked(fake)
-    assert writes(fake) == [("POST", "/token"), ("POST", f"/vendors/{V}/hold"), ("POST", f"/vendors/{V}/release")]
+    assert writes(fake) == [("POST", "/token"), ("POST", f"/vendors/{V}/hold"), ("POST", f"/vendors/{V}/hold"),
+                            ("POST", f"/vendors/{V}/release")]
     assert "422" in report.release_error and not report.dates_back
     assert report.cleared_reads == 0, "a refused release isn't waited for"
     text = render(report)
@@ -157,6 +187,25 @@ async def test_a_refused_release_sets_no_date_and_says_how_to_remove_the_hold():
     fake.release_error = 422
     fake.bills = [b for b in fake.bills if b["id"] != "bill-1"]  # no unpaid bill has a date: still not "back"
     assert not (await checked(fake)).dates_back
+
+
+async def test_a_second_hold_ramp_refuses_is_reported_and_the_check_still_cleans_up():
+    fake = SandboxRamp()
+    holds = []
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/hold"):
+            holds.append(request)
+            if len(holds) == 2:  # a vendor already on hold
+                fake.requests.append(request)
+                return ramp_error(422, "Vendor is already on hold.")
+        return fake.handle(request)
+
+    report = await checked(fake, handle=handle)
+    assert report.second_hold.startswith("refused") and "Vendor is already on hold." in report.second_hold
+    assert report.held_after == 0.0 and report.dates_back
+    assert writes(fake)[3:] == [("POST", f"/vendors/{V}/release"), ("PATCH", "/bills/bill-1")]
+    assert "Ramp REFUSED it" in render(report)
 
 
 async def test_a_date_ramp_refuses_to_set_again_is_reported():
@@ -186,7 +235,8 @@ async def test_a_release_ramp_accepts_but_never_shows_sets_no_date_and_says_so()
         return fake.handle(request)
 
     report = await checked(fake, handle=handle)
-    assert writes(fake)[1:] == [("POST", f"/vendors/{V}/hold"), ("POST", f"/vendors/{V}/release")]
+    assert writes(fake)[1:] == [("POST", f"/vendors/{V}/hold"), ("POST", f"/vendors/{V}/hold"),
+                                ("POST", f"/vendors/{V}/release")]
     assert report.cleared_after is None and report.cleared_reads == 61 and not report.dates_back
     text = render(report)
     assert "the hold still showed after 60 seconds" in text and "bill-1  2026-11-12" in text

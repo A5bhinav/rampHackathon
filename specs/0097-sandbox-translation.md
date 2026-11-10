@@ -84,11 +84,14 @@ None.
 - **Q202, answered for placement:** does Ramp file a vendor's hold and release events under the
   vendor's id (`object_id`)? Yes for a placement: the probe (spec 0098), 2026-11-10, after a hold
   placed by hand on a sandbox vendor with two unpaid bills, found `Vendor placed on hold` under the
-  vendor's id with `resource_name=Vendor / Merchant`, and the layer read the hold as on. A release
-  has not been seen yet; remove the hold and run the probe again to confirm it reads as off.
+  vendor's id with `resource_name=Vendor / Merchant`, and the layer read the hold as on. And for a
+  release: the hold check (spec 0099), 2026-11-10, held and released a second vendor through this
+  layer; both answered 204, and the release read back as off. (One vendor each: confirmed, not general.)
 - **Q203, answered:** do a held vendor's bills show `ON_HOLD`, or lose their payment date? Both, in
   the same run: each unpaid bill showed `status_summary` `ON_HOLD` and no payment date, so by the
   layer's reading the worker's read-back would pass. (One vendor, one hold: confirmed, not general.)
+  The hold check's vendor did the same, and its release gave the date back only when the worker's
+  step sets it again (Ramp's help center: removing a hold reschedules nothing).
 - **Q204:** is `Bill pay bank account updated` the event for a vendor's new bank account, and does
   its `event_details` name the new account? Until then, the author is unknown (two approvers).
   First try, 2026-11-10: a bank change made by hand in the sandbox's dashboard (its ownership check
@@ -101,6 +104,19 @@ None.
   and a payment Ramp schedules between that approval and the core's next sync isn't held (R1).
   Should a sandbox dataset open the case while the change is pending, and how does the case follow
   the account across the new id (the last four and `proposal_id` are the candidates)?
+- **Q206:** Ramp showed a hold about 7 to 10 seconds after answering 204 (the hold check, one run;
+  each read took about 3 seconds). The worker's read-back reads three times, 0.2 and 0.4 seconds
+  apart, so it may miss a hold that is on; it then retries the step, which places the hold again.
+  The worker assumes a hold on a vendor already held "changes nothing" (true of the mock). If Ramp
+  refuses it, every slow read-back ends with the case sent to a person after five tries (fail
+  closed, but no case would get through). The hold check now sends that second hold (spec 0099, D8);
+  its next run answers this. If Ramp refuses, the retry should read before placing again.
+- **Q207:** Ramp issued a token for a scope the app isn't allowed (`bills:write`) and refused only
+  the call (HTTP 403). The core's login doesn't compare what Ramp granted with what it needs, so a
+  sandbox dataset missing `bills:write` would hold and call normally, then fail every release when
+  it sets the dates back: the hold is put back and the case goes to a person (fail closed, but
+  found late). Should the core check the scopes Ramp's login answer lists at start-up? Not yet
+  known whether Ramp lists them; the hold check's next run shows it.
 
 ## Commands
 

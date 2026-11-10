@@ -21,6 +21,8 @@ None.
   a payment-date change to one of that vendor's unpaid bills as read at the start. The login asks for
   the five scopes this needs (`vendors:read vendors:write bills:read bills:write audit_logs:read`); if
   the configured scopes lack one, nothing is sent. Only `demo-api.ramp.com`, as the core checks.
+  After logging in, if Ramp's answer lists the scopes it granted (its document's `scope` field) and
+  one is missing, nothing is written (D7).
 - **D2. A vendor already on hold is left alone**: that hold may be a person's decision, and the
   release would undo it. Remove it by hand first, or pick another vendor (`probe --list`).
 - **D3. The worker's steps** (`worker.py`, `place_hold` and `release_hold`), through the layer:
@@ -29,14 +31,34 @@ None.
   until the hold is gone; set each saved date again; read the bills once more.
 - **D4. Read-backs wait up to 60 seconds**, one read a second, and report how long the hold took to
   show. Ramp answers a hold with 202 or 204, so it may apply it after answering; the worker reads
-  three times over about 0.6 seconds and then retries the whole step, so the report says whether
-  that first window would have seen it.
+  three times, 0.2 and 0.4 seconds apart, and then retries the whole step, so the report says
+  whether that first read-back would have seen it: yes on this check's first read; maybe on its
+  second or third (the worker's last read starts before this check's third, by about 1.4 seconds);
+  no after that. (The first version said "no" for any read after the first; corrected after the
+  sandbox run below, where each read took about 3 seconds.)
 - **D5. It cleans up.** Once the hold is placed, the release runs even if the read-back failed or
   timed out, and the dates are set again once the release is confirmed. If the release fails, it
   says how to remove the hold by hand and which dates to set; it doesn't set dates on a held vendor.
 - **D6. The report**: Ramp's status for each write; seconds until the hold showed and until it was
   gone; each unpaid bill before, while held and after; whether every date came back. No secret or
   token. It answers Q202 for a release, Q203 for this vendor, and tests D2's payment-date mapping.
+- **D7. Granted scopes**, added after the first sandbox run: the report shows the scopes Ramp's
+  login answer lists, and the check stops before writing if one it needs is missing.
+- **D8. A second hold**, added after the first sandbox run: once the hold shows, the check places it
+  again, as the worker does when it retries after a read-back that came too early, and reports
+  whether Ramp accepts a hold on a vendor already held (spec 0097, Q206).
+
+## Found on the sandbox, 2026-11-10 (first run, one vendor: DocuSign, one unpaid bill)
+
+- Hold and release each answered 204. The hold read back as the worker expects (the vendor showed
+  it; the bill lost its date and showed held) after 10.4 seconds, on the third read; the release
+  read back as gone after 12.4 seconds, on the fifth. Each read (vendor, audit log, bills) took
+  about 3 seconds.
+- Setting the date back failed: HTTP 403, "These scopes are not allowed for this client:
+  bills:write". The login had asked for bills:write and Ramp issued a token without complaint, so
+  the check held and released before it found out. D7 now stops that before the hold, if Ramp's
+  login answer lists its scopes (not yet seen). The bill was left with no payment date.
+- The release didn't give the date back by itself, as Ramp's help center says.
 
 ## Acceptance
 
@@ -52,12 +74,17 @@ None.
       set, and the report says how to finish by hand.
 - [x] A bill Ramp leaves scheduled fails the read-back, and the report says the vendor did show the
       hold; a date Ramp refuses to set again is reported.
+- [x] A scope missing from Ramp's login answer stops the check before any write; an answer that
+      lists no scopes is reported, and the check goes on (D7).
+- [x] Once the hold shows, a second hold is sent and Ramp's answer reported; a refusal doesn't stop
+      the release or the dates; no second hold when the first never showed (D8).
+- [x] The first read-back is "yes" on read 1, "maybe" on reads 2 and 3, "no" after (D4).
 
 ## Tests (written first)
 
 | Acceptance item | Test |
 |---|---|
-| 1-7 | `apps/core/tests/test_ramp_hold_check.py::test_*` |
+| 1-10 | `apps/core/tests/test_ramp_hold_check.py::test_*` |
 
 ## Out of scope
 

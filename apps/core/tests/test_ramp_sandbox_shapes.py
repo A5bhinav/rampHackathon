@@ -89,6 +89,8 @@ class SandboxRamp:
         self.lag = 0  # audit-log reads before a hold or release event shows (Ramp answers 202: it may apply it later)
         self.delayed: list[list] = []  # [reads left, event]
         self.release_error: int | None = None
+        self.lists_scope = True
+        self.ungranted: set[str] = set()  # scopes this app isn't allowed in Ramp: left out of the login's answer
         self.bills_error: str | None = None
         self.clock = 0
 
@@ -100,7 +102,11 @@ class SandboxRamp:
         self.requests.append(request)
         path, q = request.url.path.removeprefix("/developer/v1"), parse_qs(request.url.query.decode())
         if path == "/token":
-            return httpx.Response(200, json={"access_token": "test-token-1", "expires_in": 864000})
+            answer: dict = {"access_token": "test-token-1", "expires_in": 864000}
+            if self.lists_scope:  # Ramp's document: "Space-separated list of scopes of the access token"
+                asked = parse_qs(request.content.decode()).get("scope", [""])[0].split()
+                answer["scope"] = " ".join(s for s in asked if s not in self.ungranted)
+            return httpx.Response(200, json=answer)
         if path == "/vendors":
             if "start" not in q:  # two pages, to show `page.next` is followed
                 return httpx.Response(200, json={"data": [self.vendors[V]], "page": {"next": f"{BASE}/developer/v1/vendors?start={V}&page_size=100"}})

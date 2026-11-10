@@ -92,7 +92,9 @@ class WriteGuard:
 class Report:
     vendor_id: str
     login_scopes: tuple[str, ...]
+    granted: tuple[str, ...] | None = None  # as Ramp's login answer listed them
     vendor_name: str = ""
+    second_hold: str = ""  # "", "accepted", or "refused: ..."
     refused: str = ""
     saved: dict[str, str | None] = dataclasses.field(default_factory=dict)  # unpaid bill: payment date before
     hold_error: str = ""
@@ -134,9 +136,16 @@ async def hold_check(sandbox: RampSandbox, guard: WriteGuard, http: httpx.AsyncC
     if missing:
         raise CheckRefused(f"RAMP_SANDBOX_SCOPES lacks {' '.join(missing)}; the check needs {' '.join(NEEDED)}")
     scoped = dataclasses.replace(sandbox, scopes=NEEDED)
-    layer = RampSandboxAdapter(scoped.base_url, RampLogin(scoped, http), http, limiter or TokenBucket(100))  # Ramp's limit
+    login = RampLogin(scoped, http)
+    layer = RampSandboxAdapter(scoped.base_url, login, http, limiter or TokenBucket(100))  # Ramp's limit
     vendor_id = guard.vendor_id
     r = Report(vendor_id=vendor_id, login_scopes=NEEDED, wait=wait)
+    await login.token()
+    r.granted = login.granted
+    if r.granted is not None and (ungranted := [s for s in NEEDED if s not in r.granted]):
+        # Found on the sandbox: an app without bills:write held and released, then couldn't set the dates back.
+        raise CheckRefused(f"Ramp granted only {' '.join(r.granted)}; enable {' '.join(ungranted)} for this app "
+                           "in Ramp's developer settings, then run again")
 
     vendor = await layer.get_vendor(vendor_id)
     r.vendor_name = vendor.name
@@ -163,6 +172,12 @@ async def hold_check(sandbox: RampSandbox, guard: WriteGuard, http: httpx.AsyncC
             r.held_after, r.held_reads = await _until(held, clock, sleep, wait)
         except RampError as exc:
             r.hold_error = str(exc)
+        if r.held_after is not None:  # the worker's retry places the hold again on a vendor already held
+            try:
+                await layer.place_vendor_hold(vendor_id, REASON)
+                r.second_hold = "accepted"
+            except RampError as exc:
+                r.second_hold = f"refused: {exc}"
     finally:  # D5: release whatever happened above, even a bug
         try:
             await layer.release_vendor_hold(vendor_id)
@@ -184,6 +199,8 @@ async def hold_check(sandbox: RampSandbox, guard: WriteGuard, http: httpx.AsyncC
 
 def render(r: Report) -> str:
     lines = [f"Logged in to Ramp's sandbox with: {' '.join(r.login_scopes)}",
+             f"Ramp granted: {' '.join(r.granted)}" if r.granted is not None
+             else "Ramp's login answer listed no scopes, so the check couldn't confirm them before writing",
              f"Vendor {r.vendor_id}: {r.vendor_name}", ""]
     if r.refused:
         return "\n".join(lines + [f"Left alone: {r.refused}.",
@@ -199,12 +216,20 @@ def render(r: Report) -> str:
         lines.append(f"Hold: the worker's read-back did NOT pass within {r.wait:.0f} seconds ({r.held_reads} reads): "
                      f"the vendor {why}. The worker would retry the step.")
     else:
-        first = "yes" if r.held_reads == 1 else "no"
-        lines.append(f"Hold: showed after {r.held_after:.1f} seconds, on read {r.held_reads} "
-                     f"(the worker's first read-back would have seen it: {first}; it reads {WORKER_READS} times, then retries)")
+        # The worker's reads are 0.2 and 0.4 s apart, this check's 1 s: its last read starts before this
+        # check's third, so a hold seen on read 2 or 3 may or may not have been seen by it.
+        first = "yes" if r.held_reads == 1 else "maybe" if r.held_reads <= WORKER_READS else "no"
+        lines.append(f"Hold: showed after {r.held_after:.1f} seconds, on read {r.held_reads} (the worker's first "
+                     f"read-back would have seen it: {first}; it reads {WORKER_READS} times, 0.2 and 0.4 seconds "
+                     "apart, then retries the step)")
     lines += [f"  {b}  date {d or '(none)'}  {'held' if h else 'NOT held'}" for b, d, h in r.held_bills]
     if r.held_after is not None:
         lines.append("  the worker's read-back would pass")
+    if r.second_hold == "accepted":
+        lines.append("A second hold on the held vendor (the worker's retry sends one): Ramp accepted it")
+    elif r.second_hold:
+        lines.append(f"A second hold on the held vendor (the worker's retry sends one): Ramp REFUSED it "
+                     f"({r.second_hold.removeprefix('refused: ')}); a worker retry after a slow read-back would fail")
     if r.release_error:
         lines += ["", f"Release FAILED: {r.release_error}",
                   f"The vendor is still on hold. Remove it by hand ({BY_HAND}), then set these payment dates:"]
@@ -253,7 +278,7 @@ def run(argv: list[str] | None = None, environ: dict[str, str] | None = None,
     try:
         print(asyncio.run(go()))
     except CheckRefused as exc:
-        print(f"Nothing was sent: {exc}")
+        print(f"Nothing was written: {exc}")
         return 2
     except RampError as exc:
         print(f"Ramp refused or couldn't be reached before anything was written: {exc}")
