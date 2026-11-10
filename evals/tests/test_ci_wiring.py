@@ -24,6 +24,13 @@ def test_lab_fuzz_runs_the_green_lab_checks_and_the_gate_on_rule_changes():
     assert any("lab fuzz" in r for r in runs)                               # the gate itself
 
 
+def test_lab_fuzz_runs_the_search_that_keeps_going():
+    # Spec 0048, D2 step 5: lab-fuzz runs spec 0046's archive search, which carries the known-failures list
+    # (the first-hit search stops at a known failure, FINDINGS B3).
+    _, runs = _workflow("lab-fuzz.yml")
+    assert any("lab fuzz" in r and "--search archive" in r and "--examples 2000" in r and "--seed 0" in r for r in runs)
+
+
 def test_lab_smoke_deselects_the_selection_gate():
     _, runs = _workflow("lab-smoke.yml")
     assert any("pytest" in r and "not selection_gate" in r for r in runs)

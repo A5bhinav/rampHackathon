@@ -7,7 +7,12 @@ and needs no key. `--max-usd` is accepted for forward compatibility; the scripte
 
 `lab fuzz` re-runs every frozen finding under `--out`, then searches `--examples` generated worlds at
 `--seed`, freezing the first shrunk violation there; it exits non-zero on any frozen case that still
-fails or any new finding."""
+fails or any new finding.
+
+Spec 0046: `lab fuzz --search archive` runs the whole budget instead, freezes a 1-minimal world for
+every label no frozen case records yet, and writes near misses to `--near-misses`, which never changes
+the exit code; `--search first` (the default) is the search above, unchanged. Both hold lab-fuzz's
+known-failures list (spec 0048, D3)."""
 from __future__ import annotations
 
 import argparse
@@ -71,6 +76,10 @@ def main(argv: list[str] | None = None) -> int:
     fz.add_argument("--seed", type=int, default=0)
     fz.add_argument("--out", default="evals/corpus-generated")
     fz.add_argument("--known-failures", default="auto", help=_KNOWN_HELP)
+    fz.add_argument("--search", choices=["first", "archive"], default="first",
+                    help="first: stop at the first violation; archive: run the whole budget (spec 0046)")
+    fz.add_argument("--near-misses", default="evals/out/near-misses.json",
+                    help="where --search archive writes its near misses (never gated)")
     freeze = sub.add_parser("freeze", help="record each scenario's hash and required outcome (expected.lock.json)")
     freeze.add_argument("--split", default="voice")
     freeze.add_argument("--scenarios-root", default=str(_REPO / "evals" / "scenarios"))
@@ -87,8 +96,10 @@ def main(argv: list[str] | None = None) -> int:
         return _run(scenarios_dir, Path(args.out), _known(args.known_failures, scenarios_dir, _REPO / "evals" /
                                                           "scenarios" / "voice"))
     if args.command == "fuzz":
-        return _fuzz(args.examples, args.seed, Path(args.out),
-                     _known(args.known_failures, Path(args.out), _REPO / "evals" / "corpus-generated"))
+        listed = _known(args.known_failures, Path(args.out), _REPO / "evals" / "corpus-generated")
+        if args.search == "first":
+            return _fuzz(args.examples, args.seed, Path(args.out), listed)
+        return _search(args.examples, args.seed, Path(args.out), Path(args.near_misses), listed)
     return 2
 
 
@@ -113,6 +124,33 @@ def _fuzz(examples: int, seed: int, out_dir: Path, known_failures: Path | None =
           f"(seed {seed}, {examples} examples)")
     held = _held("lab-fuzz", known_failures, dict(failing), [new] if new else [])
     return (1 if failing or new else 0) if held is None else held
+
+
+def _search(examples: int, seed: int, out_dir: Path, near_misses: Path, known_failures: Path | None = None) -> int:
+    """Spec 0046's search that keeps going. Every failing world it evaluates is a search hit for the
+    known-failures list; the near misses are written and never change the exit code."""
+    from . import known
+    from .gencorpus import rerun
+    from .guided import ALL_MOVES, archive_fuzz
+    failing = rerun(out_dir)
+    for label, found in failing:
+        print(f"lab fuzz: frozen case {label} still fails: {', '.join(found)}")
+    entries = known.for_job(known_failures, "lab-fuzz")
+    listed = {label for e in entries or () for label in e.labels}
+    result = archive_fuzz("archive", examples=examples, seed=seed, out_dir=out_dir, near_misses=near_misses,
+                          counted=listed)
+    arc = result.archive
+    for label, hit in arc.first.items():
+        where = (f"frozen as {result.frozen[label]} under {out_dir}" if label in result.frozen
+                 else "counted, not frozen: a frozen case records it or the known-failures list holds it")
+        print(f"lab fuzz: {label}, first at world {hit.index}: {where}")
+    print(f"lab fuzz: {sum(m in arc.near for m in ALL_MOVES)} near miss(es) written to {result.near_misses} "
+          "(they never change the exit code)")
+    print(f"lab fuzz: {len(failing)} frozen case(s) failing, {len(arc.first)} label(s) found, "
+          f"{len(result.frozen)} new case(s) (--search archive, seed {seed}, {examples} examples, "
+          f"{len(arc.worlds)} distinct worlds)")
+    held = _held("lab-fuzz", known_failures, dict(failing), [labels for labels in arc.labels if labels])
+    return (1 if failing or arc.first else 0) if held is None else held
 
 
 def _run(scenarios_dir: Path, out_dir: Path, known_failures: Path | None = None) -> int:
