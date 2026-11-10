@@ -386,6 +386,15 @@ These are not reachable today, but each is frozen as a regression.
   phrasing.
 - **Why it's latent:** production agents never speak; code owns every spoken line. Spec 0048's
   `agent_said_text` gate now fails any call where an agent says anything.
+- **Spec 0079's builder check (Nov 10; a scratch prototype, exploratory):** an age limit on trust
+  can't be separated from the lookalike pull.
+  - **Measured from the rule's cutoff:** one attacker lookalike email revives a sleeper. In 300
+    generated worlds, a single probe turned 139 of 275 refusals back into calls.
+  - **Measured from the request:** one old lookalike email makes every number stale.
+  - **The cost at 365 days:** it drops the picks of demo vendors acme and cobalt and of corpus
+    control C01, all 443 days past their last clean sighting, because their change requests reply
+    on the latest invoice thread.
+  - **The change-context fix on its own** changed no demo pick and none of the 20 corpus outcomes.
 
 ## B. The fuzz lab (spec 0033)
 
