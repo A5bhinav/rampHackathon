@@ -178,3 +178,68 @@ uv run --with jsonschema --with rfc8785 --with pyyaml --with openapi-spec-valida
 uv run lab fuzz --examples 2000 --seed 0
 uv run lab overblock --out evals/out/overblock.json
 ```
+
+## Results (Nov 10, measured on `sami/0079-guard`)
+
+**How it ran.** The rule under test is this branch at `ae522fe` (`ledger-select-v3`, guard on). The
+baseline is the frozen copy of today's rule (`packages/ledger/tests/fixtures/select_v1_frozen.py`,
+main at `907b007`). The lab is `origin/sami/lab-honest-impl` at `8c54e05`, in its own worktree, with
+`PYTHONPATH` set to this branch's ledger (checked: the lab's `select` is `ledger-select-v3`). The
+lab's copy of `selection.schema.json` was replaced with this branch's, so its I6 check knows
+`withheld`. The plan and the bars were written down before the run; the script is scratch, not
+committed. The generated worlds are drawn once, so both rules see the same worlds.
+
+**Gated: every bar passes.**
+
+| Check | Worlds | Result |
+|---|---|---|
+| The prefix property | 20 corpus, 3 demo, 9 frozen (spec 0033), 2000 generated (seed 0, pinned draws; 1622 distinct), 18 frontier, 122 over-block | Holds on every world |
+| I12 | The 2000 generated worlds | Fails on 0 (today's rule: 442) |
+| A1 | The 3 `planted-number-picked-after-*` cases | Today calls the planted +16455550177; the new rule withholds; `M_incontext_label_moved_pick` no longer fires |
+| A3 | Over-block `in_thread_copy` at 365 and 730 days, planted family | Today calls the planted number; the new rule withholds |
+| A6 | The lookalike-hole world, then each probe | No probe: both call the real line. 30 and 100 days: today calls the real line, the new rule withholds (the known cost), and the run without the change context alone would call X. 400 days: both give `no_provable_number`. X is never called, and `M_lookalike_helped` never fires |
+| Corpus | 20 scenarios | Every outcome, pick, candidate and call list is today's |
+| Demo | Acme, Brightline, Cobalt | Acme calls +12065550142 and Cobalt +16175550142, each with today's backup; Brightline gets no call |
+
+Two consistency checks, not bars, held on every world above:
+- with the flag off, `select()` is byte for byte the frozen copy;
+- the new rule's outcome and call list match decision 3 recomputed from the frozen copy.
+
+**The cost, reported with no bar.**
+- **Generated worlds:**
+  - Today's rule calls in 1244 of 2000. The new rule withholds in 146 of them: 7.3% of all
+    worlds, 11.7% of the worlds where today calls.
+  - Backups are cut in none.
+  - The dates are fixtures, so these are not real-world rates.
+- **Over-block sweep, honest rows:** today calls in 32 of 61 rows, and the new rule withholds in
+  none. Nothing in that family changes.
+- **Exploratory split, chosen after seeing the numbers.** The generator marks the numbers it
+  planted ("poison").
+  - Of the 146 withheld worlds, today's pick was a planted number in 88 (calls stopped) and another
+    number in 58. The 58 are 2.9% of all worlds, and 5.6% of the 1040 where today calls a number
+    that wasn't planted.
+  - In 116 worlds both rules still call a planted number that never needed the change context
+    (K01, out of scope).
+  - FINDINGS A6's trial reported about 2%. It isn't comparable: it set labels aside rather than
+    removing documents, and drew other worlds.
+
+**What else the run showed.**
+- **The over-block sweep, planted family:** 8 of 61 rows change, all from the planted number to
+  `withheld`: `in_thread_copy` at 365 and 730 days (A3), and `bank_label_in_thread` at every age
+  (A1's shape). Three kinds of noise still hand the call to the planted number at every age, under
+  both rules:
+  - `bank_label_copy` and `fax_label_copy`: their labels are outside the change context (FINDINGS
+    A4).
+  - `shared_id_duplicate`: a second document under the real contract's id puts that contract in the
+    change context, so the run without the context loses the real line too (FINDINGS A5).
+- **Lab labels on the 2000 generated worlds:**
+  - `M_incontext_label_moved_pick` goes from 442 to 0.
+  - `M_shared_id_helped` stays at 207.
+  - No other label appears under either rule.
+- **`uv run lab fuzz --examples 2000 --seed 0`** exits 1, and 0 new findings:
+  - A1's four entries on the known-failures list no longer fail, and the list says to take them
+    off (a lab follow-up).
+  - The four A5 shared-id cases still fail as listed.
+- **`uv run lab overblock`** exits 0, and its printed lines are the same under both rules.
+- **The builder check's prediction** (no demo pick and no corpus outcome changes) is confirmed by
+  the real code.
