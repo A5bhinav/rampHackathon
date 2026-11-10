@@ -1,147 +1,177 @@
-# 0079: Refuse, don't redirect
+# 0079: Refuse, don't redirect: the change context can't change who is called
 
 **Owner:** Sami (implementing in `packages/ledger`, Inesh's slice; Inesh reviews as its owner)  **Partner:** Inesh  **Slice:** evidence  **Target day:** not set
 
 ## Goal
 
-Two changes to the number-selection rule, `select()`, under one principle: **a new check may cancel
-a call, but may never move it to a different number.**
+One change to the number-selection rule, `select()`, under one principle: **the change context may
+cancel a call, but may never move it to a different number.**
 
-1. **The change context can't change who is called.**
-   - It fixes FINDINGS A1: a label in the change email vetoes the real number, and the call moves
-     to a planted one.
-   - It fixes A3: an old hijacked thread makes R2 refuse the real number.
-   - It fixes the lookalike hole in A6.
-2. **A number must have been seen recently to be called.** This fixes A23's first point: a planted
-   number otherwise sleeps, trusted forever, until the fraudster needs it.
+The change context is the attacker's territory: the change request, its thread, and everything after
+the cutoff. Today a label there can veto the vendor's real number and hand the call to a planted one
+(FINDINGS A1). An old hijacked thread can do the same through R2 (A3). And the obvious fix, ignoring
+the change context's labels, opens a lookalike hole (A6).
 
-**The safety property: v2's call list is always a prefix of v1's.** The call list is the pick, then
-up to two backups. v2 keeps the same numbers in the same order, possibly cut short or empty. So v2
-never calls a number today's rule wouldn't. The cost is more cases sent to a person, and this spec
-measures it.
+This change closes all three by comparing two runs of today's rule:
+- one on the case as it is;
+- one with the change context removed.
 
-**Not included: a time limit on a lookalike email's pull** (A23's second point). Any simple version
-either keeps the over-block, by sending old lookalikes to a person, or opens a hole: numbers planted
-after an old lookalike email would start counting as clean. It needs its own design.
+If they disagree about who to call, nobody is called and a person reviews the case.
+
+**The safety property: the new call list is always a prefix of today's.** The call list is the pick,
+then up to two backups. The new rule keeps the same numbers in the same order, possibly cut short or
+empty. So it never calls a number today's rule wouldn't. Its cost is more cases sent to a person.
 
 It serves R2 (never call a number first seen in the change context), R7 (fail closed) and R1 (never
 verify an attack).
 
+**Left out on purpose:** an age limit on trust, and a time limit on a lookalike email's pull (A23).
+Spec 0079's first draft had an age limit. Its builder check showed two things:
+- at 365 days it drops two demo vendors' picks and one corpus control's;
+- one lookalike email undoes it.
+
+The two need one design together, later.
+
 ## Contract touched
 
 `packages/contracts/schemas/selection.schema.json`, in its own PR, first (AGENTS.md):
-- **Three new `Reason` values:** `change_context_moves_call`, `not_seen_recently` and
-  `backup_withheld`.
-- **A new `rule_settings` field:** `recent_days`.
-- **Examples:** one example per new reason.
+- `outcome` gains `withheld`. Like `no_provable_number`, it requires `reason`, and forbids
+  `contact_point_id`, `e164` and `alternates`.
+- An example of a `withheld` selection.
 
-`rule_version` becomes `ledger-select-v2`.
+`rule_version` takes the next free name when this merges. Spec 0047 has already claimed
+`ledger-select-v2` (Q130).
 
 ## Decisions
 
-1. **Today's rule is the baseline, unchanged.** It becomes `_select_v1`. v2 runs it, then only cuts
-   its call list.
-2. **C1: the change context can't change who is called.**
-   - **The pre-context run:** run v1 again on the same world with every change-context document and
-     its sightings removed (the documents `change_context_documents` returns). The change request's
-     record stays, so the cutoff and R7 behave as before, but its document's sightings go.
-   - **What v2 keeps:** the longest common prefix of v1's call list and the pre-context call list.
-   - **Every number v1 called that v2 drops** gets `change_context_moves_call`. If nothing is left,
-     the outcome is `no_provable_number`, and a person reviews the case.
-3. **C2: recent evidence.**
-   - **The new setting:** `recent_days`, 365 by default (Q130). A number in the call list with no
-     clean sighting within `recent_days` before the cutoff gets `not_seen_recently`.
-   - **The cut:** the call list is cut at the first such number, and every number after it gets
-     `backup_withheld`. So a stale pick never hands the call to a fresher backup.
-   - **What it doesn't stop:** a freshly planted number (K01 inside the window) still qualifies.
-     C2 only defeats sleepers.
-4. **The order:** C1, then C2 on what C1 kept. The final list is a prefix of v1's.
-5. **Wording.**
-   - The ledger's reason sentences (`reasons.py`) and the web's reason chips cover the three new
-     reasons.
-   - The timeline still says no provable number was found and a person must verify.
+1. **Today's rule is the baseline, unchanged.** It becomes `_select_v1`, and the new rule runs it
+   twice.
+2. **The pre-context run.**
+   - Run `_select_v1` on the same case with every change-context document and its sightings removed:
+     the documents `change_context_documents` returns.
+   - The change request's record stays, so R7 (nothing is picked with no request) behaves as
+     before, but its document's sightings go.
+   - The pre-context run keeps today's run's cutoff, as the builder check's prototype did. So the
+     comparison isolates what the change context's documents do (their labels and R2), and the
+     lookalike pull is left to the later design.
+3. **What gets called: the longest common prefix of the two call lists.**
+   - **They agree on the pick:** the outcome is `picked`, and the backups are cut to the prefix.
+     Nothing dials backups today; this affects only what is stored and shown.
+   - **They disagree on the pick:** the outcome is `withheld`, with the reason "The change request
+     would change which number is called, so a person must verify."
+   - **Today's rule picks nothing:** the outcome stays `no_provable_number`, as today.
+4. **Candidates keep today's eligibility.**
+   - A `withheld` selection changes no candidate's `eligible`, `rank` or reasons. So `_store` keeps
+     each contact point's vendor-wide status as today.
+   - So a case withheld here never makes the voice service treat that number as opted out on
+     another case.
+5. **The core needs no change.** It treats any selection without a `contact_point_id` as "no
+   pick", emits `no_provable_number` with the selection's `reason`, and a person reviews. Abhi
+   confirms (Q131).
+6. **Spec 0047 must not fire on `withheld`.** Its onboarding fallback fires "only when today's rule
+   picks nothing". It must read `no_provable_number` only; firing on `withheld` would move the call
+   at the system level.
+7. **A kill switch.** The ledger's flag `DIALBACK_CONTEXT_GUARD`, read in `flags.py`, is on by
+   default. Any unknown value means on. Off runs today's rule alone, for rollback only.
 
 ## The measurement (fixed before any run)
 
-These run on the lab's existing, deterministic tools:
+It runs on:
 - the 20-scenario corpus;
+- the 3 demo vendors (the seed run through `ingest_all`; no database needed);
 - spec 0033's frozen worlds;
 - 2000 generated worlds at seed 0, with spec 0048's pinned draws;
 - the frontier and over-block grids.
 
-**Gated, with 0 violations allowed:**
-- **Safety:** on every world above, v2's call list is a prefix of v1's.
-- **The fixes:** each of these makes v2 call nobody:
-  - A1's frozen cases;
-  - A3's over-block rows (`in_thread_copy` at 365 and 730 days);
-  - the hand-built lookalike-hole world from A6.
-- **I12:** it holds on every generated world under v2.
-- **Controls:** corpus controls C01 to C05 keep their picks.
-- **The demo:** every demo vendor keeps its pick. If one doesn't at 365 days, Sami decides the
-  default with Inesh (Q130). The bar doesn't move silently.
+**Structural, and gated.** These hold by construction, so they catch bugs in the new code and drift
+in today's rule, not design mistakes.
+- **The prefix property.** The new rule's call list is a prefix of today's on every world above.
+  "Today's" means a frozen copy of `select()` as it is on main when this branch starts, kept as a
+  test fixture. So a later change to `_select_v1` can't hide behind its own baseline.
+- **I12 holds on every generated world.**
 
-**Reported, with no bar:**
-- **The cost:** the share of worlds where v1 calls and v2 doesn't, split by C1 and C2. It covers
-  the generated worlds, the over-block sweep's honest rows, and the corpus.
-- **The attacker's cost:** the frontier's minimum effort under v2 next to v1's. It can only rise.
+**The fixes, gated.** For each case below, the lab's known failure stops firing, and the planted
+number is never called:
+- A1's three frozen cases (`planted-number-picked-after-*`);
+- A3's over-block rows (`in_thread_copy` at 365 and 730 days, planted family);
+- the A6 lookalike-hole world, with each of the lab's lookalike probes (30, 100 and 400 days).
 
-## What this changes elsewhere (the full list)
+**No change where nothing is wrong, gated:**
+- all 20 corpus outcomes are unchanged;
+- every demo vendor keeps its pick.
 
-- **The contract:** three new reasons and one setting, in their own PR first.
-- **The corpus's frozen truth:** any scenario whose expected outcome changes is listed. A person
-  updates `FROZEN_TRUTH_SHA256` on purpose (spec 0020), with Inesh's review.
-- **The lab (follow-ups on the lab branches):**
-  - A1's frozen cases leave the known-failures list.
-  - L1, the over-blocking floor, adds recency to its premise, since a clean world must now also
-    have a recent sighting.
-- **The web:** the three new reason chips.
-- **Manual reviews:** more of them, by the amount the measurement reports.
+**The cost, reported with no bar:** the share of worlds where today's rule calls and the new rule
+withholds, on the generated worlds and on the over-block sweep's honest rows.
+- The generated worlds' dates are fixtures, so their share is not a real-world rate.
+- The A6 world with the 30- and 100-day probes is a known cost: today's rule calls the real number
+  there, and the new rule withholds.
+
+**From the builder check's prototype** (exploratory, to be confirmed by the real code): the change
+alone changed no demo pick and none of the 20 corpus outcomes.
+
+## What this changes elsewhere
+
+- **The contract:** the `withheld` outcome and its example, in their own PR first. If the core's
+  OpenAPI exposes a selection's outcome, it grows too, and `packages/contracts/generated/ts` is
+  regenerated.
+- **The web:** the lineage panel and the corpus page show `withheld` and its reason.
+  `apps/web/src/data/corpus-results.json` is regenerated (unchanged, per the prototype).
+- **The risk list** (`risk.py`) runs `select()`. A vendor whose latest case is withheld reads as
+  "needs a person", not as unproven.
+- **The lab** (follow-ups on the lab branches):
+  - A1's cases leave the known-failures list;
+  - I12's frozen cases pass;
+  - the lab's selection invariants learn the new outcome.
+- **Spec 0047:** its fallback reads `no_provable_number` only (decision 6).
+- **Manual reviews:** more of them, by the share the measurement reports.
 
 ## Acceptance
 
-- [ ] `select()` returns v1's call list cut short, or no pick. A property test over the ledger's
-  own world strategy (`test_select_properties.py`) shows this, and fails on a version that skips
-  the cut.
-- [ ] Each of decision 2's and decision 3's reasons is set exactly where the spec says, and a
-  backup is never called when the pick was cut.
-- [ ] Every gated bar in the measurement passes. Every reported number is written into this spec's
-  results section.
-- [ ] The contract PR lands first. Its examples validate, and `rule_version` is
-  `ledger-select-v2`.
-- [ ] The corpus truth changes, if any, are listed and re-frozen with Inesh's review.
+- [ ] The new rule's call list is a prefix of the frozen copy's on every world in the measurement,
+  and a version that skips the comparison fails that test.
+- [ ] A1's three cases, A3's rows and the A6 world end as decision 3 says, and their known failures
+  stop firing.
+- [ ] All 20 corpus outcomes and the 3 demo picks are unchanged.
+- [ ] A `withheld` selection validates against the new schema, changes no candidate's eligibility,
+  and `_store` writes each contact point's status as today.
+- [ ] The core turns a `withheld` selection into `no_provable_number` with its reason, and a person
+  reviews.
+- [ ] The flag set off gives today's rule exactly. Its default, and any unknown value, give the new
+  rule.
+- [ ] The measurement's reported numbers are written into a results section of this spec.
 
 ## Tests (written first)
 
 | Item | Test |
 |---|---|
-| The prefix property | `packages/ledger/tests/test_select_properties.py::test_v2_is_a_prefix_of_v1` |
-| C1 | `packages/ledger/tests/test_select_v2.py::test_change_context_label_cancels_the_call` (A1's shape), `::test_old_thread_copy_cancels_the_call` (A3's), `::test_lookalike_hole_cancels_the_call` (A6's), `::test_context_that_moves_nothing_changes_nothing` |
-| C2 | `test_select_v2.py::test_stale_pick_is_not_replaced_by_a_backup`, `::test_stale_backup_is_dropped`, `::test_fresh_plant_still_qualifies` (K01 stays a stated limit) |
-| Corpus and demo | `packages/ledger/tests/test_select_corpus.py` (controls keep their picks), `packages/ledger/tests/test_demo_picks.py` (every demo vendor keeps its pick) |
-| Contract | `python3 packages/contracts/scripts/validate.py` with the new examples |
+| The prefix property | `packages/ledger/tests/test_select_properties.py::test_new_rule_is_a_prefix_of_frozen_v1` (with `packages/ledger/tests/fixtures/select_v1_frozen.py`) |
+| The fixes | `packages/ledger/tests/test_select_guard.py::test_change_context_label_is_withheld` (A1), `::test_old_thread_copy_is_withheld` (A3), `::test_lookalike_hole_never_calls_the_plant` (A6), `::test_context_that_moves_nothing_changes_nothing` |
+| Nothing else changes | `packages/ledger/tests/test_select_corpus.py` (unchanged outcomes), `packages/ledger/tests/test_demo_picks.py` |
+| Storage | `packages/ledger/tests/test_select_guard.py::test_withheld_keeps_contact_point_status` |
+| Core | `apps/core/tests/test_worker.py::test_withheld_selection_goes_to_review` |
+| Flag | `packages/ledger/tests/test_flags.py::test_context_guard_defaults_on` |
+| Contract | `python3 packages/contracts/scripts/validate.py` with the new example |
 
 ## Out of scope
 
-- A time limit on a lookalike email's pull (A23's second point). Measure it first; it needs its own
-  design.
-- Fixing A2 (honest mentions refused). The LLM reader (spec 0049) addresses most of it.
-- Any change to ingestion or the reader.
+- An age limit on trust, and a time limit on a lookalike email's pull (A23). One later design.
+- A2 (honest mentions refused). The LLM reader (spec 0049) addresses most of it.
+- Any change to ingestion, the reader or the call.
 
 ## Open questions
 
-- **Q130 (Sami, with Inesh).** The default `recent_days` is 365. If a demo vendor or a corpus control
-  loses its pick at 365, which wins: a longer default, or refreshed demo documents? Decided before
-  the default ships.
-- **Q131 (Inesh).** Sami implements this in `packages/ledger`. Inesh reviews it as the owner, and
-  approves the corpus truth change.
-- **Q132.** The lookalike time limit is deferred (my call). The lab's sweeps measure it first.
+- **Q130.** `rule_version` takes the next free name when this merges. Spec 0047 has claimed
+  `ledger-select-v2`, so whichever lands second takes the next one (my call).
+- **Q131 (Inesh and Abhi).** Inesh reviews the rule as its owner. Abhi confirms the core needs no
+  change for `withheld` (decision 5).
+- **Q132.** The age limit and the lookalike time limit are deferred, together (my call).
 
 ## Commands
 
 ```bash
 cd packages/ledger && uv run pytest -q
+cd apps/core && uv run pytest -q
 uv run --with jsonschema --with rfc8785 --with pyyaml --with openapi-spec-validator python packages/contracts/scripts/validate.py
 uv run lab fuzz --examples 2000 --seed 0
 uv run lab overblock --out evals/out/overblock.json
-uv run lab frontier --out evals/out/frontier.json
 ```
