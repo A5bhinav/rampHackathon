@@ -20,6 +20,7 @@ from dialback_core.db import system_tx
 from dialback_core.demo import DemoEnv, change, load_seed, prepare
 from dialback_core.email_door import door
 from dialback_core.email_door.classifier import ClassifierFailed, Verdict
+from dialback_core.email_door.inbox import process_inbound_emails
 from dialback_core.email_door.masking import mask_digit_runs
 from dialback_core.email_door.resend import ReceivedEmail
 from dialback_core.email_door.rules import flag_email, requested_fingerprint
@@ -357,6 +358,102 @@ async def test_an_unflagged_invoice_listing_the_account_on_file_and_another_is_n
     row = await arrive(w, sender=FROM_COBALT, subject="Invoice CF-88200", text=text)
     assert (row["outcome"], row["flagged"]) == ("not_flagged", False)
     await assert_no_case(w)
+
+
+@pytest.mark.parametrize("text,pairs", [
+    ("ACH: Account 000099990000, Routing 121000248. Wire: Account 000123454821, Routing 026009593.",
+     [("121000248", "000099990000"), ("026009593", "000123454821")]),
+    ("Routing 121000248, Account 000099990000; Routing 026009593, Account 000123454821",
+     [("121000248", "000099990000"), ("026009593", "000123454821")]),
+    ("Acct 000099990000, Routing 121000248; Acct 000123454821, Routing 026009593",   # nearer across the ';'
+     [("121000248", "000099990000"), ("026009593", "000123454821")]),
+    ("Old: Routing 121000248\nAccount 000099990000\nNew: Routing 026009593\nAccount 000123454821",
+     [("121000248", "000099990000"), ("026009593", "000123454821")]),
+    ("Routing 121000248\n" + "Thank you.\n" * 30 + "Account 000123454821",                # out of reach: first not on file
+     [("121000248", "000123454821")]),
+], ids=["account-first", "routing-first", "account-first-short-labels", "lines", "out-of-reach"])
+def test_each_account_pairs_with_its_own_routing_number(text, pairs):
+    assert [(routing, a.digits) for routing, a in door._bank_details((text, ""), None).pairs] == pairs
+
+
+async def test_a_new_bank_with_the_same_last_four_is_a_change(door_world):
+    w = door_world
+    row = await arrive(w, sender=FROM_COBALT, subject="Cobalt Freight bank details",
+                       text=f"New details: Routing {ROUTING}, Account 5557770000\n")
+    assert (row["outcome"], row["routing_number"], row["last4"]) == ("case_opened", ROUTING, "0000")
+
+
+async def test_an_account_first_invoice_listing_the_account_on_file_is_not_a_change(door_world):
+    w = door_world
+    text = ("Invoice CF-88200 from Cobalt Freight LLC\n"
+            f"ACH: Account {ON_FILE[1]}, Routing {ON_FILE[0]}. Wire: Account {ACCOUNT}, Routing {ROUTING}.\n"
+            "Thank you for your business.\n")
+    assert not flag_email("Invoice CF-88200", text, "", None).flagged, "the rule alone does not flag it"
+    row = await arrive(w, sender=FROM_COBALT, subject="Invoice CF-88200", text=text)
+    assert (row["outcome"], row["flagged"]) == ("not_flagged", False)
+    await assert_no_case(w)
+
+
+async def test_an_account_first_change_requests_the_wire_account_with_its_routing(door_world):
+    w = door_world
+    row = await arrive(w, sender=FROM_COBALT, subject="Cobalt Freight bank details",
+                       text=f"We changed banks. ACH: Account {ON_FILE[1]}, Routing {ON_FILE[0]}. "
+                            f"Wire: Account {ACCOUNT}, Routing {ROUTING}.\n")
+    assert (row["outcome"], row["routing_number"], row["last4"]) == ("case_opened", ROUTING, "4821")
+
+
+async def test_a_planted_header_is_scrubbed_before_the_model_is_asked(door_world, caplog):
+    """The check runs first: a model that keeps failing (5 tries, then `failed`) can't leave it unscrubbed."""
+    caplog.set_level(logging.DEBUG)
+    w = door_world
+    w.worker.classifier = FakeClassifier(ClassifierFailed("timeout"))
+    account = "000555123400"
+    planted = f"<{account}@x.example>"
+    row = await arrive(w, notice_message_id=planted, message_id=planted, sender=FROM_COBALT, subject="Invoice CF-88200",
+                       text=INVOICE.format(routing=ROUTING, account=account))
+    assert (row["outcome"], row["error"], row["tries"], row["message_id"]) == ("failed", door.PLANTED_ACCOUNT, 0, "scrubbed")
+    assert w.worker.classifier.asked == []
+    await assert_nowhere(w.pool, caplog, account)
+
+
+@pytest.mark.parametrize("account,message_id,headers", [
+    ("000555123401", "<555123401@x.example>", {}),                                  # leading zeros dropped
+    ("000555123402", "<clean@x.example>", {"references": "<000555123402@x.example>"}),   # References only
+], ids=["leading-zeros-dropped", "references-only"])
+async def test_planted_headers_are_caught_in_any_stored_form(door_world, caplog, account, message_id, headers):
+    caplog.set_level(logging.DEBUG)
+    w = door_world
+    row = await arrive(w, message_id=message_id, headers=headers, text=JUDGE_TEXT.replace(ACCOUNT, account))
+    assert (row["outcome"], row["error"], row["thread_id"], row["message_id"]) == ("failed", door.PLANTED_ACCOUNT, "scrubbed", "scrubbed")
+    await assert_no_case(w)
+    await assert_nowhere(w.pool, caplog, account.lstrip("0"))
+
+
+async def test_a_second_unclaimed_notice_of_a_planted_email_is_scrubbed(door_world):
+    w = door_world
+    account = "000555123403"
+    planted = f"<{account}@x.example>"
+    email_id = await deliver(w, message_id=planted)
+    await deliver(w, email_id, message_id=planted)   # Resend sent the notice twice
+    w.worker.resend.emails[email_id] = judge(email_id, message_id=planted, text=JUDGE_TEXT.replace(ACCOUNT, account))
+    await process_inbound_emails(w.pool, w.worker.settings, w.worker.resend, w.worker.keys, limit=1, dataset_id=w.demo_id)
+    async with system_tx(w.pool) as conn:
+        notices = await (await conn.execute(
+            "select raw_body, processed_at from app.inbound_webhooks where dataset_id = %s and strpos(raw_body, %s) > 0 order by id",
+            (w.demo_id, email_id))).fetchall()
+    assert [n["processed_at"] is None for n in notices] == [False, True], "only the first notice was claimed"
+    assert all("message_id" not in json.loads(n["raw_body"])["data"] for n in notices)
+
+
+async def test_an_account_labeled_past_the_cap_masks_its_phone_copy_inside_it(door_world, caplog):
+    """In one part: the phone-shaped copy sits inside the 50,000 characters the ledger reads, the labeled
+    account past them. The masking accounts are read further (1,000,000 characters per part)."""
+    caplog.set_level(logging.DEBUG)
+    w = door_world
+    filler = "Thank you for your business. " * 1800   # about 52,000 characters
+    row = await arrive(w, text=JUDGE_TEXT + "Questions: call 778-311-0247\n" + filler + "Our other account 7783110247\n")
+    assert (row["outcome"], row["last4"]) == ("case_opened", "4821")
+    await assert_nowhere(w.pool, caplog, "7783110247")
 
 
 async def test_html_only_mail_files_each_phone_once(door_world):

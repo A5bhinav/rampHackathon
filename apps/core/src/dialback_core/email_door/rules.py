@@ -364,10 +364,12 @@ def find_routing(text: str) -> list[str]:
     return _unique(_ascii(text[s:e]) for s, e, kind in _pieces(text)[0] if kind == "routing")
 
 
-def find_accounts(text: str) -> list[str]:
-    """Every labeled account number in the first MAX_CHARS of `text`, digits only, in order, once each.
-    The only function that returns a full account number: use it in memory and drop it (ADR-8)."""
-    return _unique(digits for _, _, digits in _accounts(text[:MAX_CHARS]))
+def find_accounts(text: str, limit: int = MAX_CHARS) -> list[str]:
+    """Every labeled account number in the first `limit` characters of `text`, digits only, in order, once
+    each. The label scan is linear, so a caller that masks with the result may read further than MAX_CHARS
+    (an account labeled past the cap can still repeat a phone inside it). With account_spans, the only
+    functions that return a full account number: use them in memory and drop them (ADR-8)."""
+    return _unique(digits for _, _, digits in _accounts(text[:limit]))
 
 
 def routing_spans(text: str) -> list[tuple[int, int, str]]:

@@ -522,6 +522,30 @@ def test_ledger_text_is_fast_on_a_long_email():
     assert time.perf_counter() - start < 1.0
 
 
+def test_find_accounts_reads_past_the_cap_only_when_asked():
+    text = "x" * rules.MAX_CHARS + " Our other account 7783110245"
+    assert find_accounts(text) == []
+    assert find_accounts(text, limit=1_000_000) == ["7783110245"]
+    assert find_accounts(text, limit=10) == []
+
+
+@pytest.mark.parametrize("text", [
+    "account " + " " * 999_992,                               # one label, then a long gap and no number
+    ("account no " * 100_000)[:1_000_000],                    # label words only
+    ("acct 1 " * 150_000)[:1_000_000],                        # numbers too short to be accounts
+    "Account " + "1 " * 499_996,                              # one run of half a million digits
+    ("account number is the new " * 40_000)[:1_000_000],      # every word a label word
+    "acct " + "-" * 999_995,                                  # separators only
+    ("acct:" * 200_000)[:1_000_000],
+    "".join(f"Acct {10_000_000 + i} " for i in range(72_000))[:1_000_000],   # tens of thousands of accounts
+], ids=["gap", "label-words", "short-runs", "one-long-run", "all-label-words", "separators", "colons", "many-accounts"])
+def test_find_accounts_is_fast_on_a_million_characters(text):
+    assert len(text) >= 999_000
+    start = time.perf_counter()
+    find_accounts(text, limit=1_000_000)
+    assert time.perf_counter() - start < 1.0
+
+
 # The model's copy ----------------------------------------------------------------------------------
 
 # P3 was not spelled out in the review message; these two stand in for it: an unlabeled valid routing

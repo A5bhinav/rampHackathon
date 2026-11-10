@@ -21,7 +21,9 @@ import asyncio
 import datetime as dt
 import json
 import logging
+import re
 import unicodedata
+from bisect import bisect_left
 from dataclasses import dataclass, replace
 from email.utils import parseaddr
 from typing import TYPE_CHECKING
@@ -41,7 +43,15 @@ from ..settings import Settings
 from .masking import mask_digit_runs, strip_nul
 from .match import VendorRef, match_vendor
 from .resend import ReceivedEmail, ResendPort
-from .rules import account_spans, find_accounts, flag_email, ledger_text, requested_fingerprint, routing_spans
+from .rules import (
+    MAX_CHARS,
+    account_spans,
+    find_accounts,
+    flag_email,
+    ledger_text,
+    requested_fingerprint,
+    routing_spans,
+)
 
 if TYPE_CHECKING:
     from .classifier import ChangeClassifier
@@ -50,7 +60,8 @@ log = logging.getLogger(__name__)
 
 EXTRACTOR = "email-door-v1"
 PAGE_LINES = 51   # a span at y = 72 + 14 * i stays on the 792-point page for i < 51; later lines start a new page
-PAIR_REACH = 200  # an account's routing number is the nearest one before it, within this many characters
+PAIR_REACH = 200  # off its line, an account's routing number is the nearest within this many characters
+MASK_REACH = 1_000_000   # accounts that mask the ledger's copy, or reveal a planted header, are read this far per part
 REUSED_MESSAGE_ID = "this Message-ID already made a change for another account or vendor"
 PLANTED_ACCOUNT = "an account number in the email is also in its Message-ID, thread ID or sender domain; those were scrubbed"
 SCRUBBED = "scrubbed"
@@ -93,6 +104,10 @@ def ledger_document(email: ReceivedEmail, ledger_lines: str, masked_subject: str
 
 # Bank details, per mail part ------------------------------------------------------------------------
 
+_LINE_BREAK = re.compile("[\n\r\x0b\x0c\x1c-\x1e\x85\u2028\u2029]")   # what str.splitlines splits on
+_CLAUSE_END = re.compile(r";|[.!?](?=\s|$)")
+
+
 @dataclass(frozen=True)
 class _Found:
     part: int     # 0: the text part, 1: the HTML part's text
@@ -101,24 +116,63 @@ class _Found:
     digits: str   # for an account, the full number: memory only (ADR-8)
 
 
-def _bank_details(*parts: str) -> tuple[list[_Found], list[_Found]]:
-    """(routing numbers, accounts) of each part, read on its own (each up to rules.MAX_CHARS), in order."""
+@dataclass(frozen=True)
+class _Details:
+    routings: list[_Found]
+    pairs: list[tuple[str | None, _Found]]   # each account, in order, with its routing number (None: the email has none)
+
+
+def _bank_details(parts: tuple[str, ...], on_file_routing: str | None) -> _Details:
+    """The routing numbers and accounts of each part, read on its own (each up to rules.MAX_CHARS), and each
+    account paired with a routing number: the nearest one on the same line, else the nearest within
+    PAIR_REACH characters on either side, else the first that is not on file, else the first. "Nearest"
+    prefers a routing number in the same clause (no `;` or sentence end between them) and then the fewest
+    characters between, so "Account A, Routing 1; Account B, Routing 2" pairs B with 2 although `; Account `
+    is shorter than `, Routing `. Only the nearest routing number on each side can win (a farther one on
+    that side is farther and crosses every break the nearer one does), so pairing costs a binary search per
+    account."""
     routings = [_Found(i, s, e, d) for i, part in enumerate(parts) for s, e, d in routing_spans(part)]
+    by_part = [[r for r in routings if r.part == i] for i in range(len(parts))]
+    starts = [[r.start for r in rs] for rs in by_part]
+    capped = [part[:MAX_CHARS] for part in parts]
+    lines = [[m.start() for m in _LINE_BREAK.finditer(part)] for part in capped]
+    clauses = [[m.start() for m in _CLAUSE_END.finditer(part)] for part in capped]
+
+    def crosses(points: list[int], lo: int, hi: int) -> bool:
+        return bisect_left(points, lo) < bisect_left(points, hi)
+
+    def routing_for(a: _Found) -> str | None:
+        if not routings:
+            return None
+        rs, i = by_part[a.part], bisect_left(starts[a.part], a.start)
+        sides = [(rs[i - 1], rs[i - 1].end, a.start, 0)] if i > 0 else []
+        sides += [(rs[i], a.end, rs[i].start, 1)] if i < len(rs) else []
+        ranked = sorted((crosses(clauses[a.part], lo, hi), hi - lo, after, crosses(lines[a.part], lo, hi), r.digits)
+                        for r, lo, hi, after in sides)
+        same_line = [c for c in ranked if not c[3]]
+        within = [c for c in ranked if c[1] <= PAIR_REACH]
+        if same_line or within:
+            return (same_line or within)[0][4]
+        return next((r.digits for r in routings if r.digits != on_file_routing), routings[0].digits)
+
     accounts = [_Found(i, s, e, d) for i, part in enumerate(parts) for s, e, d in account_spans(part)]
-    return routings, accounts
-
-
-def _routing_for(account: _Found, routings: list[_Found], on_file_routing: str | None) -> str:
-    """The account's routing number: the nearest one before it in its part within PAIR_REACH characters,
-    else the first that is not on file, else the first. `routings` is not empty."""
-    near = [r for r in routings if r.part == account.part and r.end <= account.start <= r.end + PAIR_REACH]
-    if near:
-        return near[-1].digits   # in text order, so the last is the nearest
-    return next((r.digits for r in routings if r.digits != on_file_routing), routings[0].digits)
+    return _Details(routings, [(routing_for(a), a) for a in accounts])
 
 
 def _digits(value: str | None) -> str:
     return "".join(str(unicodedata.decimal(c)) for c in strip_nul(value or "") if c.isdecimal())
+
+
+def _planted(accounts: list[str], values: list[str | None]) -> bool:
+    """Whether a found account of 5 or more digits, as written or without its leading zeros, is among the
+    digits of one of `values`. Each value is scanned once per account length, not once per account."""
+    secrets = {s for a in accounts for s in (a, a.lstrip("0")) if len(s) >= 5}
+    lengths = {len(s) for s in secrets}
+    for value in values:
+        d = _digits(value)
+        if any(d[i:i + n] in secrets for n in lengths for i in range(len(d) - n + 1)):
+            return True
+    return False
 
 
 # The email's row ----------------------------------------------------------------------------------
@@ -291,11 +345,24 @@ async def handle_email(pool: AsyncConnectionPool, settings: Settings, keys: Keys
         raise RuntimeError(f"delivery {delivery_id} has no inbound_emails row for its email")
     if state["outcome"] != "pending":
         return state["outcome"]   # another delivery of this email got here first: act once
+
+    # 1. ADR-8, before anything else (the door switch, the model, which can fail five times): an account
+    # planted where the door keeps headers as they are fails the email, and those headers are scrubbed. The
+    # accounts are read from each part and the subject up to MASK_REACH characters; they also mask the
+    # ledger's copy below.
+    secrets = list(dict.fromkeys(find_accounts(text, limit=MASK_REACH) + find_accounts(html, limit=MASK_REACH)
+                                 + find_accounts(subject, limit=MASK_REACH)))
+    if _planted(secrets, [state["message_id"], email.message_id, email.headers.get("message-id"), thread_id_of(email),
+                          sender_domain(email.sender)]):
+        log.warning("email door: inbound email %s has an account number in its headers; failed and scrubbed", email.email_id)
+        async with system_tx(pool) as conn:
+            await _scrub_notices(conn, dataset_id, email.email_id)
+            return await _record(conn, dataset_id, email, _Facts("failed", error=PLANTED_ACCOUNT, scrubbed=True))
     door = set(state["door"])
     if not (state["current_demo"] and door):
         return await _finish(pool, dataset_id, email, _Facts("door_off"))
 
-    # 1. Flag, in a thread: the model's SDK client is synchronous and the worker shares the app's event loop.
+    # 2. Flag, in a thread: the model's SDK client is synchronous and the worker shares the app's event loop.
     # Then match and read the bank details, which is pure: an unflagged email can still be a silent change.
     decision = await asyncio.to_thread(flag_email, subject, text, html, classifier)
     async with system_tx(pool) as conn:
@@ -304,33 +371,21 @@ async def handle_email(pool: AsyncConnectionPool, settings: Settings, keys: Keys
             "select id, routing_number, account_last4 from app.bank_accounts where vendor_id = %s and is_current "
             "order by first_seen_at desc, created_at desc limit 1", (match.vendor_id,))).fetchone()
     on_file = (current["routing_number"], current["account_last4"]) if current else None
-    routings, accounts = _bank_details(text, html)
-    pairs = {(_routing_for(a, routings, on_file and on_file[0]), a.digits[-4:]) for a in accounts} if routings else set()
+    details = _bank_details((text, html), on_file and on_file[0])
+    routings, pairs = details.routings, details.pairs
     flagged_by = decision.by if decision.flagged else None
-    if flagged_by is None and match.vendor_id in door and routings and accounts and on_file not in pairs:
+    if (flagged_by is None and match.vendor_id in door and routings and pairs
+            and on_file not in {(r, a.digits[-4:]) for r, a in pairs}):
         flagged_by = "on_file_mismatch"   # an email naming bank details, but not the account on file
-
-    # 2. ADR-8: an account planted where the door keeps headers as they are fails the email, scrubbed.
-    secrets = list(dict.fromkeys([a.digits for a in accounts] + find_accounts(subject)))
-    stored = [_digits(v) for v in (state["message_id"], email.message_id, email.headers.get("message-id"),
-                                   thread_id_of(email), sender_domain(email.sender))]
-    if any(len(a) >= 5 and a in d for a in secrets for d in stored):
-        log.warning("email door: inbound email %s has an account number in its headers; failed and scrubbed", email.email_id)
-        async with system_tx(pool) as conn:
-            await _scrub_notices(conn, dataset_id, email.email_id)
-            return await _record(conn, dataset_id, email, _Facts(
-                "failed", flagged=flagged_by is not None, error=PLANTED_ACCOUNT, scrubbed=True))
     if flagged_by is None:
         return await _finish(pool, dataset_id, email, _Facts("not_flagged"))
 
-    # 3. The requested account: the longest whose last four is not the account on file's, with its routing
-    # number. Red flags, and the ledger's copy: rebuilt phone lines only, every account found masked, and
-    # the HTML part only when it says something the text part doesn't.
-    requested = max((a for a in accounts if on_file is None or a.digits[-4:] != on_file[1]), key=lambda a: len(a.digits),
-                    default=None)
-    shown = requested or (accounts[0] if accounts else None)
-    routing = _routing_for(shown, routings, on_file and on_file[0]) if shown and routings else \
-        (routings[0].digits if routings else None)
+    # 3. The requested account: the longest whose pair (routing number, last four) is not the account on
+    # file's. Red flags, and the ledger's copy: rebuilt phone lines only, every account found masked, and the
+    # HTML part only when it says something the text part doesn't.
+    requested = max(((r, a) for r, a in pairs if (r, a.digits[-4:]) != on_file), key=lambda p: len(p[1].digits), default=None)
+    shown = requested or (pairs[0] if pairs else None)
+    routing = shown[0] if shown else (routings[0].digits if routings else None)
     lines = ledger_text(text, also_mask=secrets)
     if " ".join(html.split()) != " ".join(text.split()):
         lines += "\n" + ledger_text(html, also_mask=secrets)
@@ -342,17 +397,17 @@ async def handle_email(pool: AsyncConnectionPool, settings: Settings, keys: Keys
             if await _unknown_phone(conn, dataset_id, match.vendor_id, phones):
                 red_flags.append("unknown_phone")
     facts = _Facts("", flagged=True, vendor_id=match.vendor_id, routing_number=routing,
-                   last4=shown.digits[-4:] if shown else None, red_flags=tuple(red_flags))
+                   last4=shown[1].digits[-4:] if shown else None, red_flags=tuple(red_flags))
     log.info("email door: inbound email %s flagged by %s, vendor match %s", email.email_id, flagged_by, match.how)
 
     # 4. Enough information? (design section 6)
     stop = ("no_vendor" if match.how == "none" else "several_vendors" if match.how == "several"
             else "not_demo_vendor" if match.vendor_id not in door else "no_routing_number" if not routings
-            else "no_account_number" if not accounts else "same_as_on_file" if requested is None else None)
+            else "no_account_number" if not pairs else "same_as_on_file" if requested is None else None)
     if stop is not None:
         return await _finish(pool, dataset_id, email, replace(facts, outcome=stop))
     vendor_id = match.vendor_id
-    fingerprint = requested_fingerprint(keys.fingerprint_key, routing, requested.digits)   # ADR-8: nothing below uses the full number
+    fingerprint = requested_fingerprint(keys.fingerprint_key, routing, requested[1].digits)   # ADR-8: nothing below uses the full number
     source_event_id = f"email:{_message_key(email)}"
 
     # 5. The same email again, or the same account while the vendor's case is unfinished: nothing written.
