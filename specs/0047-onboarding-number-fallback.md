@@ -183,8 +183,8 @@ The demo
   migrations or edits. If `created_at` or `updated_at` is missing, the contact is left out.
 - **Q99. A vendor's own portal submission.** Should numbers the vendor typed into Ramp's vendor portal
   count the same as numbers a clerk typed? This spec treats both as onboarding.
-- **Q100. Collisions noticed while writing this.** Spec 0045 (PR #93) uses Q87 to Q97, and spec 0046
-  (`sami/guided-search`) uses Q87 to Q91. One of them needs renumbering before either merges.
+- **Q100. Numbering.** This spec starts at Q98 because spec 0045 (PR #93, now closed) had taken Q87 to
+  Q97. Spec 0046 (`sami/guided-search`) keeps Q87 to Q91, so nothing collides now.
 
 ## Commands
 
