@@ -103,6 +103,17 @@ def test_a_true_fax_line_labeled_fax_is_not_an_over_block():
     assert by["+12065550117"].role_correct is False and by["+12065550117"].over_block   # a main line called fax
 
 
+def test_a_true_fax_line_is_never_an_over_block():
+    # Spec 0049 at c8a7c5a (review F5): the rule refuses fax lines by design, so no label on one is an
+    # over-block, (fax, unknown) and a skipped number included.
+    labeled = {"split": "dev", "documents": [
+        doc("o1", "ordinary", ["Hello", "Fax: (206) 555-0199"], [truth(1, "+12065550199", "fax", "vendor", explicit_role=True)])]}
+    for got in [("fax", "vendor"), ("fax", "unknown"), ("unknown", "unknown"), ("main", "customer"), ("ar", "bank"), None]:
+        labels = [] if got is None else [lab("Fax: (206) 555-0199", *got)]
+        (o,), _ = ev.score(labeled, Fixed({"Hello": labels}))
+        assert not o.over_block, got
+
+
 def test_a_failed_document_counts_every_number_in_it_as_unknown():
     labeled = {"split": "dev", "documents": [
         doc("o1", "ordinary", ["Hello", "Main: 206-555-0117"], [truth(1, "+12065550117", "main", "vendor")])]}

@@ -13,9 +13,8 @@ Counted for each labeled number:
   `vendor`;
 - over-block (the accuracy metric): the text presents it as the vendor's, and it's labeled so the
   rule refuses it: a party other than `vendor`, or the role `fax` when the text doesn't call it a
-  fax line. (vendor, unknown) is not one, and neither is a true fax line labeled `fax` (the rule
-  refuses fax lines by design; the spec's first wording counted it, corrected Nov 10 at f33499d,
-  before any scored run);
+  fax line. (vendor, unknown) is not one, and a true fax line never is, whatever its label: the rule
+  refuses fax lines by design (corrected Nov 10, before any scored run, at f33499d and c8a7c5a);
 - role accuracy, only for numbers with an explicit role word;
 - "us" mentions, counted in everything above and also on their own.
 
@@ -122,7 +121,7 @@ def score(labeled: dict, reader: Reader) -> tuple[list[Outcome], int]:
             out.append(Outcome(
                 key=(doc["id"], n["line"], n["e164"]), kind=entry["kind"],
                 unsafe=not presented_as_vendor and party == "vendor",
-                over_block=presented_as_vendor and (party != "vendor" or (role == "fax" and n["role"] != "fax")),
+                over_block=presented_as_vendor and n["role"] != "fax" and (party != "vendor" or role == "fax"),
                 role_correct=(role == n["role"]) if n["explicit_role"] else None, us=n["us"],
                 truth=(n["role"], n["party"]), got=(role, party)))
     return out, failed
