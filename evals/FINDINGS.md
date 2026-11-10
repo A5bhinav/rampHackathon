@@ -353,7 +353,7 @@ These are not reachable today, but each is frozen as a regression.
     company check (A10) is what stands between that text and a decision.
 - **Open:** whether the live agent's model reading of consent behaves the same way.
 
-### A21. Trust never expires, and neither does a lookalike email's pull on the cutoff
+### A23. Trust never expires, and neither does a lookalike email's pull on the cutoff
 
 - **Status:** confirmed (read, Nov 10), `packages/ledger/src/dialback_ledger/select.py` lines 110-121
   and 175. Not run.
