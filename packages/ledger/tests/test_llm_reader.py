@@ -107,6 +107,15 @@ def replying(payload):
     return lambda request: answer(payload)
 
 
+def raw_body(content: bytes, content_type: str):
+    return lambda request: httpx2.Response(200, content=content,
+                                           headers={"content-type": content_type, "request-id": "req_test_raw"})
+
+
+def full(content) -> httpx2.Response:
+    return httpx2.Response(200, json=message(content), headers={"request-id": "req_test_raw"})
+
+
 LINE = "AR: (206) 555-0142"
 OFF_SCHEMA = {
     "schema: a role off the list": {"labels": [{"quote": LINE, "role": "head office", "party": "vendor"}]},
@@ -129,6 +138,12 @@ FAILURES = {
     "max_tokens": (cut_off, "max_tokens", 1),
     "schema: not JSON": (replying("AR is the vendor's line"), "schema", 1),
     "schema: no text block": (no_text, "schema", 1),
+    # Malformed replies (review G12): each used to escape as a raw exception.
+    "bad reply: an invalid JSON body": (raw_body(b"not json", "application/json"), "api_error", 1),
+    "bad reply: a text/plain body": (raw_body(b"hello", "text/plain"), "api_error", 1),
+    "bad reply: content null": (lambda request: full(None), "schema", 1),
+    "bad reply: a text block with no text": (lambda request: full([{"type": "text"}]), "schema", 1),
+    "bad reply: deeply nested JSON": (replying("[" * 200_000 + "]" * 200_000), "schema", 1),
     **{case: (replying(payload), "schema", 1) for case, payload in OFF_SCHEMA.items()},
 }
 GOOD = page(span("Main: 206-555-0117")) | {"id": "doc-good"}

@@ -16,6 +16,7 @@ from typing import Protocol
 import anthropic
 import httpx2
 import rfc8785
+from anthropic.types import Message
 
 from .candidates import find_phones
 from .reader import ReaderFailed
@@ -180,18 +181,24 @@ class AnthropicLabelModel:
             raise ReaderFailed("api_error", detail=f"HTTP {exc.status_code}", request_id=exc.request_id) from None
         except anthropic.AnthropicError as exc:
             raise ReaderFailed("api_error", detail=type(exc).__name__) from None
+        except ValueError as exc:              # a 200 whose body isn't valid JSON (review G12)
+            raise ReaderFailed("api_error", detail=f"an unreadable reply ({type(exc).__name__})") from None
+        if not isinstance(msg, Message):       # a non-JSON content type comes back as a bare string
+            raise ReaderFailed("api_error", detail=f"a reply that isn't a message ({type(msg).__name__})")
         rid = msg._request_id
         if msg.stop_reason in ("refusal", "max_tokens"):
             raise ReaderFailed(msg.stop_reason, request_id=rid)
         if msg.stop_reason != "end_turn":
             raise ReaderFailed("unexpected_stop", detail=str(msg.stop_reason), request_id=rid)
-        texts = [block.text for block in msg.content if block.type == "text"]
-        if len(texts) != 1:
-            raise ReaderFailed("schema", detail=f"{len(texts)} text blocks", request_id=rid)
+        if not isinstance(msg.content, list):
+            raise ReaderFailed("schema", detail="no content list", request_id=rid)
+        texts = [getattr(block, "text", None) for block in msg.content if getattr(block, "type", None) == "text"]
+        if len(texts) != 1 or not isinstance(texts[0], str):
+            raise ReaderFailed("schema", detail=f"{len(texts)} text blocks, not one with text", request_id=rid)
         try:
             return Reply(json.loads(texts[0]), rid)
-        except ValueError:
-            raise ReaderFailed("schema", detail="not JSON", request_id=rid) from None
+        except (ValueError, RecursionError) as exc:   # RecursionError: deeply nested JSON
+            raise ReaderFailed("schema", detail=f"not JSON ({type(exc).__name__})", request_id=rid) from None
 
 
 @dataclass(frozen=True)
