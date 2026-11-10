@@ -160,11 +160,14 @@ alone changed no demo pick and none of the 20 corpus outcomes.
 
 ## Open questions
 
-- **Q130.** `rule_version` takes the next free name when this merges. Spec 0047 has claimed
-  `ledger-select-v2`, so whichever lands second takes the next one (my call).
-- **Q131 (Inesh and Abhi).** Inesh reviews the rule as its owner. Abhi confirms the core needs no
-  change for `withheld` (decision 5).
-- **Q132.** The age limit and the lookalike time limit are deferred, together (my call).
+Sami approved the spec and every call in it as written on Nov 10. One question is still open, for
+Inesh and Abhi:
+
+- **Q131 (open).** Inesh reviews the rule as its owner. Abhi confirms the core needs no change for
+  `withheld` (decision 5).
+- **Q130, resolved:** `rule_version` takes the next free name when this merges. Spec 0047 has
+  claimed `ledger-select-v2`, so whichever lands second takes the next one.
+- **Q132, resolved:** the age limit and the lookalike time limit are deferred, together.
 
 ## Commands
 
