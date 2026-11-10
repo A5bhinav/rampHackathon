@@ -248,7 +248,7 @@ This tests the step after the call, the way the fuzz lab tests `select()`. No ca
    - Spec 0046's Q87 to Q91, which collide with spec 0045, written first.
 2. **PR order.** Each PR is stacked on the one before, and kept as close to 400 changed lines as its
    parts allow. Any of them may be split further. The voice and fuzz labs never share a PR.
-   1. `apps/core`: pull out `call_facts`, with no change in behavior (Abhi reviews). `apps/voice`:
+   1. `apps/core`: pull out `call_facts`, with no change in behavior. `apps/voice`:
       make the report helpers public.
    2. The voice lab (0017), with part A. Nothing from the voice lab merges until part A's PR is
       approved, so main never carries the lab C9 criticizes. FINDINGS lands here and each later PR
@@ -287,7 +287,7 @@ This tests the step after the call, the way the fuzz lab tests `select()`. No ca
 ## Review fixes (fresh review, Nov 10)
 
 The review reproduced the headline numbers, but found that they say less than they seem, and that
-the known-failures list hides new bugs (FINDINGS C12). Before Abhi's review and the PR plan:
+the known-failures list hides new bugs (FINDINGS C12). Before the PR plan:
 
 1. **F1's label names the condition that failed,** such as `F1:company=negation`. The
    known-failures list names only A10's three conditions (negation, correction, reseller). Any
@@ -387,14 +387,13 @@ the known-failures list hides new bugs (FINDINGS C12). Before Abhi's review and 
 
 ## Open questions
 
-Sami approved the spec and every call in it as written on Nov 9. One question is still open, and
-it is Abhi's:
+Sami approved the spec and every call in it as written on Nov 9. None is open. No review by another
+teammate is needed (Sami, Nov 10); PRs open only on Sami's OK.
 
-- **Q102 (Abhi, open).** Whether Abhi pulls `call_facts` out of `worker.py`, or Sami does it as
-  partner, with Abhi's review. Until he answers, `call_facts` may be drafted on a branch for his
-  review, but no PR touching `apps/core` opens without his OK.
+- **Q102, resolved (Sami, Nov 10):** Sami's build pulled `call_facts` out of `worker.py`, with no
+  change in behavior, and that stands without another teammate's review.
 - **Q101, resolved (Sami, Nov 9):** a strict known-failures list for each job, as D3 describes.
-- **Q103, resolved:** `UNREACHABLE.md` is reviewed by Abhi, who owns the decision rules.
+- **Q103, resolved (Sami, Nov 10):** `UNREACHABLE.md` needs no outside review.
 - **Q104, resolved:** the report fuzzer's findings live in `evals/reports-generated/`.
 - **Q105, resolved for now:** the company phrase bank is hand-written, so it covers only phrasings
   we think of. A model-written bank comes with the live agent.
