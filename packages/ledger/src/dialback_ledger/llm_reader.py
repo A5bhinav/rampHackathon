@@ -110,9 +110,14 @@ def for_the_model(visible_text: str) -> tuple[str, int]:
     for i, text in enumerate(visible_text.split("\n")):
         spans = [(c.start, c.end) for c in find_phones([Line(text, "visible", 0, i)])]
         count += len(spans)
-        out.append(_LONG_RUN.sub(lambda m: m.group(0) if any(s <= m.start() and m.end() <= e for s, e in spans)
-                                 else PLACEHOLDER, text))
+        out.append(_redact(text, spans))
     return "\n".join(out), count
+
+
+def _redact(text: str, phones: list[tuple[int, int]]) -> str:
+    def keep_phones(m: re.Match) -> str:
+        return m.group(0) if any(s <= m.start() and m.end() <= e for s, e in phones) else PLACEHOLDER
+    return _LONG_RUN.sub(keep_phones, text)
 
 
 def llm_version(*, model: str = MODEL, system: str = SYSTEM_PROMPT, user: tuple[str, str] = (USER_BEFORE, USER_AFTER),
