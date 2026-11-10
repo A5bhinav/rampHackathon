@@ -70,6 +70,10 @@ Rules served:
     number (FINDINGS A1);
   - it is not a near miss of an older number.
 
+  "Picks nothing" means the outcome `no_provable_number` only, never `withheld` (spec 0079). A
+  withheld case is one where the change context would change who is called; falling back to the
+  onboarding number there would move the call at the system level.
+
   There is no age requirement and no recorded change request needed: the record predates the change
   (the assumption).
 
