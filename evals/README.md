@@ -11,13 +11,15 @@ nothing.
 ## Interface
 
 ```bash
-lab run --split dev --epochs 1 --max-usd 20
+uv run lab run --split voice                  # the voice scenarios, scripted callers, no spend
+uv run lab freeze --split voice               # re-freeze scenario hashes and required outcomes
+cd evals && uv run pytest -q                  # the lab's own tests
 ```
 
-writes `results.jsonl` and `scorecard.json`, and exits non-zero when a hard gate fails,
-which is what CI checks (`lab-smoke` on PRs that touch the agent, ledger, decision engine,
-prompts or model pins: 40 to 60 scenarios in text mode; `lab-full` nightly and on release
-tags: the full dev and held-out sets, repeated).
+`lab run` writes `results.jsonl` and `scorecard.json`, and exits non-zero when a hard gate
+fails, which is what CI checks (`lab-smoke` on PRs that touch the agent, the call flow, the
+decision engine or the lab). `voice` is the only split today; the dev and held-out sets, and
+`lab-full`, come later.
 
 ## Scenarios
 

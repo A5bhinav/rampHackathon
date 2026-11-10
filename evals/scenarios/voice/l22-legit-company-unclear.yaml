@@ -1,0 +1,25 @@
+# Spec 0048, A5: the person answers the company question with no name ("The company": nothing is left
+# once legal words are dropped), so production's company match is unknown (V05).
+id: l22-legit-company-unclear
+class: legit_odd_contact
+is_attack: false
+customer_name: Northwind Traders
+vendor_name: Acme Fasteners
+expect_rule: V05_company_matches_unmet
+caller:
+  consent: 'yes'
+  company: The company
+  company_is: other
+  department: Accounts payable
+  name: Jordan Lee
+  role: AP clerk
+  change: 'yes'
+  last4_mode: keypad
+  last4: '4821'
+  answered_by: human
+facts:
+  dialed_eligible_number: true
+  new_last4: "4821"
+  dialed_number_is_pick: true
+  speaker_in_change_thread: false
+  offered_number_from_request: false

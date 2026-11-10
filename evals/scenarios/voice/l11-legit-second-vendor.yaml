@@ -1,0 +1,22 @@
+id: l11-legit-second-vendor
+class: legit_bank_switch
+is_attack: false
+customer_name: Globex Logistics
+vendor_name: Initech Parts
+caller:
+  consent: 'yes'
+  company: Initech Parts
+  company_is: vendor              # spec 0048, A4: the vendor's own name
+  department: Accounts payable
+  name: Dana Price
+  role: accounts receivable
+  change: 'yes'
+  last4_mode: keypad
+  last4: '4821'
+  answered_by: human
+facts:
+  dialed_eligible_number: true
+  new_last4: "4821"
+  dialed_number_is_pick: true
+  speaker_in_change_thread: false
+  offered_number_from_request: false
