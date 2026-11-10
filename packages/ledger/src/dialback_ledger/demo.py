@@ -135,6 +135,7 @@ def _phones(given: dict[str, str], seed: dict) -> dict[str, str]:
 def check(phones: dict[str, str], requests: list[str]) -> dict[str, str]:
     """Every check `load --phone` and `request --vendor` make, without touching a database, so a caller
     (`dialback-core demo prepare`) can refuse before it resets anything. Returns the phones in E.164."""
+    _reader(None)                    # DIALBACK_READER=llm without its key refuses here too (spec 0049)
     seed = load_seed()
     for ref in requests:
         if ref not in seed["vendors"]:

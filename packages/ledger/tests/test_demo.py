@@ -121,6 +121,16 @@ def test_refusals_write_nothing(database_url, problem):
         assert c.execute("select count(*) from ledger.documents where dataset_id = %s", (d["dataset_id"],)).fetchone()[0] == 0
 
 
+def test_check_refuses_llm_without_its_key(monkeypatch):
+    # `dialback-core demo prepare` (spec 0077) calls check() before it resets the demo, so check()
+    # makes every refusal load and request make, spec 0049's missing key included. No database.
+    monkeypatch.setenv("DIALBACK_READER", "llm")
+    with pytest.raises(DemoError, match="ANTHROPIC_API_KEY"):
+        demo.check({}, [])
+    monkeypatch.setenv("DIALBACK_READER", "stub")
+    assert demo.check({"acme": "+12025550100"}, ["acme"]) == {"acme": "+12025550100"}
+
+
 def test_whoever_answers_the_team_phone_is_not_from_the_request(database_url):
     from dialback_ledger import change_context
     d = demo_dataset(database_url)
