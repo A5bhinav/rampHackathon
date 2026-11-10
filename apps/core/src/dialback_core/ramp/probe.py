@@ -2,11 +2,12 @@
 
     export RAMP_SANDBOX_CLIENT_ID='...'
     read -rs RAMP_SANDBOX_CLIENT_SECRET && export RAMP_SANDBOX_CLIENT_SECRET
-    uv run --package dialback-core python -m dialback_core.ramp.probe [--vendor <ramp vendor id>]
+    uv run --package dialback-core python -m dialback_core.ramp.probe [--vendor <ramp vendor id>] [--since HOURS]
 
-It reads one vendor (its details, bank accounts, bills and audit events) through the real layer
-(spec 0097) and reports what the core would see, where Ramp's answers differ from its document, and
-what the sandbox says about Q202 to Q204. To see a hold or a bank change, make it by hand in
+It reads one vendor (its details, bank accounts, pending ones too, bills and audit events) through
+the real layer (spec 0097), and recent events from the whole business, and reports what the core
+would see, where Ramp's answers differ from its document, and what the sandbox says about Q202 to
+Q204 and where a bank change was filed. To see a hold or a bank change, make it by hand in
 demo.ramp.com first. Read only, twice over: the token asks only for read scopes, and the client
 refuses anything but a GET and the login. No secret or token is ever printed.
 """
@@ -15,6 +16,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import dataclasses
+import datetime as dt
 import json
 import logging
 import os
@@ -28,8 +30,10 @@ from ..settings import ConfigurationError, RampSandbox, _ramp_sandbox
 from .http import API, TokenBucket
 from .login import RampLogin
 from .port import RampAccount, RampBill, RampError, RampVendor
-from .sandbox import PLACED, RELEASED, VENDOR_RESOURCE, RampSandboxAdapter
+from .sandbox import OLDEST, PLACED, RELEASED, VENDOR_RESOURCE, RampSandboxAdapter, _ts
 
+RECENT_PAGES = 10  # D7: at most 1,000 events from the whole business
+RECENT_WORDS = ("bank", "approv")  # Ramp's ownership-check events all say "bank account"
 DOC_PATH = Path(__file__).resolve().parents[5] / "packages" / "contracts" / "openapi" / "ramp-developer-api.json"
 DOC_URL = "https://docs.ramp.com/openapi/developer-api.json"
 HOW_TO = """No Ramp sandbox credentials in this terminal. Set them first (the secret isn't shown or saved):
@@ -53,10 +57,25 @@ def read_only_client(transport: httpx.AsyncBaseTransport | None = None) -> httpx
     return httpx.AsyncClient(transport=transport, timeout=15.0, event_hooks={"request": [_reads_only]})
 
 
+@dataclasses.dataclass(frozen=True)
+class RecentEvent:
+    """D7: one audit event from anywhere in the business, and what it is filed under."""
+    id: str
+    when: str
+    kind: str
+    resource: str
+    ref_id: str
+    label: str
+    actor_type: str
+    detail_keys: tuple[str, ...]
+    mentions_vendor: bool
+
+
 @dataclasses.dataclass
 class Findings:
     vendor_id: str
     login_scopes: tuple[str, ...]
+    since_hours: int = 24
     vendor: RampVendor | None = None
     accounts: list[RampAccount] = dataclasses.field(default_factory=list)
     bills: list[RampBill] = dataclasses.field(default_factory=list)
@@ -68,6 +87,42 @@ class Findings:
     unpaid_bills: list[tuple[str, str | None, str | None, bool]] = dataclasses.field(default_factory=list)
     readback_would_pass: bool = False
     bank_events: list[tuple[str, str, list[str], bool]] = dataclasses.field(default_factory=list)
+    all_accounts: list[tuple[str, str | None, str | None, str | None]] = dataclasses.field(default_factory=list)
+    recent_events: list[RecentEvent] = dataclasses.field(default_factory=list)  # newest first
+    recent_truncated: bool = False
+
+
+async def _pages(layer: RampSandboxAdapter, path: str, params: dict[str, Any], most: int) -> tuple[list[dict[str, Any]], bool]:
+    """The layer's paging, stopped after `most` pages; says whether Ramp had more (D7)."""
+    items: list[dict[str, Any]] = []
+    body, pages = await layer._request("GET", f"{API}{path}", params=params), 1
+    while True:
+        items.extend(body.get("data", []))
+        nxt = (body.get("page") or {}).get("next")
+        if not nxt:
+            return items, False
+        if pages == most:
+            return items, True
+        body, pages = await layer._request("GET", nxt), pages + 1
+
+
+def _recent(events: list[dict[str, Any]], vendor_name: str, ids: set[str]) -> list[RecentEvent]:
+    """D7: a bank or approval type, or a mention of the vendor anywhere in the event (one of its ids,
+    which are UUIDs, so one inside a URL or a sentence counts; or its name, ignoring case). Newest first."""
+    name = vendor_name.lower()
+    shown = []
+    for e in events:
+        text = json.dumps(e, ensure_ascii=False)
+        mentions = any(i in text for i in ids) or bool(name and name in text.lower())
+        kind = str(e.get("event_type") or "")
+        if not (mentions or any(word in kind.lower() for word in RECENT_WORDS)):
+            continue
+        ref = e.get("primary_reference") or {}
+        details = e.get("event_details")
+        shown.append(RecentEvent(str(e.get("id")), str(e.get("event_time") or ""), kind, str(ref.get("resource_name") or ""),
+                                 str(ref.get("id") or ""), str(ref.get("label") or ""), str(e.get("actor_type") or ""),
+                                 tuple(sorted(details)) if isinstance(details, dict) else (), mentions))
+    return sorted(shown, key=lambda r: (_ts(r.when) or OLDEST, r.id), reverse=True)
 
 
 def _differences(name: str, obj: dict[str, Any], doc: dict[str, Any]) -> set[str]:
@@ -93,7 +148,7 @@ def _reader(sandbox: RampSandbox, http: httpx.AsyncClient) -> tuple[RampSandbox,
 
 
 async def probe(sandbox: RampSandbox, http: httpx.AsyncClient, *, vendor_id: str | None = None,
-                doc: dict[str, Any] | None = None) -> Findings:
+                doc: dict[str, Any] | None = None, now: dt.datetime | None = None, since_hours: int = 24) -> Findings:
     read, login, layer = _reader(sandbox, http)
     await login.token()  # a refused login stops here, with Ramp's status
     raw: list[tuple[str, dict[str, Any]]] = []
@@ -103,14 +158,21 @@ async def probe(sandbox: RampSandbox, http: httpx.AsyncClient, *, vendor_id: str
             raise RampError("Ramp lists no vendors in this sandbox business")
         vendor_id = listed[0]["id"]
         raw.append(("Vendor", listed[0]))
-    f = Findings(vendor_id=vendor_id, login_scopes=read.scopes)
-    raw.append(("ApiVendorDetailResource", await layer._request("GET", f"{API}/vendors/{vendor_id}")))
-    accounts = await layer._all_pages(f"/vendors/{vendor_id}/accounts", {"page_size": 100})
+    f = Findings(vendor_id=vendor_id, login_scopes=read.scopes, since_hours=since_hours)
+    detail = await layer._request("GET", f"{API}/vendors/{vendor_id}")
+    raw.append(("ApiVendorDetailResource", detail))
+    accounts = await layer._all_pages(f"/vendors/{vendor_id}/accounts", {"page_size": 100, "include_pending": "true"})
     bills = await layer._all_pages("/bills", {"vendor_id": vendor_id, "page_size": 100})
     events = await layer._all_pages("/audit-logs/events", {"object_id": vendor_id, "resource_name": VENDOR_RESOURCE,
                                                            "page_size": 100})
+    since = (now or dt.datetime.now(dt.UTC)) - dt.timedelta(hours=since_hours)
+    recent, f.recent_truncated = await _pages(layer, "/audit-logs/events", {
+        "from_date": since.astimezone(dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ"), "page_size": 100}, RECENT_PAGES)
     raw += [("ApiVendorBankAccountResource", a) for a in accounts] + [("Bill", b) for b in bills]
-    raw += [("AuditLogEventResource", e) for e in events]
+    raw += [("AuditLogEventResource", e) for e in events + recent]
+    f.all_accounts = [(a["id"], a.get("account_number_last_four"), a.get("status"), a.get("proposal_id")) for a in accounts]
+    ids = {vendor_id} | {a["id"] for a in accounts} | {a["proposal_id"] for a in accounts if a.get("proposal_id")}
+    f.recent_events = _recent(recent, str(detail.get("name") or ""), ids)
 
     # The core's view, through the layer. A rejection is reported, and the probe goes on.
     for attr, call in (("vendor", layer.get_vendor), ("accounts", layer.list_vendor_accounts), ("bills", layer.list_bills_for_vendor)):
@@ -198,6 +260,16 @@ def render(f: Findings) -> str:
     lines += ["", "Q204  Bank-change events under this vendor's id"]
     lines += [f"  {eid}  {kind}  details: {', '.join(keys) or '(none)'}  names one of the vendor's accounts: {'yes' if names else 'no'}"
               for eid, kind, keys, names in f.bank_events] or ["  none"]
+    lines += ["", "Q204  Every bank account Ramp has for this vendor, pending approval included (Ramp's status)"]
+    lines += [f"  {aid}  last four {last4}  {status}  proposal {proposal or '(none)'}"
+              for aid, last4, status, proposal in f.all_accounts] or ["  none"]
+    lines += ["", (f"Q204  Events in the last {f.since_hours} hours, anywhere in the business: bank or approval "
+                   "types, and any that mention this vendor (newest first)")]
+    lines += [f"  {e.when}  {e.kind}  ({e.id})\n      filed under: {e.resource} {e.ref_id} \"{e.label}\"  "
+              f"actor: {e.actor_type}  details: {', '.join(e.detail_keys) or '(none)'}  "
+              f"mentions this vendor: {'yes' if e.mentions_vendor else 'no'}" for e in f.recent_events] or ["  none"]
+    if f.recent_truncated:
+        lines.append(f"  (stopped after {RECENT_PAGES * 100} events; Ramp has more: narrow the window with --since)")
     lines += ["", f.doc_note]
     lines += [f"  {d}" for d in f.doc_differences] or (["  no differences"] if "compared" in f.doc_note else [])
     return "\n".join(lines)
@@ -219,6 +291,8 @@ def run(argv: list[str] | None = None, environ: dict[str, str] | None = None,
     parser.add_argument("--spec", help="Ramp's OpenAPI document (default: the repo's copy, else docs.ramp.com)")
     parser.add_argument("--skip-doc", action="store_true", help="don't compare with Ramp's document")
     parser.add_argument("--list", action="store_true", help="list vendors with unpaid bills and their ids, then stop")
+    parser.add_argument("--since", type=int, default=24, metavar="HOURS",
+                        help="how far back to read events across the whole business (default 24)")
     args = parser.parse_args(argv)
     for name in ("httpx", "httpcore"):
         logging.getLogger(name).setLevel(logging.WARNING)
@@ -236,7 +310,7 @@ def run(argv: list[str] | None = None, environ: dict[str, str] | None = None,
         async with read_only_client(transport) as http:
             if args.list:
                 return render_list(await list_vendors(sandbox, http))
-            return render(await probe(sandbox, http, vendor_id=args.vendor, doc=doc))
+            return render(await probe(sandbox, http, vendor_id=args.vendor, doc=doc, since_hours=args.since))
 
     try:
         print(asyncio.run(go()))

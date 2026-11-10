@@ -9,7 +9,7 @@ from __future__ import annotations
 import datetime as dt
 import json
 import uuid
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, urlencode
 
 import httpx
 import pytest
@@ -58,11 +58,12 @@ def bill(bill_id: str, payment_date: str | None, status: str = "OPEN", summary: 
             "amount": {"amount": 80000, "currency_code": "USD"}}
 
 
-def event(event_id: str, event_type: str, when: str, about: str = V, actor: str | None = CLERK, details=None) -> dict:
-    """Ramp's AuditLogEventResource."""
+def event(event_id: str, event_type: str, when: str, about: str = V, actor: str | None = CLERK, details=None,
+          resource: str = "Vendor / Merchant", label: str = "Acme Fasteners LLC") -> dict:
+    """Ramp's AuditLogEventResource. `primary_reference` is what the event is filed under."""
     return {"id": event_id, "event_type": event_type, "event_time": when, "actor_id": actor, "actor_type": "user",
             "event_details": details if details is not None else {"description": event_type},
-            "primary_reference": {"id": about, "label": "Acme Fasteners LLC", "resource_name": "Vendor / Merchant", "url": "/x"}}
+            "primary_reference": {"id": about, "label": label, "resource_name": resource, "url": "/x"}}
 
 
 def ramp_error(status: int, message: str) -> httpx.Response:
@@ -105,7 +106,10 @@ class SandboxRamp:
         if parts[0] == "vendors" and len(parts) == 2:
             return httpx.Response(200, json=self.vendors[parts[1]])
         if parts[0] == "vendors" and parts[2] == "accounts":
-            return httpx.Response(200, json={"data": self.accounts[parts[1]], "page": {"next": None}})
+            # Ramp's document: an account proposed in a vendor edit, pending approval, only with include_pending.
+            pending = q.get("include_pending") == ["true"]
+            data = [a for a in self.accounts[parts[1]] if pending or a["status"] != "pending_approval"]
+            return httpx.Response(200, json={"data": data, "page": {"next": None}})
         if parts[0] == "vendors" and parts[2] in ("hold", "release"):
             held = parts[2] == "hold"
             self.events.append(event(f"ev-{len(self.events) + 1}", "Vendor placed on hold" if held else "Vendor hold released",
@@ -129,11 +133,17 @@ class SandboxRamp:
             if ("object_id" in q) != ("resource_name" in q):
                 return ramp_error(422, "The resource name must also be provided when filtering by object ID.")
             wanted = set(q["event_types"][0].split(",")) if "event_types" in q else None
+            since = dt.datetime.fromisoformat(q["from_date"][0]) if "from_date" in q else None
             data = [e for e in self.events  # oldest first on purpose: a layer that took the first event would be wrong
-                    if e["primary_reference"]["id"] == q.get("object_id", [None])[0]
-                    and e["primary_reference"]["resource_name"] == q.get("resource_name", [None])[0]
-                    and (wanted is None or e["event_type"] in wanted)]
-            return httpx.Response(200, json={"data": data, "page": {"next": None}})
+                    if ("object_id" not in q  # without object_id, the whole business
+                        or (e["primary_reference"]["id"] == q["object_id"][0]
+                            and e["primary_reference"]["resource_name"] == q["resource_name"][0]))
+                    and (wanted is None or e["event_type"] in wanted)
+                    and (since is None or dt.datetime.fromisoformat(e["event_time"]) >= since)]
+            size, start = int(q.get("page_size", ["20"])[0]), int(q.get("start", ["0"])[0])  # Ramp's default page is 20
+            more = start + size < len(data)
+            nxt = f"{BASE}/developer/v1/audit-logs/events?{urlencode({**q, 'start': [start + size]}, doseq=True)}"
+            return httpx.Response(200, json={"data": data[start:start + size], "page": {"next": nxt if more else None}})
         return httpx.Response(404, json={})
 
     def api(self, path_suffix: str = "") -> list[httpx.Request]:

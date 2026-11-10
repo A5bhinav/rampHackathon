@@ -6,6 +6,7 @@ up what a developer would have done by hand in demo.ramp.com, then reads the pro
 from __future__ import annotations
 
 import dataclasses
+import datetime as dt
 from urllib.parse import parse_qs
 
 import httpx
@@ -24,6 +25,7 @@ from test_ramp_sandbox_shapes import BASE, OTHER, SANDBOX, SandboxRamp, V, accou
 pytestmark = pytest.mark.anyio
 
 SECRET = SANDBOX.client_secret.decode()
+NOW = dt.datetime(2026, 11, 10, 13, tzinfo=dt.UTC)
 FIVE = ("vendors:read", "vendors:write", "bills:read", "bills:write", "audit_logs:read")
 
 
@@ -41,9 +43,21 @@ def bank_change_by_hand(fake: SandboxRamp, details: dict) -> None:
     fake.events.append(event("ev-bank", "Bill pay bank account updated", "2026-11-10T11:00:00+00:00", details=details))
 
 
+def change_pending_review(fake: SandboxRamp) -> None:
+    """A bank change waiting for approval in Ramp: an account proposed in a vendor edit (D7)."""
+    fake.accounts[V].append(account("acct-proposed", "6666", "pending_approval") | {"proposal_id": "prop-1"})
+
+
 async def findings_from(fake: SandboxRamp, sandbox=SANDBOX, **kwargs):
+    kwargs.setdefault("now", NOW)
     async with read_only_client(httpx.MockTransport(fake.handle)) as http:
         return await probe(sandbox, http, **kwargs)
+
+
+def business_wide(fake: SandboxRamp) -> list[dict[str, list[str]]]:
+    """The audit-log reads without an object_id (D7), as query strings."""
+    qs = [parse_qs(r.url.query.decode()) for r in fake.api("/audit-logs/events")]
+    return [q for q in qs if "object_id" not in q]
 
 
 # Read only (D1) -------------------------------------------------------------------------------------
@@ -130,6 +144,93 @@ async def test_an_account_the_layer_rejects_is_reported_and_the_probe_carries_on
     f = await findings_from(fake)
     [error] = f.layer_errors
     assert "acct-x" in error and f.accounts == [] and len(f.unpaid_bills) == 2
+
+
+# Where a bank change went (D7) ------------------------------------------------------------------------
+
+async def test_pending_accounts_are_listed_with_their_status_and_the_layers_view_is_unchanged():
+    fake = SandboxRamp()
+    change_pending_review(fake)
+    f = await findings_from(fake)
+    assert f.all_accounts == [("acct-old", "2222", "pending_deletion", None), ("acct-cur", "4444", "active", None),
+                              ("acct-proposed", "6666", "pending_approval", "prop-1")]
+    assert [a.id for a in f.accounts] == ["acct-old", "acct-cur"], "the layer still reads without include_pending"
+    text = render(f)
+    assert "acct-proposed" in text and "pending_approval" in text and "prop-1" in text
+
+
+async def test_recent_events_from_anywhere_in_the_business_show_where_a_change_was_filed():
+    # Where Ramp files these is what the probe must find out, so the names and references below are
+    # planted in several places on purpose; they are not Ramp's.
+    fake = SandboxRamp()
+    change_pending_review(fake)
+    # Each shown event is shown for one reason only, so each rule is checked on its own.
+    fake.events += [
+        event("ev-appr2", "Approval step approved", "2026-11-10T11:40:00+00:00", about="appr-2", resource="Approval",
+              label="Card limit", details={}),  # an approval type only
+        event("ev-appr", "Approval step added", "2026-11-10T11:30:00+00:00", about="appr-1", resource="Approval",
+              label="Vendor edit", details={"proposal_id": "prop-1"}),  # an approval type; names the proposal
+        event("ev-draft", "Draft vendor changed by AP coworker", "2026-11-10T11:25:00+00:00", about="draft-1",
+              resource="Draft vendor", label="Draft",
+              details={"summary": "proposed bank acct-proposed for review"}),  # only the account id, inside a sentence
+        event("ev-edit", "Edited vendor field", "2026-11-10T11:20:00+00:00", label="Acme",
+              details={"field": "payment details"}),  # only the vendor's id, as what it is filed under
+        event("ev-own", "Bill pay rejected PDR bank account ownership match", "2026-11-10T11:10:00+00:00",
+              about="bpv-1", resource="Bill pay vendor", label="ACME FASTENERS LLC"),  # the name, another case
+        event("ev-other", "Bank account updated", "2026-11-10T10:00:00+00:00", about=OTHER,
+              label="Brightline Office Supply Inc"),  # a bank type, another vendor
+        event("ev-card", "Card created", "2026-11-10T12:00:00+00:00", about="card-1", resource="Card",
+              label="Ops card"),  # neither: left out
+        event("ev-funds", "Transferred ownership of funds", "2026-11-10T12:10:00+00:00", about="fund-1",
+              resource="Funds", label="Travel"),  # "ownership" alone: left out
+        event("ev-old", "Bill pay bank account updated", "2026-11-08T10:00:00+00:00"),  # before the window
+    ]
+    f = await findings_from(fake)
+    assert [(e.id, e.kind, e.resource, e.ref_id, e.label, e.actor_type, e.detail_keys, e.mentions_vendor)
+            for e in f.recent_events] == [
+        ("ev-appr2", "Approval step approved", "Approval", "appr-2", "Card limit", "user", (), False),
+        ("ev-appr", "Approval step added", "Approval", "appr-1", "Vendor edit", "user", ("proposal_id",), True),
+        ("ev-draft", "Draft vendor changed by AP coworker", "Draft vendor", "draft-1", "Draft", "user", ("summary",), True),
+        ("ev-edit", "Edited vendor field", "Vendor / Merchant", V, "Acme", "user", ("field",), True),
+        ("ev-own", "Bill pay rejected PDR bank account ownership match", "Bill pay vendor", "bpv-1",
+         "ACME FASTENERS LLC", "user", ("description",), True),
+        ("ev-other", "Bank account updated", "Vendor / Merchant", OTHER, "Brightline Office Supply Inc", "user",
+         ("description",), False)]
+    assert f.recent_events[0].when == "2026-11-10T11:40:00+00:00"
+    [q] = business_wide(fake)
+    assert q["from_date"] == ["2026-11-09T13:00:00Z"], "24 hours before now"
+    assert "resource_name" not in q and "event_types" not in q, "nothing filtered at Ramp but the time"
+    assert f.recent_truncated is False
+    text = render(f)
+    assert "ev-appr" in text and "Approval appr-1" in text and "ev-card" not in text
+
+
+async def test_recent_events_stop_after_ten_pages_and_say_so():
+    noise = [event(f"ev-n{i}", "Card created", "2026-11-10T12:00:00+00:00", about=f"card-{i}", resource="Card",
+                   label="Ops card") for i in range(1000)]
+    late = event("ev-late", "Bank account updated", "2026-11-10T12:30:00+00:00")
+    fake = SandboxRamp()
+    fake.events += noise[:999] + [late]  # 1,000 in the window: exactly ten pages of 100
+    f = await findings_from(fake)
+    assert [e.id for e in f.recent_events] == ["ev-late"] and f.recent_truncated is False
+    assert len(business_wide(fake)) == 10 and "stopped after" not in render(f)
+    fake = SandboxRamp()
+    fake.events += noise + [late]  # 1,001: the bank event is on an eleventh page, which isn't read
+    f = await findings_from(fake)
+    assert f.recent_events == [] and f.recent_truncated is True
+    assert len(business_wide(fake)) == 10
+    assert "stopped after 1000 events" in render(f)
+
+
+def test_since_sets_the_window(capsys):
+    fake = SandboxRamp()
+    env = {"RAMP_SANDBOX_CLIENT_ID": "client-for-tests", "RAMP_SANDBOX_CLIENT_SECRET": SECRET}
+    before = dt.datetime.now(dt.UTC)
+    assert run(["--skip-doc", "--since", "48"], env, transport=httpx.MockTransport(fake.handle)) == 0
+    [q] = business_wide(fake)
+    sent = dt.datetime.fromisoformat(q["from_date"][0])
+    assert abs(sent - (before - dt.timedelta(hours=48))) < dt.timedelta(minutes=1)
+    assert "last 48 hours" in capsys.readouterr().out
 
 
 def schema(*fields: str, nullable: tuple[str, ...] = ()) -> dict:

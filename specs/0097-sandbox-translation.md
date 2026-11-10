@@ -91,6 +91,16 @@ None.
   layer's reading the worker's read-back would pass. (One vendor, one hold: confirmed, not general.)
 - **Q204:** is `Bill pay bank account updated` the event for a vendor's new bank account, and does
   its `event_details` name the new account? Until then, the author is unknown (two approvers).
+  First try, 2026-11-10: a bank change made by hand in the sandbox's dashboard (its ownership check
+  failed; saved without verifying) showed no new account and no event under the vendor's id. Ramp
+  showed it as "pending review". The probe now lists pending accounts and recent events from the
+  whole business (spec 0098, D7) to find where it went.
+- **Q205:** a bank change can wait for approval in Ramp, and until then the proposed account shows
+  only with `include_pending`, under an id Ramp replaces when it approves the change (Ramp's
+  document). The layer reads without `include_pending`, so it sees the change only once approved,
+  and a payment Ramp schedules between that approval and the core's next sync isn't held (R1).
+  Should a sandbox dataset open the case while the change is pending, and how does the case follow
+  the account across the new id (the last four and `proposal_id` are the candidates)?
 
 ## Commands
 
