@@ -5,6 +5,9 @@ A frozen case is one directory holding `world.json`: the select() inputs field f
 sightings, the change request, settings, domains, ids and times, including `recorded_at`), plus what
 the oracle found when it was frozen and why. It round-trips exactly, so a frozen regression always
 means what it meant when it was written.
+
+Spec 0046: an exception raised inside select() or a check is a finding of its own,
+`crash_<ExceptionName>`, so `rerun` reports a frozen case that crashes instead of raising.
 """
 from __future__ import annotations
 
@@ -105,9 +108,32 @@ def load_all(out_dir: Path) -> list[tuple[str, World]]:
     return [(case.name, load_world(case)) for case in sorted(root.iterdir()) if (case / FILE).is_file()]
 
 
-def rerun(out_dir: Path) -> list[tuple[str, list[str]]]:
-    """Every frozen case the rule still fails, with what the oracle finds now (a found case stays found)."""
-    return [(label, found) for label, world in load_all(out_dir) if (found := all_violations(world))]
+def frozen_labels(out_dir: Path) -> set[str]:
+    """Every label a frozen case under `out_dir` records (its `labels`, as written when it was frozen)."""
+    root = Path(out_dir)
+    if not root.is_dir():
+        return set()
+    return {label for case in sorted(root.iterdir()) if (case / FILE).is_file()
+            for label in json.loads((case / FILE).read_text(encoding="utf-8")).get("labels", [])}
+
+
+def crash_label(error: BaseException) -> str:
+    return f"crash_{type(error).__name__}"
+
+
+def checked(world: World, rule=None) -> list[str]:
+    """`all_violations`, with a crash inside select() or a check reported as the label `crash_<Name>`
+    (spec 0046). `rule` is a rule module to check instead of the working tree's select()."""
+    try:
+        return all_violations(world) if rule is None else all_violations(world, rule=rule)
+    except Exception as error:  # noqa: BLE001  a crash in select() or a check is a finding, not the end of the run
+        return [crash_label(error)]
+
+
+def rerun(out_dir: Path, rule=None) -> list[tuple[str, list[str]]]:
+    """Every frozen case the rule still fails, with what the oracle finds now (a found case stays found).
+    A case that crashes the rule or a check is reported as `crash_<Name>`."""
+    return [(label, found) for label, world in load_all(out_dir) if (found := checked(world, rule))]
 
 
 class _Found(Exception):

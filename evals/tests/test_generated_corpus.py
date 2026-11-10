@@ -79,8 +79,10 @@ def test_freeze_refuses_a_real_looking_number(tmp_path):
 
 def test_lab_files_hold_only_fictional_numbers():
     found = {}
+    # Spec 0046 adds the planted breaks and the tests' recorded fixtures to what the lab writes.
     for path in [*(ROOT / "evals" / "src").rglob("*.py"), *(ROOT / "evals" / "tests").rglob("*.py"),
-                 *GENERATED.rglob("*.json")]:
+                 *GENERATED.rglob("*.json"), *(ROOT / "evals" / "redteam").rglob("*.json"),
+                 *(ROOT / "evals" / "tests").rglob("*.json")]:
         bad = sorted({n for n in E164.findall(path.read_text(encoding="utf-8")) if not FICTIONAL.match(n)})
         if bad:
             found[str(path.relative_to(ROOT))] = bad
@@ -104,6 +106,16 @@ def test_rerun_reports_frozen_cases_the_rule_still_fails(tmp_path, monkeypatch):
     assert rerun(tmp_path) == []
     monkeypatch.setattr("dialback_evals.gencorpus.all_violations", lambda w: ["M_reorder"])
     assert rerun(tmp_path) == [("plain", ["M_reorder"])]
+
+
+def test_rerun_reports_a_frozen_crash(tmp_path, monkeypatch):
+    # Spec 0046: a crash in select() or a check on a frozen case is reported as a label, not raised.
+    freeze(make_world(numbers=[NumberSpec("+14695550142", ["contract", "listing"], 500)]), "plain", tmp_path)
+
+    def crash(world, **_):
+        raise ZeroDivisionError("a planted crash")
+    monkeypatch.setattr("dialback_evals.gencorpus.all_violations", crash)
+    assert rerun(tmp_path) == [("plain", ["crash_ZeroDivisionError"])]
 
 
 @pytest.mark.selection_gate
