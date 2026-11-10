@@ -8,6 +8,7 @@ from dataclasses import replace
 import pytest
 from conftest import CLEAN, GOOD
 from dialback_decision import decide, rules
+from dialback_decision.engine import RETIRED, TEMPLATES
 from dialback_decision.facts import EarlierCall
 
 CONSENTED = ("yes",)
@@ -84,7 +85,6 @@ UNMET = {
     "V02_outbound_dial": {"dialed_number_is_pick": None},
     "V03_live_person": {"answered_by": None},
     "V04_recording_consent": {"recording_consent": ()},
-    "V05_company_matches": {"company_matches": None},
     "V06_speaker_identified": {"speaker_role": ()},
     "V07_right_person_confirmed": {"speaker_in_change_thread": None},
     "V08_digits_match": {"last_four_result": None},
@@ -132,7 +132,7 @@ def test_every_rule_in_the_table_has_a_case():
     table = {r.id for r in (*rules.BLOCK0, *rules.NOT_VERIFIED, *rules.NEEDS_REVIEW)}
     assert table | {"NR97_facts_invalid", "NR99_conditions_not_met"} == set(FIRES)
     assert {r.id for r in (*rules.VERIFIED, *rules.STRICT)} == set(UNMET)
-    assert len(rules.NOT_VERIFIED) == 4 and len(rules.VERIFIED) == 12
+    assert len(rules.NOT_VERIFIED) == 4 and len(rules.VERIFIED) == 11, "V05 retired (spec 0082, D7b)"
     assert len(rules.NEEDS_REVIEW) + len(rules.BLOCK0) == 21, "NR01-NR21"
 
 
@@ -178,3 +178,35 @@ def test_every_rule_an_answer_feeds_exists():
     assert {i for feeds in (*SLOT_RULES.values(), *EARLIER_SLOT_RULES.values()) for i in feeds} <= ids
     assert "V09_same_person" not in SLOT_RULES["account_last4"], "same_person reads names and the change answer only"
     assert {"V09_same_person", "NR17_split_speakers"} <= set(SLOT_RULES["change_requested"])
+
+
+# Spec 0082, D7b (B10): the company answer is no longer required to verify. Only a refusal word
+# (company_matches False) blocks, through NR03; no answer, a short or garbled one, or another
+# company's name (None) blocks nothing.
+
+ELEVEN = ("V01_number_eligible", "V02_outbound_dial", "V03_live_person", "V04_recording_consent", "V06_speaker_identified",
+          "V07_right_person_confirmed", "V08_digits_match", "V09_same_person", "V10_answers_grounded", "V11_script_clean",
+          "V12_no_flags")
+
+
+@pytest.mark.parametrize("company_matches", [None, True], ids=["unknown", "named"])
+def test_the_company_answer_is_not_required_to_verify(company_matches):
+    for strict, extra in ((False, ()), (True, ("S01_known_contact",))):
+        d = decide(replace(GOOD, company_matches=company_matches), strict=strict)
+        assert (d.outcome, d.rules_fired) == ("verified", (*ELEVEN, *extra))
+    assert decide(replace(GOOD, company_matches=False)).rules_fired == ("NR03_wrong_company",), "a refusal still blocks"
+
+
+def test_v05_is_retired_and_its_ids_still_render():
+    table = (*rules.BLOCK0, *rules.NOT_VERIFIED, *rules.NEEDS_REVIEW, *rules.VERIFIED, *rules.STRICT)
+    current = {r.id for r in table} | {r.unmet_id for r in (*rules.VERIFIED, *rules.STRICT)} | set(rules.FIXED)
+    for retired, sentence in (("V05_company_matches", "The person named this vendor."),
+                              ("V05_company_matches_unmet", "The person did not clearly name this vendor.")):
+        assert retired not in current, f"{retired} never comes back as a current id"
+        assert RETIRED[retired] == TEMPLATES[retired] == sentence, "old decisions still render"
+
+
+def test_nr03_has_its_new_sentence_and_is_the_company_answers_only_rule():
+    assert TEMPLATES["NR03_wrong_company"] == \
+        "The company answer says the person is not with this vendor, or only works with it."
+    assert rules.SLOT_RULES["company_named"] == ("NR03_wrong_company",)

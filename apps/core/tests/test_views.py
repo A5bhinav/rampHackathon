@@ -11,7 +11,7 @@ V = [r.id for r in rules.VERIFIED]
 
 def test_verified_passes_every_condition():
     items, note = checklist("verified", V, ENGINE_VERSION)
-    assert [i["status"] for i in items] == ["passed"] * 12 and [i["id"] for i in items] == V
+    assert [i["status"] for i in items] == ["passed"] * 11 and [i["id"] for i in items] == V
     assert note.startswith("Every condition")
 
 
@@ -19,7 +19,7 @@ def test_unmet_conditions_are_exactly_the_ones_recorded():
     items, _ = checklist("needs_review", [rules.NOT_MET, "V08_digits_match_unmet", "V12_no_flags_unmet"], ENGINE_VERSION)
     status = {i["id"]: i["status"] for i in items}
     assert [k for k, v in status.items() if v == "not_met"] == ["V08_digits_match", "V12_no_flags"]
-    assert sum(v == "passed" for v in status.values()) == 10
+    assert sum(v == "passed" for v in status.values()) == 9, "11 conditions since V05 was retired (spec 0082, D7b)"
     v08 = next(i for i in items if i["id"] == "V08_digits_match")
     assert v08["sentence"] == "The person did not give matching digits for the new account."
 
