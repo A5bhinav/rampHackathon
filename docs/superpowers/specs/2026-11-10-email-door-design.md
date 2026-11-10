@@ -391,6 +391,25 @@ model says it is a change request.**
   unchanged: every change request flagged, at most 3 ordinary emails flagged. The rule-only numbers
   above stay recorded as the original result.
 
+## Flagging: the model decides (Sami's decision 12, after the Haiku run)
+
+With "rule OR model" and Haiku, the sealed `heldout2` run caught every change request (39/39) but
+flagged 23 of 70 ordinary emails, against a bar of 3. The rule caused 20 of them: it reacts to
+bank-change words in emails that request nothing (fraud-awareness newsletters, training emails
+quoting sample scams, "nothing changed" notes). None of the 23 would have opened a case. **Sami's
+decision 12: an email is flagged only when the model says yes.** The rule no longer flags on its own.
+
+- The pinned model is `claude-haiku-5-5` (fast, under a cent per evaluation run).
+- `DIALBACK_EMAIL_CLASSIFIER` = `rule` (safe default, no external call, the rule alone) or `model`
+  (the model decides; needs Anthropic credentials).
+- The backstop stays: an email from a door vendor whose bank details differ from the account on
+  file opens a case even when the model says no (Task 8's on-file check). So a sender who talks the
+  model out of a yes still can't redirect a known vendor's payments without verification.
+- A model failure is retried, then listed as `failed` for a person, as before (R7).
+- Judged on a third sealed set (`heldout3`) by a new author on a different model, under the same
+  bar, with change requests that only an on-file comparison can catch reported separately. The
+  earlier rule-OR-model result stays recorded.
+
 ## Open questions (team)
 
 1. **Should red flags feed `decide()`?** That changes decision logic (Abhi and Inesh's area).

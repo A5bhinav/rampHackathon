@@ -238,6 +238,26 @@ Written by a fresh agent on a different model from Task 5's author, from a brief
 
 It runs `flag_email` with the real `AnthropicClassifier` over the tuning set, the development set (old held-out) and, once, the sealed fresh held-out set. It reports per set: change requests flagged, ordinary flagged, file names of misses and false flags, the model, and the cost. The same bar applies to the fresh held-out set, and so does the stop rule (two revisions of the prompt, judged on the development set, then stop and report to Sami). It needs Anthropic credentials, and every run spends money, so Sami approves each run. Results are recorded in spec 0086.
 
+### Task 6d: A third sealed set (Sami's decision 12)
+
+**Files:** Create `apps/core/tests/email_door/fixtures/heldout3/*.json` and `heldout3.sha256`.
+
+Written by a fresh agent on a model not used for the earlier sets, from a brief with categories and the label meaning only; it reads none of the existing fixtures, code, plan, design or specs. 40 change requests and 70 ordinary emails, same JSON format. A change request that only a comparison with the account on file can reveal starts its `note` with `ON-FILE-ONLY:`. The controller commits and seals it.
+
+### Task 6e: The model decides
+
+**Files:** Modify `apps/core/src/dialback_core/email_door/rules.py` (`flag_email`), `classifier.py` (`MODEL = "claude-haiku-5-5"`), `flags.py`, `settings.py`, `app.py`, `AGENTS.md`, `docs/deploy.md`, `tests/email_door/eval_flagger.py`; tests.
+
+**Interfaces:**
+- `ClassifierMode`: `RULE = "rule"` (safe default) and `MODEL = "model"`; `rule+model` is removed. `model` requires `ANTHROPIC_API_KEY`.
+- `flag_email(subject, text, html_text, classifier)`: with a classifier, the model alone decides (`FlagDecision(True, "model", quote)` or `FlagDecision(False, "none", None)`); `ClassifierFailed` propagates. With no classifier, the rule decides as before (`by = "rule"`).
+- The door's on-file mismatch check (Task 8) is unchanged and still opens a case on an unflagged email.
+- `eval_flagger.py` evaluates the model-decides flagger, accepts the `heldout3` set (sealed, `--confirm-heldout3`, the same once-only guard), and reports change requests whose note starts `ON-FILE-ONLY:` separately.
+
+### Task 6f: Evaluate the model-decides flagger
+
+Pre-registered in the ledger and spec 0086 before any run: Haiku, prompt v1; exploratory on tuning, dev and `heldout2` (at most 2 prompt revisions, judged there); `heldout3` once; bar: every change request flagged except `ON-FILE-ONLY:` ones, at most 3 of 70 ordinary flagged, failures count as not flagged; if it fails, stop and report to Sami.
+
 ### Task 7: Vendor matching
 
 **Files:**
