@@ -266,6 +266,28 @@ def test_the_heldout_hash_comes_from_a_committed_file(tmp_path, monkeypatch, cap
         ev.main(["--split", "heldout", "--labels", str(path), "--expect-sha256", digest])
 
 
+def test_heldout_runs_exactly_three_times_and_no_run_never_passes(tmp_path, monkeypatch, capsys):
+    # Review G11: --runs -1 gave zero runs, and every bar over no runs printed "passed": true.
+    assert not ev.bars([], [outcome("a")])["passed"]
+    path, _, sha_file = frozen(tmp_path, heldout(30))
+    dev_path = tmp_path / "dev.json"
+    dev_path.write_text(json.dumps(dev_set()))
+    monkeypatch.setattr(ev, "HELDOUT_SHA256", sha_file)
+    monkeypatch.setattr(ev, "reader_for", lambda mode: Fixed({}))
+    monkeypatch.setenv("DIALBACK_READER", "llm")
+    for runs in ("-1", "0", "1", "2", "4"):
+        assert ev.main(["--split", "heldout", "--labels", str(path), "--runs", runs]) == 2, runs
+        assert "exactly 3" in capsys.readouterr().err
+    for runs in ("-1", "0"):
+        assert ev.main(["--split", "dev", "--labels", str(dev_path), "--runs", runs]) == 2, runs
+        assert "at least one run" in capsys.readouterr().err
+    loaded, _ = ev.load(path, "heldout", sha_file=sha_file)
+    with pytest.raises(ValueError, match="exactly 3"):
+        ev.evaluate(loaded, Fixed({}), StubReader(), runs=1)
+    with pytest.raises(ValueError, match="at least one run"):
+        ev.evaluate(dev_set(), Fixed({}), StubReader(), runs=0)
+
+
 def test_the_dev_report_lists_each_error():
     labeled = {"split": "dev", "documents": [
         doc("o1", "ordinary", ["Hi", "Bank 206-555-0186"], [truth(1, "+12065550186", "unknown", "bank")])]}

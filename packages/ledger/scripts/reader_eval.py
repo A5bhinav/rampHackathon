@@ -19,7 +19,8 @@ Counted for each labeled number:
 - role accuracy, only for numbers with an explicit role word;
 - "us" mentions, counted in everything above and also on their own.
 
-The bars, on every run (the model's output varies; held-out runs 3 times):
+The bars, on every run (the model's output varies; held-out runs exactly 3 times, and a report with
+no run never passes):
 - no new unsafe labels: none the stub didn't also make on the same number;
 - fewer over-blocks than the stub on the hard documents, by a one-sided exact McNemar test on the
   paired per-number outcomes, p <= 0.05;
@@ -70,6 +71,7 @@ DEV_LABELS = Path(__file__).with_name("reader_dev.json")   # the 30 dev document
 HELDOUT_SHA256 = Path(__file__).with_name("reader_heldout.sha256")   # committed when the held-out set is frozen
 SIZES = {"dev": 30, "heldout": 70}
 MIN_NOT_VENDOR = 30                                        # held-out numbers that aren't the vendor's
+HELDOUT_RUNS = 3                                           # the model's output varies
 ALPHA = Fraction(5, 100)
 ROLES = {"main", "ar", "billing", "fax", "unknown"}
 PARTIES = {"vendor", "customer", "bank", "unknown"}
@@ -173,9 +175,17 @@ def _run_bars(llm: Sequence[Outcome], stub: Sequence[Outcome]) -> dict:
 
 
 def bars(llm_runs: Sequence[Sequence[Outcome]], stub: Sequence[Outcome]) -> dict:
-    """Each bar on each run; passed only if every bar holds on every run."""
+    """Each bar on each run; passed only if there was a run and every bar holds on every run."""
     runs = [_run_bars(run, stub) for run in llm_runs]
-    return {"runs": runs, "passed": all(bar["passed"] for run in runs for bar in run.values())}
+    return {"runs": runs, "passed": bool(runs) and all(bar["passed"] for run in runs for bar in run.values())}
+
+
+def check_runs(split: str, runs: int) -> None:
+    """Held-out runs exactly HELDOUT_RUNS times; any split needs at least one run (review G11)."""
+    if split == "heldout" and runs != HELDOUT_RUNS:
+        raise ValueError(f"the held-out set runs exactly {HELDOUT_RUNS} times, not {runs}")
+    if runs < 1:
+        raise ValueError(f"at least one run is needed, not {runs}")
 
 
 # The labeled set -----------------------------------------------------------------------------------
@@ -251,6 +261,7 @@ def _errors(outcomes: Sequence[Outcome]) -> list[dict]:
 def evaluate(labeled: dict, llm: Reader, stub: Reader, *, runs: int, sha256: str | None = None) -> dict:
     """Score the stub once (it's deterministic) and the LLM reader `runs` times, pair them, and
     report. Held-out: totals only."""
+    check_runs(labeled["split"], runs)
     stub_out, stub_failed = score(labeled, stub)
     llm_runs = [score(labeled, llm) for _ in range(runs)]
     verdict = bars([out for out, _ in llm_runs], stub_out)
@@ -269,21 +280,22 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--split", choices=("dev", "heldout"), required=True)
     parser.add_argument("--labels", type=Path, help=f"the labeled set (dev default: {DEV_LABELS.name} beside this script)")
-    parser.add_argument("--runs", type=int, help="LLM runs (default: 3 for heldout, 1 for dev)")
+    parser.add_argument("--runs", type=int, help="LLM runs (heldout: exactly 3; dev: at least 1, default 1)")
     args = parser.parse_args(argv)
     if reader_mode() is not ReaderMode.LLM:
         print("refused: run with DIALBACK_READER=llm (this evaluation calls the model)", file=sys.stderr)
         return 2
+    runs = args.runs if args.runs is not None else (HELDOUT_RUNS if args.split == "heldout" else 1)
     try:
+        check_runs(args.split, runs)
         llm = reader_for(ReaderMode.LLM)
         path = args.labels or (DEV_LABELS if args.split == "dev" else None)
         if path is None:
             raise LabeledSetError("--labels is required for heldout: that set lives outside the repo")
         labeled, sha = load(path, args.split)
-    except (ReaderUnavailable, LabeledSetError) as exc:
+    except (ValueError, ReaderUnavailable, LabeledSetError) as exc:
         print(f"refused: {exc}", file=sys.stderr)
         return 2
-    runs = args.runs or (3 if args.split == "heldout" else 1)
     report = evaluate(labeled, llm, StubReader(), runs=runs, sha256=sha)
     print(json.dumps(report, indent=2))
     return 0 if report["passed"] else 1
