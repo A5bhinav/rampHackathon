@@ -17,13 +17,15 @@ from uuid import UUID
 from dialback_ledger.lookalike import is_lookalike, sender_domain
 
 from dialback_core.company import SUFFIXES
+
+_BOTH_SIDES = frozenset({"and", "the"})  # dropped from the text as well as the name
 from dialback_core.email_door.rules import MAX_CHARS
 
 LOOKALIKE_DOMAIN = "lookalike_domain"
 SENDER_OFF_DOMAIN = "sender_off_domain"
 
-_QUOTES = str.maketrans({"‘": "'", "’": "'", "‚": "'", "‛": "'", "ʼ": "'",
-                         "“": '"', "”": '"', "„": '"'})
+_QUOTES = str.maketrans({"\u2018": "'", "\u2019": "'", "\u201a": "'", "\u201b": "'", "\u02bc": "'",
+                         "\u201c": '"', "\u201d": '"', "\u201e": '"'})
 
 
 @dataclass(frozen=True)
@@ -70,8 +72,8 @@ def _contains(haystack: list[str], needle: list[str]) -> bool:
 def name_in_text(name: str, text: str) -> bool:
     """True when the name's words, legal suffixes dropped, appear together and in order in the first
     MAX_CHARS characters of `text`. A name with no words left never matches."""
-    wanted = [t for t in _tokens(name) if t not in SUFFIXES]
-    return bool(wanted) and _contains(_tokens(text[:MAX_CHARS]), wanted)
+    wanted = [t for t in _tokens(name) if t not in SUFFIXES]  # "and"/"the" are in SUFFIXES
+    return bool(wanted) and _contains([t for t in _tokens(text[:MAX_CHARS]) if t not in _BOTH_SIDES], wanted)
 
 
 def match_vendor(sender: str, subject: str, text: str, vendors: Sequence[VendorRef]) -> Match:
@@ -88,14 +90,15 @@ def match_vendor(sender: str, subject: str, text: str, vendors: Sequence[VendorR
 
     if domain:
         known = domain.rstrip(".")
-        hit = decide([v for v in vendors if known in {d.strip().lower().rstrip(".") for d in v.domains}],
-                     "domain", ())
+        hit = decide([v for v in vendors if any(
+            known == k or known.endswith("." + k)
+            for k in (d.strip().lower().rstrip(".") for d in v.domains) if k)], "domain", ())
         if hit:
             return hit
         hit = decide([v for v in vendors if is_lookalike(known, v.domains)], "lookalike", (LOOKALIKE_DOMAIN,))
         if hit:
             return hit
     hit = decide([v for v in vendors
-                  if any(name_in_text(n, subject or "") or name_in_text(n, text or "")
+                  if any(name_in_text(n, (subject or "")[:MAX_CHARS]) or name_in_text(n, text or "")
                          for n in (v.legal_name, *v.trade_names))], "name", (SENDER_OFF_DOMAIN,))
     return hit or Match(None, "none", ())

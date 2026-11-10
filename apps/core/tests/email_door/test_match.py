@@ -36,17 +36,19 @@ def test_acme_alone_does_not_match():
 
 def test_name_words_out_of_order_do_not_match():
     assert not name_in_text("Acme Fasteners LLC", "Fasteners Acme changed banks")
-    assert not name_in_text("Acme Fasteners", "Acme and Fasteners")
+    assert name_in_text("Acme Fasteners", "Acme and Fasteners")  # ruling: "and" is dropped from the text too
     assert name_in_text("Acme Fasteners LLC", "from Acme Fasteners, Inc.")
 
 
 def test_accents_and_smart_quotes_still_match():
-    assert name_in_text("Acme Fasteners LLC", "ACME FASTENERS’")
-    assert name_in_text("Acme Fasteners LLC", "Acmé Fasteners, L.L.C.")
-    assert name_in_text("Joe’s Diner", "Joe's Diner moved")
-    # "and" is a suffix word: dropped from the name only, so the text must not have it between the words
+    assert name_in_text("Acme Fasteners LLC", "ACME FASTENERS\u2019")
+    assert name_in_text("Acme Fasteners LLC", "Acm\u00e9 Fasteners, L.L.C.")
+    assert name_in_text("Joe\u2019s Diner", "Joe's Diner moved")
+    # ruling: "and" and "the" are dropped from the text too; other suffix words only from the name
     assert name_in_text("Smith & Sons", "Smith Sons")
-    assert not name_in_text("Smith & Sons", "Smith and Sons")
+    assert name_in_text("Smith & Sons", "Smith and Sons")
+    assert name_in_text("The Smith Sons", "Smith and Sons")
+    assert not name_in_text("Acme Fasteners", "Acme Co Fasteners")
 
 
 def test_two_vendors_named_is_several():
@@ -93,3 +95,15 @@ def test_name_past_the_cap_is_ignored_and_matching_is_fast():
     start = time.perf_counter()
     assert not name_in_text("a " * 50 + "b", hostile)
     assert time.perf_counter() - start < 1.0
+
+
+def test_subdomain_of_a_vendor_domain_is_a_domain_match():
+    m = match_vendor("x@Mail.Acme.Example.", "s", BODY, VENDORS)
+    assert m == Match(ACME.vendor_id, "domain", ())
+
+
+def test_vendor_domain_as_a_prefix_of_another_domain_is_not_a_domain_match():
+    m = match_vendor("x@acme.example.evil.test", "s", BODY, VENDORS)
+    assert m.how != "domain"
+    m = match_vendor("x@notacme.example", "s", BODY, VENDORS)
+    assert m.how != "domain"
