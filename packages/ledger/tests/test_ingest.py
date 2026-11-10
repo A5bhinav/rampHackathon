@@ -6,7 +6,7 @@ import pytest
 from _world import CASE, DATASET, ROOT, VENDOR, at, corpus_world, run
 from dialback_ledger.flags import ReaderMode, reader_mode
 from dialback_ledger.ingest import ingest_all
-from dialback_ledger.reader import reader_for
+from dialback_ledger.reader import ReaderUnavailable, reader_for
 from dialback_ledger.select import DocumentRef, Sighting
 from test_extract import page, span
 
@@ -21,8 +21,8 @@ def test_the_reader_flag_is_stub_unless_asked():
     assert reader_mode({}) is ReaderMode.STUB
     assert reader_mode({"DIALBACK_READER": "something"}) is ReaderMode.STUB
     assert reader_mode({"DIALBACK_READER": "llm"}) is ReaderMode.LLM
-    with pytest.raises(NotImplementedError):
-        reader_for(ReaderMode.LLM)  # fails closed: nothing is ingested without a reader
+    with pytest.raises(ReaderUnavailable):
+        reader_for(ReaderMode.LLM, env={})  # fails closed: without its key, llm mode has no reader (spec 0049)
 
 
 def test_the_labeler_sees_only_visible_text():

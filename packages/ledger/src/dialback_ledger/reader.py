@@ -1,20 +1,28 @@
 """The labeler: sees one document's visible text, says each value's role and party, and quotes it.
 
 Its output is untrusted (R9) and goes through grounding.py before anything uses it. The `stub`
-reader is a keyword labeler with no model (Q47). The quarantined LLM reader (`llm`) isn't built
-yet, so asking for it fails closed: nothing is ingested without a reader.
+reader is a keyword labeler with no model (Q47). The `llm` reader is a quarantined model behind the
+same port (llm_reader.py, spec 0049). It fails closed: a document it can't label raises
+`ReaderFailed` and is never stored, and nothing ever falls back to the stub.
 """
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping
 from typing import Protocol
 
+import httpx2
+
 from .candidates import parse_phone
-from .flags import ReaderMode
+from .flags import ReaderMode, anthropic_api_key
 
 
 class Reader(Protocol):
     def label(self, visible_text: str) -> list: ...
+
+
+class ReaderUnavailable(Exception):
+    """The configured reader can't start (llm mode without its key). Nothing is labeled or stored."""
 
 
 def _role(label_words: list[str]) -> str:
@@ -52,7 +60,15 @@ class StubReader:
         return out
 
 
-def reader_for(mode: ReaderMode) -> Reader:
+def reader_for(mode: ReaderMode, *, env: Mapping[str, str] | None = None,
+               http_client: httpx2.Client | None = None) -> Reader:
+    """The reader for `mode`. `llm` needs ANTHROPIC_API_KEY (from `env`, else the process's
+    environment) and refuses to start without it. `http_client` is the SDK's HTTP client (tests pass
+    one with a fake transport); by default the SDK builds its own."""
     if mode is ReaderMode.STUB:
         return StubReader()
-    raise NotImplementedError("DIALBACK_READER=llm: the quarantined LLM reader isn't built yet (spec 0022); use stub")
+    key = anthropic_api_key(env)
+    if key is None:
+        raise ReaderUnavailable("DIALBACK_READER=llm needs ANTHROPIC_API_KEY, which is unset: refusing to start")
+    from .llm_reader import AnthropicLabelModel, LlmReader, anthropic_client
+    return LlmReader(AnthropicLabelModel(anthropic_client(key, http_client)))
