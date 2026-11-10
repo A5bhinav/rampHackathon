@@ -161,10 +161,10 @@ async def alerts(w) -> list[dict]:
 async def test_a_repeated_signing_header_is_refused(demo):
     body = notice()
     h = sign(body, msg_id=f"msg_{uuid.uuid4().hex}", ts=_now())
-    pairs = [(k, v) for k, v in h.items()] + [("svix-id", "msg_other")]
+    pairs = [("svix-id", "msg_other")] + [(k, v) for k, v in h.items()]  # forged id first: the MAC check alone passes
     assert (await post(demo, body, pairs)).status_code == 401
     (row,) = await deliveries(demo.pool, demo.dataset.id)
-    assert row["signature_valid"] is False
+    assert row["signature_valid"] is False and row["event_id"] != "msg_other"
 
 
 async def test_a_non_ascii_signature_is_401_stored_unsigned_and_alerted(demo):
@@ -196,7 +196,8 @@ async def test_unsigned_deliveries_stop_being_stored_at_the_hourly_limit(demo, m
 async def test_an_account_number_in_a_notice_is_stored_nowhere(demo):
     body = notice(subject=f"New account {ACCOUNT}")
     assert (await post(demo, body)).status_code == 200                    # signed
-    assert (await post(demo, body, sign(b"x", ts=_now()))).status_code == 401  # unsigned, same text
+    forged = sign(b"x", msg_id=f"msg_{ACCOUNT}", ts=_now()) | {"user-agent": f"agent {ACCOUNT}"}
+    assert (await post(demo, body, forged)).status_code == 401  # unsigned, same text, forged header values
     async with system_tx(demo.pool) as conn:
         seen = await (await conn.execute(
             "select (select count(*) from app.inbound_webhooks w where w::text like %s) + "

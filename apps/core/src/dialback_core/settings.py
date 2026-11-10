@@ -124,7 +124,7 @@ class Settings:
                 key = b""
             if len(key) < MIN_KEY_BYTES:
                 raise ConfigurationError(
-                    f"RESEND_WEBHOOK_SECRET must be Resend's signing secret (whsec_ and base64 of at least {MIN_KEY_BYTES} bytes)")
+                    f"RESEND_WEBHOOK_SECRET must be Resend's signing secret (base64, optionally prefixed whsec_, of at least {MIN_KEY_BYTES} bytes)")
         base = env.get("RAMP_BASE_URL")
         if not base:
             raise ConfigurationError("RAMP_BASE_URL is required (the mock's URL, or Ramp's sandbox API)")

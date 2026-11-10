@@ -7,7 +7,8 @@ carries no email body; the worker fetches the email later. Check order: off (404
 
 What is stored (ADR-8: a subject line or a forged body can carry a full account number): a signed
 delivery keeps only the notice's type, created_at and data.email_id, message_id, from and to. A bad
-delivery is stored as the hash and length of its body, never the body. This route has no secret in
+delivery is stored as the hash and length of its body, never the body, and with the names of its
+headers, never their values. This route has no secret in
 its path, so a bad delivery raises at most one alert per dataset per 10 minutes and at most 100
 are stored per dataset per hour; beyond that it answers 401 and stores nothing.
 """
@@ -82,7 +83,7 @@ async def email_webhook(request: Request) -> JSONResponse:
                 await conn.execute(
                     """insert into app.inbound_webhooks (source, dataset_id, event_id, signature_valid, headers, raw_body, error, received_at)
                        values ('resend', %s, %s, false, %s, %s, 'bad signature', app.now(%s)) on conflict (source, event_id) do nothing""",
-                    (dataset_id, "unsigned:" + digest, Jsonb(headers), json.dumps({"sha256": digest, "length": len(raw)}), dataset_id))
+                    (dataset_id, "unsigned:" + digest, Jsonb({"present": sorted(k.lower() for k in headers)}), json.dumps({"sha256": digest, "length": len(raw)}), dataset_id))
             recent = await (await conn.execute(
                 """select 1 from app.alerts where dataset_id = %s and kind = 'bad_webhook_signature' and message = %s
                    and raised_at > app.now(%s) - make_interval(secs => %s)""",
