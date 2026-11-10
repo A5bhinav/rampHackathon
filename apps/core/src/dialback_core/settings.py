@@ -5,7 +5,7 @@ import os
 from dataclasses import dataclass, field
 from urllib.parse import urlsplit
 
-from .flags import RampMode, ResolverMode, read_flag
+from .flags import EmailMode, RampMode, ResolverMode, read_flag
 
 
 class ConfigurationError(RuntimeError):
@@ -94,6 +94,14 @@ class Settings:
     supabase_url: str | None = None
     jwt_secret: bytes = b""
     jwt_audience: str = "authenticated"
+    # The email door (spec 0085). With `resend`, the key and the webhook signing secret are required.
+    email_mode: EmailMode = EmailMode.OFF
+    resend_api_key: str | None = None
+    resend_webhook_secret: str | None = None
+    inbox_address: str | None = None
+    reply_from: str | None = None             # unset: replies are not configured
+    bank_changes_url: str | None = None
+    company_name: str = "the company you're writing to"
     extra: dict[str, str] = field(default_factory=dict)
 
     @classmethod
@@ -104,6 +112,11 @@ class Settings:
             raise ConfigurationError("DATABASE_URL is required")
         ramp_mode = read_flag("DIALBACK_RAMP", RampMode, RampMode.MOCK, env)
         supabase_url = _supabase_url(env)
+        email_mode = read_flag("DIALBACK_EMAIL", EmailMode, EmailMode.OFF, env)
+        if email_mode is EmailMode.RESEND:
+            for name in ("RESEND_API_KEY", "RESEND_WEBHOOK_SECRET"):
+                if not env.get(name, "").strip():
+                    raise ConfigurationError(f"{name} is required when DIALBACK_EMAIL=resend")
         base = env.get("RAMP_BASE_URL")
         if not base:
             raise ConfigurationError("RAMP_BASE_URL is required (the mock's URL, or Ramp's sandbox API)")
@@ -131,6 +144,13 @@ class Settings:
             full_sweep_interval_seconds=int(env.get("DIALBACK_FULL_SWEEP_SECONDS", "86400")),
             reconcile_interval_seconds=int(env.get("DIALBACK_RECONCILE_SECONDS", "300")),
             verify_interval_seconds=int(env.get("DIALBACK_VERIFY_SECONDS", "300")),
+            email_mode=email_mode,
+            resend_api_key=(env.get("RESEND_API_KEY") or "").strip() or None,
+            resend_webhook_secret=(env.get("RESEND_WEBHOOK_SECRET") or "").strip() or None,
+            inbox_address=(env.get("DIALBACK_INBOX_ADDRESS") or "").strip() or None,
+            reply_from=(env.get("DIALBACK_REPLY_FROM") or "").strip() or None,
+            bank_changes_url=(env.get("DIALBACK_BANK_CHANGES_URL") or "").strip() or None,
+            company_name=(env.get("DIALBACK_COMPANY_NAME") or "").strip() or "the company you're writing to",
             supabase_url=supabase_url,
             jwt_secret=_jwt_secret(env, supabase_url),
         )

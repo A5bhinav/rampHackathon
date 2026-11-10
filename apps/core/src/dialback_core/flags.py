@@ -21,6 +21,11 @@ class ResolverMode(StrEnum):
     LEDGER = "ledger"
 
 
+class EmailMode(StrEnum):
+    OFF = "off"          # safe: no email door
+    RESEND = "resend"
+
+
 def read_flag[E: StrEnum](name: str, kind: type[E], safe: E, environ: dict[str, str] | None = None) -> E:
     raw = (environ if environ is not None else os.environ).get(name)
     if raw is None:

@@ -16,6 +16,7 @@ from .auth import TokenVerifier, verifier_from_settings
 from .calls import router as calls_router
 from .db import open_pool
 from .detection import Keys
+from .email_door.route import router as email_router
 from .ports import (
     CallPlacer,
     ChangeContext,
@@ -82,6 +83,7 @@ def create_app(settings: Settings, pool: AsyncConnectionPool | None = None, conn
         return JSONResponse({"code": code, "message": str(exc.detail)}, status_code=exc.status_code, headers=exc.headers)
 
     app.include_router(webhooks_router)
+    app.include_router(email_router)
     app.include_router(calls_router)
     app.include_router(api_router)
 
