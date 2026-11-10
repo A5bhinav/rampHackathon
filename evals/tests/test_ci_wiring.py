@@ -88,3 +88,10 @@ def test_lab_reports_runs_on_what_turns_answers_into_outcomes():
         _, runs = _workflow(name)
         tests = [r for r in runs if "pytest" in r]
         assert tests and all("not selection_gate" in r and "not report_gate" in r for r in tests), name
+
+
+def test_lab_smoke_runs_the_rule_sweep():
+    # Spec 0048, A5: lab-smoke (which triggers on the decision engine) runs lab sweep.
+    triggers, runs = _workflow("lab-smoke.yml")
+    assert "packages/decision/**" in triggers["pull_request"]["paths"]
+    assert any(r.strip() == "uv run lab sweep" for r in runs)

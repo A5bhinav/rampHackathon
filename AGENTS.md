@@ -69,6 +69,7 @@ second owner (the partner) who reviews it.
 | Attack lab: re-run the frozen selection findings, then search generated worlds | `uv run lab fuzz --examples 2000 --seed 0 --out evals/corpus-generated` |
 | Attack lab: the known-limit frontier and the over-block sweep (measurement, not gates) | `uv run lab frontier`, `uv run lab overblock` |
 | Attack lab: re-run the frozen call-report findings, then check generated call reports | `uv run lab reports --examples 2000 --seed 0` |
+| Attack lab: remove each decision rule in turn; every one is seen or listed in `evals/UNREACHABLE.md` | `uv run lab sweep` |
 | Run the whole skeleton locally (Postgres, Ramp mock, core with worker; seeded demo dataset) | `uv run python scripts/dev/stack.py --changes` |
 | End-to-end smoke run (the demo-smoke CI job) | `uv run python scripts/dev/stack.py --smoke` |
 | Rehearse the demo beats (reset, change, release, tamper) on the local stack | `uv run python scripts/dev/demo_rehearsal.py` |

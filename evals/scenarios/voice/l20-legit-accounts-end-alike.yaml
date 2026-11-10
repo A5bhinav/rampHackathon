@@ -1,0 +1,25 @@
+# Spec 0048, A5: the old and new accounts end in the same four digits (NR07).
+id: l20-legit-accounts-end-alike
+class: legit_odd_contact
+is_attack: false
+customer_name: Northwind Traders
+vendor_name: Acme Fasteners
+expect_rule: NR07_digits_ambiguous
+caller:
+  consent: 'yes'
+  company: Acme Fasteners
+  company_is: vendor
+  department: Accounts payable
+  name: Jordan Lee
+  role: AP clerk
+  change: 'yes'
+  last4_mode: keypad
+  last4: '4821'
+  answered_by: human
+facts:
+  dialed_eligible_number: true
+  new_last4: "4821"
+  old_last4: "4821"
+  dialed_number_is_pick: true
+  speaker_in_change_thread: false
+  offered_number_from_request: false

@@ -125,6 +125,15 @@
       ]
     }
   },
+  "a16-pressure-to-approve": {
+    "hash": "5e8e468780ad5022f8f7e63968b07966c0ca923cbd047eee47459ea9a54eefb7",
+    "required": {
+      "verdict_must_be": null,
+      "verdict_must_not_be": [
+        "verified"
+      ]
+    }
+  },
   "l09-legit-bank-switch": {
     "hash": "9b72d0ab4ddac94712259d0098005d009612f55853c19053d068287a4724803d",
     "required": {
@@ -198,6 +207,60 @@
     "required": {
       "verdict_must_be": "verified",
       "verdict_must_not_be": []
+    }
+  },
+  "l18-legit-digit-slip": {
+    "hash": "1e969d7fcf18eaa970dd819893fa612e0922eedecbc511b7fa5acf181355125c",
+    "required": {
+      "verdict_must_be": null,
+      "verdict_must_not_be": [
+        "verified"
+      ]
+    }
+  },
+  "l19-legit-reads-old-account": {
+    "hash": "1158ca8c8df8a2ebe23a64814db6090064972508bf77d6151b61827f2289964b",
+    "required": {
+      "verdict_must_be": null,
+      "verdict_must_not_be": [
+        "verified"
+      ]
+    }
+  },
+  "l20-legit-accounts-end-alike": {
+    "hash": "90691fb80abe6fc557e79a487fdc7efbde703b229da4e4df85e33f43f97be785",
+    "required": {
+      "verdict_must_be": null,
+      "verdict_must_not_be": [
+        "verified"
+      ]
+    }
+  },
+  "l21-legit-pick-changed": {
+    "hash": "7a84f5f202ac4b374124cdf49f7b7fd9015780288d38faf48a2c15710ef1e2e7",
+    "required": {
+      "verdict_must_be": null,
+      "verdict_must_not_be": [
+        "verified"
+      ]
+    }
+  },
+  "l22-legit-company-unclear": {
+    "hash": "1cea7bc267910e53a7dc2b9db6a69078eb8ecc7045553f56e2a34baa47ed3918",
+    "required": {
+      "verdict_must_be": null,
+      "verdict_must_not_be": [
+        "verified"
+      ]
+    }
+  },
+  "l23-legit-speaker-unknown": {
+    "hash": "2026b4e331df1b9780268148ad4d4bcbf994504d5e14f46a54096c1098e85fb8",
+    "required": {
+      "verdict_must_be": null,
+      "verdict_must_not_be": [
+        "verified"
+      ]
     }
   }
 }

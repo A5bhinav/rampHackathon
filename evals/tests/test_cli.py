@@ -220,3 +220,11 @@ def test_lab_reports_passes_when_nothing_is_found(tmp_path, monkeypatch):
     monkeypatch.setattr(reports, "check_f2", lambda cases, decide=None, moves=(): reports.Found())
     monkeypatch.setattr(reports, "check_f3", lambda cases, matcher=None: reports.Found())
     assert main(["reports", "--examples", "20", "--seed", "0", "--out", str(tmp_path / "r")]) == 0
+
+
+def test_lab_sweep_starts_without_hypothesis():
+    # Spec 0048, B7: lab sweep (like lab run) starts without the dev-only hypothesis package; it imports it
+    # only when it draws the generated reports.
+    done = _without_hypothesis(["sweep", "--help"])
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert "--unreachable" in done.stdout

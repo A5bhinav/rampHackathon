@@ -52,6 +52,12 @@ def main(argv: list[str] | None = None) -> int:
     fr.add_argument("--out", default="evals/out/frontier.json")
     ob = sub.add_parser("overblock", help="sweep single pieces of attacker noise (spec 0033)")
     ob.add_argument("--out", default="evals/out/overblock.json")
+    sw = sub.add_parser("sweep", help="remove each decision rule in turn; every one must be seen or listed (spec 0048)")
+    sw.add_argument("--split", default="voice")
+    sw.add_argument("--scenarios-root", default=str(_REPO / "evals" / "scenarios"))
+    sw.add_argument("--examples", type=int, default=2000)
+    sw.add_argument("--seed", type=int, default=0)
+    sw.add_argument("--unreachable", default=str(_REPO / "evals" / "UNREACHABLE.md"))
     rp = sub.add_parser("reports", help="re-run frozen report findings, then check generated call reports (spec 0048)")
     rp.add_argument("--examples", type=int, default=2000)
     rp.add_argument("--seed", type=int, default=0)
@@ -75,6 +81,8 @@ def main(argv: list[str] | None = None) -> int:
         return _frontier(Path(args.out))
     if args.command == "overblock":
         return _overblock(Path(args.out))
+    if args.command == "sweep":
+        return _sweep(Path(args.scenarios_root) / args.split, args.examples, args.seed, Path(args.unreachable))
     if args.command == "reports":
         return _reports(args.examples, args.seed, Path(args.out))
     return 2
@@ -95,6 +103,24 @@ def _fuzz(examples: int, seed: int, out_dir: Path) -> int:
     print(f"lab fuzz: {len(failing)} frozen case(s) failing, {len(fresh)} new finding(s) "
           f"(seed {seed}, {examples} examples)")
     return 1 if failing or new else 0
+
+
+def _sweep(scenarios_dir: Path, examples: int, seed: int, unreachable: Path) -> int:
+    """Spec 0048, A5: remove each rule; fail on a rule neither seen nor listed, or a listed rule that is seen.
+    The generated reports need Hypothesis, which this imports only when it draws them."""
+    from . import sweep
+    subjects = sweep.scenario_subjects(scenarios_dir, _clock) + sweep.report_subjects(examples, seed)
+    seen = sweep.sweep(subjects)
+    listed = sweep.listed(unreachable)
+    for rule_id, by in seen.items():
+        print(f"lab sweep: {rule_id}: " + (sweep.how(by) if by else "not seen; listed in UNREACHABLE.md"
+                                           if rule_id in listed else "not seen"))
+    found = sweep.problems(seen, listed)
+    for problem in found:
+        print(f"lab sweep: {problem}")
+    print(f"lab sweep: {sum(1 for by in seen.values() if by)} of {len(seen)} rules seen, {len(listed)} listed as "
+          f"unreachable, {len(found)} problem(s) ({len(subjects)} subjects, seed {seed})")
+    return 1 if found else 0
 
 
 def _reports(examples: int, seed: int, out_dir: Path) -> int:

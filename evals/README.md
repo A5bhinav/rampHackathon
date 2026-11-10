@@ -17,6 +17,7 @@ uv run lab fuzz --examples 2000 --seed 0 --out evals/corpus-generated   # select
 uv run lab frontier                           # measurement: what an attack costs (prints its grid)
 uv run lab overblock                          # measurement: what a defense costs
 uv run lab reports --examples 2000 --seed 0   # call reports: frozen findings, then F1 to F3 (spec 0048)
+uv run lab sweep                              # remove each decision rule: seen, or in UNREACHABLE.md
 cd evals && uv run pytest -q -m "not selection_gate and not report_gate"   # the checks that must stay green
 ```
 
