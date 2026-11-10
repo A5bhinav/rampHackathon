@@ -893,3 +893,42 @@ def freeze_new(found: Run, out_dir: Path, shown: set[str], *, reader, rule=None)
         shown |= set(patterns)
         frozen.append((name, pattern))
     return frozen
+
+
+def report(found: Run) -> dict:
+    """The stub report: unsafe labels, wrong parties, over-blocks split by stub-readable, G5's stability
+    rate, and every failing pattern with its count."""
+    t = found.result.tally
+    readable = {split: {"left_unlabeled": t.overblocks[split], "vendor_claims_with_a_role": t.vendor_role_claims[split]}
+                for split in ("stub_readable", "not_stub_readable")}
+    return {
+        "seed": found.seed, "documents": t.documents, "worlds": t.worlds, "worlds_planted": t.worlds_planted,
+        "visible_numbers": t.visible_numbers,
+        "unsafe_labels": t.unsafe, "wrong_parties": t.wrong_party,
+        "overblocks": {**readable, "fax_lines_among_them": t.overblocks_fax},
+        "g5_stability": {"same": t.g5_same, "compared": t.g5_compared,
+                         "rate": t.g5_same / t.g5_compared if t.g5_compared else None},
+        "g6_compared": t.g6_compared,
+        "g7_failing_worlds": len({v.plan for v in found.world_violations}),
+        "patterns": dict(sorted(Counter(v.pattern for v in found.violations).items())),
+    }
+
+
+def report_lines(body: dict) -> list[str]:
+    o, g5 = body["overblocks"], body["g5_stability"]
+    rate = "n/a" if g5["rate"] is None else f"{g5['rate']:.1%}"
+    lines = [
+        (f"{body['documents']} documents and {body['worlds']} worlds ({body['worlds_planted']} with a planted "
+         f"number) at seed {body['seed']}"),
+        f"unsafe labels (G3): {body['unsafe_labels']} of {body['visible_numbers']} visible numbers",
+        f"wrong parties (G4): {body['wrong_parties']}",
+        ("over-blocks (a vendor claim with a role, left unlabeled; not gated): "
+         f"stub-readable {o['stub_readable']['left_unlabeled']} of {o['stub_readable']['vendor_claims_with_a_role']}, "
+         f"not stub-readable {o['not_stub_readable']['left_unlabeled']} of "
+         f"{o['not_stub_readable']['vendor_claims_with_a_role']} ({o['fax_lines_among_them']} of them fax lines, "
+         "which the rule refuses anyway)"),
+        f"G5 stability: the same label on {g5['same']} of {g5['compared']} rewordings ({rate})",
+        f"G6: {body['g6_compared']} original numbers compared with and without their quote",
+        f"G7: {body['g7_failing_worlds']} of {body['worlds']} worlds fail",
+    ]
+    return lines + [f"{pattern}: {count} violation(s)" for pattern, count in body["patterns"].items()]

@@ -311,7 +311,7 @@ def _lab_docs(tmp_path, entries: list[dict], capsys) -> tuple[int, str]:
     listed = tmp_path / "known.json"
     listed.write_text(json.dumps({"lab-docs": entries}))
     code = main(["docs", "--examples", str(SMALL), "--seed", str(SEED), "--out", str(tmp_path / "frozen"),
-                 "--known-failures", str(listed)])
+                 "--known-failures", str(listed), "--report", str(tmp_path / "report.json")])
     return code, capsys.readouterr().out
 
 
@@ -352,3 +352,33 @@ def test_a_pattern_entry_needs_every_field(tmp_path):
     path.write_text(json.dumps({"lab-docs": [{k: v for k, v in good.items() if k != "placement"}]}))
     with pytest.raises(ValueError, match="placement"):
         known.load(path)
+
+
+# --- The stub report ---------------------------------------------------------------------------------
+
+def test_stub_report_has_every_count(tmp_path, capsys):
+    from collections import Counter
+
+    from dialback_evals.cli import main
+    found = docgen.run(examples=200, seed=SEED, reader=StubReader())
+    body = docgen.report(found)
+    assert body["unsafe_labels"] == sum(v.check == "G3" for v in found.violations) > 0
+    assert body["wrong_parties"] == sum(v.check == "G4" for v in found.violations) > 0
+    over = body["overblocks"]
+    assert set(over) == {"stub_readable", "not_stub_readable", "fax_lines_among_them"}
+    # Stub-readable is computed, not hand-tagged, so both sides of the split hold vendor claims; and by its
+    # own definition the stub never leaves a stub-readable vendor claim unlabeled.
+    assert over["stub_readable"]["vendor_claims_with_a_role"] > 0 and over["not_stub_readable"]["vendor_claims_with_a_role"] > 0
+    assert over["stub_readable"]["left_unlabeled"] == 0 < over["not_stub_readable"]["left_unlabeled"]
+    g5 = body["g5_stability"]
+    assert 0 < g5["same"] < g5["compared"] and g5["rate"] == g5["same"] / g5["compared"]
+    assert body["patterns"] == dict(sorted(Counter(v.pattern for v in found.violations).items()))
+    assert body["documents"] == 200 and body["worlds"] == docgen.world_count(200) and body["g6_compared"] > 0
+    # lab docs prints it and writes it.
+    path = tmp_path / "report.json"
+    main(["docs", "--examples", "200", "--seed", str(SEED), "--out", str(tmp_path / "frozen"), "--known-failures",
+          "none", "--report", str(path)])
+    out = capsys.readouterr().out
+    assert json.loads(path.read_text()) == json.loads(json.dumps(body))
+    for words in ("unsafe labels (G3)", "wrong parties (G4)", "stub-readable", "not stub-readable", "G5 stability"):
+        assert words in out, words
