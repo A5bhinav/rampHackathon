@@ -52,6 +52,14 @@ def test_fired_rules_name_their_block():
     assert fired(["made_up"])[0]["sentence"] == "made_up"
 
 
+def test_a_retired_company_condition_still_renders():
+    # A decision-1.0.0 decision recorded V05; spec 0082 D7b retired it, and it still renders with its sentence.
+    rows = fired(["V05_company_matches", "V05_company_matches_unmet"])
+    assert [r["block"] for r in rows] == ["retired", "retired"]
+    assert [r["sentence"] for r in rows] == ["The person named this vendor.",
+                                             "The person did not clearly name this vendor."]
+
+
 def test_effects_say_what_happens_to_the_hold():
     assert "hold stays on" in effect("verified") and "approver" in effect("verified")
     assert "blocked" in effect("not_verified") and "review" in effect("needs_review")

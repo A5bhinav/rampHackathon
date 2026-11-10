@@ -68,7 +68,7 @@ def company_matches(named: str | None, legal_name: str, trade_names: Iterable[st
         return None
     names = (legal_name, *trade_names)
     said = words(named)
-    if said and _refuses(named, names):
+    if _refuses(named, names):  # read as the guard reads text (NFKC), like the variants: a fullwidth "Not Acme" too
         return False
     if said and any(core and core <= said for core in (words(n) for n in names)):
         return True

@@ -192,3 +192,41 @@ def test_b9_another_company_or_nonsense_is_unknown(said):
 def test_b9_a_refusal_in_any_answer_is_false():
     assert every_name_matches(["This is Globex", "Not Acme, this is Globex"], "Acme Fasteners LLC") is False
     assert every_name_matches(["Not Acme, this is Globex", "This is Globex"], "Acme Fasteners LLC") is False
+
+
+# Review fixes (Nov 10): D7a's list exactly, each word and phrase on its own, and the ways a refusal can
+# be written, read as the speech guard reads text.
+D7A_WORDS = {"not", "isn", "aren", "wasn", "weren", "never", "former", "formerly", "until", "reseller",
+             "resellers", "resell", "resells", "distribute", "distributes", "distributor", "behalf"}
+
+
+def test_d7a_the_refusal_lists_are_exactly_the_specs():
+    assert company.REFUSAL_WORDS == D7A_WORDS
+    assert tuple(company.REFUSAL_PHRASES) == (("used", "to"), ("i", "mean"))
+
+
+@pytest.mark.parametrize("said", [
+    "Not Acme", "This isn't Acme", "They aren't Acme", "That wasn't Acme", "We weren't Acme", "Never Acme",
+    "A former Acme office", "Formerly Acme", "Acme until last year", "An Acme reseller", "Acme resellers",
+    "We resell Acme", "He resells Acme", "We distribute Acme", "She distributes Acme", "An Acme distributor",
+    "On behalf of Acme", "I used to be Acme", "Acme, I mean Globex",
+])
+def test_d7a_each_refusal_word_and_phrase_flags_on_its_own(said):
+    assert matches(said, ACME) is False
+
+
+@pytest.mark.parametrize("said", ["NOT ACME", "This isn’t Acme",
+                                  "Ｎｏｔ Ａｃｍｅ"],
+                         ids=["uppercase", "curly-apostrophe", "fullwidth"])
+def test_d7a_refusals_read_as_the_guard_reads_text(said):
+    # The fullwidth "Not Acme" has no ASCII words, but the guard reads it as "not acme" (NFKC), and the
+    # variant check already matches it that way, so the refusal check must read it the same way.
+    assert matches(said, ACME) is False
+
+
+@pytest.mark.parametrize("said, names", [
+    ("I Mean It", ("I Mean It LLC",)),                          # a phrase wholly in the vendor's own name
+    ("Never Summer", ("Globex Holdings Inc", "Never Summer")),  # a word in a trade name
+], ids=["phrase-in-own-name", "trade-name-word"])
+def test_d7a_the_vendors_own_words_are_not_refusals(said, names):
+    assert matches(said, names) is True
