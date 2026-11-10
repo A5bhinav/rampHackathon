@@ -1,10 +1,14 @@
 """The worker's half of receiving (spec 0085): fetch each stored `email.received` notice's email from Resend.
 
 Per delivery: the `inbound_emails` row is created first, from the stored notice, with outcome `pending`;
-then the email is fetched and `door.handle_email` fills the row in. A retryable Resend error counts a
-try on the row and leaves the delivery for the next tick; the fifth try records outcome `failed` and
-marks the delivery processed, with no case opened (R7). A non-retryable error fails it at once.
-The email's body is held in memory only.
+then the email is fetched and `door.handle_email` fills the row in. Any error on one email (a Resend
+error or anything else) counts a try on its row and never stops the tick. Tries are spaced by
+RETRY_SECONDS through `next_try_at`; a delivery whose email is waiting is left unprocessed and skipped.
+The fifth failure records outcome `failed` and marks the delivery processed, with no case opened (R7);
+a non-retryable Resend error fails it at once; a failure before the row exists marks the delivery
+failed without a row. A failure only ever changes a row that is still `pending`. What is kept of an
+error is a fixed text (for a Resend error) or the exception's type name, never its message, because
+a message can hold an email's values (ADR-8). The email's body is held in memory only.
 """
 from __future__ import annotations
 
@@ -46,24 +50,32 @@ async def _open_row(pool: AsyncConnectionPool, delivery: dict[str, Any], notice_
             (delivery["dataset_id"], notice_data["email_id"]))).fetchone()
 
 
-async def _record_failure(pool: AsyncConnectionPool, delivery: dict[str, Any], email_id: str, reason: str, give_up: bool) -> bool:
-    """Count a failed try. Give up (outcome `failed`) or schedule the next try. Returns True when it gave up.
+async def _record_failure(pool: AsyncConnectionPool, delivery: dict[str, Any], email_id: str, reason: str, give_up: bool) -> str:
+    """Count a failed try on a still-pending row, in one statement. Returns "failed" when it gave up, "waiting" when
+    it scheduled the next try, "settled" when the row was no longer pending (nothing is changed then).
     `reason` never holds an email's content."""
     async with system_tx(pool) as conn:
         now = await dataset_now(conn, delivery["dataset_id"])
-        tries = (await (await conn.execute(
-            "select tries from app.inbound_emails where dataset_id = %s and resend_email_id = %s",
-            (delivery["dataset_id"], email_id))).fetchone())["tries"] + 1
-        if give_up or tries > len(RETRY_SECONDS):
-            await conn.execute(
-                "update app.inbound_emails set outcome = 'failed', error = %s, tries = %s, processed_at = %s, next_try_at = null "
-                "where dataset_id = %s and resend_email_id = %s", (reason, tries, now, delivery["dataset_id"], email_id))
-            return True
-        await conn.execute(
-            "update app.inbound_emails set error = %s, tries = %s, next_try_at = %s + make_interval(secs => %s) "
-            "where dataset_id = %s and resend_email_id = %s",
-            (reason, tries, now, RETRY_SECONDS[tries - 1], delivery["dataset_id"], email_id))
-        return False
+        stop = "(%(give_up)s::boolean or tries + 1 > cardinality(%(delays)s::int[]))"
+        row = await (await conn.execute(
+            f"""update app.inbound_emails set tries = tries + 1, error = %(reason)s,
+                       outcome = case when {stop} then 'failed' else outcome end,
+                       processed_at = case when {stop} then %(now)s else processed_at end,
+                       next_try_at = case when {stop} then null else %(now)s + make_interval(secs => (%(delays)s::int[])[tries + 1]) end
+                where dataset_id = %(dataset)s and resend_email_id = %(email)s and outcome = 'pending'
+                returning outcome""",
+            {"give_up": give_up, "delays": list(RETRY_SECONDS), "reason": reason, "now": now,
+             "dataset": delivery["dataset_id"], "email": email_id})).fetchone()
+    return "settled" if row is None else ("failed" if row["outcome"] == "failed" else "waiting")
+
+
+async def _waiting(pool: AsyncConnectionPool, dataset_id: UUID, email_id: str) -> bool:
+    """True when this email's next try is still in the future."""
+    async with system_tx(pool) as conn:
+        row = await (await conn.execute(
+            "select next_try_at > app.now(dataset_id) as waiting from app.inbound_emails where dataset_id = %s and resend_email_id = %s",
+            (dataset_id, email_id))).fetchone()
+    return bool(row and row["waiting"])
 
 
 async def process_inbound_emails(pool: AsyncConnectionPool, settings: Settings, resend: ResendPort, keys: Keys, limit: int = 20,
@@ -73,19 +85,16 @@ async def process_inbound_emails(pool: AsyncConnectionPool, settings: Settings, 
     Any error on one email counts a try for that email only; it never stops the others or the rest of the tick.
     """
     handled, seen = 0, set()
-    for _ in range(limit):
+    while handled < limit:
         async with system_tx(pool) as conn:
+            # No casts in the claim: whatever the stored text holds, it must never make the claim itself fail.
             # `for no key update`: the inbound_emails row's foreign key to a delivery takes a key-share lock,
-            # which a plain `for update` would make this claim wait on forever. A delivery whose email waits
-            # for its next try stays unprocessed and is skipped until then.
+            # which a plain `for update` would make this claim wait on forever.
             row = await (await conn.execute(
-                "select w.id, w.dataset_id, w.raw_body from app.inbound_webhooks w "
-                "where w.source = 'resend' and w.signature_valid and w.event_type = 'email.received' and w.processed_at is null "
-                "and not (w.id = any(%s::bigint[])) and (%s::uuid is null or w.dataset_id = %s::uuid) "
-                "and not exists (select 1 from app.inbound_emails e where e.dataset_id = w.dataset_id "
-                "and e.resend_email_id = (w.raw_body::jsonb)->'data'->>'email_id' and e.next_try_at > app.now(w.dataset_id)) "
-                "order by w.received_at, w.id for no key update of w skip locked limit 1",
-                (list(seen), dataset_id, dataset_id))).fetchone()
+                "select id, dataset_id, raw_body from app.inbound_webhooks "
+                "where source = 'resend' and signature_valid and event_type = 'email.received' and processed_at is null "
+                "and not (id = any(%s::bigint[])) and (%s::uuid is null or dataset_id = %s::uuid) "
+                "order by received_at, id for no key update skip locked limit 1", (list(seen), dataset_id, dataset_id))).fetchone()
             if row is None:
                 return handled
             seen.add(row["id"])
@@ -94,10 +103,12 @@ async def process_inbound_emails(pool: AsyncConnectionPool, settings: Settings, 
                 payload = json.loads(row["raw_body"])
                 data = payload.get("data") if isinstance(payload, dict) else None
                 email_id = data.get("email_id") if isinstance(data, dict) else None
-            except ValueError:
+            except Exception:  # not JSON, or not JSON this process can read: this delivery only
                 email_id = None
             if not isinstance(email_id, str) or not strip_nul(email_id):
-                error = "ignored: the notice has no email id"
+                error = "ignored: the notice has no readable email id"
+            elif await _waiting(pool, row["dataset_id"], strip_nul(email_id)):
+                continue
             else:
                 data["email_id"] = email_id = strip_nul(email_id)
                 try:
@@ -114,13 +125,14 @@ async def process_inbound_emails(pool: AsyncConnectionPool, settings: Settings, 
                         # Only our own ResendError text is kept; any other error is kept as its type name, because
                         # its message can hold the email's values (ADR-8).
                         if isinstance(exc, ResendError):
-                            reason, retryable = str(exc), exc.retryable
+                            reason, retryable = ("resend: retryable error" if exc.retryable else "resend: refused"), exc.retryable
                         else:
                             reason, retryable = type(exc).__name__, True
-                        if not await _record_failure(pool, row, email_id, reason, give_up=not retryable):
+                        result = await _record_failure(pool, row, email_id, reason, give_up=not retryable)
+                        if result == "waiting":
                             await conn.execute("update app.inbound_webhooks set error = %s where id = %s", (reason, row["id"]))
                             continue
-                        error = f"failed: {reason}"
+                        error = f"failed: {reason}" if result == "failed" else "duplicate: this email was already recorded"
             await conn.execute(
                 "update app.inbound_webhooks set processed_at = app.now(dataset_id), error = %s where id = %s", (error, row["id"]))
             handled += 1

@@ -13,7 +13,7 @@ from dialback_core.email_door.door import handle_email
 from dialback_core.email_door.masking import mask_digit_runs
 from dialback_core.email_door.resend import ResendClient, ResendError, html_to_text
 from flows import FakeResend, assert_nowhere, received
-from test_email_route import SECRET, _now, demo, sign  # noqa: F401  (demo is a fixture)
+from test_email_route import SECRET, _now, demo, post, sign  # noqa: F401  (demo is a fixture)
 
 pytestmark = pytest.mark.anyio
 
@@ -84,6 +84,11 @@ def test_mask_digit_runs():
     ("acct 0001\u00a02345\u00a04821", "acct ****\u00a0****\u00a04821"),
     ("acct 0001  2345 4821", "acct ****  **** 4821"),
     ("acct 0001 / 2345_4821", "acct **** / ****_4821"),
+    ("acct 0001\u200b2345\u200b4821", "acct ****\u200b****\u200b4821"),
+    ("acct 0001    2345 4821", "acct ****    **** 4821"),
+    ("acct 0001,2345,4821", "acct ****,****,4821"),
+    ("acct 0001\u20132345\u22124821", "acct ****\u2013****\u22124821"),
+    ("acct 0001\ufeff\u20602345 4821", "acct ****\ufeff\u2060**** 4821"),
 ])
 def test_mask_digit_runs_other_separators(subject, masked):
     assert mask_digit_runs(subject) == masked
@@ -182,7 +187,7 @@ async def test_resend_failing_five_times_is_listed_failed_and_opens_nothing(demo
         assert (await delivery(demo))["processed_at"] is None
     await demo.worker.tick(demo.dataset.id)
     (row,) = await rows(demo)
-    assert (row["outcome"], row["tries"], row["error"]) == ("failed", 5, "resend answered 503")
+    assert (row["outcome"], row["tries"], row["error"]) == ("failed", 5, "resend: retryable error")
     assert (await delivery(demo))["processed_at"] is not None
     assert len(demo.worker.resend.fetched) == 5
     await demo.worker.tick(demo.dataset.id)
@@ -214,10 +219,17 @@ async def test_a_second_notice_for_the_same_email_is_not_recorded_twice(demo):
     assert len(await rows(demo)) == 1 and demo.worker.resend.fetched == [email_id]
 
 
+async def add_delivery(w, raw_body: str, valid: bool = True, event_type: str | None = "email.received") -> None:
+    async with system_tx(w.pool) as conn:
+        await conn.execute(
+            "insert into app.inbound_webhooks (source, dataset_id, event_id, event_type, signature_valid, headers, raw_body, received_at) "
+            "values ('resend', %s, %s, %s, %s, '{}', %s, app.now(%s))",
+            (w.dataset.id, f"direct:{uuid.uuid4().hex}", event_type, valid, raw_body, w.dataset.id))
+
+
 async def test_the_claim_skips_unsigned_and_other_event_types(demo):
     await deliver(demo, kind="email.bounced")
-    bad = await demo.core.post("/webhooks/email", content=b"{}", headers={"svix-id": "msg_x", "svix-timestamp": "1", "svix-signature": "v1,AAAA"})
-    assert bad.status_code == 401
+    await add_delivery(demo, json.dumps({"type": "email.received", "data": {"email_id": "em_unsigned"}}), valid=False)
     demo.worker.resend = FakeResend()
     await demo.worker.tick(demo.dataset.id)
     assert demo.worker.resend.fetched == [] and await rows(demo) == []
@@ -225,6 +237,54 @@ async def test_the_claim_skips_unsigned_and_other_event_types(demo):
         left = await (await conn.execute("select count(*) as n from app.inbound_webhooks where dataset_id = %s and processed_at is null",
                                          (demo.dataset.id,))).fetchone()
     assert left["n"] == 2
+
+
+@pytest.mark.parametrize("bad", [
+    '{"type":"email.received","data":{"email_id":"em_bad","from":"\\ud800"}}',        # a lone surrogate: Python reads it, Postgres refuses it
+    '{"type":"email.received","data":{"email_id":"em_bad","from":"a@b.example","to":NaN}}',
+    '{"type":"email.received","data":{"email_id":"em_bad","from":"a@b.example","to":[' + "[" * 5000 + "]" * 5000 + ']}}',
+    '[1, 2]', '{"type":"email.received","data":{"email_id":{"x":1}}}',
+])
+async def test_an_unreadable_stored_notice_never_stalls_the_tick(demo, bad):
+    await add_delivery(demo, bad)  # earlier than the good one, so it is claimed first
+    good = await deliver(demo)
+    demo.worker.resend = FakeResend({good: received(good), "em_bad": received("em_bad")})
+    await demo.worker.tick(demo.dataset.id)  # does not raise
+    assert good in {r["resend_email_id"] for r in await rows(demo) if r["outcome"] == "door_off"}
+    async with system_tx(demo.pool) as conn:
+        assert (await (await conn.execute("select count(*) as n from app.inbound_webhooks where dataset_id = %s and processed_at is null",
+                                          (demo.dataset.id,))).fetchone())["n"] == 0
+
+
+@pytest.mark.parametrize("raw", [
+    b'{"type":"email.received","data":{"email_id":"em_s1","from":"x\\ud800y <a@b.example>","to":["i@x.example"]}}',
+    b'{"type":"email.received","data":{"email_id":"em_s2","from":"a@b.example","to":NaN}}',
+])
+async def test_the_route_stores_only_json_postgres_accepts(demo, raw):
+    assert (await post(demo, raw)).status_code == 200
+    async with system_tx(demo.pool) as conn:
+        await conn.execute("select raw_body::jsonb from app.inbound_webhooks where dataset_id = %s and source = 'resend'", (demo.dataset.id,))
+    demo.worker.resend = FakeResend()
+    await demo.worker.tick(demo.dataset.id)  # does not raise
+
+
+async def test_a_nul_byte_in_thread_headers_is_stripped(demo):
+    await set_vendors(demo, [uuid.uuid4()])
+    email_id = await deliver(demo)
+    demo.worker.resend = FakeResend({email_id: received(email_id, headers={"references": "<a\x00b@v> <c@v>"})})
+    await demo.worker.tick(demo.dataset.id)
+    assert (await rows(demo))[0]["thread_id"] == "<ab@v>"
+
+
+async def test_a_failure_never_overwrites_a_terminal_outcome(demo):
+    email_id = await deliver(demo)
+    demo.worker.resend = FakeResend({email_id: received(email_id)})
+    await demo.worker.tick(demo.dataset.id)
+    async with system_tx(demo.pool) as conn:
+        await conn.execute("update app.inbound_emails set outcome = 'case_opened' where dataset_id = %s", (demo.dataset.id,))
+    await inbox._record_failure(demo.pool, await delivery(demo), email_id, "RuntimeError", give_up=True)
+    (row,) = await rows(demo)
+    assert (row["outcome"], row["tries"], row["error"]) == ("case_opened", 0, None)
 
 
 async def test_a_nul_byte_in_a_subject_or_sender_is_stripped(demo):

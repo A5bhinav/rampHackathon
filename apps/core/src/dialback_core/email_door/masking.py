@@ -3,14 +3,15 @@ from __future__ import annotations
 
 import re
 
-# A run of digits, possibly grouped by 1 to 3 separator characters: whitespace (a no-break space too),
-# `.`, `-`, `/` or `_` ("0001 2345 4821", "0001.2345.4821", "0001  2345").
-_RUN = re.compile(r"(?<!\d)\d(?:[\s.\-/_]{0,3}\d)*")
+# A run of digits, possibly grouped by up to 5 separator characters: whitespace (a no-break space too),
+# `,` `.` `-` `/` `_`, the Unicode dashes U+2010 to U+2015 and U+2212, and the zero-width characters
+# U+200B, U+200C, U+200D, U+2060 and U+FEFF. A separator never matches a digit, so the pattern is linear.
+_RUN = re.compile(r"(?<!\d)\d(?:[\s,.\-/_\u2010-\u2015\u2212\u200b\u200c\u200d\u2060\ufeff]{0,5}\d)*")
 
 
 def strip_nul(text: str) -> str:
-    """Postgres text cannot hold NUL; an email can carry one."""
-    return text.replace("\x00", "")
+    """Text Postgres can store: no NUL, and a lone surrogate (which json will happily read) becomes `?`."""
+    return text.replace("\x00", "").encode("utf-8", errors="replace").decode("utf-8")
 
 
 def _mask(match: re.Match[str]) -> str:

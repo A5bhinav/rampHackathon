@@ -66,7 +66,10 @@ def _kept(raw: bytes) -> str:
     kept = {k: data.get(k) for k in ("email_id", "message_id", "from", "to") if k in data}
     if isinstance(kept.get("from"), str):  # a display name is typed by a person: it can carry an account number (ADR-8)
         kept["from"] = mask_digit_runs(kept["from"])
-    return json.dumps(_no_nul({"type": payload.get("type"), "created_at": payload.get("created_at"), "data": kept}))
+    try:  # a non-finite number is not JSON Postgres accepts: keep the hash and length instead
+        return json.dumps(_no_nul({"type": payload.get("type"), "created_at": payload.get("created_at"), "data": kept}), allow_nan=False)
+    except ValueError:
+        return json.dumps({"unreadable": True, "sha256": hashlib.sha256(raw).hexdigest(), "length": len(raw)})
 
 
 @router.post("/webhooks/email")
