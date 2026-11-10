@@ -630,11 +630,16 @@ F1 to F9 hold as built (verified). But the lab still claims more than it shows:
     `0029-voice-call-lookup-and-store.md`, Q65 in `0034-live-call-blockers.md`. A4 above cites
     "spec 0033, Q65", meaning the lab's.
   - Main uses up to Q68. PR #91 takes Q69 to Q75, the `sami/onboarding-anchors` branch takes
-    Q76 and Q77, spec 0043 (`sami/keypad-only-digits`) takes Q78 to Q82, spec 0044
-    (`sami/line-risk`) takes Q83 to Q86, and spec 0046 (`sami/guided-search`) takes Q87 to Q91,
-    so the next free number is Q92. Renumber before this branch merges.
-  - Spec 0045 is on `sami/shared-vendor-profile-spec` and 0046 on `sami/guided-search`, so the
-    next free spec number is 0047.
+    Q76 and Q77, spec 0043 (`sami/keypad-only-digits`) takes Q78 to Q82, and spec 0044
+    (`sami/line-risk`) takes Q83 to Q86.
+  - Spec 0045 (`sami/shared-vendor-profile-spec`, written first) takes Q87 to Q97, so spec 0046's
+    Q87 to Q91 collide with it and must be renumbered. Spec 0047 (`sami/onboarding-number-fallback`)
+    takes Q97 to Q100, and spec 0048 (`sami/lab-honest`) takes Q101 to Q105. The next free number
+    is Q106.
+  - Spec 0017's Q56, Q57 and Q58 collide with main's spec 0030.
+  - **Correction (Nov 9):** the earlier "next free" numbers here (Q87, then Q92) came from a search
+    that never matched (`git grep -E` with `\b`), so they were wrong. Search with a plain pattern.
+  - Specs 0045 to 0048 are taken, so the next free spec number is 0049.
 
 ## F. How other services verify a bank change (Nov 9)
 
