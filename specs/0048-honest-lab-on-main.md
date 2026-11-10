@@ -279,13 +279,47 @@ This tests the step after the call, the way the fuzz lab tests `select()`. No ca
 4. **Spec 0046's pin.** Tag `e3d57b5` as `lab-0046-select-pin` before any rebase. The planted
    breaks name that commit as the rule under test.
 5. **Coordination.**
-   - Spec 0043 is being built on `sami/keypad-only-digits-impl` and changes the call flow.
-     Whichever of the two lands second refreezes the voice scenarios.
+   - Spec 0043 (keypad-only digits) has landed on main, so this lab merges main and refreezes its
+     voice scenarios (updated Nov 10).
    - When spec 0044 lands, a07's `line_risk` stops being declared.
 6. **PRs open only on Sami's OK.** Agents open PRs; a person merges.
 
+## Review fixes (fresh review, Nov 10)
+
+The review reproduced the headline numbers, but found that they say less than they seem, and that
+the known-failures list hides new bugs (FINDINGS C12). Before Abhi's review and the PR plan:
+
+1. **F1's label names the condition that failed,** such as `F1:company=negation`. The
+   known-failures list names only A10's three conditions (negation, correction, reseller). Any
+   other F1 failure turns `lab-reports` red.
+2. **F1 covers every verify condition.** Its "honest, full confirmation" adds: no flags, no offered
+   number, a name and a role given, one person throughout, and answers in order.
+3. **Main is merged in,** with spec 0043 (keypad-only digits). The oracle never counts spoken
+   digits, and the voice scenarios are refrozen.
+4. **The reachable domain is only what production sends.** A reachable report records only the
+   current question's answer, only the `pressure_to_approve` flag from code, no answers after
+   consent `no`, answers in order, and no offered number. Anything else moves to the contract-only
+   domain.
+5. **The phrase bank gets near-variants whose truth production's check gets wrong,** so F3
+   measures something: another company whose name contains the vendor's ("Acme Fasteners Supply
+   Co"), a past connection ("I used to work at Acme Fasteners"), a singular and a typo ("Acme
+   Fastener", "Ackme Fasteners"). F3's counts are reported per phrase class, and its bar is
+   unchanged.
+6. **The sweep separates rules seen only through stand-ins** (contract-only reports or a declared
+   scenario). Its test fails if a rule moves into that state.
+7. **Smaller:**
+   - V09's reason in `UNREACHABLE.md` describes production, not the generators, or V09 gets a
+     scenario.
+   - The detector also flags digits spoken as "double two", digits joined by "then", and keycap
+     digits.
+   - The loader refuses an unquoted number in a digits field: YAML reads `0142` as 98.
+   - CI triggers add `origination.py`, `ports.py` and `uv.lock`.
+
 ## Acceptance
 
+- [ ] Each review fix above has a test that failed first. Three planted `call_facts` bugs (an
+  unknown speaker read as "not in the change thread", a stale pick counted as current, only the
+  first company answer read) each turn `lab-reports` red.
 - [ ] The lab gets the call's report and its facts through A1's chain, and `build_facts` is gone.
   The core's and the voice service's tests pass unchanged.
 - [ ] With the lab's own detector, each of C9's four blind cases fails `lab run`:
