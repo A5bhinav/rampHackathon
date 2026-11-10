@@ -58,7 +58,7 @@ def map_message(msg: dict[str, Any], at: dt.datetime) -> policy.Event | None:
     return None
 
 
-KEYPAD_TIMEOUT = 5.0  # seconds with no key, once a digit is typed, before the entry goes in (spec 0043, Q78)
+KEYPAD_TIMEOUT = 5.0  # seconds after the last kept digit before the entry goes in (spec 0043, Q78)
 MAX_KEYS = 16         # digits held per entry; later ones are dropped, the entry still goes in, and step refuses it
 
 
@@ -106,11 +106,12 @@ async def _send(ws: WebSocketLike, lines: tuple[str, ...], greeting: str | None 
 class _Inbox:
     """The socket's messages as policy events. ConversationRelay sends one `dtmf` message per key, so
     digits collect here into one entry (spec 0043, D2): '#' sends it as a Keypad, '*' empties it and
-    is a KeypadReset, and digits left with no key for `timeout` seconds go in as if '#' were pressed.
-    There is no submit at four keys, and at most MAX_KEYS digits are held. A spoken turn or a silence
-    ends a partial entry. A receive that raises is a dropped or broken call: a Hangup, which step
-    fails closed once consent is recorded (R7). At most one receive is in flight, and a timeout leaves
-    it running for the next event, so no message is ever lost to a cancelled read."""
+    is a KeypadReset, and digits left with no kept key for `timeout` seconds go in as if '#' were
+    pressed. There is no submit at four keys, and at most MAX_KEYS digits are held; a digit past that
+    is dropped and does not restart the wait. A spoken turn or a silence ends a partial entry. A
+    receive that raises is a dropped or broken call: a Hangup, which step fails closed once consent is
+    recorded (R7). At most one receive is in flight, and a timeout leaves it running for the next
+    event, so no message is ever lost to a cancelled read."""
 
     def __init__(self, ws: WebSocketLike, timeout: float) -> None:
         self._ws = ws
@@ -136,8 +137,9 @@ class _Inbox:
                 if key == "*":                               # start over: what was typed is gone
                     self._digits.clear()
                     return policy.KeypadReset(clock())
-                if key.isdigit():
-                    self._digits.extend(key[:MAX_KEYS - len(self._digits)])  # past MAX_KEYS, dropped
+                room = MAX_KEYS - len(self._digits)
+                if key.isdigit() and room > 0:               # past MAX_KEYS a digit is dropped and does
+                    self._digits.extend(key[:room])          # not restart the wait, so the cap bounds time too
                     self._deadline = loop.time() + self._timeout
                 continue                                     # noise: keep collecting keypresses
             event = map_message(msg, clock())
