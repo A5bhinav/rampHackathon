@@ -528,6 +528,12 @@ These are not reachable today, but each is frozen as a regression.
   older plant. That drops the third of worlds that test A1's fail-safe path, needs an attacker
   stronger than K01's two-channel shape, and breaks a B5 catch ("ranking reads change-context
   roles" falls from 14 worlds to 0 at seed 0). Nothing was committed; the decision is Sami's.
+- **Decided (Sami, Nov 10): restore the original count.** The floor exists so the never-eligible
+  checks aren't trivially true, which happens when a rule refuses everything, and any eligible number
+  shows it doesn't, the real line included. So the floor counts the real line again, against 50%,
+  and the share without it (27.2%) is reported with no bar. Nothing was lowered to fit. M9 is closed
+  for that reason; how often an attacker's number gets close to eligible is measured by spec 0046's
+  search and near-miss reports instead.
 
 ### B12. The label-on-pick coverage floor swings by seed
 
