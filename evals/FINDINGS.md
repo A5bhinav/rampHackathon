@@ -643,7 +643,10 @@ F1 to F9 hold as built (verified). But the lab still claims more than it shows:
   - Spec 0017's Q56, Q57 and Q58 collide with main's spec 0030.
   - **Correction (Nov 9):** the earlier "next free" numbers here (Q87, then Q92) came from a search
     that never matched (`git grep -E` with `\b`), so they were wrong. Search with a plain pattern.
-  - Specs 0045 to 0048 are taken, so the next free spec number is 0049.
+  - Spec 0048 is taken twice: `sami/lab-honest` (the lab, added 22:34 on Nov 9, Q101 to Q105) and
+    `sami/detect-first-account` (added 22:44, Q102 to Q106). The later one should renumber.
+  - Spec 0049 (`sami/llm-reader-spec`, the LLM document reader) takes Q107 to Q111. The next free
+    numbers are spec 0050 and Q112.
 
 ## F. How other services verify a bank change (Nov 9)
 
