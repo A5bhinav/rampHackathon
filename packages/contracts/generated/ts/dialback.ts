@@ -114,6 +114,55 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/datasets/{dataset_id}/vendor-accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Each vendor's current bank account, for the demo's Ramp (mock) portal (spec 0077)
+         * @description Every vendor on the dataset with its current account as Dialback stores it (routing number
+         *     and last four only, ADR-8) and its open case, if any. `can_change` says whether the signed-in
+         *     person can send a bank change from the dashboard: only on the current demo dataset, against
+         *     the Ramp mock, for a person linked to a Ramp user. When it is false, `reason` is the core's
+         *     sentence for why.
+         */
+        get: operations["listVendorAccounts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/datasets/{dataset_id}/vendors/{vendor_id}/bank-change": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * A clerk changes a vendor's bank details in the Ramp mock, as their linked Ramp user (demo only, spec 0077)
+         * @description Demo datasets only, with `DIALBACK_RAMP=mock`. The core forwards the change to the Ramp
+         *     mock as the signed-in person's linked Ramp user, then asks the mock to deliver its webhooks.
+         *     Dialback then detects the change the way it detects any change in Ramp, and the person who
+         *     sent it is the change's author, so they can't release it (R5). The full account number passes
+         *     through to the mock and is never stored, logged or returned (ADR-8). A refusal sends nothing
+         *     to Ramp.
+         */
+        post: operations["changeVendorBankAccount"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/cases": {
         parameters: {
             query?: never;
@@ -541,9 +590,34 @@ export interface components {
             /** @description The ledger's sentence for the status. */
             status_text: string;
         };
+        VendorAccount: {
+            vendor_id: components["schemas"]["Uuid"];
+            legal_name: string;
+            /** @description The vendor's current account as Dialback last saw it in Ramp, or null if none. */
+            account: components["schemas"]["AccountRef"] | null;
+            /** @description The vendor's unfinished case, if one is open. */
+            open_case_id: components["schemas"]["Uuid"] | null;
+        };
+        VendorAccounts: {
+            vendors: components["schemas"]["VendorAccount"][];
+            /** @description Whether the signed-in person can send a bank change from the dashboard here. */
+            can_change: boolean;
+            /** @description When can_change is false, the core's sentence for why; otherwise null. */
+            reason: string | null;
+        };
+        BankChangeRequest: {
+            /** @description Nine digits with a valid ABA checksum. */
+            routing_number: string;
+            /** @description 4 to 17 digits. Forwarded to the Ramp mock; never stored */
+            account_number: string;
+        };
+        BankChangeResult: {
+            vendor_id: components["schemas"]["Uuid"];
+            account: components["schemas"]["AccountRef"];
+        };
         Error: {
             /** @enum {string} */
-            code: "unauthenticated" | "forbidden" | "not_found" | "version_conflict" | "transition_refused" | "invalid_request";
+            code: "unauthenticated" | "forbidden" | "not_found" | "version_conflict" | "transition_refused" | "invalid_request" | "upstream_unavailable";
             message: string;
         };
         Sha256Hex: string;
@@ -969,6 +1043,82 @@ export interface operations {
             };
             401: components["responses"]["Unauthenticated"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    listVendorAccounts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dataset_id: components["parameters"]["DatasetId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VendorAccounts"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    changeVendorBankAccount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dataset_id: components["parameters"]["DatasetId"];
+                vendor_id: components["schemas"]["Uuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "routing_number": "026009593",
+                 *       "account_number": "000123450001"
+                 *     }
+                 */
+                "application/json": components["schemas"]["BankChangeRequest"];
+            };
+        };
+        responses: {
+            /** @description Sent to Ramp; Dialback will detect it */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BankChangeResult"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["InvalidRequest"];
+            /** @description The Ramp mock refused the change or could not be reached; nothing was changed */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "code": "upstream_unavailable",
+                     *       "message": "The Ramp mock did not accept the change. Nothing was changed; try again."
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
     };
     listCases: {
