@@ -1,6 +1,9 @@
 # 0049: The LLM document reader (`DIALBACK_READER=llm`)
 
-**Owner:** Inesh (drafted from Sami's session, for Inesh's review)  **Partner:** Abhi  **Slice:** evidence  **Target day:** not set (Q112; code freeze was Nov 8, the live final is Nov 19)
+**Owner:** Inesh (drafted from Sami's session, for Inesh's review)  **Partner:** Abhi  **Slice:** evidence  **Target day:** not set (Q123; code freeze was Nov 8, the live final is Nov 19)
+
+**Status:** approved by Sami on Nov 10, with the defaults below standing until Inesh reviews. It is
+built on its own branch, and no PR opens until Inesh has reviewed it.
 
 ## Goal
 
@@ -123,11 +126,21 @@ The person who checks the evaluation set labels by this table, and the prompt te
 
 ## The evaluation (fixed before the reader's first scored run)
 
+**Building doesn't wait for documents.**
+- The code and its tests need none: the tests fake the API, and use the corpus and demo fixtures.
+- Writing the prompt can start on the existing corpus (369 documents) and demo seed (47).
+- Only the scored evaluation below needs the new hard and held-out sets.
+
 **The labeled set: 100 documents, labeled by "What a label means".**
-- **Who does it:** a person checks every label (Q109). No model writes the labels.
+- **Where the documents come from:**
+  - the corpus and demo seed documents;
+  - spec 0052's generator (`sami/docgen-spec`). Its plans carry each number's claim, with the same
+    meaning as here, so their labels are known by construction.
+- **Who checks:** a person checks every held-out label and a sample of the rest (Q109). No model
+  writes the labels.
 - **Two kinds of document:**
-  - **Ordinary:** the corpus and demo seed documents, plus new ones written to look like real vendor
-    mail (invoices, signatures, remittance notices).
+  - **Ordinary:** the corpus and demo seed documents, plus documents that look like real vendor mail
+    (invoices, signatures, remittance notices).
   - **Hard for the stub:** "call us at" and other mentions without a label; a dash instead of a
     colon; the label on the line above; tables; two numbers on one line; a bank's or the customer's
     number labeled only by its context.
@@ -139,6 +152,9 @@ The person who checks the evaluation set labels by this table, and the prompt te
   - only their hash is committed, and the files live outside the repo;
   - whoever writes the prompt sees only the totals from held-out runs, never the documents or the
     list of errors.
+  - **If they come from spec 0052's generator,** they must use phrasings and layouts the prompt's
+    author never saw. Those lists, too, live outside the repo with only a hash committed. Spec 0052
+    has to provide for that, since its phrase bank is in the repo today.
 
 **What is counted, for each labeled number:**
 - **Unsafe label** (the security metric): a number the text doesn't present as the vendor's, labeled
@@ -163,7 +179,7 @@ keyword reader might pass too.
 on the same held-out 70 is exploratory. Adopting it needs fresh held-out documents. If nothing
 passes, `stub` stays.
 
-**What passing changes (Q112).** In code, the default stays `stub`. Switching a deployment to `llm`
+**What passing changes (Q123).** In code, the default stays `stub`. Switching a deployment to `llm`
 is a setting, and needs the API key on that host and a rehearsal in `llm` mode.
 
 ## Acceptance
@@ -210,20 +226,24 @@ is a setting, and needs the API key on that host and a rehearsal in `llm` mode.
 
 ## Open questions
 
-- **Q107 (Inesh).** The official `anthropic` SDK (my call: typed errors, retries, structured
-  outputs) or raw `httpx`, as the voice service does.
-- **Q108 (Inesh).** Visible text only (spec 0022's rule), or also the vendor's legal name, or the
-  document's author. Either would let the model place "us" and tell the vendor from the customer,
-  but it widens what the quarantined model sees.
-- **Q109 (the team).** Who writes and labels the documents, and in particular who writes the
-  held-out 70 without writing the prompt. This is the real cost of this spec.
-- **Q110 (Inesh).** Replacing long digit runs before the call (my call). The cost is that a quote
+Sami approved the spec on Nov 10. The defaults for Inesh's questions stand until he reviews it, and
+each is easy to change then.
+
+- **Q107 (Inesh), default:** the official `anthropic` SDK (typed errors, retries, structured
+  outputs), not raw `httpx` as the voice service uses.
+- **Q108 (Inesh), default:** visible text only (spec 0022's rule). The alternatives are adding the
+  vendor's legal name or the document's author. Either would let the model place "us" and tell the
+  vendor from the customer, but it widens what the quarantined model sees.
+- **Q109, resolved (Sami, Nov 10):** documents come from the corpus, the demo seed and spec 0052's
+  generator. A person checks every held-out label and a sample of the rest.
+- **Q110 (Inesh), default:** replace long digit runs before the call. The cost is that a quote
   including one is dropped.
 - **Q111, resolved by the review:** a failed document stops the demo and is never stored
   (decisions 3 and 4).
-- **Q112 (the team).** Is the LLM reader meant for the Nov 19 live final, after the Nov 8 code
+- **Q112:** renumbered to Q123, because main's spec 0050 already uses Q112.
+- **Q123 (the team), open.** Is the LLM reader meant for the Nov 19 live final, after the Nov 8 code
   freeze? If so, the plan needs the deploy setting, the API key on that host, and a rehearsal in
-  `llm` mode. If not, it is post-hackathon work.
+  `llm` mode. Until someone says so, deployment is later work.
 
 ## Commands
 
