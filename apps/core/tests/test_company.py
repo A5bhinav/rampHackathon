@@ -197,12 +197,16 @@ def test_b9_a_refusal_in_any_answer_is_false():
 # Review fixes (Nov 10): D7a's list exactly, each word and phrase on its own, and the ways a refusal can
 # be written, read as the speech guard reads text.
 D7A_WORDS = {"not", "isn", "aren", "wasn", "weren", "never", "former", "formerly", "until", "reseller",
-             "resellers", "resell", "resells", "distribute", "distributes", "distributor", "behalf"}
+             "resellers", "resell", "resells", "distribute", "distributes", "distributor", "behalf",
+             # D7a's extension (Sami, Nov 10): more contractions, and the spellings with no apostrophe
+             "doesn", "didn", "isnt", "arent", "wasnt", "werent", "dont", "doesnt", "didnt"}
+D7A_PHRASES = (("used", "to"), ("i", "mean"),
+               ("don", "t"), ("no", "longer"), ("wrong", "number"), ("different", "company"))
 
 
 def test_d7a_the_refusal_lists_are_exactly_the_specs():
     assert company.REFUSAL_WORDS == D7A_WORDS
-    assert tuple(company.REFUSAL_PHRASES) == (("used", "to"), ("i", "mean"))
+    assert tuple(company.REFUSAL_PHRASES) == D7A_PHRASES
 
 
 @pytest.mark.parametrize("said", [
@@ -210,9 +214,20 @@ def test_d7a_the_refusal_lists_are_exactly_the_specs():
     "A former Acme office", "Formerly Acme", "Acme until last year", "An Acme reseller", "Acme resellers",
     "We resell Acme", "He resells Acme", "We distribute Acme", "She distributes Acme", "An Acme distributor",
     "On behalf of Acme", "I used to be Acme", "Acme, I mean Globex",
+    # D7a's extension
+    "I don't work for Acme", "Acme doesn't take calls here", "We didn't ask Acme", "This isnt Acme",
+    "They arent Acme", "That wasnt Acme", "We werent Acme", "I dont work for Acme", "Acme doesnt sit here",
+    "We didnt ask Acme", "We're no longer Acme", "Sorry, wrong number", "Acme? Sorry, wrong number",
+    "This is a different company", "Acme is a different company",
 ])
 def test_d7a_each_refusal_word_and_phrase_flags_on_its_own(said):
     assert matches(said, ACME) is False
+
+
+@pytest.mark.parametrize("said", ["Hi, this is Don at Acme", "Don, Acme accounts payable", "Acme, Don speaking"])
+def test_d7a_a_first_name_is_not_a_refusal(said):
+    # "don't" reads as "don t", so it is a phrase, not the word "don": "Don" is a first name (D7a's extension).
+    assert matches(said, ACME) is True
 
 
 @pytest.mark.parametrize("said", ["NOT ACME", "This isn’t Acme",

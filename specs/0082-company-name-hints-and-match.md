@@ -142,6 +142,16 @@ say (Part B), and keeps the clear-mismatch signal.
      its effect there proves nothing, and D10's run on that same bank is exploratory too.
      Confirming it needs fresh data: real calls, or phrases written by someone who hasn't seen the
      list.
+   - **Extended (Sami, Nov 10, after the code review listed refusals the list missed):**
+     - **Words:** `doesn` and `didn` (from "doesn't", "didn't"), and the spellings speech-to-text
+       may write with no apostrophe: `isnt`, `arent`, `wasnt`, `werent`, `dont`, `doesnt`, `didnt`.
+     - **Phrases:** "don t" (from "don't"), "no longer", "wrong number", "different company".
+       "Don't" is a phrase and not the word `don`, because "Don" is a first name ("Hi, this is Don
+       at Acme" must not flag).
+     - **Not added:** an outsourced AP firm ("We handle AP for Acme"). Its words ("handle", "for") are
+       everyday words, so flagging them would send honest answers to review.
+     - **Not measured.** The lab's phrase bank has none of these phrases, so only unit tests pin
+       them (B11). Their cost on real answers is unknown until real calls.
 
    **7b. The decision (Sami, Nov 10): the company answer no longer has to match** (amendment). D7a
    stands as written. Where D7, D8, B2 to B5, "Contract touched", "Considered and rejected" or "Out
@@ -325,6 +335,10 @@ the vendor unless stated:
   - The clean call (`GOOD`) verifies with `company_matches=None` and with `True`.
   - A worked example, another company named with no refusal word (`company_matches` null) and
     everything else clean, is verified.
+- [ ] B11. D7a's extension. The refusal lists are exactly D7a's, extension included. Each added
+  word and phrase flags on its own ("I don't work for Acme", "We're no longer Acme", "Sorry, wrong
+  number", "This is a different company", and each apostrophe-free spelling). "Hi, this is Don at
+  Acme" names the vendor (`True`).
 
 ## Tests (written first)
 
@@ -340,6 +354,7 @@ the vendor unless stated:
 | B5 | the existing `apps/core/tests/test_worker.py` company tests, unedited (they need Postgres); D7b edits them (B9) |
 | B9 | `apps/core/tests/test_company.py::test_b9_another_company_or_nonsense_is_unknown`, `::test_b9_a_refusal_in_any_answer_is_false`, and the B2 to B6 and D6 tests' `None` rows; `apps/core/tests/test_call_facts.py::test_the_company_matches_a_trade_name`; `apps/core/tests/test_worker.py::test_another_company_named_decides_as_the_call_would_without_it`, `::test_a_refusal_in_the_company_answer_goes_to_review` (Postgres) |
 | B10 | `packages/decision/tests/test_rules.py::test_the_company_answer_is_not_required_to_verify`, `::test_v05_is_retired_and_its_ids_still_render`, `::test_nr03_has_its_new_sentence_and_is_the_company_answers_only_rule`; `test_engine.py` (the version); `tests/examples/22-another-company-named.json` |
+| B11 | `apps/core/tests/test_company.py::test_d7a_the_refusal_lists_are_exactly_the_specs`, `::test_d7a_each_refusal_word_and_phrase_flags_on_its_own`, `::test_d7a_a_first_name_is_not_a_refusal` |
 
 ## Landing
 

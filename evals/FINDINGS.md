@@ -998,6 +998,14 @@ F1 to F9 hold as built (verified). But the lab still claims more than it shows:
     The denominators differ from the before-and-after above because the contract sample changed.
 - **Known failures now:** lab-smoke lists a02 (A28) and l16 (A29); lab-reports lists nothing; lab-fuzz
   is unchanged.
+- **D7a extended (Sami, Nov 10, after the code review):**
+  - The additions: "don't" (as a phrase, since "Don" is a first name), "doesn't", "didn't", the
+    apostrophe-free spellings (isnt, arent, wasnt, werent, dont, doesnt, didnt), "no longer", "wrong
+    number" and "different company".
+  - **Not measured here:** the phrase bank has none of these phrases, so only `test_company.py` pins
+    them, and the lab's numbers above are unchanged.
+  - **Not added:** an outsourced AP firm ("We handle AP for Acme"). Its words are everyday words, so it
+    still passes as "anything else".
 
 ## D. Red teaming
 

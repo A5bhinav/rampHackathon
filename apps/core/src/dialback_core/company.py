@@ -13,7 +13,8 @@ Nothing is fuzzy: "acne" is not "Acme" (D8).
 
 An answer that says the person is not with the vendor, or only works with it, is False even when
 it names the vendor (D7a): "Not Acme, this is Globex", "We're a reseller for Acme", "I used to work
-at Acme". Bare "no" and "sorry" never count, and a word in the vendor's own name doesn't count.
+at Acme", "I don't work for Acme", "Sorry, wrong number". Bare "no" and "sorry" never count, and a
+word in the vendor's own name doesn't count.
 False fires NR03, and the case goes to a person.
 
 Anything else is unknown (None), and blocks nothing (D7b): another company ("This is Globex"), a
@@ -39,8 +40,13 @@ def words(name: str) -> frozenset[str]:
 # D7a: words that say the person is not with the vendor, or only works with it ("isn't" reads as "isn").
 REFUSAL_WORDS = frozenset({"not", "isn", "aren", "wasn", "weren", "never", "former", "formerly", "until",
                            "reseller", "resellers", "resell", "resells", "distribute", "distributes",
-                           "distributor", "behalf"})
-REFUSAL_PHRASES = (("used", "to"), ("i", "mean"))
+                           "distributor", "behalf",
+                           # D7a's extension (Sami, Nov 10): more contractions, and the spellings speech-to-text
+                           # may write with no apostrophe
+                           "doesn", "didn", "isnt", "arent", "wasnt", "werent", "dont", "doesnt", "didnt"})
+# "don't" reads as "don t": a phrase, since "Don" alone is a first name ("Hi, this is Don at Acme").
+REFUSAL_PHRASES = (("used", "to"), ("i", "mean"),
+                   ("don", "t"), ("no", "longer"), ("wrong", "number"), ("different", "company"))
 
 
 def _refuses(named: str, names: tuple[str, ...]) -> bool:
