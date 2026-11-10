@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { PageHead } from "@/components/page";
+import { PageHead, Stats } from "@/components/page";
 import { CoreError, core } from "@/lib/core";
 import { phone } from "@/lib/lineage";
 import { counts, digitMarks, shares, statusLabel, statusTone, type RiskStatus } from "@/lib/risk";
@@ -17,10 +17,12 @@ export default async function RiskPage({ params }: { params: Promise<{ datasetId
 
   return (
     <main>
-      <PageHead title="Vendor risk" lead="Is each vendor's number on file one the Trust Ledger can prove? Each row says why, in the ledger's own words." />
+      <PageHead eyebrow="Control · posture" title="Trust Ledger"
+        lead="Is each vendor's number on file one the Trust Ledger can prove? Each row says why, in the ledger's own words." />
+      {vendors.length > 0 ? <CountStrip vendors={vendors} /> : null}
       {vendors.length > 0 ? <RiskMix vendors={vendors} /> : null}
       {vendors.length === 0 ? (
-        <section className="card empty"><p>The Trust Ledger has no documents for this dataset&apos;s vendors yet.</p></section>
+        <section className="card empty-card"><p>The Trust Ledger has no documents for this dataset&apos;s vendors yet.</p></section>
       ) : (
         <section className="card flush" aria-label="Vendors">
           <div className="table-wrap">
@@ -31,7 +33,7 @@ export default async function RiskPage({ params }: { params: Promise<{ datasetId
               <tbody>
                 {vendors.map((v) => (
                   <tr key={v.vendor_id} className={STRIPE[v.status]}>
-                    <td><strong>{v.legal_name}</strong><div className="muted sub cell-note">{v.status_text}</div></td>
+                    <td><strong className="vendor-name">{v.legal_name}</strong><div className="muted sub cell-note">{v.status_text}</div></td>
                     <td><span className={`badge ${statusTone(v.status)}`}>{statusLabel(v.status)}</span></td>
                     <td className="mono nowrap">{v.number_on_file ? <OnFile number={v.number_on_file} provable={v.status === "near_miss" ? v.provable_number : null} /> : "—"}</td>
                     <td className="mono nowrap">{v.provable_number ? phone(v.provable_number) : "—"}</td>
@@ -50,6 +52,15 @@ function cap(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
+const STAT_TONE = { near_miss: "bad", unproven: "warn", missing: undefined, provable: "ok" } as const;
+
+/** The count strip, worst first: near miss, unproven, missing, provable. */
+function CountStrip({ vendors }: { vendors: { status: RiskStatus }[] }) {
+  return (
+    <Stats label="Vendors by status" items={counts(vendors).map(([status, n]) => ({ label: cap(statusLabel(status)), value: n, tone: STAT_TONE[status] }))} />
+  );
+}
+
 const KEY = { near_miss: "bad", unproven: "warn", missing: "muted", provable: "ok" } as const;
 
 /** Vendors by status as one segmented bar (spec 0032): shares inside the blocks that fit them,
@@ -61,6 +72,7 @@ function RiskMix({ vendors }: { vendors: { status: RiskStatus }[] }) {
   return (
     <section className="card mix" aria-labelledby="mix-h">
       <div className="chart-head">
+        <span className="section-marker">Mix</span>
         <h2 id="mix-h">Vendors by status <span className="count">{vendors.length}</span></h2>
       </div>
       <div className="segbar" role="img" aria-label={`Vendors by status: ${label}`}>

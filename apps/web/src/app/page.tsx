@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { Icon } from "@/components/icons";
 import { BrandMark } from "@/components/nav";
+import { PublicHeader } from "@/components/public-header";
+import { RingMotif, Rings } from "@/components/ring-band";
 import { HeroShot, StationShot } from "@/components/showcase";
 import { ACROSS, DEMO_STORIES, STORY_STATIONS, type StoryKey } from "@/lib/story";
 import "./landing.css";
@@ -37,33 +39,25 @@ const COMPARE: { row: string; old: string; now: string }[] = [
 
 export default function HowItWorks() {
   return (
-    <>
-      <header className="topbar">
-        <div className="topbar-inner">
-          <nav className="nav" aria-label="Main">
-            <Link className="brand" href="/"><BrandMark />Dialback</Link>
-            <a href="#stations">The pipeline</a>
-            <a href="#demo">Demo data</a>
-            <Link href="/corpus">Frozen test cases</Link>
-          </nav>
-          <div className="who"><Link className="button-link primary" href="/app">Open the dashboard</Link></div>
+    <div className="public story">
+      <PublicHeader links={[{ href: "#stations", label: "The pipeline" }, { href: "#demo", label: "Demo data" }, { href: "/corpus", label: "Frozen test cases" }]} />
+      <section className="hero" aria-labelledby="hero-h">
+        <Rings className="rings hero-rings" />
+        <div className="hero-text">
+          <p className="eyebrow">For accounts payable teams on Ramp</p>
+          <h1 id="hero-h">A changed bank account gets paid only after the real vendor says so.</h1>
+          <p className="lead">
+            When a vendor&apos;s bank details change in Ramp, Dialback holds their payments, calls the vendor on a phone number it can
+            prove is theirs, lets code decide what the answers mean, and waits for a second person to release.
+          </p>
+          <p className="story-cta">
+            <Link className="button-link primary" href="/tour/1">Take the guided demo</Link>
+            <a className="button-link" href="#stations">See the pipeline</a>
+          </p>
         </div>
-      </header>
-      <main className="shell story">
-        <section className="story-hero" aria-labelledby="hero-h">
-          <div className="story-hero-text">
-            <p className="eyebrow">For accounts payable teams on Ramp</p>
-            <h1 id="hero-h">A changed bank account gets paid only after the real vendor says so.</h1>
-            <p className="lead">
-              When a vendor&apos;s bank details change in Ramp, Dialback holds their payments, calls the vendor on a phone number it can
-              prove is theirs, lets code decide what the answers mean, and waits for a second person to release.
-            </p>
-            <p className="story-cta">
-              <Link className="button-link primary" href="/tour/1">Take the guided demo</Link>
-              <a className="button-link" href="#demo">See it on demo data</a>
-              <a className="button-link" href="#stations">How each step works</a>
-            </p>
-          </div>
+      </section>
+      <main className="story-main">
+        <section className="story-section hero-shot-section" aria-label="The dashboard, drawn">
           <HeroShot />
         </section>
 
@@ -75,7 +69,7 @@ export default function HowItWorks() {
           <ol className="scam">
             {SCAM.map((s, i) => (
               <li key={s.title} className="scam-step">
-                <span className="scam-n" aria-hidden="true">{i + 1}</span>
+                <span className="scam-n" aria-hidden="true">{String(i + 1).padStart(2, "0")}</span>
                 <h3>{s.title}</h3>
                 <p>{s.text}</p>
               </li>
@@ -94,7 +88,7 @@ export default function HowItWorks() {
               <thead><tr><th scope="col"><span className="sr-only">Step</span></th><th scope="col">The old way</th><th scope="col">With Dialback</th></tr></thead>
               <tbody>
                 {COMPARE.map((r) => (
-                  <tr key={r.row}><th scope="row">{r.row}</th><td className="muted">{r.old}</td><td>{r.now}</td></tr>
+                  <tr key={r.row}><th scope="row">{r.row}</th><td className="muted">{r.old}</td><td><RuleText text={r.now} /></td></tr>
                 ))}
               </tbody>
             </table>
@@ -162,10 +156,12 @@ export default function HowItWorks() {
           <ul className="demo-stories">
             {DEMO_STORIES.map((s) => (
               <li key={s.ref} className="card">
-                <p className="eyebrow">{s.title}</p>
-                <h3>{s.legal_name}</h3>
-                <p className="muted">{s.story}</p>
-                <Link href={`/demo/${s.ref}`}>Open this case</Link>
+                <div className="card-body">
+                  <p className="tags"><span className="badge tone-muted">{s.title}</span></p>
+                  <h3>{s.legal_name}</h3>
+                  <p className="muted">{s.story}</p>
+                  <Link className="button-link" href={`/demo/${s.ref}`}>Open this case</Link>
+                </div>
               </li>
             ))}
           </ul>
@@ -176,6 +172,21 @@ export default function HowItWorks() {
           <p><Link className="button-link primary" href="/app">Open the dashboard</Link></p>
         </section>
       </main>
-    </>
+      <footer className="pub-foot">
+        <RingMotif />
+        <span className="brand"><BrandMark />Dialback</span>
+        <nav aria-label="Footer">
+          <a href="#stations">The pipeline</a>
+          <Link href="/corpus">Frozen test cases</Link>
+          <Link href="/scorecard">Scorecard</Link>
+          <Link href="/app">Open the dashboard</Link>
+        </nav>
+      </footer>
+    </div>
   );
+}
+
+/** A sentence with its rule ids, "(R1)", set in mono. */
+function RuleText({ text }: { text: string }) {
+  return <>{text.split(/(R\d)/).map((part, i) => (/^R\d$/.test(part) ? <span key={i} className="mono rule-ref">{part}</span> : part))}</>;
 }
