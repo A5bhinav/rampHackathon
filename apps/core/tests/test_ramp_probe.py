@@ -10,8 +10,16 @@ from urllib.parse import parse_qs
 
 import httpx
 import pytest
-from dialback_core.ramp.probe import ProbeRefused, probe, read_only_client, render, run
-from test_ramp_sandbox_shapes import BASE, SANDBOX, SandboxRamp, V, account, event
+from dialback_core.ramp.probe import (
+    ProbeRefused,
+    VendorRow,
+    list_vendors,
+    probe,
+    read_only_client,
+    render,
+    run,
+)
+from test_ramp_sandbox_shapes import BASE, OTHER, SANDBOX, SandboxRamp, V, account, bill, event
 
 pytestmark = pytest.mark.anyio
 
@@ -146,6 +154,41 @@ async def test_the_probe_lists_where_ramps_answers_differ_from_its_document():
     assert f.doc_differences == ["ApiVendorDetailResource.country: not in Ramp's document",
                                  "ApiVendorDetailResource.display_name: null, which Ramp's document says it can't be",
                                  "Vendor.display_name: null, which Ramp's document says it can't be"]
+
+
+# --list (D6): which vendor to look at -------------------------------------------------------------------
+
+async def rows_from(fake: SandboxRamp, **kwargs) -> list[VendorRow]:
+    async with read_only_client(httpx.MockTransport(fake.handle)) as http:
+        return await list_vendors(SANDBOX, http, **kwargs)
+
+
+async def test_list_shows_vendors_with_unpaid_bills_most_first_with_their_ids():
+    # By hand from the fake: Acme has two unpaid bills (one paid) and one active account of two;
+    # Brightline has one unpaid bill and no account.
+    fake = SandboxRamp()
+    assert await rows_from(fake) == [VendorRow(V, "Acme Fasteners LLC", unpaid_bills=2, active_accounts=1),
+                                     VendorRow(OTHER, "Brightline Office Supply Inc", unpaid_bills=1, active_accounts=0)]
+    assert {r.method for r in fake.requests} == {"GET", "POST"}  # the login's POST, then reads
+    assert [r.url.path for r in fake.requests if r.method == "POST"] == ["/developer/v1/token"]
+
+
+async def test_list_leaves_out_vendors_with_no_unpaid_bills_and_stops_at_the_limit():
+    fake = SandboxRamp()
+    fake.bills.insert(0, bill("bill-8", "2026-11-12T00:00:00+00:00", vendor_id=OTHER))  # Ramp's order puts Brightline first
+    assert [r.id for r in await rows_from(fake, limit=1)] == [V], "two each, so the tie goes by id, then the limit"
+    fake = SandboxRamp()
+    fake.bills = [b for b in fake.bills if b["vendor"]["id"] == V]
+    assert [r.id for r in await rows_from(fake)] == [V], "Brightline has no unpaid bill"
+
+
+def test_the_list_command_prints_each_vendors_id(capsys):
+    fake = SandboxRamp()
+    env = {"RAMP_SANDBOX_CLIENT_ID": "client-for-tests", "RAMP_SANDBOX_CLIENT_SECRET": SECRET}
+    assert run(["--list"], env, transport=httpx.MockTransport(fake.handle)) == 0
+    out = capsys.readouterr().out
+    assert V in out and OTHER in out and "Brightline Office Supply Inc" in out and "--vendor" in out
+    assert SECRET not in out and "test-token-1" not in out
 
 
 # The command (D2) --------------------------------------------------------------------------------------

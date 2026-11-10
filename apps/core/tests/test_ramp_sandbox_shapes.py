@@ -52,7 +52,8 @@ def bill(bill_id: str, payment_date: str | None, status: str = "OPEN", summary: 
     """Ramp's Bill: the vendor is an object, and the date lives in `payment`."""
     payment = None if payment_date is None else {"id": f"pay-{bill_id}", "payment_date": payment_date,
                                                   "payment_method": "ACH", "effective_date": None}
-    return {"id": bill_id, "vendor": {"id": vendor_id, "name": "Acme Fasteners LLC"}, "status": status,
+    name = "Acme Fasteners LLC" if vendor_id == V else "Brightline Office Supply Inc"
+    return {"id": bill_id, "vendor": {"id": vendor_id, "name": name}, "status": status,
             "status_summary": summary, "paid_at": paid_at, "payment": payment, "invoice_number": f"INV-{bill_id[-1]}",
             "amount": {"amount": 80000, "currency_code": "USD"}}
 

@@ -32,6 +32,10 @@ None.
   fatal.
 - **D5. Ramp's document** is the repo's copy when present (`packages/contracts/openapi/`, spec
   0078), else downloaded from `docs.ramp.com`; if neither works, the comparison is skipped and says so.
+- **D6. `--list`**, to pick a vendor worth reading: vendors with unpaid bills, most first (ties by
+  id), each with its id and its active bank accounts, up to 20. One read of the business's bills,
+  then one accounts read per vendor shown; paid only when Ramp says `PAID`, as the layer reads it.
+  Added after the first sandbox run read a vendor with no accounts, bills or events.
 
 ## Acceptance
 
@@ -40,12 +44,15 @@ None.
 - [x] Findings report the layer's view, the document differences, and the answers to Q202 to Q204,
       from a fake sandbox with a hold and a bank change in it.
 - [x] An account the layer rejects is reported, and the probe carries on.
+- [x] `--list` shows vendors with unpaid bills, most first, with ids and active accounts; leaves
+      out vendors with none; stops at the limit; reads only.
 
 ## Tests (written first)
 
 | Acceptance item | Test |
 |---|---|
 | 1-4 | `apps/core/tests/test_ramp_probe.py::test_*` |
+| 5 | `apps/core/tests/test_ramp_probe.py::test_list_*`, `::test_the_list_command_prints_each_vendors_id` |
 
 ## Out of scope
 
@@ -57,6 +64,7 @@ than one vendor; nested fields in the document comparison.
 ```bash
 export RAMP_SANDBOX_CLIENT_ID='...'
 read -rs RAMP_SANDBOX_CLIENT_SECRET && export RAMP_SANDBOX_CLIENT_SECRET
+uv run --package dialback-core python -m dialback_core.ramp.probe --list
 uv run --package dialback-core python -m dialback_core.ramp.probe [--vendor <ramp vendor id>]
 cd apps/core && uv run pytest -q tests/test_ramp_probe.py
 ```

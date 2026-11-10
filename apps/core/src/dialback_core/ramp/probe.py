@@ -85,11 +85,16 @@ def _differences(name: str, obj: dict[str, Any], doc: dict[str, Any]) -> set[str
     return found
 
 
-async def probe(sandbox: RampSandbox, http: httpx.AsyncClient, *, vendor_id: str | None = None,
-                doc: dict[str, Any] | None = None) -> Findings:
+def _reader(sandbox: RampSandbox, http: httpx.AsyncClient) -> tuple[RampSandbox, RampLogin, RampSandboxAdapter]:
+    """D1: a login that asks Ramp only for the read scopes, and the layer on top of it."""
     read = dataclasses.replace(sandbox, scopes=tuple(s for s in sandbox.scopes if s.endswith(":read")))
     login = RampLogin(read, http)
-    layer = RampSandboxAdapter(read.base_url, login, http, TokenBucket(100))
+    return read, login, RampSandboxAdapter(read.base_url, login, http, TokenBucket(100))
+
+
+async def probe(sandbox: RampSandbox, http: httpx.AsyncClient, *, vendor_id: str | None = None,
+                doc: dict[str, Any] | None = None) -> Findings:
+    read, login, layer = _reader(sandbox, http)
     await login.token()  # a refused login stops here, with Ramp's status
     raw: list[tuple[str, dict[str, Any]]] = []
     if vendor_id is None:
@@ -139,6 +144,42 @@ async def probe(sandbox: RampSandbox, http: httpx.AsyncClient, *, vendor_id: str
     return f
 
 
+@dataclasses.dataclass(frozen=True)
+class VendorRow:
+    id: str
+    name: str
+    unpaid_bills: int = 0
+    active_accounts: int = 0
+
+
+async def list_vendors(sandbox: RampSandbox, http: httpx.AsyncClient, *, limit: int = 20) -> list[VendorRow]:
+    """D6: vendors with unpaid bills, most first (ties by id), each with its active bank accounts. One
+    read of the business's bills, then one accounts read per vendor shown."""
+    _, _, layer = _reader(sandbox, http)
+    unpaid: dict[str, int] = {}
+    names: dict[str, str] = {}
+    for b in await layer._all_pages("/bills", {"page_size": 100}):
+        vendor = b.get("vendor") or {}
+        if vendor.get("id") and b.get("status") != "PAID":  # paid only when Ramp says PAID, as the layer reads it
+            unpaid[vendor["id"]] = unpaid.get(vendor["id"], 0) + 1
+            names[vendor["id"]] = vendor.get("name") or ""
+    rows = []
+    for vendor_id in sorted(unpaid, key=lambda v: (-unpaid[v], v))[:limit]:
+        accounts = await layer._all_pages(f"/vendors/{vendor_id}/accounts", {"page_size": 100})
+        rows.append(VendorRow(vendor_id, names[vendor_id], unpaid[vendor_id],
+                              sum(1 for a in accounts if a.get("status") == "active")))
+    return rows
+
+
+def render_list(rows: list[VendorRow]) -> str:
+    if not rows:
+        return "No vendor in this sandbox business has an unpaid bill."
+    lines = ["Vendors with unpaid bills, most first. Read one with:  --vendor <id>", ""]
+    lines += [f"  {r.id}  {r.name}  (unpaid bills: {r.unpaid_bills}, active bank accounts: {r.active_accounts})"
+              for r in rows]
+    return "\n".join(lines)
+
+
 def render(f: Findings) -> str:
     lines = [f"Logged in to Ramp's sandbox with read scopes only: {' '.join(f.login_scopes)}",
              f"Vendor {f.vendor_id}: {f.vendor.name if f.vendor else '(the layer could not read it)'}", ""]
@@ -177,6 +218,7 @@ def run(argv: list[str] | None = None, environ: dict[str, str] | None = None,
     parser.add_argument("--vendor", help="the Ramp vendor id to read (default: the first one Ramp lists)")
     parser.add_argument("--spec", help="Ramp's OpenAPI document (default: the repo's copy, else docs.ramp.com)")
     parser.add_argument("--skip-doc", action="store_true", help="don't compare with Ramp's document")
+    parser.add_argument("--list", action="store_true", help="list vendors with unpaid bills and their ids, then stop")
     args = parser.parse_args(argv)
     for name in ("httpx", "httpcore"):
         logging.getLogger(name).setLevel(logging.WARNING)
@@ -188,18 +230,19 @@ def run(argv: list[str] | None = None, environ: dict[str, str] | None = None,
     if sandbox is None:
         print(HOW_TO)
         return 2
-    doc = None if args.skip_doc else _load_doc(args.spec)
+    doc = None if args.skip_doc or args.list else _load_doc(args.spec)
 
-    async def go() -> Findings:
+    async def go() -> str:
         async with read_only_client(transport) as http:
-            return await probe(sandbox, http, vendor_id=args.vendor, doc=doc)
+            if args.list:
+                return render_list(await list_vendors(sandbox, http))
+            return render(await probe(sandbox, http, vendor_id=args.vendor, doc=doc))
 
     try:
-        findings = asyncio.run(go())
+        print(asyncio.run(go()))
     except RampError as exc:
         print(f"Ramp refused or couldn't be reached: {exc}")
         return 1
-    print(render(findings))
     return 0
 
 
