@@ -1,7 +1,8 @@
 /* Dialback's dashboard, "Signature A: callback rings" (spec 0041; earlier 0031, 0032).
    White surfaces, warm paper for chrome, ink for the one primary action, deep green for the
-   brand and links. Status colours only ever mean status and always sit beside a word. The serif
-   is for page titles only. The rings in the page band are the product's only decoration. Motion
+   brand and links. Status colours only ever mean status and always sit beside a word. One
+   typeface, Inter: bold and tightly tracked for titles and key figures, regular for reading;
+   IBM Plex Mono for data and section markers. The rings in the page band are the product's only decoration. Motion
    answers a person (hover 150ms in, 120ms out, press 90ms), plus the rail filling in once on
    load; nothing moves under reduced motion. */
 
@@ -46,7 +47,7 @@
   --ring: 0 0 0 2px var(--surface), 0 0 0 4px var(--accent);
   /* type */
   --sans: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
-  --display: var(--font-display), Georgia, serif;
+  --display: var(--sans);
   --mono: var(--font-mono), ui-monospace, "SF Mono", Menlo, monospace;
   /* motion */
   --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -59,10 +60,10 @@
 /* Base ------------------------------------------------------------------------------------- */
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
-body { margin: 0; background: var(--bg); color: var(--text); font: 14px/20px var(--sans);
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/20px var(--sans); font-optical-sizing: auto;
   -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
-h1 { font: 400 42px/46px var(--display); letter-spacing: -0.012em; margin: 0; color: var(--ink); }
-h2 { font-size: 16px; line-height: 22px; font-weight: 600; margin: 0 0 12px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+h1 { font: 700 40px/44px var(--display); letter-spacing: -0.035em; margin: 0; color: var(--ink); }
+h2 { font-size: 16px; line-height: 22px; font-weight: 600; letter-spacing: -0.011em; margin: 0 0 12px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 h3 { font-size: 14px; line-height: 20px; font-weight: 600; margin: 0 0 8px; }
 p { margin: 0 0 12px; }
 p:last-child { margin-bottom: 0; }
@@ -188,7 +189,7 @@ a.brand:hover { text-decoration: none; color: var(--ink); }
 .ring-motif span:nth-child(3) { inset: 20px; background: var(--brand-light); }
 .tags { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 0; }
 .held-aside { display: grid; gap: 2px; justify-items: end; }
-.held-figure { font-size: 30px; line-height: 36px; font-weight: 600; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.held-figure { font-size: 32px; line-height: 38px; font-weight: 700; letter-spacing: -0.035em; font-variant-numeric: tabular-nums; }
 
 /* Cards and callouts ------------------------------------------------------------------------ */
 .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); margin: 0; min-width: 0; }
@@ -227,7 +228,7 @@ a.brand:hover { text-decoration: none; color: var(--ink); }
   border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
 .stat { padding: 18px 20px; border-left: 1px solid var(--line); margin-left: -1px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .stat dt { font: 500 11px/14px var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--marker); }
-.stat dd { margin: 0; font-size: 30px; line-height: 36px; font-weight: 600; letter-spacing: -0.02em; color: var(--ink); }
+.stat dd { margin: 0; font-size: 30px; line-height: 36px; font-weight: 700; letter-spacing: -0.03em; color: var(--ink); }
 .stat dd.stat-sub { font-size: 13px; line-height: 18px; font-weight: 400; letter-spacing: 0; color: var(--muted); }
 .stat dd.stat-small { font-size: 15px; line-height: 22px; font-weight: 500; letter-spacing: 0; }
 .stat dd.stat-mono { font-family: var(--mono); font-size: 15px; line-height: 22px; font-weight: 500; letter-spacing: 0; }
@@ -335,7 +336,7 @@ dl.facts .fact-row { display: contents; }
 .station.has-count .station-node { background: var(--brand-deep); border-color: var(--brand-deep); color: #fff; }
 .station-label { font-size: 13px; line-height: 18px; font-weight: 600; }
 .station-meaning { font-size: 12px; line-height: 16px; color: var(--muted); }
-.station-count { font-size: 26px; line-height: 32px; font-weight: 600; letter-spacing: -0.02em; margin-top: 8px; font-variant-numeric: tabular-nums; }
+.station-count { font-size: 26px; line-height: 32px; font-weight: 700; letter-spacing: -0.03em; margin-top: 8px; font-variant-numeric: tabular-nums; }
 .station.is-empty .station-count { color: var(--line-strong); }
 .station-split { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
 
@@ -453,7 +454,7 @@ figure { margin: 0; }
 .console-head h2 { margin: 0; }
 .console-head > p { margin: 4px 0 0; }
 .console-figure { display: grid; gap: 2px; }
-.console-figure .figure { font-size: 26px; line-height: 32px; font-weight: 600; letter-spacing: -0.02em; }
+.console-figure .figure { font-size: 28px; line-height: 34px; font-weight: 700; letter-spacing: -0.035em; }
 .console-body { padding: 16px 20px; display: grid; gap: 12px; }
 form.console { display: block; margin: 0; }
 .console textarea { font-size: 14px; }
@@ -517,7 +518,7 @@ ul.checks li.is-bad { color: var(--bad); }
 
 /* The decision. */
 .outcome { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; margin-bottom: 8px; }
-.outcome-word { font-size: 26px; line-height: 32px; font-weight: 600; letter-spacing: -0.02em; }
+.outcome-word { font-size: 28px; line-height: 34px; font-weight: 700; letter-spacing: -0.035em; }
 .effect { font-size: 15px; line-height: 22px; color: var(--ink); margin: 0 0 8px; }
 .rule-group { margin-top: 16px; }
 .rule-group h3 { margin-bottom: 6px; }
@@ -618,7 +619,7 @@ table.chain-table tr { scroll-margin-top: 100px; }
 .node { display: grid; gap: 4px; padding: 10px 12px; border-radius: var(--radius-sm); border: 1px solid var(--line); background: var(--surface); min-height: 76px; align-content: start; }
 .node.has-n { border-color: var(--line-strong); }
 .node-label { font-size: 13px; line-height: 18px; color: var(--text-2); }
-.node-n { font-size: 26px; line-height: 32px; font-weight: 600; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.node-n { font-size: 26px; line-height: 32px; font-weight: 700; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
 .node:not(.has-n) .node-n { color: var(--line-strong); }
 .node-released.has-n { background: var(--ok-bg); border-color: transparent; }
 .edge { display: flex; gap: 4px; align-items: center; justify-content: space-between; margin-top: 6px; font-size: 11px; color: var(--muted); overflow: hidden; }
@@ -690,7 +691,7 @@ ul.reason-chips li { font-size: 12px; padding: 1px 8px; border-radius: var(--rad
 .main-col .front { min-height: 60vh; }
 .signin { position: relative; z-index: 1; width: min(420px, 100%); padding: 32px; border-radius: var(--radius); box-shadow: var(--shadow); }
 .signin .brand { margin: 0 0 24px; }
-.signin h1 { font-size: 32px; line-height: 36px; margin-bottom: 8px; }
+.signin h1 { font-size: 30px; line-height: 34px; letter-spacing: -0.03em; margin-bottom: 8px; }
 .signin form { display: grid; gap: 8px; margin: 0; }
 .signin form + p, .signin form + form { margin-top: 16px; }
 .signin form p { margin: 0; }
@@ -769,7 +770,7 @@ ul.reason-chips li { font-size: 12px; padding: 1px 8px; border-radius: var(--rad
   .nav-item { white-space: nowrap; min-height: 44px; }
   .utilbar { padding: 8px var(--pad-x); min-height: 0; }
   .ring-band { --k: .42; --cx: 44px; --cy: 52px; padding: 24px var(--pad-x) 24px; }
-  .ring-band h1 { font-size: 32px; line-height: 36px; }
+  .ring-band h1 { font-size: 30px; line-height: 34px; letter-spacing: -0.03em; }
   .ring-band-main { padding-right: 110px; flex-basis: 100%; }
   .ring-band:has(.ring-band-aside) .ring-band-main { padding-right: 110px; }
   .ring-band .lead { font-size: 14px; line-height: 20px; }

@@ -20,7 +20,7 @@ None. `packages/contracts/**` is unchanged; the gaps the wireframes show are ope
 
 Tokens, type and components
 - [ ] `globals.css :root` carries the tokens of the prompt's section 4 (paper, ink, brand deep/mid/light, status pairs, neutral, fills, radii, shadows, `--display`); no per-component colours outside them.
-- [ ] Fonts: Schibsted Grotesk (`--font-sans`), IBM Plex Mono (`--font-mono`), Instrument Serif (`--font-display`), all three on `<html>`. The serif is used only for h1.
+- [ ] Fonts: Inter (`--font-sans`, optical-size axis; bold and tightly tracked for h1 and key figures) and IBM Plex Mono (`--font-mono`), both on `<html>`. No serif: the team chose Inter over the prompt's Schibsted Grotesk and Instrument Serif after seeing the "Signature A" board.
 - [ ] `RingBand` (`components/ring-band.tsx`) draws five `aria-hidden` circles centred 130px from the right and 80px from the top (500/396/288/180/72); compact under 720px; a `dark` variant. `PageHead` renders it, so every page head gets it.
 - [ ] Badges are 22px dot-and-word pills; `StateBadge` uses `STATE_LABEL` (10 states, `words()` fallback); `released` is ok and `retry_wait` warn; `OutcomeBadge` says Verified / Not verified / Needs review; `ChainBadge` says "Chain intact" or "Chain broken at #N".
 - [ ] Buttons are pills (ink primary, white secondary, white danger); cards have no shadow and no coloured side edge (`edge-*` kept as no-ops); tables have sentence-case heads and a 3px inset stripe on the first cell.
