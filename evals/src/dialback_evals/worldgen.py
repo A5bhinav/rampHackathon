@@ -97,7 +97,9 @@ class World:
     settings: Settings = DEFAULT
 
 
-def _address(sender: str, domain: str) -> str:
+def sender_address(sender: str, domain: str) -> str:
+    """The sender address a knob value gives a document from `domain`: the vendor's own, a subdomain, a
+    lookalike, a combosquat or another domain."""
     host, _, suffix = domain.partition(".")
     tail = f".{suffix}" if suffix else ""
     if sender == "subdomain":
@@ -154,7 +156,7 @@ def make_world(*, numbers: list[NumberSpec], vendor_domains: tuple[str, ...] = (
             seen_recorded = late_at if sp.sighting_late else recorded
             thread = "req" if sp.in_thread else f"t{label}"
             subject = _subject_line(sp.subject, label)
-            documents.append(DocumentRef(doc_id, sp.channel, received, _address(sp.sender, domain), thread,
+            documents.append(DocumentRef(doc_id, sp.channel, received, sender_address(sp.sender, domain), thread,
                                          subject, recorded))
             if sp.shared_id:
                 twin_sender = "" if sp.twin_first else "ar@other.example"   # "" sorts before every "ar@" sender

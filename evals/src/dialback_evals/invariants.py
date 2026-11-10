@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import dataclasses
 import datetime as dt
+import importlib.resources
 import json
 import re
 from functools import lru_cache
@@ -26,18 +27,28 @@ from dialback_ledger.lookalike import is_lookalike, sender_domain
 from dialback_ledger.select import DocumentRef, Sighting, change_context_documents
 from jsonschema import Draft202012Validator
 
-from .worldgen import World, _address, run
+from .worldgen import World, run, sender_address
 
 COUNTING = frozenset({"email", "contract", "vendor_portal", "listing", "paper_mail"})  # not vendor_master
 FRESH = "+10895550199"   # fictional, at least 3 digits from every generated number; a probe target
 LOOKALIKE_PROBE_DAYS = (30, 100, 400)   # a lookalike email this many days before the request
-_SCHEMA = Path(__file__).resolve().parents[3] / "packages/contracts/schemas/selection.schema.json"
+SCHEMA = "packages/contracts/schemas/selection.schema.json"
 _PREFIX = re.compile(r"^((re|fwd?|aw|sv)\s*:|\[[^\]]*\])\s*")
+
+
+def schema_path(start: Path | None = None) -> Path:
+    """The selection schema, found by walking up from the package (or `start`) to the checkout that holds
+    the contracts, so it no longer depends on how deep the package sits (FINDINGS B7, M13)."""
+    here = Path(start if start is not None else str(importlib.resources.files("dialback_evals"))).resolve()
+    for folder in (here, *here.parents):
+        if (folder / SCHEMA).is_file():
+            return folder / SCHEMA
+    raise FileNotFoundError(f"no {SCHEMA} in {here} or above it: run the lab from a checkout of the repository")
 
 
 @lru_cache(maxsize=1)
 def _validator() -> Draft202012Validator:
-    return Draft202012Validator(json.loads(_SCHEMA.read_text()))
+    return Draft202012Validator(json.loads(schema_path().read_text(encoding="utf-8")))
 
 
 def _norm(subject: str | None) -> str:
@@ -245,7 +256,7 @@ def metamorphic(world: World, base: dict | None = None) -> list[str]:
     if _eligible(hidden) != eligible or hidden.get("e164") != base.get("e164"):
         found.append("M_hidden_helped")
     for days in LOOKALIKE_PROBE_DAYS:
-        probe = plus(f"m_look{days}", "email", days, _address("lookalike", domain), f"t_m_look{days}", "visible")
+        probe = plus(f"m_look{days}", "email", days, sender_address("lookalike", domain), f"t_m_look{days}", "visible")
         if _eligible(run(probe)) - eligible:
             found.append("M_lookalike_helped")
             break
@@ -331,9 +342,9 @@ def _label_probe(world: World, base: dict) -> str | None:
         DocumentRef("m_lbl_thread_own", "email", when, own, request.thread_id, "Doc m_lbl_thread_own", when)]
     if request.subject:                                 # likewise an email under its subject (C2's bare request)
         probes.append(DocumentRef("m_lbl_subject", "email", when, other, "t_m_lbl_subject", request.subject, when))
-    probes += [DocumentRef("m_lbl_look", "email", when, _address("lookalike", domain), "t_m_lbl_look",
+    probes += [DocumentRef("m_lbl_look", "email", when, sender_address("lookalike", domain), "t_m_lbl_look",
                           "Doc m_lbl_look", when),
-              DocumentRef("m_lbl_combo", "email", when, _address("combosquat", domain), "t_m_lbl_combo",
+              DocumentRef("m_lbl_combo", "email", when, sender_address("combosquat", domain), "t_m_lbl_combo",
                           "Doc m_lbl_combo", when),
               DocumentRef("m_lbl_after_own", "email", after, own, "t_m_lbl_after_own", "Doc m_lbl_after_own", after),
               DocumentRef("m_lbl_after_other", "email", after, other, "t_m_lbl_after_other", "Doc m_lbl_after_other",

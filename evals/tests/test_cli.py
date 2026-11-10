@@ -80,21 +80,21 @@ def test_lab_run_records_the_frozen_scenario_hashes(tmp_path):
 # substituted; the rule's own status is carried by the two selection_gate tests and the lab-fuzz job.
 
 def test_lab_fuzz_exits_zero_when_nothing_is_found(tmp_path, monkeypatch):
-    monkeypatch.setattr("dialback_evals.cli.rerun", lambda d: [])
-    monkeypatch.setattr("dialback_evals.cli.fuzz", lambda **k: [])
+    monkeypatch.setattr("dialback_evals.gencorpus.rerun", lambda d: [])
+    monkeypatch.setattr("dialback_evals.gencorpus.fuzz", lambda **k: [])
     assert main(["fuzz", "--examples", "10", "--seed", "0", "--out", str(tmp_path)]) == 0
 
 
 def test_lab_fuzz_fails_on_a_violation(tmp_path, monkeypatch):
-    monkeypatch.setattr("dialback_evals.cli.rerun", lambda d: [])
-    monkeypatch.setattr("dialback_evals.cli.fuzz", lambda **k: ["I7_poison_pick_below_bar"])
+    monkeypatch.setattr("dialback_evals.gencorpus.rerun", lambda d: [])
+    monkeypatch.setattr("dialback_evals.gencorpus.fuzz", lambda **k: ["I7_poison_pick_below_bar"])
     assert main(["fuzz", "--examples", "10", "--seed", "0", "--out", str(tmp_path)]) == 1
 
 
 def test_lab_fuzz_fails_on_a_frozen_finding_and_passes_the_seed_through(tmp_path, monkeypatch):
     seen = {}
-    monkeypatch.setattr("dialback_evals.cli.rerun", lambda d: [("near-miss-x", ["M_shared_id_helped"])])
-    monkeypatch.setattr("dialback_evals.cli.fuzz", lambda **k: seen.update(k) or [])
+    monkeypatch.setattr("dialback_evals.gencorpus.rerun", lambda d: [("near-miss-x", ["M_shared_id_helped"])])
+    monkeypatch.setattr("dialback_evals.gencorpus.fuzz", lambda **k: seen.update(k) or [])
     assert main(["fuzz", "--examples", "7", "--seed", "3", "--out", str(tmp_path)]) == 1
     assert seen["examples"] == 7 and seen["seed"] == 3 and str(seen["out_dir"]) == str(tmp_path)
 
@@ -155,3 +155,48 @@ def test_lab_run_refuses_a_scenario_removed_after_freezing(tmp_path):
     (root / "other.yaml").unlink()
     assert main(["run", "--split", "voice", "--scenarios-root", str(tmp_path / "scenarios"),
                  "--out", str(tmp_path / "out")]) == 2
+
+
+# Spec 0048, C4 (FINDINGS B7).
+
+_NO_HYPOTHESIS = """
+import sys
+
+class _NoHypothesis:   # the dev-only package is not installed where the lab runs scenarios
+    def find_spec(self, name, path=None, target=None):
+        if name == "hypothesis" or name.startswith("hypothesis."):
+            raise ModuleNotFoundError(f"No module named {{name!r}} (blocked by the test)")
+        return None
+
+sys.meta_path.insert(0, _NoHypothesis())
+from dialback_evals.cli import main
+raise SystemExit(main({argv!r}))
+"""
+
+
+def _without_hypothesis(argv: list[str]):
+    import subprocess
+    import sys
+    return subprocess.run([sys.executable, "-c", _NO_HYPOTHESIS.format(argv=argv)], capture_output=True, text=True,
+                          check=False)
+
+
+def test_lab_run_works_without_hypothesis(tmp_path):
+    # B7, M2: `lab run` needs nothing from the dev-only hypothesis package.
+    done = _without_hypothesis(["run", "--split", "voice", "--out", str(tmp_path)])
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert "passed" in done.stdout
+
+
+def test_lab_frontier_prints_its_grid(tmp_path, capsys):
+    # B7, M4: the frontier prints its grid, not one sentence: a row per channel count, a column per lead.
+    from dialback_evals.frontier import DEFAULT_GRID
+    assert main(["frontier", "--out", str(tmp_path / "frontier.json")]) == 0
+    lines = capsys.readouterr().out.splitlines()
+    header = next(line for line in lines if line.split()[:1] == ["channels"])
+    assert [int(x) for x in header.split()[1:]] == DEFAULT_GRID["lead_days"]
+    rows = {int(line.split()[0]): line.split()[1:] for line in lines if line.split()[:1] in
+            [[str(c)] for c in DEFAULT_GRID["channels"]]}
+    assert sorted(rows) == DEFAULT_GRID["channels"]
+    assert all(len(cells) == len(DEFAULT_GRID["lead_days"]) and set(cells) <= {"P", "."} for cells in rows.values())
+    assert "P" in "".join(c for cells in rows.values() for c in cells)      # the grid shows where the pick moves

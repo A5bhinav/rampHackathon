@@ -22,20 +22,13 @@ from pathlib import Path
 from dialback_decision import decide
 from dialback_voice.agent import ScriptedAgent
 
-from .frontier import (
-    frontier_table,
-    overblock_holds,
-    overblock_sweep,
-    overblock_table,
-    sweep,
-    threshold_holds,
-)
-from .gencorpus import fuzz, load_all, rerun
 from .oracle import required
 from .runner import build_facts, run_scenario
 from .scenario import Scenario, expected_hash, load_scenarios
 from .scorers import ScenarioResult, score, scorecard
-from .worldgen import DEFAULT
+
+# The fuzz lab's modules import the dev-only hypothesis package, so the commands that need them import
+# them when they run: `lab run` starts without it (spec 0048, C4; FINDINGS B7, M2).
 
 _REPO = Path(__file__).resolve().parents[3]   # evals/src/dialback_evals/cli.py -> the repo root
 
@@ -79,6 +72,7 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _fuzz(examples: int, seed: int, out_dir: Path) -> int:
+    from .gencorpus import fuzz, load_all, rerun
     before = {label for label, _ in load_all(out_dir)}
     failing = rerun(out_dir)
     for label, found in failing:
@@ -100,14 +94,20 @@ def _write(path: Path, body: dict) -> None:
 
 
 def _frontier(out: Path) -> int:
+    from .frontier import frontier_grid, frontier_table, sweep, threshold_holds
+    from .worldgen import DEFAULT
     cells = sweep()
     table = frontier_table(cells)
     _write(out, table)
+    print("lab frontier: is the poison number picked (P) or not (.), by counting channels and days of lead")
+    for line in frontier_grid(cells):
+        print(line)
     print(f"lab frontier: {table['min_effort']['summary']}")
     return 0 if threshold_holds(cells, DEFAULT) else 1
 
 
 def _overblock(out: Path) -> int:
+    from .frontier import overblock_holds, overblock_sweep, overblock_table
     cells = overblock_sweep()
     table = overblock_table(cells)
     _write(out, table)

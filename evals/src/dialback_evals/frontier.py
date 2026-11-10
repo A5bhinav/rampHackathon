@@ -66,6 +66,17 @@ def threshold_holds(cells: list[dict], settings: Settings) -> bool:
                    if c["channels"] < settings.min_source_types or c["lead_days"] < settings.min_age_days)
 
 
+def frontier_grid(cells: list[dict]) -> list[str]:
+    """The frontier as printed lines: a header of lead days, then a row per channel count, P where the
+    poison number is picked and . where it is not (FINDINGS B7, M4)."""
+    leads = sorted({c["lead_days"] for c in cells})
+    picked = {(c["channels"], c["lead_days"]): c["poison_picked"] for c in cells}
+    lines = ["channels " + "".join(f"{d:>6}" for d in leads)]
+    for ch in sorted({c["channels"] for c in cells}):
+        lines.append(f"{ch:>8} " + "".join(f"{'P' if picked[(ch, d)] else '.':>6}" for d in leads))
+    return lines
+
+
 def frontier_table(cells: list[dict]) -> dict:
     return {"real": {"e164": K01_REAL, "channels": ["email"], "seen_days": list(K01_EMAIL_DAYS)},
             "grid": {"channels": sorted({c["channels"] for c in cells}),

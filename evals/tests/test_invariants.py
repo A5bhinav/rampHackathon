@@ -467,3 +467,58 @@ def test_a_threadless_request_opens_no_thread_path(request_subject, monkeypatch)
     assert _context_blind(world)["e164"] == REAL
     monkeypatch.setattr("dialback_evals.invariants.run", _context_blind)
     assert metamorphic(world) == []
+
+
+# Spec 0048, C4 (FINDINGS B7, M7 and M13).
+
+def _near_pair(lead_a: int, lead_b: int):
+    """Two vendor numbers one digit apart, each in a contract and a listing, first seen at the given leads."""
+    return make_world(numbers=[NumberSpec(REAL, ["contract", "listing"], lead_a),
+                               NumberSpec("+14155550143", ["contract", "listing"], lead_b, near_miss_of=REAL)])
+
+
+def _flagged(world, rule=select) -> set[str]:
+    return {c["e164"] for c in rule(**world.kwargs)["candidates"] if "near_miss_of_older_number" in c["reasons"]}
+
+
+def test_near_miss_edges_at_365_days_and_a_same_time_tie():
+    from test_breaks_selection import B5, changed_rule
+    changes = {name: changed_rule(name, old, new) for name, old, new in B5}
+    from dialback_evals.invariants import _frame, _near_flagged
+
+    def oracle(world) -> set[str]:
+        f = _frame(world)
+        return {e for e in f.numbers if _near_flagged(f, e, world.settings)}
+
+    at_line, inside, tie = _near_pair(400, 365), _near_pair(400, 364), _near_pair(200, 200)
+    # Exactly 365 days is established: neither flags; a day younger, the younger one does.
+    assert _flagged(at_line) == oracle(at_line) == set()
+    assert _flagged(inside) == oracle(inside) == {"+14155550143"}
+    # First seen at the same time and younger than the line: each flags the other.
+    assert _flagged(tie) == oracle(tie) == {REAL, "+14155550143"}
+    # Each edge tells production from the rule changed at it.
+    assert _flagged(at_line, changes["established-line-strict"].select) == {"+14155550143"}
+    assert _flagged(tie, changes["same-time-near-misses-do-not-flag"].select) == set()
+
+
+def test_invariants_imports_no_private_worldgen_name():
+    import ast
+    from pathlib import Path
+
+    import dialback_evals.invariants as inv
+    tree = ast.parse(Path(inv.__file__).read_text(encoding="utf-8"))
+    private = [a.name for node in ast.walk(tree) if isinstance(node, ast.ImportFrom) and node.module == "worldgen"
+               for a in node.names if a.name.startswith("_")]
+    assert private == []
+
+
+def test_schema_is_found_from_the_package(tmp_path):
+    from pathlib import Path
+
+    from dialback_evals.invariants import schema_path
+    root = Path(__file__).resolve().parents[2]
+    assert schema_path() == root / "packages/contracts/schemas/selection.schema.json"
+    deeper = root / "evals" / "src" / "dialback_evals" / "a" / "b"             # how deep the package sits no longer matters
+    assert schema_path(deeper) == schema_path()
+    with pytest.raises(FileNotFoundError, match="selection.schema.json"):
+        schema_path(tmp_path)
