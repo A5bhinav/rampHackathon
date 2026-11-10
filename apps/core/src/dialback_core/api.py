@@ -294,6 +294,9 @@ async def get_case(case_id: UUID, request: Request, user: UserDep):
                  from app.bank_change_events ce join app.bank_accounts n on n.id = ce.new_account_id
                  left join app.bank_accounts o on o.id = ce.old_account_id where ce.id = %s""",
             (c["change_event_id"],))).fetchone()
+        email = await (await conn.execute(
+            "select sender, subject, received_at, red_flags from app.inbound_emails "
+            "where change_event_id = %s order by received_at desc, id desc limit 1", (c["change_event_id"],))).fetchone()
         hold = await (await conn.execute(
             "select status::text as status, ramp_ref, placed_at, confirmed_at, released_at, original_schedule, last_error "
             "from app.holds where case_id = %s order by (released_at is null) desc, created_at desc limit 1", (case_id,))).fetchone()
@@ -341,6 +344,8 @@ async def get_case(case_id: UUID, request: Request, user: UserDep):
             "new_account": {"routing_number": change["new_routing"], "last4": change["new_last4"]},
             "changed_by": person_json(change["changed_by"], names),
             "unknown_changer": c["has_unknown_changer"],
+            "email": None if email is None else {"sender": email["sender"], "subject": email["subject"],
+                                                 "received_at": ts(email["received_at"]), "red_flags": list(email["red_flags"])},
         },
         "hold": None if hold is None else {
             "status": hold["status"], "ramp_ref": hold["ramp_ref"], "placed_at": ts(hold["placed_at"]),
@@ -496,6 +501,29 @@ async def vendor_accounts(dataset_id: UUID, request: Request, user: UserDep):
                          "account": {"routing_number": r["routing_number"], "last4": r["account_last4"]} if r["routing_number"] else None,
                          "open_case_id": str(r["open_case_id"]) if r["open_case_id"] else None} for r in rows],
             "can_change": ramp_user is not None, "reason": reason}
+
+
+MAIL_LIMIT = 200
+
+
+@router.get("/datasets/{dataset_id}/mail")
+async def list_mail(dataset_id: UUID, request: Request, user: UserDep):
+    """What the email door did with each inbound email, newest first (spec 0089). The table holds
+    no body and no full account number, and none is selected."""
+    async with person_tx(request.app.state.pool, user.user_id, user.claims) as conn:
+        if await (await conn.execute("select 1 from app.datasets where id = %s", (dataset_id,))).fetchone() is None:
+            return problem(404, "not_found", "No such dataset.")
+        rows = await (await conn.execute(
+            "select m.id, m.received_at, m.sender, m.subject, m.flagged, m.outcome, m.reply, m.red_flags, m.case_id, "
+            "       m.routing_number, m.last4, v.id as vendor_id, v.legal_name "
+            "from app.inbound_emails m left join app.vendors v on v.id = m.vendor_id "
+            "where m.dataset_id = %s order by m.received_at desc, m.id desc limit %s", (dataset_id, MAIL_LIMIT))).fetchall()
+    return {"items": [{
+        "id": r["id"], "received_at": ts(r["received_at"]), "sender": r["sender"], "subject": r["subject"],
+        "flagged": r["flagged"], "outcome": r["outcome"], "reply": r["reply"], "red_flags": list(r["red_flags"]),
+        "vendor": None if r["vendor_id"] is None else {"id": str(r["vendor_id"]), "legal_name": r["legal_name"]},
+        "case_id": str(r["case_id"]) if r["case_id"] else None, "routing_number": r["routing_number"], "last4": r["last4"],
+    } for r in rows]}
 
 
 @router.post("/datasets/{dataset_id}/vendors/{vendor_id}/bank-change")
