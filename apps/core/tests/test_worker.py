@@ -7,6 +7,7 @@ import datetime as dt
 import uuid
 from zoneinfo import ZoneInfo
 
+import psycopg
 import pytest
 from conftest import core_settings, make_world
 from contract import CONTRACTS
@@ -255,6 +256,66 @@ async def test_without_the_ledger_rule_no_number_is_provable_and_a_person_takes_
     assert case["state"] == "needs_review" and world.voice.placed == []
     alert = await one(world.pool, "select kind from app.alerts where case_id = %s", case["id"])
     assert alert["kind"] == "no_provable_number"
+
+
+def _page(*lines: str) -> list[dict]:
+    return [{"width": 612, "height": 792, "spans": [{"text": t, "x": 72, "y": 72 + 14 * i, "size": 10, "color": "#000000"}
+                                                     for i, t in enumerate(lines)]}]
+
+
+def _source(doc_id: str, channel: str, received: dt.datetime, *lines: str, **custody) -> dict:
+    """A source document in the corpus's shape, for the ledger's ingest_all."""
+    return {"id": doc_id, "kind": channel, "claimed_date": None, "header_date": None, "scan": False, "pages": _page(*lines),
+            "custody": {"channel": channel, "parent_document_id": None, "received_at": received.isoformat(),
+                        "sender": custody.get("sender"), "subject": custody.get("subject"), "thread_id": custody.get("thread")}}
+
+
+async def test_withheld_selection_goes_to_review(world, database_url, monkeypatch):
+    # Spec 0079, decision 5: the core needs no change for withheld. The real ledger rule runs on
+    # FINDINGS A1 (the change request's own text calls the vendor's line a bank's; a planted number
+    # is provable), withholds, and the core treats the selection like no_provable_number: no call,
+    # its reason, and a person reviews.
+    from dialback_ledger.ingest import ingest_all
+    from dialback_ledger.select import WITHHELD
+    from dialback_ledger.store import add_vendor_domain, mark_change_request, write_ingest
+    monkeypatch.delenv("DIALBACK_READER", raising=False)
+    monkeypatch.delenv("DIALBACK_CONTEXT_GUARD", raising=False)
+    monkeypatch.setenv("DATABASE_URL", database_url)             # select_number opens its own connection
+    await import_all(world.pool, world.ramp, world.keys, world.dataset.id)
+    vendor = (await one(world.pool, "select id from app.vendors where dataset_id = %s and ramp_vendor_id = %s",
+                        world.dataset.id, world.refs["acme"]))["id"]
+    now = dt.datetime.now(dt.UTC)
+
+    def ago(days: int) -> dt.datetime:
+        return now - dt.timedelta(days=days)
+
+    sources = [
+        _source("real-contract", "contract", ago(200), "Master supply agreement: Acme", "Accounts receivable: (415) 555-0142"),
+        _source("real-listing", "listing", ago(200), "Acme Fasteners", "Accounts receivable: (415) 555-0142"),
+        _source("planted-contract", "contract", ago(150), "Supply agreement: Acme", "Accounts receivable: (645) 555-0177"),
+        _source("planted-listing", "listing", ago(150), "Acme Fasteners, west office", "Accounts receivable: (645) 555-0177"),
+        _source("request", "email", now - dt.timedelta(hours=1), "Please update our bank details for future payments.",
+                "Bank verification line: (415) 555-0142", sender="ar@acme.example", thread="thr-request",
+                subject="Updated banking details")]
+    async with await psycopg.AsyncConnection.connect(database_url) as conn, conn.transaction():
+        await write_ingest(conn, dataset_id=world.dataset.id, vendor_id=vendor,
+                           result=ingest_all(sources, extractor_version="test"))
+        await add_vendor_domain(conn, dataset_id=world.dataset.id, vendor_id=vendor, domain="acme.example")
+        await mark_change_request(conn, dataset_id=world.dataset.id, vendor_id=vendor, document_id="request")
+    world.worker.resolver = LedgerResolver(ResolverMode.LEDGER)  # the real resolver and the real rule
+    await change_and_detect(world)
+
+    case = await case_of(world)
+    assert case["state"] == "needs_review" and world.voice.placed == [], "nobody is called"
+    alert = await one(world.pool, "select kind from app.alerts where case_id = %s", case["id"])
+    assert alert["kind"] == "no_provable_number"
+    event = await one(world.pool, "select body_jcs::jsonb -> 'body' as body from audit.evidence_events "
+                                  "where case_id = %s and type = 'no_provable_number'", case["id"])
+    assert event["body"]["reason"] == WITHHELD
+    stored = await one(world.pool, "select outcome::text as outcome, contact_point_id, rule_version from ledger.number_selections "
+                                   "where id = %s", event["body"]["number_selection_id"])
+    assert stored["outcome"] == "withheld" and stored["contact_point_id"] is None
+    assert event["body"]["rule_version"] == stored["rule_version"]
 
 
 async def test_a_pre_dial_refusal_sends_the_case_to_a_person(world):
