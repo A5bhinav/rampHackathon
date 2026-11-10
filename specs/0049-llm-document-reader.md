@@ -1,9 +1,9 @@
 # 0049: The LLM document reader (`DIALBACK_READER=llm`)
 
-**Owner:** Inesh (drafted from Sami's session, for Inesh's review)  **Partner:** Abhi  **Slice:** evidence  **Target day:** not set (Q123; code freeze was Nov 8, the live final is Nov 19)
+**Owner:** Sami (the code is in `packages/ledger`)  **Slice:** evidence  **Target day:** not set (Q123; code freeze was Nov 8, the live final is Nov 19)
 
-**Status:** approved by Sami on Nov 10, with the defaults below standing until Inesh reviews. It is
-built on its own branch, and no PR opens until Inesh has reviewed it.
+**Status:** approved by Sami on Nov 10, with the defaults below. It is built on its own branch, and
+no PR opens without Sami's OK. No review by another teammate is needed (Sami, Nov 10).
 
 ## Goal
 
@@ -253,17 +253,17 @@ scored run:
 
 ## Open questions
 
-Sami approved the spec on Nov 10. The defaults for Inesh's questions stand until he reviews it, and
-each is easy to change then.
+Sami approved the spec on Nov 10, with these defaults as the decisions. No review by another
+teammate is needed.
 
-- **Q107 (Inesh), default:** the official `anthropic` SDK (typed errors, retries, structured
+- **Q107, decided:** the official `anthropic` SDK (typed errors, retries, structured
   outputs), not raw `httpx` as the voice service uses.
-- **Q108 (Inesh), default:** visible text only (spec 0022's rule). The alternatives are adding the
+- **Q108, decided:** visible text only (spec 0022's rule). The alternatives are adding the
   vendor's legal name or the document's author. Either would let the model place "us" and tell the
   vendor from the customer, but it widens what the quarantined model sees.
 - **Q109, resolved (Sami, Nov 10):** documents come from the corpus, the demo seed and spec 0052's
   generator. A person checks every held-out label and a sample of the rest.
-- **Q110 (Inesh), default:** replace long digit runs before the call. The cost is that a quote
+- **Q110, decided:** replace long digit runs before the call. The cost is that a quote
   including one is dropped.
 - **Q111, resolved by the review:** a failed document stops the demo and is never stored
   (decisions 3 and 4).
