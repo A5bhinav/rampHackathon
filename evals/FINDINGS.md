@@ -620,6 +620,33 @@ F1 to F9 hold as built (verified). But the lab still claims more than it shows:
   (`sami/guided-search`, approved Nov 9) is a guided search on `select()` with no model: it scores each
   world by how much a must-not-help attacker move helped, steers toward higher scores, and fixes
   the measurement that decides whether the steering stays. The model-driven targets below remain.
+- **Spec 0046 code review (fresh session, Nov 10; exploratory, dev seeds 0 to 9 only).** The code
+  matches the spec where it counts: "found", the sign test, the guard and kill rule, pinned draws
+  across processes, and the probe refactor (labels and call counts identical on 300 worlds). But:
+  - **Critical, the design:** the pass bar can almost never be met.
+    - Archive found all 6 `helps` breaks on 9 of 10 dev seeds. H01/H02, H03/H04 and H05/H06 fall on
+      the same worlds, so there are really 3 independent breaks.
+    - D01 and D03 can never be found, which leaves the guard resting on D06 alone. Guided already
+      lost D06 at seed 0.
+    - A held-out run could barely come out the other way.
+  - **Important:**
+    - The spec's "every arm sees the same first 200 worlds" is false. Hypothesis keeps a mutation
+      only if no `target()` score drops, so steering starts around world 15.
+    - The budget is test cases, not distinct worlds: 781 to 850 per arm, and guided always gets 2
+      to 5% fewer than archive. The cap at `guided.py:203` is dead code.
+    - `guided-new`'s moves are read from the working tree's frozen corpus, which nothing pins.
+    - A held-out run records no HEAD sha or Hypothesis version, and doesn't refuse uncommitted edits
+      outside `breaks.json`.
+    - `test_bench_runs_the_pinned_rule` can't fail: the installed `select.py` equals the pinned
+      one, so a bench that runs the working tree passes all 7 bench tests.
+    - `gain_new` is 0 on every world of the pinned rule, so `guided-new` is archive with a
+      reshuffled random stream.
+  - **Minor:**
+    - `--held-out` accepts any seeds and overwrites its output.
+    - "Already frozen" uses recorded labels, not the labels the frozen cases fail today.
+    - The gain share is computed on whatever seeds run.
+    - Default `lab fuzz` draws stay put only because no new int literal between 100 and 800 exists.
+  - Scratch files are under `.../c52163f2-.../scratchpad/rv/`.
 - **Spec 0052 (`sami/docgen-spec`, approved Nov 10):** generated documents with a known claim and
   owner for every number, run through real ingestion and `select()`. This is the first piece named
   below, and it runs on the stub before any LLM reader exists.
