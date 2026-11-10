@@ -378,6 +378,15 @@ These are not reachable today, but each is frozen as a regression.
     older ones to a person;
   - refuse the case whenever the top number drops out and a backup would take over.
 
+### A23. The guard's new-number check misses a plain agreement
+
+- **Status:** reported by the spec 0048 build (Nov 10); latent.
+- **What happens:** with the product unbroken, an agent line "Sure, I'll use the number you gave me."
+  passes the speech guard and every product gate, because the new-number pattern doesn't cover that
+  phrasing.
+- **Why it's latent:** production agents never speak; code owns every spoken line. Spec 0048's
+  `agent_said_text` gate now fails any call where an agent says anything.
+
 ## B. The fuzz lab (spec 0033)
 
 ### B1. I12 never probes the change-request email itself
@@ -513,6 +522,19 @@ These are not reachable today, but each is frozen as a regression.
 - **What happens:** B7's M9 says the "at least half the worlds hold an eligible number" floor
   counts the planted real number. Without it, the floor is 27% against its 50% bar, and it was
   19% before 0048's generator changes. The fix is held back for Sami's call.
+- **Tried (Nov 10), keeping the 50% bar:** 16 generator variants, changing only how the planted
+  provable number is planted and drawn. The unchanged generator reads 27.2%. Only 3 variants reach
+  50% (50.2% to 56.0%), and each needs a planted number in every world, a third channel and an
+  older plant. That drops the third of worlds that test A1's fail-safe path, needs an attacker
+  stronger than K01's two-channel shape, and breaks a B5 catch ("ranking reads change-context
+  roles" falls from 14 worlds to 0 at seed 0). Nothing was committed; the decision is Sami's.
+
+### B12. The label-on-pick coverage floor swings by seed
+
+- **Status:** measured by the spec 0048 build (Nov 10).
+- **What happens:** on fresh 600-world samples, the unchanged generator's label-on-pick share reads
+  8.5%, 1.2% and 6.2% at seeds 1 to 3, against a 5% bar. It reads 6.5% on the test's fixed sample.
+- **So:** a floor checked at one seed is weaker evidence than its sample size suggests.
 
 ## C. The voice lab (spec 0017)
 
