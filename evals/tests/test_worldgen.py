@@ -26,7 +26,10 @@ REASONS = {"first_seen_in_change_context", "too_few_source_types", "younger_than
            "near_miss_of_older_number", "hidden_text_only", "not_vendor_party", "fax_line"}
 KNOBS = {"no_request", "late", "shared_id", "reply_subject", "subdomain", "lookalike", "near_miss_pair",
          "mixed_visibility", "mixed_party", "mixed_timing", "non_default_settings", "twin_first",
-         "request_label", "follow_up", "early_cutoff"}
+         "request_label", "follow_up", "early_cutoff",
+         # spec 0048, C2: the boundaries B5 found unreached
+         "no_thread", "bare_request", "late_sighting", "upper_fax", "same_time_near_miss", "age_at_min_age",
+         "age_at_established", "age_at_subject_window", "context_role_claim"}
 
 
 def test_generated_world_runs_and_validates():

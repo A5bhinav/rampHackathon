@@ -442,3 +442,28 @@ def test_fail_closed_trims_backups_and_a_version_that_does_not_is_caught(monkeyp
         return select(**w.kwargs) if o.get("e164") else o           # keeps today's shifted backups
     monkeypatch.setattr("dialback_evals.invariants.run", never_trims)
     assert _label_hits(world) == [CONTEXT_LABEL]
+
+
+# Spec 0048, C2: a request without a thread (or without a thread and a subject) opens no thread or subject
+# path. Probes that would sit on those paths are not built, so a document the rule reads as outside the
+# change context is never treated as inside it. Found when the knob first ran: an earlier lookalike email
+# whose first-sorting twin hides it pulls only the oracle's conservative cutoff back, so a thread-less
+# "thread reply" at the request's time looked in context to the oracle and not to the rule, and the
+# context-blind fix was flagged for I12.
+
+def _threadless(request_subject: bool):
+    numbers = [NumberSpec("+12015550100", [], 0, sightings=(
+                   SightingSpec("email", 0, role="main"),
+                   SightingSpec("email", 1, role="main", sender="lookalike", shared_id=True, twin_first=True))),
+               NumberSpec(REAL, ["contract", "listing"], 500),
+               NumberSpec(X, ["contract", "listing"], 90, is_poison=True)]
+    return make_world(numbers=numbers, request_thread=False, request_subject=request_subject)
+
+
+@pytest.mark.parametrize("request_subject", [True, False], ids=["no-thread", "bare"])
+def test_a_threadless_request_opens_no_thread_path(request_subject, monkeypatch):
+    world = _threadless(request_subject)
+    assert world.kwargs["request"].thread_id is None
+    assert _context_blind(world)["e164"] == REAL
+    monkeypatch.setattr("dialback_evals.invariants.run", _context_blind)
+    assert metamorphic(world) == []

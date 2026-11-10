@@ -230,10 +230,14 @@ def metamorphic(world: World, base: dict | None = None) -> list[str]:
         seen = Sighting(target, doc_id, channel, when, visibility, "ar", "vendor", when)
         return _with(world, documents=[*kw["documents"], doc], sightings=[*kw["sightings"], seen])
 
-    if _eligible(run(plus("m_ctx", "contract", 1, f"ar@{domain}", thread, "visible"))) - eligible:
+    # These two probes put their document in the request's thread. A request with no thread opens no
+    # thread path (spec 0048, C2), so there they do not apply: their document would sit outside the
+    # rule's change context, where a clean contract sighting may rightly help.
+    threaded = thread is not None
+    if threaded and _eligible(run(plus("m_ctx", "contract", 1, f"ar@{domain}", thread, "visible"))) - eligible:
         found.append("M_incontext_helped")
     rows = [r for r in kw["sightings"] if r.e164 == target]
-    if rows and kw["request"] is not None:             # R2: a sighting in context older than all others blocks it
+    if threaded and rows and kw["request"] is not None:   # R2: a sighting in context older than all others blocks it
         days = (t_req - min(r.received_at for r in rows)).days + 1
         if target in _eligible(run(plus("m_first", "contract", days, f"ar@{domain}", thread, "visible"))):
             found.append("M_first_seen_ignored")
@@ -320,10 +324,14 @@ def _label_probe(world: World, base: dict) -> str | None:
     paths: list[tuple[str, list[DocumentRef], dt.datetime]] = []
     if request.document_id in f.docs:
         paths.append((request.document_id, kw["documents"], when))
-    probes = [DocumentRef("m_lbl_thread", "email", when, other, request.thread_id, "Doc m_lbl_thread", when),
-              DocumentRef("m_lbl_thread_own", "email", when, own, request.thread_id, "Doc m_lbl_thread_own", when),
-              DocumentRef("m_lbl_subject", "email", when, other, "t_m_lbl_subject", request.subject, when),
-              DocumentRef("m_lbl_look", "email", when, _address("lookalike", domain), "t_m_lbl_look",
+    # A reply in the request's thread exists only when the request has a thread (spec 0048, C2); without
+    # one these two documents would sit outside the rule's change context, so they are not built.
+    probes = [] if request.thread_id is None else [
+        DocumentRef("m_lbl_thread", "email", when, other, request.thread_id, "Doc m_lbl_thread", when),
+        DocumentRef("m_lbl_thread_own", "email", when, own, request.thread_id, "Doc m_lbl_thread_own", when)]
+    if request.subject:                                 # likewise an email under its subject (C2's bare request)
+        probes.append(DocumentRef("m_lbl_subject", "email", when, other, "t_m_lbl_subject", request.subject, when))
+    probes += [DocumentRef("m_lbl_look", "email", when, _address("lookalike", domain), "t_m_lbl_look",
                           "Doc m_lbl_look", when),
               DocumentRef("m_lbl_combo", "email", when, _address("combosquat", domain), "t_m_lbl_combo",
                           "Doc m_lbl_combo", when),
