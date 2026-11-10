@@ -185,15 +185,15 @@ None.
 
 ## Open questions
 
-These are my calls; Sami can overrule them.
+None open. Sami approved the spec and every call in it as written on Nov 10:
 
-- **Q119.** The phrase and placement lists start from the corpus's labels and spec 0049's hard
-  cases. Inesh reviews them, since a list's gaps are this suite's blind spots.
-- **Q120.** The stub is gated by known failures keyed by pattern (decision 6), extending Sami's
-  Q101 decision from cases to patterns.
-- **Q121.** The generator lives in `evals`, not in `corpus/generator`. The corpus is Inesh's frozen
-  truth, and this is the lab's search.
-- **Q122.** This builds on spec 0048's known-failures list (D3). So it starts from
+- **Q119, resolved:** the phrase and placement lists start from the corpus's labels and spec 0049's
+  hard cases. Inesh reviews them, since a list's gaps are this suite's blind spots.
+- **Q120, resolved:** the stub is gated by known failures keyed by pattern (decision 6), extending
+  Sami's Q101 decision from cases to patterns.
+- **Q121, resolved:** the generator lives in `evals`, not in `corpus/generator`. The corpus is
+  Inesh's frozen truth, and this is the lab's search.
+- **Q122, resolved:** this builds on spec 0048's known-failures list (D3). So it starts from
   `sami/lab-honest-impl` once D3 is pushed. It doesn't need spec 0046.
 
 ## Commands
