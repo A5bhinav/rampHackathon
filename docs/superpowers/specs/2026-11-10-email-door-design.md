@@ -24,10 +24,12 @@ The difference from the clerk path (spec 0077) is where the requested account go
 ## What the demo shows
 
 A judge (or a teammate) sends a fraud-style email from their own phone to a real address: "This is
-Acme Supplies. We moved banks. New routing 026009593, account 000123454821. Call Dana at
-555-0199 with questions." On the dashboard, a case opens for Acme "via email" and payments to Acme
-go on hold. The lineage panel shows that 555-0199 was rejected because it first appeared in the
-change request. The agent calls the number Dialback can prove belongs to Acme, a teammate playing
+Acme Fasteners. We moved banks. New routing 026009593, account 000123454821. Call Dana at
+212-555-0199 with questions." On the dashboard, a case opens for Acme "via email" and payments to
+Acme go on hold. The lineage panel shows that 212-555-0199 was rejected because it first appeared
+in the change request. (The judge's card should spell out the vendor's name and a phone number
+with its area code: "Acme" alone matches no vendor, and the ledger's phone finder needs the area
+code.) The agent calls the number Dialback can prove belongs to Acme, a teammate playing
 Acme says they never asked for a change, and code decides Not verified. The judge gets one fixed
 reply: bank changes are not accepted by email, please use the portal.
 
@@ -101,7 +103,11 @@ includes inbound email (100 emails a day) at a Resend-managed address, `<anythin
 with no domain needed. Sending the reply to an outside address needs a domain the team owns and has
 verified in Resend, which also gives a nicer address (for example `ap@in.<domain>`).
 
-- New flag `DIALBACK_EMAIL`: `off` (safe default) or `resend`. Any other value means `off`.
+- New flag `DIALBACK_EMAIL`: `off` (safe default) or `resend`. Any other value means `off`. This is
+  the master switch.
+- **A per-dataset switch in the database** decides whether the door acts on mail for a demo
+  dataset. It is set by `dialback-core demo prepare`, not by a Railway variable, because changing a
+  Railway variable redeploys the service. Off means: store, list, do nothing else.
 - Secrets in Railway: the Resend API key and the webhook signing secret.
 - Settings: the inbox address, the portal link for the reply, and the reply's from address.
 - Mail goes to the current demo dataset (the one demo dataset that isn't retired). With no current
@@ -125,10 +131,18 @@ An email is **flagged** when its subject or body asks to change where payments g
 (change, update, new, switch, replace, moved) near a payment word (bank, account, routing, ACH,
 wire, remittance, payment details). The exact rule is the builder's, written as code with tests.
 
-Pass bar, set before any tuning: write a labeled set of test emails first (fraud-style change
-requests and ordinary AP mail such as invoices, receipts and payment questions). Split it, tune only
-on one half, and report the other half at the end. On the held-out half: every change request
-flagged, and no more than 1 in 20 ordinary emails flagged. Report every rule version tried.
+Pass bar, set before any tuning:
+
+- **Who writes the test emails.** Not the rule's author. A fresh agent writes them from a brief that
+  lists categories (fraud-style change requests, invoices that list the account already on file,
+  receipts, payment questions, newsletters) and never sees the rule. The corpus's existing
+  change-request emails (Inesh's generator) are added to the set.
+- **Held out.** Split the set before the rule is written. Seal the held-out half by recording its
+  SHA-256 in the spec. Tune only on the other half.
+- **Bar on the held-out half,** at least 30 change requests and 60 ordinary emails: every change
+  request flagged, and at most 3 of the 60 ordinary emails flagged.
+- **Stop rule.** If the held-out bar fails after two rule revisions on the tuning half, stop and
+  report every version and its numbers to Sami before trying more. Never tune on the held-out half.
 
 Unflagged email gets no reply and opens nothing. It is still listed (goal 6) so the presenter can see
 that it arrived.
@@ -140,7 +154,13 @@ that it arrived.
 - **Phone numbers:** the ledger's existing `find_phones` does this when the email is filed.
 
 The full account number is turned into the fingerprint and last four right away and then dropped. It
-never leaves that function. (`packages/ledger/README.md` says candidates already finds routing and
+never leaves that function.
+
+**Redact before the ledger sees the text.** Every account-number match is replaced by a mask that
+keeps only the last four (`********4821`) before the email's text is handed to the ledger. This is
+required, not tidy-up: the stub reader stores a phone's whole line as its `quote`
+(`reader.py::StubReader`), so a line holding both a phone number and an account number would put the
+full number into `ledger.observations`. (`packages/ledger/README.md` says candidates already finds routing and
 account numbers, but on `main` `candidates.py` only finds phones, so this part is new.)
 
 ### 5. Matching a vendor
@@ -150,8 +170,12 @@ In order, within the demo dataset:
 1. The sender's domain is one of the vendor's known domains: match.
 2. The sender's domain is a lookalike of a vendor's domain (`packages/ledger/.../lookalike.py`):
    match, with the red flag "lookalike domain".
-3. The vendor's exact legal or trade name appears in the subject or body (case and accents folded,
-   whole words): match, with the red flag "sender is not on the vendor's domain". (Sami's decision 3.)
+3. The vendor's name appears in the subject or body: match, with the red flag "sender is not on the
+   vendor's domain". (Sami's decision 3.) Use the normalization the call already uses for "did the
+   person name this vendor" (`apps/core/src/dialback_core/company.py::words`: case, punctuation
+   and legal suffixes such as LLC and Inc dropped), and require every remaining word of the legal or
+   trade name, together and in order. "Acme Fasteners" matches "Acme Fasteners LLC"; "Acme" alone
+   does not. (The demo vendors have no trade names today; detection fills only `legal_name`.)
 4. No vendor, or more than one vendor at the same step: no match.
 
 ### 6. Enough information
@@ -188,9 +212,16 @@ selection with `cutoff = detected_at` (the worker uses `ramp_changed_at or detec
 Consequences, all through existing behavior:
 
 - The same email delivered twice gives the same `source_event_id`: one change, one case.
-- A second change email for the same vendor while the case is open joins that case (version + 1).
+- **A repeat request for the same account** (same fingerprint) while that vendor's case is
+  unfinished is recorded and listed, but writes no new change and bumps no version. Otherwise a
+  resend, or a second judge, would move a case from `calling` back to `held` and abandon the call in
+  progress.
+- A change email asking for a **different** account while the case is open joins that case
+  (version + 1), as any new change does.
 - If a clerk also types the change into Ramp (0077) while the case is open, Ramp detection joins the
   same case the same way.
+- 0077's "one bank change a minute per demo dataset" check counts `bank_change_events`, so an email
+  change also pauses the clerk portal for a minute. That is acceptable; the inbox list says so.
 
 ### 8. The reply
 
@@ -198,6 +229,12 @@ One fixed message for every flagged email, with or without a case: payment detai
 by email, please use the portal, plus the link. The wording is Sami's to approve.
 
 - Sent only to the `From` address, never `Reply-To`, threaded with `In-Reply-To`.
+- **Sent only when the `From` domain passed authentication** (DMARC, or SPF or DKIM aligned with
+  the `From` domain) according to the receiving server's `Authentication-Results`. A forged `From`
+  would otherwise aim our reply at an innocent third party. A failed check is also a red flag. The
+  builder first confirms that Resend's received-email headers include `Authentication-Results`. If
+  they don't, replies go out under the rate limits below and the email is listed as "reply sent
+  unauthenticated", and Sami is told.
 - Never sent when `Auto-Submitted` is anything but `no`, when `Precedence` is bulk, list or junk,
   when `List-Id` is present, or to the inbox's own address or a no-reply address.
 - At most one reply per sender address per 24 hours, and a global cap per hour.
@@ -213,7 +250,7 @@ by email, please use the portal, plus the link. The wording is Sami's to approve
   one vendor, no routing number, no account number, same as the account on file, failed). This is
   how the presenter sees why a judge's email did or didn't open a case.
 - **Red flags** in v1: lookalike domain; sender not on the vendor's domain; `Reply-To` differs from
-  `From`; a phone number in the email that isn't on file. They are shown and recorded, not given to
+  `From`; the `From` domain failed authentication; a phone number in the email that isn't on file. They are shown and recorded, not given to
   `decide()` (open question 2).
 
 ## How we'll know it works
@@ -246,6 +283,15 @@ Tests written before code, following the repo's spec loop:
 8. **Not storing the email body** in Dialback.
 9. This document lives in `docs/superpowers/specs/` because the repo's `specs/` are one screen each.
    The plan will split it into numbered specs.
+10. **Name matching** reuses `company.py`'s normalization, with the name's words together and in order.
+11. **Redaction** of account numbers before the ledger ingests the text.
+12. **A repeat request for the same account** doesn't bump the case version.
+13. **Replies only to authenticated senders,** if Resend exposes the results.
+14. **Test emails written by a fresh agent** that never sees the rule, with a sealed held-out half.
+15. **A per-dataset on/off switch** set by `demo prepare`.
+16. **Timeline.** Sami said the code freeze and dates are not a constraint for this work. If something
+    must be cut, cut the case-page additions first, then the inbox list. Never cut the redaction, the
+    ledger filing order, or the reply's suppression rules.
 
 ## Left to the builder
 
@@ -254,16 +300,41 @@ Tests written before code, following the repo's spec loop:
 - How the inbox list looks, within the existing dashboard style.
 - Whether the email door also writes a masked `bank_account` observation to the ledger.
 
+## Decisions pending (Sami)
+
+Raised by the builder check; each changes what gets built.
+
+A. **A way out of `blocked` for email cases** (open question 4). Either a new person action,
+   "dismiss: nothing changed in Ramp", that moves an email case from `blocked` to `releasing` (lifting
+   the hold so the real account is paid), allowed only while Ramp's current account is unchanged
+   and with two approvers. That is one more PR in Abhi's money-path SQL, a contract change, a
+   dashboard button and a state-machine redraw. Or accept the freeze and reset the demo between runs.
+B. **Demo staging.** Does the email beat run next to the clerk beat (0077) or replace it? Should
+   the door act only on the vendors named at `demo prepare` while the address is public on stage?
+   Two things depend on this. Both doors on one vendor collide, because there is one unfinished case
+   per vendor. And the email door ends Not verified with an unknown changer, so it can't show R5
+   refusing the changer's release; only the clerk beat can.
+C. **The domain** (open question 6). It is effectively required: the free `<id>.resend.app` address
+   is hard to type on a phone, and replies need a verified domain.
+D. **The portal link** (open question 1). The repo has no vendor-facing portal; 0077's page is a
+   signed-in clerk tool.
+
 ## Open questions (team)
 
 1. **Where does the portal link point?** Ramp's real vendor portal, or a page in the dashboard?
+   Pending Sami (D).
 2. **Should red flags feed `decide()`?** That changes decision logic (Abhi and Inesh's area).
 3. **The verified ending.** One option: a Ramp change whose routing number and last four match a
    request verified in the last N days skips the second call. Note that today the two fingerprints
    can't be compared: the email side uses the full number and the Ramp side uses routing, last four
    and Ramp's account ID (`detection.py::fingerprint`).
-4. **Freezing by email.** Anyone can pause a vendor's payments with a convincing email, and each new
-   one restarts verification. The existing deadline sends a stuck case to a person. Is that enough?
+4. **Freezing by email: a blocked case never lets go.** When an email case is decided Not verified it
+   goes to `blocked`, and the only way out of `blocked` is another `change_detected`
+   (`supabase/migrations/app/0003_case_transitions.sql`). The deadline doesn't help: it acts only in
+   held, calling, retry_wait and deciding (`worker.py::DEADLINE_ACTIVE`). In the clerk path that dead
+   end is defensible, because the fraudulent account sits in Ramp. In the email door Ramp never
+   changed, so catching a fraud freezes the real vendor's real account indefinitely, and any
+   convincing email can do it. **Pending Sami** (see "Decisions pending").
 5. **A heads-up to the vendor's contact on file** ("we received a request to change your bank
    details"), sent to the address Dialback already trusts, not the sender. Wanted in v1?
 6. **The domain:** who buys it, and what is it called?
