@@ -52,14 +52,15 @@ class ScriptedAgent:
         low = text.lower()
         phase = request.phase
         slot = PHASE_SLOT[phase]
-        if phase is Phase.CONSENT or phase is Phase.CHANGE:
-            value = read_yes_no(text, allow_unsure=phase is Phase.CHANGE)
-        elif phase is Phase.LAST4:
-            value = "refused" if _REFUSE.search(low) else "dont_know" if _DONT_KNOW.search(low) else "unclear"
-        else:
+        if phase is Phase.CONSENT or phase is Phase.CHANGE or phase is Phase.LAST4:
+            if phase is Phase.LAST4:
+                value = "refused" if _REFUSE.search(low) else "dont_know" if _DONT_KNOW.search(low) else "unclear"
+            else:
+                value = read_yes_no(text, allow_unsure=phase is Phase.CHANGE)
+            if value == "unclear":  # only a judgment question can be unclear, never the caller's words (R9)
+                return AgentReply(unclear=True)
+        else:  # free text: recorded as said, even "unclear"
             value = text.strip()
-        if value == "unclear":
-            return AgentReply(unclear=True)
         call = ToolCall(id=f"tc_{turn_id}", name="record_answer",
                         args={"slot": slot, "value": value, "turn_id": turn_id})
         return AgentReply(tool_calls=(call,))

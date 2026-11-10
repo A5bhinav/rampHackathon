@@ -78,21 +78,18 @@ class ClaudeAgent:
         except ValueError:
             return AgentReply()  # no caller turn to cite: an empty reply fails the call closed (R7)
         slot = PHASE_SLOT[request.phase]
-        value = self._value(request, text)
-        if value == UNCLEAR:
-            return AgentReply(unclear=True)
-        if value is None or not value_ok(slot, value):  # never emit a value step would reject
+        allowed = _ALLOWED.get(request.phase)
+        if allowed is not None:  # a judgment phase; the model never sees the caller's digits (D8)
+            value = self._judge(request.goal, allowed, redact_digits(text))
+            if value == UNCLEAR:  # only the model's answer can be unclear, never the caller's words (R9)
+                return AgentReply(unclear=True)
+        else:  # free-text phases: the caller's own words, recorded as said, even "unclear"
+            value = text.strip()[:200]
+        if not value or not value_ok(slot, value):  # never emit a value step would reject
             return AgentReply()
         call = ToolCall(id=f"tc_{turn_id}", name="record_answer",
                         args={"slot": slot, "value": value, "turn_id": turn_id})
         return AgentReply(tool_calls=(call,))
-
-    def _value(self, request: AgentRequest, text: str) -> str | None:
-        allowed = _ALLOWED.get(request.phase)
-        if allowed is not None:  # a judgment phase; the model never sees the caller's digits (D8)
-            return self._judge(request.goal, allowed, redact_digits(text))
-        said = text.strip()[:200]  # free-text phases: the caller's own words (company, department, name, role)
-        return said or None
 
     def _judge(self, goal: str, allowed: tuple[str, ...], text: str) -> str:
         try:
