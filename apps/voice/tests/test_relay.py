@@ -519,7 +519,7 @@ def test_quiet_clock_starts_at_the_estimate_counting_the_disclosure(make_ctx, cl
     events = _spy_on_events(monkeypatch)
     ctx = make_ctx()
     lead, per_second, margin = 0.1, 500.0, 0.1
-    r, ws = _quiet_relay(ctx, clock, [_good_setup(), {"pause": 3 * LONG}],
+    _, ws = _quiet_relay(ctx, clock, [_good_setup(), {"pause": 3 * LONG}],
                          estimate=_estimate(lead, per_second, margin))
     assert ws.sent[0]["token"] == ctx.script.consent_question()   # the disclosure was the welcome greeting
     spoken = len(ctx.script.disclosure()) + len(ctx.script.consent_question())
@@ -533,21 +533,21 @@ def test_quiet_clock_starts_when_the_agent_stops_speaking(make_ctx, clock, monke
     slow = _estimate(lead=1.5)                            # the estimate alone would start the clock much later
     # With an "on" then an "off" after the line was sent, the clock starts at the "off".
     events = _spy_on_events(monkeypatch)
-    r, ws = _quiet_relay(make_ctx(), clock, [_good_setup(), {"pause": 0.1}, on, {"pause": 0.2}, off,
+    _, ws = _quiet_relay(make_ctx(), clock, [_good_setup(), {"pause": 0.1}, on, {"pause": 0.2}, off,
                                              {"pause": 1.0}], estimate=slow)
     stopped = ws.delivered_at[2]
     silences = _silences(events)
     assert silences and _about(silences[0] - stopped, Q)
     # A lone "off", with no "on" since the line was sent, does not start it: the estimate does.
     events.clear()
-    r, ws = _quiet_relay(make_ctx(), clock, [_good_setup(), {"pause": 0.05}, off, {"pause": 3 * LONG}],
+    _, ws = _quiet_relay(make_ctx(), clock, [_good_setup(), {"pause": 0.05}, off, {"pause": 3 * LONG}],
                          estimate=_estimate(lead=0.6))
     silences = _silences(events)
     assert silences and _about(silences[0] - ws.sent_at[0], 0.6 + Q)
     # Nor does an "off" whose "on" came before the line was sent (one that piled up while the model
     # answered): the clock for the company question starts at its estimate.
     events.clear()
-    r, ws = _quiet_relay(make_ctx(), clock, [_good_setup(), on, *_say("Yes, that's fine."), off,
+    _, ws = _quiet_relay(make_ctx(), clock, [_good_setup(), on, *_say("Yes, that's fine."), off,
                                              {"pause": 3 * LONG}], estimate=_estimate(lead=0.6))
     company = [m["token"] for m in ws.sent].index(QUESTIONS[Phase.COMPANY].wording(make_ctx().script))
     silences = _silences(events)
@@ -594,7 +594,7 @@ def test_unknown_info_message_is_ignored(make_ctx, clock, monkeypatch):  # C6
     assert (r.result, r.end.reason) == ("failed", "silence")
     # ... and no malformed agentSpeaking starts it before the estimate.
     events.clear()
-    r, ws = _quiet_relay(make_ctx(), clock, [_good_setup(), _info("agentSpeaking", "on"), *junk,
+    _, ws = _quiet_relay(make_ctx(), clock, [_good_setup(), _info("agentSpeaking", "on"), *junk,
                                              {"pause": 3 * LONG}], estimate=_estimate(lead=0.6))
     silences = _silences(events)
     assert silences and _about(silences[0] - ws.sent_at[0], 0.6 + Q)

@@ -100,13 +100,16 @@ class SpeechEstimate:
         return self.lead + sum(len(line) for line in lines) / self.chars_per_second + self.margin
 
 
+SPEECH_ESTIMATE = SpeechEstimate()
+
+
 async def run_relay(ctx: policy.CallContext, agent: Agent, ws: WebSocketLike, *,
                     verify: Any, clock: Clock, greeting: str | None = None,
                     keypad_timeout: float = KEYPAD_TIMEOUT, quiet_seconds: float = QUIET_SECONDS,
                     quiet_seconds_last4: float = QUIET_SECONDS_LAST4,
                     after_check_in_seconds: float = AFTER_CHECK_IN_SECONDS,
                     after_check_in_seconds_last4: float = AFTER_CHECK_IN_SECONDS_LAST4,
-                    estimate: SpeechEstimate = SpeechEstimate(), max_steps: int = 500) -> CallResult:
+                    estimate: SpeechEstimate = SPEECH_ESTIMATE, max_steps: int = 500) -> CallResult:
     """Read the setup, verify it, then run step() to its End over the socket. Mirrors run_call.
 
     `greeting`, when set, is a line ConversationRelay has already spoken as the welcomeGreeting (the
