@@ -52,7 +52,7 @@ def _lab_commands() -> list[str]:
 def test_every_lab_command_is_documented():
     # Spec 0048, C4 (FINDINGS B7, M11): every lab command is in AGENTS.md's commands table and the evals README.
     commands = _lab_commands()
-    assert {"run", "fuzz"} <= set(commands)
+    assert {"run", "fuzz", "frontier", "overblock"} <= set(commands)
     agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
     table = agents[agents.index("## Commands"):agents.index("## Never")]
     readme = (ROOT / "evals" / "README.md").read_text(encoding="utf-8")
