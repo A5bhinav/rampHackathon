@@ -150,6 +150,9 @@ The keypad steps (`specs/0043-keypad-only-digits.md`):
 
 - **Type the four digits, then press `#`.** Only the keypad counts. Nothing goes in at the fourth
   key; if you forget `#`, the entry goes in 5 seconds after your last key.
+- **Press `#` before you hang up.** Four digits typed without `#` are lost if you hang up within 5
+  seconds: the call ends as dropped (failed), and the core calls again about 5 minutes later while
+  the case has attempts left.
 - **A slip? Press `*` and type all four again.** The agent says "Okay, let's start over." This
   costs nothing.
 - **Do not say the digits.** Spoken digits are never recorded. The agent asks once for the keypad
