@@ -107,6 +107,7 @@ falls back to the safe path.
 | `DIALBACK_READER` | `stub`, `llm` | `stub` |
 | `DIALBACK_RESOLVER` | `stub`, `ledger` | `stub` |
 | `DIALBACK_LAB_ATTACKER` | `scripted`, `llm` | `scripted` |
+| `DIALBACK_CONTEXT_GUARD` | `on`, `off` | `on` (spec 0079: `off` runs today's selection rule alone, for rollback only) |
 
 ## Key dates
 
