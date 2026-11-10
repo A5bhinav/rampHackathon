@@ -414,6 +414,28 @@ These are not reachable today, but each is frozen as a regression.
 - **What happens:** a name the policy can't read ("?") is recorded but not grounded, so NR14 fires.
   But grounded non-names such as "um", "J." or "Mr." count as a name, and the call verifies.
 
+### A25. Spec 0079's implementation: what its guard leaves open, and what it touches
+
+- **Status:** reported by the spec 0079 implementation session (Nov 10), on `sami/0079-guard`; its
+  measurement ran against a local Postgres 16, not CI. Not reproduced here, except the guard's
+  non-database tests (37 passed; the storage test needs a database).
+- **What the guard still leaves open:** in the over-block sweep, bank or fax labels outside the
+  change context (A4) and duplicate document ids (A5) still hand the call to a planted number,
+  under both rules.
+- **What it touches that the spec didn't plan for:**
+  - **The web's lineage table** shows a withheld case's would-be pick (in A1, the planted number)
+    as "alternate 0". A follow-up for the web.
+  - **The risk list:** "needs a person" isn't an allowed `VendorRisk.status`, and `risk.py` doesn't
+    read cases. So spec 0079's line about it needs a contract change it never declared. Left
+    unchanged.
+  - **The ledger's own property tests:** spec 0021's random worlds gave today's rule a pick in 0 of
+    3000 draws. So those properties almost never test a pick. The new prefix test uses its own
+    targeted generator.
+- **Coordination with the lab:** when spec 0079 merges, A1's four known-failure entries start
+  passing, so `lab-fuzz` turns red until they come off the list. The lab's schema check also needs
+  the `withheld` outcome, and its selection invariants need to learn it. Whichever of the two
+  lands second makes those changes.
+
 ## B. The fuzz lab (spec 0033)
 
 ### B1. I12 never probes the change-request email itself
