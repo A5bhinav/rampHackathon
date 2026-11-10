@@ -277,7 +277,7 @@ def test_labels_that_shrink_alike_share_a_case(tmp_path, monkeypatch):
     monkeypatch.setattr("dialback_evals.guided.evaluate", lambda w, **k: Evaluation(labels=["M_a", "M_b"]))
     result = archive_fuzz("archive", examples=1, seed=0, out_dir=tmp_path, near_misses=tmp_path / "nm.json",
                           strategy=st.just(world))
-    [(case, frozen)] = load_all(tmp_path)
+    [(case, _)] = load_all(tmp_path)
     assert result.frozen == {"M_a": case, "M_b": case}
     assert json.loads((tmp_path / case / "world.json").read_text(encoding="utf-8"))["labels"] == ["M_a", "M_b"]
 
