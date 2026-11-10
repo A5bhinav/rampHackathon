@@ -3,7 +3,7 @@ import { CardHead, PageHead } from "@/components/page";
 import type { Candidate, Selection, SelectionView } from "@/lib/api-types";
 import { CoreError, core } from "@/lib/core";
 import { when } from "@/lib/format";
-import { lanePoints, phone, seenBefore, sourceLabel, split, type LaneChart } from "@/lib/lineage";
+import { candidateBadge, lanePoints, noCallHead, phone, seenBefore, sourceLabel, split, type LaneChart } from "@/lib/lineage";
 
 // Number lineage (specs 0023, 0041; owner Inesh): the number this case will call, where it came
 // from, and every number the Trust Ledger refused, with the ledger's own sentence for each reason.
@@ -43,14 +43,11 @@ export default async function LineagePage({ params }: { params: Promise<{ datase
                 <tbody>
                   {s.candidates.map((c) => {
                     const isPick = c.contact_point_id === chosen;
+                    const badge = candidateBadge(s, c);   // an alternate only if the selection calls it (spec 0079)
                     return (
                       <tr key={c.contact_point_id} className={`candidate ${isPick ? "is-ok" : c.eligible ? "" : "is-bad"}`}>
                         <td className="mono candidate-number nowrap">{phone(c.e164)}</td>
-                        <td>
-                          {c.eligible
-                            ? <span className={`badge ${isPick ? "tone-ok" : "tone-info"}`}>{isPick ? "chosen" : `alternate ${(c.rank ?? 1) - 1}`}</span>
-                            : <span className="badge tone-bad">refused</span>}
-                        </td>
+                        <td><span className={`badge ${badge.tone}`}>{badge.word}</span></td>
                         <td className="candidate-sources"><Sources candidate={c} />{c.on_file ? <span className="badge tone-muted">on the old vendor master</span> : null}</td>
                         <td className="candidate-seen" title={when(c.first_seen_at)}>{seenBefore(c.first_seen_at, s.cutoff)}</td>
                         <td className="num">{c.observation_count ?? "—"}</td>
@@ -78,9 +75,10 @@ function Chosen({ view }: { view: SelectionView }) {
   const s = view.selection!;
   const { pick, alternates } = split(s);
   if (!pick) {
+    const head = noCallHead(s);   // withheld (spec 0079) or no provable number; the why is s.reason
     return (
       <section className="card" aria-labelledby="pick-h">
-        <CardHead marker="Chosen" title="No provable number" id="pick-h" meta={<span className="badge tone-bad">No provable number</span>} />
+        <CardHead marker="Chosen" title={head.title} id="pick-h" meta={<span className="badge tone-bad">{head.badge}</span>} />
         <div className="card-body">
           <p>{s.reason}</p>
           <p className="muted">{view.notes.no_provable_number}</p>
@@ -106,14 +104,15 @@ function Chosen({ view }: { view: SelectionView }) {
   );
 }
 
-const KIND_WORD = { pick: "chosen", alternate: "alternate", refused: "refused" } as const;
+const KIND_WORD = { pick: "chosen", alternate: "alternate", uncalled: "provable, not called", refused: "refused" } as const;
 
 /** First seen, by source: display only, one dot per number per source at its first sighting. */
 function LaneFigure({ chart, selection }: { chart: LaneChart; selection: Selection }) {
   const pick = chart.points.find((p) => p.kind === "pick");
   const n = (k: keyof typeof KIND_WORD) => new Set(chart.points.filter((p) => p.kind === k).map((p) => p.e164)).size;
   const label = `${pick ? `The chosen number ${phone(pick.e164)} was first seen in ${chart.points.filter((p) => p.kind === "pick").length} source lanes before the request. ` : "No number was chosen. "}`
-    + `${n("alternate")} alternate and ${n("refused")} refused numbers are also drawn, against the ${chart.minAge.days}-day minimum age and the request cutoff.`;
+    + `${n("alternate")} alternate, ${n("uncalled")} provable but not called, and ${n("refused")} refused numbers are also drawn, `
+    + `against the ${chart.minAge.days}-day minimum age and the request cutoff.`;
   return (
     <figure className="card lineage-chart" aria-labelledby="lanes-title">
       <div className="card-head">
@@ -122,6 +121,7 @@ function LaneFigure({ chart, selection }: { chart: LaneChart; selection: Selecti
         <ul className="legend card-meta" aria-label="Legend">
           <li><span className="dot-key is-pick" aria-hidden="true" />chosen</li>
           <li><span className="dot-key is-alternate" aria-hidden="true" />alternate</li>
+          {n("uncalled") ? <li><span className="dot-key is-uncalled" aria-hidden="true" />provable, not called</li> : null}
           <li><span className="dot-key is-refused" aria-hidden="true" />refused</li>
         </ul>
       </div>

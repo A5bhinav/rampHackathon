@@ -1,5 +1,5 @@
 import { Stats } from "./page";
-import { CHANNEL, CORPUS, REASON_SHORT, groups, numberVerdict, pickedPlanted, type CorpusCase } from "@/lib/corpus";
+import { CHANNEL, CORPUS, REASON_SHORT, groups, numberVerdict, pickedPlanted, ruleResult, type CorpusCase } from "@/lib/corpus";
 import { phone } from "@/lib/lineage";
 
 // The number-picking rule against the frozen corpus (specs 0038, 0063), shared by the public /corpus
@@ -62,7 +62,7 @@ function Case({ c }: { c: CorpusCase }) {
       <p className="muted sub">
         Change request &ldquo;{c.request.subject}&rdquo; · expected:{" "}
         {c.expected.pick ? <span className="mono">{phone(c.expected.pick)}</span> : "no number (a person reviews)"} · the rule:{" "}
-        {c.actual.pick ? <span className="mono">{phone(c.actual.pick)}</span> : "no provable number"}
+        {c.actual.pick ? <span className="mono">{phone(c.actual.pick)}</span> : ruleResult(c.actual)}
       </p>
       {planted && limit ? (
         <p className="result error">

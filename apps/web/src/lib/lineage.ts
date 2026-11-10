@@ -2,9 +2,13 @@
 // those come from the API's reason_text and the selection's own reason, written by the ledger.
 import type { Candidate, Selection } from "./api-types";
 
-export type Split = { pick: Candidate | null; alternates: Candidate[]; refused: Candidate[] };
+export type Split = { pick: Candidate | null; alternates: Candidate[]; uncalled: Candidate[]; refused: Candidate[] };
+export type Role = "pick" | "alternate" | "uncalled" | "refused";
 
-/** The pick, then its alternates in rank order, then every number the rule refused. */
+/** The pick, then its alternates, then the provable numbers nobody calls, then every number the rule
+ *  refused. A number is an alternate only if the selection names it as one: under spec 0079 a
+ *  withheld selection calls no one, and a picked one may call fewer backups than it ranks, so an
+ *  eligible number can be neither the pick nor an alternate ("uncalled"). */
 export function split(selection: Selection): Split {
   const ranked = selection.candidates.filter((c) => c.eligible).sort((a, b) => (a.rank ?? 0) - (b.rank ?? 0));
   const alternateIds = new Set((selection.alternates ?? []).map((a) => a.contact_point_id));
@@ -13,8 +17,36 @@ export function split(selection: Selection): Split {
   return {
     pick,
     alternates: ranked.filter((c) => alternateIds.has(c.contact_point_id)),
+    uncalled: ranked.filter((c) => c.contact_point_id !== pick?.contact_point_id && !alternateIds.has(c.contact_point_id)),
     refused: selection.candidates.filter((c) => !c.eligible),
   };
+}
+
+/** What a candidate is to this selection's call list. */
+export function roleOf(selection: Selection, candidate: Candidate): Role {
+  if (selection.outcome === "picked" && candidate.contact_point_id === selection.contact_point_id) return "pick";
+  if ((selection.alternates ?? []).some((a) => a.contact_point_id === candidate.contact_point_id)) return "alternate";
+  return candidate.eligible ? "uncalled" : "refused";
+}
+
+/** The lineage table's word and tone for a candidate: an alternate is numbered by its place in the
+ *  selection's own alternates, never by its rank. */
+export function candidateBadge(selection: Selection, candidate: Candidate): { word: string; tone: string } {
+  const role = roleOf(selection, candidate);
+  if (role === "pick") return { word: "chosen", tone: "tone-ok" };
+  if (role === "alternate") {
+    const n = (selection.alternates ?? []).findIndex((a) => a.contact_point_id === candidate.contact_point_id) + 1;
+    return { word: `alternate ${n}`, tone: "tone-info" };
+  }
+  return role === "uncalled" ? { word: "provable, not called", tone: "tone-warn" } : { word: "refused", tone: "tone-bad" };
+}
+
+/** The heading and badge when a selection calls no one: withheld (spec 0079) or no provable number.
+ *  The why is the selection's own reason, written by the ledger. */
+export function noCallHead(selection: Selection): { title: string; badge: string } {
+  return selection.outcome === "withheld"
+    ? { title: "Withheld for a person", badge: "Withheld" }
+    : { title: "No provable number", badge: "No provable number" };
 }
 
 /** +14155550142 -> (415) 555-0142; anything else as stored. */
@@ -49,7 +81,7 @@ export function sourceLabel(source: string): string {
 const LANE_ORDER: string[] = ["contract", "vendor_portal", "listing", "email", "paper_mail"];
 const LANE_NOTE: Record<string, string> = { email: "counts once", on_file: "never counts" };
 
-export type LanePoint = { lane: string; e164: string; kind: "pick" | "alternate" | "refused"; pct: number; at: string };
+export type LanePoint = { lane: string; e164: string; kind: Role; pct: number; at: string };
 export type LaneChart = {
   start: string; end: string;
   lanes: { key: string; label: string; note?: string }[];
@@ -63,7 +95,6 @@ const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 export function lanePoints(selection: Selection | null): LaneChart | null {
   if (!selection || selection.candidates.length === 0) return null;
-  const pickId = split(selection).pick?.contact_point_id;
   const cutoff = Date.parse(selection.cutoff);
   const seen = selection.candidates.map((c) => Date.parse(c.first_seen_at)).filter(Number.isFinite);
   const firstYear = new Date(Math.min(cutoff, ...seen)).getUTCFullYear();
@@ -79,7 +110,7 @@ export function lanePoints(selection: Selection | null): LaneChart | null {
   }));
 
   const points = selection.candidates.flatMap((c) => {
-    const kind: LanePoint["kind"] = c.contact_point_id === pickId ? "pick" : c.eligible ? "alternate" : "refused";
+    const kind = roleOf(selection, c);
     const at = pct(Date.parse(c.first_seen_at));
     return [...c.source_types, ...(c.on_file ? ["on_file"] : [])].map((lane) => ({ lane, e164: c.e164, kind, pct: at, at: c.first_seen_at }));
   });

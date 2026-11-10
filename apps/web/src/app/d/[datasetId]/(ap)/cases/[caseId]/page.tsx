@@ -12,7 +12,7 @@ import { CardHead, Callout, PageHead } from "@/components/page";
 import type { CaseDetail, Candidate, SelectionView } from "@/lib/api-types";
 import { CoreError, core } from "@/lib/core";
 import { brief, datasetNow, date, dueLabel, relative, when, words } from "@/lib/format";
-import { phone, seenBefore, sourceLabel, split } from "@/lib/lineage";
+import { noCallHead, phone, seenBefore, sourceLabel, split } from "@/lib/lineage";
 import { REFRESH_STATES, stations } from "@/lib/stations";
 import { canWatchCall } from "@/lib/live-call";
 import { stateLabel } from "@/lib/states";
@@ -238,7 +238,7 @@ function NumberCard({ view, path }: { view: SelectionView | null; path: string }
       <div className="card-body">
         {!s ? <p className="muted">{view.notes.no_selection}</p> : !pick ? (
           <>
-            <p><span className="badge tone-bad">No provable number</span></p>
+            <p><span className="badge tone-bad">{noCallHead(s).badge}</span></p>
             <p>{s.reason}</p>
             <p className="muted sub">{view.notes.no_provable_number}</p>
           </>
