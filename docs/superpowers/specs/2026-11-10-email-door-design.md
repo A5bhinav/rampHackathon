@@ -1,6 +1,6 @@
 # Email door: a bank-change email opens a Dialback case
 
-**Status:** draft for Sami's approval. **Date:** 2026-11-10. **Written by:** Sami with Claude.
+**Status:** approved by Sami on 2026-11-10. Plan: `docs/superpowers/plans/2026-11-10-email-door.md`. **Date:** 2026-11-10. **Written by:** Sami with Claude.
 **Builds on:** `docs/Dialback_System_Design.pdf` ("a change-request email forwarded to Dialback is
 the third way in"), the Trust Ledger (`packages/ledger/README.md`), detection
 (`apps/core/src/dialback_core/detection.py`) and spec 0077 (the clerk portal).
