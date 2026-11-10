@@ -44,3 +44,29 @@ class RampConnector:
             adapter = RampHttpAdapter(self._settings.ramp_base_url, token, self._http, self._limiter, sleep=self._sleep)
             self._adapters[dataset_id] = adapter
         return adapter
+
+    async def mock_bank_change(self, dataset_id: UUID, ramp_vendor_id: str, routing_number: str, account_number: str,
+                               actor_ramp_user_id: str) -> None:
+        """Demo only (spec 0077): a bank change made in the Ramp mock as a seeded Ramp user, the way a
+        clerk makes one in Ramp, then the mock's webhooks sent now. The account number goes to the mock
+        and nowhere else: nothing here logs it, and a refusal says only the status code."""
+        if self._settings.ramp_mode is not RampMode.MOCK:
+            raise MockRefused("not the Ramp mock")
+        headers = {"Authorization": f"Bearer {mock_token(self._settings.mock_ramp_secret or b'', dataset_id)}"}
+        base = self._settings.ramp_base_url
+        try:
+            made = await self._http.post(f"{base}/_mock/vendors/{ramp_vendor_id}/bank-change", headers=headers,
+                                         json={"routing_number": routing_number, "account_number": account_number,
+                                               "actor_user_id": actor_ramp_user_id})
+        except httpx.HTTPError as exc:
+            raise MockRefused(type(exc).__name__) from None  # never the request, which carries the number
+        if made.status_code != 200:
+            raise MockRefused(f"status {made.status_code}")
+        try:  # the change is made; if this fails the mock's sender (or the poller) delivers it soon
+            await self._http.post(f"{base}/_mock/webhooks/deliver", headers=headers)
+        except httpx.HTTPError:
+            pass
+
+
+class MockRefused(RuntimeError):
+    """The Ramp mock didn't take a demo bank change. The message never carries the account number."""
