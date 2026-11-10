@@ -284,7 +284,8 @@ def _step_to_change(ctx):
     at = dt.datetime(2026, 11, 1, 17, 0, tzinfo=dt.UTC)
     state = policy.step(policy.start(ctx), policy.Connected(at, "human")).state
     for said, slot in [("Yes, that's fine.", "recording_consent"), ("Acme Fasteners", "company_named"),
-                       ("Accounts payable", "department"), ("Jordan Lee", "speaker_name"), ("AP clerk", "speaker_role")]:
+                       ("Accounts payable", "department"), ("Jordan Lee", "speaker_name"),
+                       ("AP clerk", "speaker_role")]:
         state = policy.step(state, policy.CalleeSaid(at, said)).state
         turn = state.turns[-1].id
         value = "yes" if slot == "recording_consent" else said
