@@ -18,7 +18,19 @@ from dialback_core.ports import ChangeFacts, LedgerChangeContext, LedgerResolver
 from dialback_core.ramp import RampError
 from dialback_core.worker import Worker
 from dialback_decision import rules
-from flows import _types, answer, bills, case_of, change_and_detect, one, pay, release, report, transit
+from flows import (
+    _types,
+    add_vendor,
+    answer,
+    bills,
+    case_of,
+    change_and_detect,
+    one,
+    pay,
+    release,
+    report,
+    transit,
+)
 
 pytestmark = pytest.mark.anyio
 
@@ -61,6 +73,43 @@ async def test_a_bank_change_walks_all_the_way_to_release(world):
     types = [r["type"] for r in await _types(world, case["id"])]
     assert types == ["change_detected", "hold_confirmed", "number_resolved", "call_started", "call_ended",
                      "decision_made", "release_approved", "hold_release_confirmed"]
+
+
+@pytest.mark.parametrize("digits, last_four, outcome, state", [
+    ("6666", "match", "verified", "awaiting_release"),
+    ("1111", "mismatch", "not_verified", "blocked"),
+], ids=["new-account-digits", "other-digits"])
+async def test_a_first_account_case_walks_the_money_path(world, digits, last_four, outcome, state):
+    """Spec 0050: a vendor paid by check gets its first bank account. There is no previous account,
+    and the case takes the same path as any other."""
+    await add_vendor(world, "birch", "Birch Supply Co",
+                     bills=[{"ref": "birch-bill", "invoice_number": "B-1", "amount_cents": 50000, "payment_date": "2026-11-06"}])
+    await import_all(world.pool, world.ramp, world.keys, world.dataset.id)
+    await world.bank_change(vendor_ref="birch")
+    await world.deliver_webhooks()
+    await world.worker.drain(world.dataset.id)
+
+    case = await case_of(world)
+    assert case is not None, "a known vendor's first account opens a case"
+    assert case["state"] == "calling" and case["call_attempts"] == 1
+    [bill] = await world.ramp.list_bills_for_vendor(world.refs["birch"])
+    assert bill.is_on_hold and bill.payment_date is None, "the hold went on and cleared the date"
+    assert world.refs["birch-bill"] not in await pay(world, "2026-12-31"), "R1: nothing is paid while the case is open"
+    [placed] = world.voice.placed
+    assert placed["case_id"] == case["id"]
+
+    answers = transit(placed["call_id"], digits=digits, company="Birch Supply")
+    assert (await report(world, case["id"], placed["call_id"], answers=answers)).status_code == 204
+    await world.worker.drain(world.dataset.id)
+    case = await case_of(world)
+    assert (case["state"], case["outcome"]) == (state, outcome)
+    decision = await one(world.pool, "select last_four_result from app.decisions where case_id = %s", case["id"])
+    assert decision["last_four_result"] == last_four, "no old account, so the digits match the new one or nothing"
+
+    chain = await one(world.pool, "select * from audit.verify_chain(%s)", world.dataset.chain_id)
+    assert chain["ok"], chain["detail"]
+    assert [r["type"] for r in await _types(world, case["id"])] == [
+        "change_detected", "hold_confirmed", "number_resolved", "call_started", "call_ended", "decision_made"]
 
 
 async def test_a_hold_that_fails_once_is_retried(world):
