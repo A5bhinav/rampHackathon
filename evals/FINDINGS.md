@@ -592,7 +592,8 @@ F1 to F9 hold as built (verified). But the lab still claims more than it shows:
 ## E. Process and housekeeping
 
 - `.superpowers/` (the plan ledger and logs) is not git-ignored. Stage files by name.
-- The voice branch commits carry "Claude Opus 4.8" in their trailers.
+- The voice branch commits, and the planted-breaks commit on `sami/redteam-breaks` (7ef40df), carry
+  "Claude Opus 4.8" in their trailers. Left as is: the spec 0046 work builds on that commit.
 - Scratch worktrees exist under `/private/tmp/claude-501/...` (`fixtrial`, `voicereview`,
   `mainrun`). They are temporary, and the reproduction scripts in them may disappear.
 - The 44 Postgres-backed ledger tests can't run on this machine; CI's `py` job runs them.
