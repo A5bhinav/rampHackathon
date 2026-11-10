@@ -77,10 +77,11 @@ def test_generator_covers_every_reason_and_knob():
     # for the call to move to (>= 20%), and its removal half a context label on the pick (>= 5%); and the
     # safety invariants are trivially true in a world with nothing eligible, so at least half the worlds
     # must hold an eligible number (floors set Nov 8 before measuring; the old mix gave 3.7% and 1.2% on
-    # the two-provable floors). Spec 0048 C3 also leaves the planted real line out of that last floor (B7,
-    # M9); without it the floor reads 27%, so that change is held back for Sami (see the spec's report).
+    # the two-provable floors). The share of worlds with an eligible number other than the real line is
+    # reported next to that floor with no bar (spec 0048 C3; B7 M9, decided Nov 10).
     seen, n = coverage.measure(_coverage_sample(worlds()), REAL_LINE)
-    assert coverage.shortfalls(seen, n) == {}
+    assert coverage.shortfalls(seen, n) == {}, coverage.summary(seen, n)
+    assert set(coverage.summary(seen, n)) >= {"some_eligible", "eligible_other_than_real"}
 
 
 # Spec 0048, C3 (FINDINGS B6 and B7 M10).
@@ -99,6 +100,29 @@ def test_context_label_counts_only_on_the_pick():
         assert coverage.reference_provable(world)[0] == {REAL_LINE, OTHER}
     assert coverage.measure([on_other], REAL_LINE)[0]["context_label_on_provable"] == 0
     assert coverage.measure([on_pick], REAL_LINE)[0]["context_label_on_provable"] == 1
+
+
+def test_the_eligible_floor_counts_any_eligible_number_and_reports_the_rest():
+    # Spec 0048 C3 (Sami, Nov 10): the floor keeps its original count (any eligible number, the real line
+    # included, against 50%), and the share holding an eligible number other than the real line is reported
+    # next to it with no bar (B7, M9).
+    only_real = make_world(numbers=[NumberSpec(REAL_LINE, ["contract", "listing"], 500)])
+    with_other = make_world(numbers=[NumberSpec(REAL_LINE, ["contract", "listing"], 500),
+                                     NumberSpec(OTHER, ["contract", "listing"], 400)])
+    nothing = make_world(numbers=[NumberSpec(REAL_LINE, ["contract", "listing"], 10)])        # too young
+    assert run(only_real)["e164"] == REAL_LINE and run(nothing).get("e164") is None
+    seen, n = coverage.measure([only_real, with_other], REAL_LINE)
+    assert (seen["some_eligible"], seen["eligible_other_than_real"]) == (2, 1)
+    report = coverage.summary(seen, n)
+    assert report["some_eligible"] == 1.0 and report["eligible_other_than_real"] == 0.5   # both in the output
+    # Pass or fail depends only on the original count: no eligible number other than the real line at all
+    # still passes; nothing eligible at all fails.
+    only, m = coverage.measure([only_real, only_real], REAL_LINE)
+    assert coverage.summary(only, m)["eligible_other_than_real"] == 0.0
+    assert "some_eligible" not in coverage.shortfalls(only, m)
+    assert "eligible_other_than_real" not in coverage.shortfalls(only, m)
+    none, k = coverage.measure([nothing, nothing], REAL_LINE)
+    assert coverage.shortfalls(none, k)["some_eligible"] == 0.0
 
 
 def _first_cut():

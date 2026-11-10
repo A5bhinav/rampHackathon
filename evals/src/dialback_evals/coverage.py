@@ -1,13 +1,17 @@
 """Spec 0033's coverage floor for the world generator (spec 0048, C3).
 
 Over a fixed, seeded sample of worlds, every rejection reason must fire in at least 5% of worlds and
-every knob path appear in at least 3%; at least half the worlds must hold an eligible number (the real
-line every adversarial world plants still counts: B7's M9 is held back, see spec 0048's report); at least
-20% must hold two or more numbers the
+every knob path appear in at least 3%; at least half the worlds must hold an eligible number (any one,
+the real line every adversarial world plants included: the "never eligible" checks are trivially true only
+when a rule refuses everything); at least 20% must hold two or more numbers the
 oracle's reference finds nothing against (`two_provable`), and at least 5% must hold two such numbers with
 a change-context label on the one the call would go to (`context_label_on_provable`, B6), which I12's
 removal half needs. The two-provable floors read the oracle's reference frame, not the rule, so a fixed
 rule cannot move them.
+
+Reported next to the floors, with no bar (spec 0048 C3; B7 M9, decided by Sami on Nov 10): the share of
+worlds holding an eligible number other than the real line (`eligible_other_than_real`). Counted that way
+it read 27.2% on the fixed sample; reaching 50% needed generator changes that distorted the worlds.
 """
 from __future__ import annotations
 
@@ -63,8 +67,8 @@ def reference_pick(world, provable: set[str]) -> str | None:
 
 def measure(sample: Iterable, real_line: str) -> tuple[Counter, int]:
     """How often each reason, knob path and floor quantity shows up in `sample`, and the sample's size.
-    `real_line` is the established line every world of that generator plants, eligible by construction
-    (not yet left out of the eligible floor: B7's M9 is held back)."""
+    `real_line` is the established line every world of that generator plants, eligible by construction:
+    the floor counts it, and `eligible_other_than_real` (reported, no bar) leaves it out."""
     seen, n = Counter(), 0
     for world in sample:
         n += 1
@@ -72,10 +76,19 @@ def measure(sample: Iterable, real_line: str) -> tuple[Counter, int]:
         seen.update({r for c in out["candidates"] for r in c["reasons"]})
         seen.update(k for k, v in profile(world).items() if v)
         seen["some_eligible"] += any(c["eligible"] for c in out["candidates"])
+        seen["eligible_other_than_real"] += any(c["eligible"] and c["e164"] != real_line for c in out["candidates"])
         ok, labeled = reference_provable(world)
         seen["two_provable"] += len(ok) >= 2
         seen["context_label_on_provable"] += len(ok) >= 2 and reference_pick(world, ok) in labeled
     return seen, n
+
+
+REPORTED = ("eligible_other_than_real",)   # reported next to the floors, never a bar
+
+
+def summary(seen: Counter, n: int) -> dict[str, float]:
+    """The floors' rates and the reported numbers, for the coverage output."""
+    return {k: round(seen[k] / n, 3) for k in [*FLOORS, "some_eligible", *REPORTED]}
 
 
 def shortfalls(seen: Counter, n: int) -> dict[str, float]:
