@@ -101,9 +101,10 @@ export interface paths {
         };
         /**
          * The vendor risk list (spec 0026) - is each vendor's number on file one the Trust Ledger can prove?
-         * @description One row per vendor with ledger documents, worst first (near_miss, unproven, missing,
-         *     provable), then by name. The status is decided by code from `ledger-select-v1` as of now;
-         *     `status_text` is the ledger's sentence for it, so the dashboard writes none of its own.
+         * @description One row per vendor with ledger documents, worst first (needs_person, near_miss, unproven,
+         *     missing, provable), then by name. The status is decided by code from the selection rule
+         *     (`select()`, spec 0021 and spec 0079) run as of now; `status_text` is the ledger's sentence
+         *     for it, so the dashboard writes none of its own.
          */
         get: operations["getVendorRisk"];
         put?: never;
@@ -580,13 +581,13 @@ export interface components {
             vendor_id: components["schemas"]["Uuid"];
             legal_name: string;
             /**
-             * @description provable - the number on file meets the rule; near_miss - it is a near miss of a number the rule can prove; unproven - the rule can't prove it; missing - no number on file.
+             * @description needs_person - the rule withholds (spec 0079) because documents it treats as change context, such as a message from a lookalike domain, would change which number is called, so a person must verify; provable - the number on file meets the rule; near_miss - it is a near miss of a number the rule can prove; unproven - the rule can't prove it; missing - no number on file.
              * @enum {string}
              */
-            status: "near_miss" | "unproven" | "missing" | "provable";
+            status: "needs_person" | "near_miss" | "unproven" | "missing" | "provable";
             /** @description What the old vendor master says, in E.164, or null. */
             number_on_file: string | null;
-            /** @description The number ledger-select-v1 would pick today, in E.164, or null. */
+            /** @description The number the selection rule would call today, in E.164, or null when it would call no one (no provable number, or needs_person). */
             provable_number: string | null;
             /** @description The ledger's sentence for the status. */
             status_text: string;

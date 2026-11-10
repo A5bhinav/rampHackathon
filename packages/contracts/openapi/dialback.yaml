@@ -125,9 +125,10 @@ paths:
       operationId: getVendorRisk
       summary: The vendor risk list (spec 0026) - is each vendor's number on file one the Trust Ledger can prove?
       description: |
-        One row per vendor with ledger documents, worst first (near_miss, unproven, missing,
-        provable), then by name. The status is decided by code from `ledger-select-v1` as of now;
-        `status_text` is the ledger's sentence for it, so the dashboard writes none of its own.
+        One row per vendor with ledger documents, worst first (needs_person, near_miss, unproven,
+        missing, provable), then by name. The status is decided by code from the selection rule
+        (`select()`, spec 0021 and spec 0079) run as of now; `status_text` is the ledger's sentence
+        for it, so the dashboard writes none of its own.
       parameters:
         - $ref: '#/components/parameters/DatasetId'
       responses:
@@ -905,13 +906,13 @@ components:
         legal_name: { type: string }
         status:
           type: string
-          enum: [near_miss, unproven, missing, provable]
-          description: provable - the number on file meets the rule; near_miss - it is a near miss of a number the rule can prove; unproven - the rule can't prove it; missing - no number on file.
+          enum: [needs_person, near_miss, unproven, missing, provable]
+          description: needs_person - the rule withholds (spec 0079) because documents it treats as change context, such as a message from a lookalike domain, would change which number is called, so a person must verify; provable - the number on file meets the rule; near_miss - it is a near miss of a number the rule can prove; unproven - the rule can't prove it; missing - no number on file.
         number_on_file:
           description: What the old vendor master says, in E.164, or null.
           oneOf: [{ type: string, pattern: '^\+[1-9][0-9]{1,14}$' }, { type: 'null' }]
         provable_number:
-          description: The number ledger-select-v1 would pick today, in E.164, or null.
+          description: The number the selection rule would call today, in E.164, or null when it would call no one (no provable number, or needs_person).
           oneOf: [{ type: string, pattern: '^\+[1-9][0-9]{1,14}$' }, { type: 'null' }]
         status_text: { type: string, description: "The ledger's sentence for the status." }
 
