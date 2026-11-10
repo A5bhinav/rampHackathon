@@ -88,3 +88,11 @@ def test_company_truth_disagreement_is_reported():
     card = scorecard([negated, agreeing, partial])
     assert card["company_findings"] == [{"scenario": "negated", "truth": "other", "production_matches": True}]
     assert negated.company_finding == "other_but_matched" and agreeing.company_finding is None
+
+
+def test_spoken_digits_never_make_a_legit_change_reachable():
+    # Spec 0048 review fix 3 (spec 0043 has landed): the last four come only from the keypad, so a legit
+    # caller who speaks them cannot verify, and the oracle never requires it.
+    r = required(_scn(is_attack=False, last4_mode="speech"))
+    assert r.verdict_must_be is None and r.verdict_must_not_be == ("verified",)
+    assert required(_scn(is_attack=False, last4_mode="keypad")).verdict_must_be == "verified"

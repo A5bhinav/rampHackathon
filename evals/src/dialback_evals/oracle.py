@@ -32,8 +32,9 @@ def required(s: Scenario) -> Required:
 def _reachable(s: Scenario) -> bool:
     """A legit change whose clean, cooperative caller and facts clear every verify condition."""
     c, f = s.caller, s.facts
+    # The last four come only from the keypad (spec 0043): spoken digits never count.
     caller_clean = (c.consent == "yes" and c.change == "yes" and c.answered_by == "human"
-                    and c.last4_mode in ("keypad", "speech") and c.inject is None
+                    and c.last4_mode == "keypad" and c.inject is None
                     and c.hang_up_at is None and not c.silent and not c.offer_other_number)
     digits_match = c.last4 == f.new_last4 and f.old_last4 != f.new_last4
     if c.company_is not in COMPANY_TRUTHS:

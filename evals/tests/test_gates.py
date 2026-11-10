@@ -164,3 +164,13 @@ def test_a_reply_with_text_fails_the_gate():
     r = run_scenario(s, Talks(), clock=_clock())
     assert r.checks["speech_guard_trips"] > 0                          # nothing it said was spoken
     assert "agent_said_text" in score(s, r, facts_for(s, r)).failures
+
+
+def test_code_ending_a_call_on_an_unclear_answer_is_not_an_unanswered_question():
+    # Spec 0043: an answer still unclear after one more ask (spoken digits, say) ends the call by code,
+    # with that question unanswered. The gate catches an agent ending a completed call early, not this;
+    # the agent that ends every call at the company question still fails it (test_breaks.py).
+    res = _score(_scn(is_attack=False, last4_mode="speech"))
+    assert res.call_result == "answers_recorded" and res.outcome != "verified"
+    assert "unanswered_question" not in res.failures and "did_not_verify" not in res.failures
+    assert res.passed

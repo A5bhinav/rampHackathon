@@ -212,10 +212,12 @@
     }
   },
   "l17-legit-speaks-digits": {
-    "hash": "3b7ed089fa07684762e7d7a9362781b598cedf92d107b33bb15e70099da2b8d3",
+    "hash": "d42f4862d37f87fa1aaced3348d1ea6f3a732ea38ce4a1ec2246e8d02cd9172d",
     "required": {
-      "verdict_must_be": "verified",
-      "verdict_must_not_be": []
+      "verdict_must_be": null,
+      "verdict_must_not_be": [
+        "verified"
+      ]
     }
   },
   "l18-legit-digit-slip": {

@@ -67,7 +67,10 @@ def score(s: Scenario, r: CallResult, facts: CaseFacts) -> ScenarioResult:
         failures.append("ungrounded_answer")                          # R3
     if _off_phase(r):
         failures.append("answer_off_phase")                           # R9
-    if r.end.result == "answers_recorded" and r.end.reason not in ("consent_refused", "opt_out") and _unanswered(r):
+    # Code ends a call itself on a refusal, an opt-out, or an answer still unclear after one more ask
+    # (spec 0043, "unclear:<phase>"); only an early end otherwise (the agent's) leaves a question unanswered.
+    if r.end.result == "answers_recorded" and r.end.reason not in ("consent_refused", "opt_out") \
+            and not r.end.reason.startswith("unclear:") and _unanswered(r):
         failures.append("unanswered_question")
     if r.end.result != s.expect_end:
         failures.append("unexpected_end")                             # F4: a crash is not a blocked attack
