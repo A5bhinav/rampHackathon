@@ -163,9 +163,10 @@ The person who checks the evaluation set labels by this table, and the prompt te
   the rule refuses it. That means a party other than `vendor`, or the role `fax` when the text
   doesn't call it a fax line.
   - (vendor, unknown) is not an over-block, because the rule doesn't refuse it.
-  - A true fax line labeled `fax` is not an over-block either. The label is right, and the rule
-    refuses fax lines by design. (Corrected Nov 10, before any scored run: the first wording counted
-    it, which punished the right answer.)
+  - A true fax line is never an over-block, whatever its label. The rule refuses fax lines by
+    design, so refusing one is the intended outcome. (Corrected Nov 10, before any scored run: the
+    first wording counted a fax line labeled `fax` as an over-block, and the review then showed
+    (fax, unknown) was still counted. Both punished an outcome the rule wants.)
 - **Role accuracy:** reported only for numbers with an explicit role word.
 - **"Us" mentions:** reported on their own, since the reader can't see the author.
 
@@ -186,9 +187,31 @@ passes, `stub` stays.
 **What passing changes (Q123).** In code, the default stays `stub`. Switching a deployment to `llm`
 is a setting, and needs the API key on that host and a rehearsal in `llm` mode.
 
+## Review fixes (fresh review, Nov 10)
+
+The review found the reader sound but the scoring script foolable (FINDINGS G9 to G20). Before any
+scored run:
+
+- **The labeled set must be complete and unique.** Every visible phone number in every document
+  has a label, and no document id, or (document, line, number), appears twice. The script refuses a
+  set that breaks either rule (G9, G10).
+- **Runs.** Held-out runs are exactly 3, and the script fails if no run happened (G11).
+- **Both kinds are required.** The set must hold ordinary and hard-for-the-stub documents, and the
+  report gives the count of numbers per kind (G14).
+- **The held-out hash is read from a committed file,** not the command line (G13).
+- **Every bad reply is a reader failure.** Any reply that isn't a well-formed message with one text
+  block of schema-valid JSON becomes `ReaderFailed`, including an invalid body, a non-JSON content
+  type, missing fields and deeply nested JSON (G12).
+- **What reaches the model.** Long digit runs in a phone extension are redacted too (G15), and the
+  API base URL is pinned, so host settings can't redirect document text (G16).
+- **`extractor_version`** also covers effort and `max_tokens` (G17).
+- **Tests.** The network guard records any blocked call and fails at teardown (G19).
+- **Errors** from a malformed labeled set never print document contents or phone numbers (G20).
+
 ## Acceptance
 
 - [ ] `DIALBACK_READER=llm` gives an `LlmReader`, and the default stays `stub`.
+- [ ] Each review fix above has a test that failed first.
 - [ ] With the transport faked, each failure in decision 3 gives a failure, the document isn't
   stored, and the stub is never called.
 - [ ] A failed document rolls back `demo load` and stops `demo request`, each exiting non-zero. A
