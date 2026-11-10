@@ -82,9 +82,12 @@ The `ramp-mock` URL uses Railway's reference variables (`${{service.VARIABLE}}`)
 | Variable | Required | Meaning |
 |---|---|---|
 | `DATABASE_URL` | yes | Supabase, through the session pooler |
-| `RAMP_BASE_URL` | yes | The mock's private URL (or Ramp's API with `DIALBACK_RAMP=sandbox`, which isn't wired yet) |
-| `DIALBACK_RAMP` | no | `mock` (default) |
+| `RAMP_BASE_URL` | with `mock` | The mock's private URL |
+| `DIALBACK_RAMP` | no | `mock` (default): this server has the mock. `sandbox`: it has none, and needs the sandbox credentials. Each dataset picks its Ramp when it is made (`new-dataset --ramp`, spec 0096) |
 | `MOCK_RAMP_SECRET` | with `mock` | Shared with the mock; per-dataset tokens are derived from it |
+| `RAMP_SANDBOX_CLIENT_ID`, `RAMP_SANDBOX_CLIENT_SECRET` | for sandbox datasets | The Ramp sandbox app's client credentials. Both or neither. Seal the secret (a service variable on the core, not a shared one) |
+| `RAMP_SANDBOX_BASE_URL` | no | Only `https://demo-api.ramp.com` (the default) is accepted, so these credentials never reach production Ramp |
+| `RAMP_SANDBOX_SCOPES` | no | Default `vendors:read vendors:write bills:read bills:write audit_logs:read`; a read-only app sets the three read scopes |
 | `RAMP_WEBHOOK_SECRET` | yes | Verifies `X-Ramp-Signature`; at least 16 characters |
 | `FINGERPRINT_KEY`, `FINGERPRINT_KEY_VERSION` | yes | Keyed fingerprints of bank accounts; at least 32 characters |
 | `DIGITS_KEY`, `DIGITS_KEY_VERSION` | yes | Keyed hash of spoken digits; at least 32 characters |

@@ -23,7 +23,7 @@ and record all of it in the evidence chain.
 | In, from Ramp | `POST /webhooks/ramp`: verify `X-Ramp-Signature` (HMAC-SHA256 of the raw body, constant-time compare) before parsing; store the raw delivery in `app.inbound_webhooks` (unique on Ramp's event id); answer 2xx within Ramp's 10-second limit, for duplicates too | Ramp's webhook docs |
 | In, from the voice service | `call_ended` with the recorded answers; also Twilio status callbacks for calls that never connected | `packages/contracts/openapi/internal.yaml` |
 | In, from the dashboard | REST with the signed-in user's token, passed through to Postgres so `auth.uid()` is the person | `packages/contracts/openapi/dialback.yaml`, served by Prism until each endpoint lands |
-| Out, to Ramp | `RampPort`, implemented by one `RampHttpAdapter` that talks to the Ramp-shaped mock or to Ramp's sandbox (spec 0002, D1). `DIALBACK_RAMP=mock|sandbox` picks the base URL and credentials; no other code knows which. `RampConnector.for_dataset()` hands out a dataset's adapter (per-dataset mock tokens) | Ramp Developer API |
+| Out, to Ramp | `RampPort`, implemented by one `RampHttpAdapter` that talks to the Ramp-shaped mock or to Ramp's sandbox (spec 0002, D1). Each dataset's `ramp` (`mock` or `sandbox`, fixed when it is made, spec 0096) picks which; no other code knows. `RampConnector.for_dataset()` hands out the dataset's one port: the mock with its per-dataset token, or the sandbox with the server's login | Ramp Developer API |
 | Out, to the voice service | `POST /calls {case_id, attempt}`; the voice service reads the chosen number from the database itself | `internal.yaml` |
 | Out, to the Trust Ledger | `select_number(case)` and `lineage(vendor_id)` as Python calls | `packages/contracts/schemas/selection.schema.json` (Inesh) |
 | Out, to Postgres | `app.apply_case_event()` for every state change; `audit.verify_chain()` for the badge and the verify job | `supabase/migrations/app/0002_app_functions.sql` |
@@ -171,7 +171,7 @@ If this slice is behind at the Nov 4 checkpoint, `packages/decision` moves to In
 |---|---|---|
 | `DATABASE_URL` | yes | Postgres (Supabase) |
 | `RAMP_BASE_URL` | yes | The Ramp mock's URL, or Ramp's API |
-| `DIALBACK_RAMP` | no | `mock` (default) or `sandbox` (not wired yet; fails at startup) |
+| `DIALBACK_RAMP` | no | `mock` (default): the server has the mock. `sandbox`: it has none (needs `RAMP_SANDBOX_CLIENT_ID` and `RAMP_SANDBOX_CLIENT_SECRET`). Sandbox datasets work whenever those two are set; see `docs/deploy.md` |
 | `MOCK_RAMP_SECRET` | with `mock` | Shared with the mock; per-dataset tokens are derived from it |
 | `RAMP_WEBHOOK_SECRET` | yes | Verifies `X-Ramp-Signature` |
 | `FINGERPRINT_KEY`, `FINGERPRINT_KEY_VERSION` | yes | Keyed fingerprints of bank accounts (32+ characters) |
