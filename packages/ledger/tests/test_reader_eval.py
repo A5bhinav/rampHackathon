@@ -224,22 +224,46 @@ def test_the_heldout_set_needs_thirty_numbers_that_are_not_the_vendors():
         ev.check(heldout(29), "heldout")
 
 
-def test_the_heldout_report_shows_totals_only(tmp_path):
-    labeled = heldout(30)
+def frozen(tmp_path, labeled: dict) -> tuple:
+    """The held-out set written outside the repo, and a hash file as the repo would commit it."""
     path = tmp_path / "heldout.json"
     path.write_text(json.dumps(labeled))
     digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    sha_file = tmp_path / "reader_heldout.sha256"
+    sha_file.write_text(f"{digest}  heldout.json\n")
+    return path, digest, sha_file
+
+
+def test_the_heldout_report_shows_totals_only(tmp_path):
+    path, digest, sha_file = frozen(tmp_path, heldout(30))
     llm = Fixed({"Hi": [lab("Bank 206-555-0186", "unknown", "vendor")]})                 # unsafe on every bank line
-    loaded, sha = ev.load(path, "heldout", digest)
+    loaded, sha = ev.load(path, "heldout", sha_file=sha_file)
     report = ev.evaluate(loaded, llm, StubReader(), runs=3, sha256=sha)
     text = json.dumps(report)
     assert report["sha256"] == digest and len(report["runs"]) == 3 and not report["passed"]
     assert report["runs"][0]["bars"]["no_new_unsafe"] == {"passed": False, "new": 30}
     assert "heldout-doc" not in text and "+12065550186" not in text                   # no list of errors
+
+
+def test_the_heldout_hash_comes_from_a_committed_file(tmp_path, monkeypatch, capsys):
+    # Review G13: "frozen before the first scored run" can't rest on someone typing the hash.
+    assert ev.HELDOUT_SHA256 == ROOT / "packages/ledger/scripts/reader_heldout.sha256"
+    path, digest, sha_file = frozen(tmp_path, heldout(30))
+    assert ev.load(path, "heldout", sha_file=sha_file)[1] == digest
+    sha_file.write_text("0" * 64 + "\n")
     with pytest.raises(ev.LabeledSetError, match="sha256"):
-        ev.load(path, "heldout", "0" * 64)
+        ev.load(path, "heldout", sha_file=sha_file)
     with pytest.raises(ev.LabeledSetError, match="sha256"):
-        ev.load(path, "heldout", None)                                               # held-out needs its hash
+        ev.load(path, "heldout", sha_file=tmp_path / "nothing-committed.sha256")
+    # The command line reads the committed file and takes no hash of its own.
+    path, digest, sha_file = frozen(tmp_path, heldout(30))
+    monkeypatch.setattr(ev, "HELDOUT_SHA256", sha_file)
+    monkeypatch.setattr(ev, "reader_for", lambda mode: Fixed({}))
+    monkeypatch.setenv("DIALBACK_READER", "llm")
+    assert ev.main(["--split", "heldout", "--labels", str(path)]) in (0, 1)
+    assert json.loads(capsys.readouterr().out)["sha256"] == digest
+    with pytest.raises(SystemExit):
+        ev.main(["--split", "heldout", "--labels", str(path), "--expect-sha256", digest])
 
 
 def test_the_dev_report_lists_each_error():

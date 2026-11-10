@@ -2,7 +2,7 @@
 
     DIALBACK_READER=llm uv run python packages/ledger/scripts/reader_eval.py --split dev
     DIALBACK_READER=llm uv run python packages/ledger/scripts/reader_eval.py --split heldout \\
-        --labels /outside/the/repo/heldout.json --expect-sha256 <the committed hash>
+        --labels /outside/the/repo/heldout.json
 
 Each run calls the Anthropic API once per document that holds a visible phone number, so it costs
 money: run it only with Sami's OK. It compares the LLM reader with today's stub on a labeled set,
@@ -45,7 +45,8 @@ The labeled set, one JSON file (a provisional format: spec 0049 doesn't fix one)
 The set must be complete and unique: every visible phone candidate code finds has exactly one label,
 every label is such a candidate, and no document id appears twice. Held-out: 70
 documents holding at least 30 numbers that aren't the vendor's, and its SHA-256 must match the one
-committed (`--expect-sha256`). Dev: 30 documents.
+committed in `reader_heldout.sha256` beside this script (`sha256sum` format; there is no command-line
+hash, so the frozen set can't be swapped by typing another). Dev: 30 documents.
 """
 from __future__ import annotations
 
@@ -66,6 +67,7 @@ from dialback_ledger.reader import Reader, ReaderFailed, ReaderUnavailable, Stub
 from dialback_ledger.text import lines, visible_text
 
 DEV_LABELS = Path(__file__).with_name("reader_dev.json")   # the 30 dev documents, once someone writes them
+HELDOUT_SHA256 = Path(__file__).with_name("reader_heldout.sha256")   # committed when the held-out set is frozen
 SIZES = {"dev": 30, "heldout": 70}
 MIN_NOT_VENDOR = 30                                        # held-out numbers that aren't the vendor's
 ALPHA = Fraction(5, 100)
@@ -216,16 +218,20 @@ def check(labeled: dict, split: str) -> None:
                                   f"it needs at least {MIN_NOT_VENDOR}, or the unsafe count means little")
 
 
-def load(path: Path, split: str, expect_sha256: str | None) -> tuple[dict, str]:
-    """The labeled set and its SHA-256. Held-out needs `expect_sha256` (only the hash is committed)."""
+def load(path: Path, split: str, *, sha_file: Path | None = None) -> tuple[dict, str]:
+    """The labeled set and its SHA-256. The held-out set must match the hash committed in `sha_file`
+    (HELDOUT_SHA256 by default; `sha256sum` format), never one given on the command line."""
     if not path.exists():
         raise LabeledSetError(f"no labeled set at {path}: spec 0049's labeled set isn't written yet")
     raw = path.read_bytes()
     sha = hashlib.sha256(raw).hexdigest()
-    if split == "heldout" and expect_sha256 is None:
-        raise LabeledSetError("the held-out set is scored only against its committed sha256 (--expect-sha256)")
-    if expect_sha256 is not None and sha != expect_sha256.lower():
-        raise LabeledSetError(f"the labeled set's sha256 is {sha}, not the expected {expect_sha256}")
+    if split == "heldout":
+        sha_file = sha_file or HELDOUT_SHA256
+        if not sha_file.exists():
+            raise LabeledSetError(f"no committed sha256 at {sha_file}: freeze the held-out set and commit its hash first")
+        committed = (sha_file.read_text().split() or [""])[0].lower()
+        if sha != committed:
+            raise LabeledSetError(f"the held-out set's sha256 is {sha}, not the committed {committed or '(empty)'}")
     try:
         labeled = json.loads(raw)
         check(labeled, split)
@@ -263,7 +269,6 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--split", choices=("dev", "heldout"), required=True)
     parser.add_argument("--labels", type=Path, help=f"the labeled set (dev default: {DEV_LABELS.name} beside this script)")
-    parser.add_argument("--expect-sha256", help="the labeled set's committed SHA-256 (required for heldout)")
     parser.add_argument("--runs", type=int, help="LLM runs (default: 3 for heldout, 1 for dev)")
     args = parser.parse_args(argv)
     if reader_mode() is not ReaderMode.LLM:
@@ -274,7 +279,7 @@ def main(argv: list[str] | None = None) -> int:
         path = args.labels or (DEV_LABELS if args.split == "dev" else None)
         if path is None:
             raise LabeledSetError("--labels is required for heldout: that set lives outside the repo")
-        labeled, sha = load(path, args.split, args.expect_sha256)
+        labeled, sha = load(path, args.split)
     except (ReaderUnavailable, LabeledSetError) as exc:
         print(f"refused: {exc}", file=sys.stderr)
         return 2
