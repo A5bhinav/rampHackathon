@@ -2,7 +2,7 @@
 from pathlib import Path
 
 import pytest
-from _world import ROOT, SCHEMA, at, corpus_world, run
+from _world import ROOT, SCHEMA, at, calls, corpus_world, frozen, run
 from jsonschema import Draft202012Validator
 
 TRUTHS = sorted((ROOT / "corpus" / "truth").glob("*.json"))
@@ -32,3 +32,14 @@ def test_matches_the_frozen_truth(path: Path):
     poison = {p["e164"] for p in truth["planted"] if p["truth"] == "poison"}
     if truth["kind"] != "known_limit":
         assert out.get("e164") not in poison, "a poisoned number was picked"
+
+
+@pytest.mark.parametrize("path", TRUTHS, ids=lambda p: p.stem)
+def test_the_guard_changes_no_corpus_outcome(path: Path):
+    # Spec 0079's gate: the new rule gives every frozen scenario today's outcome and pick, and
+    # leaves every candidate as today's rule found it.
+    _truth, inputs = corpus_world(path)
+    today, new = frozen(inputs), run(inputs)
+    assert (new["outcome"], new.get("e164")) == (today["outcome"], today.get("e164"))
+    assert new["candidates"] == today["candidates"]
+    assert calls(new) == calls(today)[:len(calls(new))]
