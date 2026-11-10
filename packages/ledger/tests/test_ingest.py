@@ -1,4 +1,5 @@
 """Spec 0022 B: ingest() end to end on the frozen corpus, then select() reproduces the truth."""
+import ast
 import json
 from collections import Counter
 
@@ -6,7 +7,7 @@ import pytest
 from _world import CASE, DATASET, ROOT, VENDOR, at, corpus_world, run
 from dialback_ledger.flags import ReaderMode, reader_mode
 from dialback_ledger.ingest import ingest_all
-from dialback_ledger.reader import reader_for
+from dialback_ledger.reader import ReaderUnavailable, StubReader, reader_for
 from dialback_ledger.select import DocumentRef, Sighting
 from test_extract import page, span
 
@@ -14,15 +15,16 @@ TRUTHS = sorted((ROOT / "corpus" / "truth").glob("*.json"))
 
 
 def ingested(truth):
-    return ingest_all(json.loads((ROOT / "corpus" / truth["documents"]).read_text()), extractor_version="test")
+    return ingest_all(json.loads((ROOT / "corpus" / truth["documents"]).read_text()), extractor_version="test",
+                      reader=StubReader())
 
 
 def test_the_reader_flag_is_stub_unless_asked():
     assert reader_mode({}) is ReaderMode.STUB
     assert reader_mode({"DIALBACK_READER": "something"}) is ReaderMode.STUB
     assert reader_mode({"DIALBACK_READER": "llm"}) is ReaderMode.LLM
-    with pytest.raises(NotImplementedError):
-        reader_for(ReaderMode.LLM)  # fails closed: nothing is ingested without a reader
+    with pytest.raises(ReaderUnavailable):
+        reader_for(ReaderMode.LLM, env={})  # fails closed: without its key, llm mode has no reader (spec 0049)
 
 
 def test_the_labeler_sees_only_visible_text():
@@ -42,7 +44,7 @@ def test_the_labeler_sees_only_visible_text():
 
 
 def test_provenance_comes_from_custody():
-    result = ingest_all([page(span("Main: 415-555-0117"))], extractor_version="test")
+    result = ingest_all([page(span("Main: 415-555-0117"))], extractor_version="test", reader=StubReader())
     (o,) = result.observations
     assert (o["source_type"], o["seen_at"]) == ("email", at("2026-01-01T00:00:00Z"))
 
@@ -88,7 +90,7 @@ def test_custody_must_be_the_documents_own():
     from dialback_ledger.ingest import ingest
     a, b = page(span("Main: 415-555-0117")), page(span("Main: 415-555-0117")) | {"id": "other"}
     with pytest.raises(ValueError):
-        ingest(a, custody_for(b), extractor_version="test")
+        ingest(a, custody_for(b), extractor_version="test", reader=StubReader())
 
 
 def test_an_attachment_cycle_is_refused():
@@ -97,11 +99,25 @@ def test_an_attachment_cycle_is_refused():
     a["custody"] = a["custody"] | {"parent_document_id": "b"}
     b["custody"] = b["custody"] | {"parent_document_id": "a"}
     with pytest.raises(ValueError, match="cycle"):
-        ingest_all([a, b], extractor_version="test")
+        ingest_all([a, b], extractor_version="test", reader=StubReader())
+
+
+def test_every_test_passes_a_reader_to_ingest():
+    # Spec 0049, decision 8: the default reader comes from the environment, so a test that leaves it out
+    # could call the model. Every test in the repo that ingests names its reader.
+    missing = []
+    for path in sorted(ROOT.glob("**/test_*.py")):
+        if {".venv", "node_modules"} & set(path.parts):
+            continue
+        for node in ast.walk(ast.parse(path.read_text(), str(path))):
+            if isinstance(node, ast.Call) and getattr(node.func, "id", getattr(node.func, "attr", None)) in {"ingest", "ingest_all"}:
+                reader = next((k.value for k in node.keywords if k.arg == "reader"), None)
+                if reader is None or (isinstance(reader, ast.Constant) and reader.value is None):
+                    missing.append(f"{path.relative_to(ROOT)}:{node.lineno}")
+    assert missing == []
 
 
 def test_the_stub_reader_says_vendor_only_for_a_contact_label():
-    from dialback_ledger.reader import StubReader
     labels = StubReader().label("Accounts receivable: (415) 555-0142\nCall our bank at 415-555-0186\n"
                                 "The verified callback number is 415-555-0169\nMain: 415-555-0117")
     assert [(lab["role"], lab["party"]) for lab in labels] == [("ar", "vendor"), ("unknown", "bank"), ("unknown", "unknown"),
