@@ -49,6 +49,8 @@ reply: bank changes are not accepted by email, please use the portal.
 8. **Build without a domain for now:** receive at the free Resend address, no replies until a
    domain exists.
 9. **The reply links to a small public page on the dashboard.**
+10. **The reply and the page describe the real process,** in the wording quoted under "What Sami's
+    later decisions add", instead of pointing to a portal that doesn't exist.
 
 ## Goals
 
@@ -234,8 +236,8 @@ Consequences, all through existing behavior:
 ### 8. The reply
 
 One fixed message for every flagged email, with or without a case, plus the link to the public page
-(see "What Sami's later decisions add"; wording pending Sami). Until a domain exists, replies are
-built and tested but switched off.
+(see "What Sami's later decisions add" for the approved wording). Until a domain exists, replies
+are built and tested but switched off.
 
 - Sent only to the `From` address, never `Reply-To`, threaded with `In-Reply-To`.
 - **Sent only when the `From` domain passed authentication** (DMARC, or SPF or DKIM aligned with
@@ -348,9 +350,9 @@ number including its area code) already filled in. Judges don't have to type the
 matches, and they can still edit it.
 
 **A small public page on the dashboard** that the reply links to. It needs no sign-in and shows no
-data. **Its content is pending Sami:** the repo has no vendor-facing portal and no formal request
-channel. Dialback's model is that requests arrive however they arrive and a clerk types them into
-Ramp. Proposed wording for the page and the reply: "We never change payment details because of an
+data. The repo has no vendor-facing portal and no formal request channel: Dialback's model is that
+requests arrive however they arrive and a clerk types them into Ramp. So the page and the reply
+describe what actually happens instead of pointing to a portal. Wording for both, approved by Sami: "We never change payment details because of an
 email. Every change is confirmed using contact details we already have for you, not ones sent in the
 request. To change your payment details, contact your account contact at <company> using details
 you already have for them. We will never ask you to confirm by replying to an email or calling a
@@ -358,15 +360,14 @@ number someone sent you."
 
 ## Open questions (team)
 
-1. **The page and reply wording** (above). Pending Sami.
-2. **Should red flags feed `decide()`?** That changes decision logic (Abhi and Inesh's area).
-3. **The verified ending.** One option: a Ramp change whose routing number and last four match a
+1. **Should red flags feed `decide()`?** That changes decision logic (Abhi and Inesh's area).
+2. **The verified ending.** One option: a Ramp change whose routing number and last four match a
    request verified in the last N days skips the second call. Note that today the two fingerprints
    can't be compared: the email side uses the full number and the Ramp side uses routing, last four
    and Ramp's account ID (`detection.py::fingerprint`).
-4. **A heads-up to the vendor's contact on file** ("we received a request to change your bank
+3. **A heads-up to the vendor's contact on file** ("we received a request to change your bank
    details"), sent to the address Dialback already trusts, not the sender. Wanted in v1?
-5. **The domain, later:** who buys it, and what is it called? Until then there are no replies.
+4. **The domain, later:** who buys it, and what is it called? Until then there are no replies.
 
 ## Rough size
 
