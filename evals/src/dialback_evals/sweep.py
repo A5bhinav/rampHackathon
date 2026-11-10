@@ -24,6 +24,9 @@ from dialback_decision.facts import CaseFacts
 
 BLOCKS = ("BLOCK0", "NOT_VERIFIED", "NEEDS_REVIEW", "VERIFIED")
 _ROW = re.compile(r"^\|\s*`?([A-Z]+[0-9]{2}_[a-z_]+)`?\s*\|\s*(.*?)\s*\|\s*$")
+_BULLET = re.compile(r"^-\s*`([A-Z]+[0-9]{2}_[a-z_]+)`:\s*(.*)$")
+STAND_INS = ("declared_scenario", "contract")       # what production does not do today
+STANDIN_HEADING = "## Seen only through a stand-in"
 
 
 def rule_ids() -> list[str]:
@@ -88,10 +91,39 @@ def listed(path: Path) -> dict[str, str]:
     return out
 
 
-def problems(seen: dict[str, list[Subject]], unreachable: dict[str, str]) -> list[str]:
+def standin_only(seen: dict[str, list[Subject]]) -> set[str]:
+    """Rules seen, but only through stand-ins: a contract-only report or a scenario resting on a declared fact
+    (spec 0048 review fix 6). Nothing production does today shows them."""
+    return {r for r, by in seen.items() if by and all(s.kind in STAND_INS for s in by)}
+
+
+def standin_listed(path: Path) -> dict[str, str]:
+    """UNREACHABLE.md's "Seen only through a stand-in" list, each with its reason (lines "- RULE_ID: reason",
+    the id in backticks)."""
+    out, inside = {}, False
+    for line in Path(path).read_text(encoding="utf-8").splitlines():
+        if line.startswith("## "):
+            inside = line.strip() == STANDIN_HEADING
+        elif inside and (m := _BULLET.match(line.strip())):
+            out[m.group(1)] = m.group(2)
+    return out
+
+
+def problems(seen: dict[str, list[Subject]], unreachable: dict[str, str],
+             standins: dict[str, str] | None = None) -> list[str]:
     """Why the sweep fails: a rule neither seen nor listed, a listed rule that is seen (the list is stale), a
-    listed rule with no reason, or a listed id that is not a rule."""
+    listed rule with no reason, or a listed id that is not a rule; and, given the stand-in list, a rule seen
+    only through stand-ins that it does not hold, or one it holds that is seen otherwise."""
     found = []
+    if standins is not None:
+        only = standin_only(seen)
+        for rule_id in sorted(only - set(standins)):
+            found.append(f"{rule_id}: seen only through a stand-in (contract-only reports or a declared scenario), "
+                         "and UNREACHABLE.md's stand-in list does not hold it")
+        for rule_id in sorted(set(standins) - only):
+            found.append(f"{rule_id}: listed as seen only through a stand-in, but it is "
+                         + ("seen through production" if seen.get(rule_id) else "not seen at all"))
+        found += [f"{r}: on the stand-in list without a reason" for r, why in standins.items() if not why.strip()]
     for rule_id, by in seen.items():
         if not by and rule_id not in unreachable:
             found.append(f"{rule_id}: removing it changes no outcome, and UNREACHABLE.md does not list it")

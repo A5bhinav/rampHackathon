@@ -38,9 +38,19 @@ same outcome whenever it fires.
 
 ## Seen only through a stand-in
 
-These are seen, so they are not in the table, but only through something production does not do today:
+These are seen, so they are not in the table, but only through something production does not do today: a
+contract-only report, or a scenario resting on a declared fact (A3). `lab sweep` fails when a rule joins
+this list or leaves it (spec 0048 review fix 6), so a rule that stops being seen by anything production does
+is noticed.
 
+- `NV04_offered_number_from_request`: only through contract-only reports. No production agent records an
+  offered number, so the ledger is never asked about one (spec 0048 review fix 4).
+- `NR18_contradictory_answers`: only through contract-only reports. Production records each answer once, so
+  no answer contradicts another.
 - `NR19_earlier_call_concern`: only through contract-only reports, whose earlier calls carry answers.
   Production never sends answers on an earlier call (FINDINGS A16), so in production it cannot fire.
 - `NR21_line_risk`: only through a07, which declares `line_risk` (A3). Nothing in production computes line
   risk yet (FINDINGS A7); spec 0044 adds it.
+- `V06_speaker_identified`: only through contract-only reports. Production asks the name and the role in turn
+  and records each as said, so a report that reaches the change question holds both; one is missing only on a
+  call that ended there, where the change and digits are missing too.

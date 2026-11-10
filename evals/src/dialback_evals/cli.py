@@ -150,15 +150,17 @@ def _sweep(scenarios_dir: Path, examples: int, seed: int, unreachable: Path) -> 
     from . import sweep
     subjects = sweep.scenario_subjects(scenarios_dir, _clock) + sweep.report_subjects(examples, seed)
     seen = sweep.sweep(subjects)
-    listed = sweep.listed(unreachable)
+    listed, standins = sweep.listed(unreachable), sweep.standin_listed(unreachable)
     for rule_id, by in seen.items():
         print(f"lab sweep: {rule_id}: " + (sweep.how(by) if by else "not seen; listed in UNREACHABLE.md"
                                            if rule_id in listed else "not seen"))
-    found = sweep.problems(seen, listed)
+    found = sweep.problems(seen, listed, standins)
     for problem in found:
         print(f"lab sweep: {problem}")
-    print(f"lab sweep: {sum(1 for by in seen.values() if by)} of {len(seen)} rules seen, {len(listed)} listed as "
-          f"unreachable, {len(found)} problem(s) ({len(subjects)} subjects, seed {seed})")
+    only = sweep.standin_only(seen)
+    print(f"lab sweep: {sum(1 for by in seen.values() if by) - len(only)} of {len(seen)} rules seen through "
+          f"production, {len(only)} only through stand-ins, {len(listed)} listed as unreachable, {len(found)} "
+          f"problem(s) ({len(subjects)} subjects, seed {seed})")
     return 1 if found else 0
 
 

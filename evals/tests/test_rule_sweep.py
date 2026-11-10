@@ -54,3 +54,26 @@ def test_the_new_scenarios_each_isolate_their_rule():
                    for s in by}
     assert {"l19-legit-reads-old-account", "l21-legit-pick-changed", "l22-legit-company-unclear",
             "l23-legit-speaker-unknown"} <= by_scenario
+
+
+# Spec 0048 review fix 6: a rule seen only through a stand-in (a contract-only report, or a scenario that rests on
+# a declared fact) is not seen by anything production does. The sweep keeps those apart, and fails when the set
+# differs from UNREACHABLE.md's "Seen only through a stand-in" list in either direction.
+
+def test_stand_in_only_rules_are_exactly_the_listed_ones():
+    listed = sweep.standin_listed(UNREACHABLE)
+    assert sweep.standin_only(_seen()) == set(listed)
+    assert all(reason.strip() for reason in listed.values())
+
+
+def test_a_rule_moving_into_stand_in_only_fails_the_sweep():
+    listed, standins = sweep.listed(UNREACHABLE), sweep.standin_listed(UNREACHABLE)
+    production = next(r for r, by in _seen().items() if any(s.kind in ("scenario", "reachable") for s in by))
+    moved = {**_seen(), production: [s for s in _seen()["NR19_earlier_call_concern"]]}   # now seen only by stand-ins
+    assert any(p.startswith(f"{production}: seen only through a stand-in") for p in sweep.problems(moved, listed, standins))
+    one = next(iter(standins))
+    fewer = {k: v for k, v in standins.items() if k != one}
+    assert any(p.startswith(f"{one}: seen only through a stand-in") for p in sweep.problems(_seen(), listed, fewer))
+    stale = {**standins, production: "listed by mistake"}
+    assert any(p.startswith(f"{production}: listed as seen only through a stand-in") for p in
+               sweep.problems(_seen(), listed, stale))
