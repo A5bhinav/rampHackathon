@@ -147,6 +147,7 @@ class FakeResend:
         self.emails: dict[str, ReceivedEmail | Exception] = emails or {}
         self.fetched: list[str] = []
         self.sent: list[dict] = []
+        self.send_error: Exception | None = None   # when set, send raises it
 
     async def get_received(self, email_id: str) -> ReceivedEmail:
         self.fetched.append(email_id)
@@ -155,6 +156,9 @@ class FakeResend:
             raise found
         return found
 
-    async def send(self, *, sender, to, subject, text, in_reply_to) -> str:
-        self.sent.append({"sender": sender, "to": to, "subject": subject, "text": text, "in_reply_to": in_reply_to})
+    async def send(self, *, sender, to, subject, text, in_reply_to, idempotency_key) -> str:
+        if self.send_error is not None:
+            raise self.send_error
+        self.sent.append({"sender": sender, "to": to, "subject": subject, "text": text, "in_reply_to": in_reply_to,
+                          "idempotency_key": idempotency_key})
         return f"sent_{len(self.sent)}"

@@ -7,6 +7,7 @@ live email is the request. The door is on for Cobalt only, and the real ledger r
 """
 from __future__ import annotations
 
+import dataclasses
 import datetime as dt
 import json
 import logging
@@ -94,9 +95,11 @@ async def door_world(pool, database_url, monkeypatch):
     await w.mock.aclose()
 
 
-async def arrive(w, email_id: str | None = None, notice_message_id: str | None = None, **changes) -> dict:
-    """One email through the signed route; the worker runs until idle. Returns the email's row."""
-    email_id = await deliver(w, email_id, message_id=notice_message_id)
+async def arrive(w, email_id: str | None = None, notice_message_id: str | None = None, notice_sender: str | None = None,
+                 **changes) -> dict:
+    """One email through the signed route; the worker runs until idle. Returns the email's row.
+    `notice_sender` is the From the notice carries (the row stores it); the default is the tests' usual one."""
+    email_id = await deliver(w, email_id, **({"sender": notice_sender} if notice_sender else {}), message_id=notice_message_id)
     w.worker.resend.emails[email_id] = judge(email_id, **changes)
     await w.worker.drain(w.demo_id)
     return await one(w.pool, "select * from app.inbound_emails where dataset_id = %s and resend_email_id = %s", w.demo_id, email_id)
@@ -589,3 +592,120 @@ async def test_a_retired_demo_does_nothing(door_world):
     row = await one(w.pool, "select * from app.inbound_emails where dataset_id = %s and resend_email_id = %s", w.demo_id, email_id)
     assert (row["outcome"], row["flagged"]) == ("door_off", False)
     await assert_no_case(w)
+
+
+# The reply (spec 0088, Task 10) ------------------------------------------------------------------
+
+def replying(w, **changes) -> None:
+    """Switch replies on for the world's worker (DIALBACK_REPLY_FROM and friends)."""
+    base = {"reply_from": "Dialback <bank-changes@dialback.example>", "bank_changes_url": "https://dialback.example/bank-changes",
+            "company_name": "Cobalt Freight", "inbox_address": "inbox@dialback.example"}
+    w.worker.settings = dataclasses.replace(w.worker.settings, **(base | changes))
+
+
+async def reply_of(w, row) -> str:
+    return (await one(w.pool, "select reply from app.inbound_emails where id = %s", row["id"]))["reply"]
+
+
+async def test_a_flagged_email_gets_the_fixed_reply_to_its_from_address(door_world):
+    replying(door_world)
+    row = await arrive(door_world, reply_to=("attacker@elsewhere.example",), subject="Cobalt Freight: new bank details")
+    assert row["outcome"] == "case_opened" and row["reply"] == "sent"
+    [sent] = door_world.worker.resend.sent
+    assert sent["to"] == "sam.judge@gmail.example"
+    assert sent["sender"] == "Dialback <bank-changes@dialback.example>"
+    assert sent["subject"] == "Re: Cobalt Freight: new bank details"
+    assert sent["in_reply_to"] == row["message_id"]
+    assert sent["idempotency_key"] == f"reply-{row['resend_email_id']}"
+    assert sent["text"].splitlines()[-1] == "https://dialback.example/bank-changes"
+    assert "contact at Cobalt Freight using details" in sent["text"]
+
+
+async def test_the_reply_is_the_same_whatever_happened_to_the_email(door_world):
+    replying(door_world)
+    opened = await arrive(door_world)
+    stopped = await arrive(door_world, notice_sender="Pat <pat@other.example>", sender="Pat <pat@other.example>", text="Please move to our new bank. Routing 026009593.")
+    assert (opened["outcome"], stopped["outcome"]) == ("case_opened", "no_account_number")
+    assert (opened["reply"], stopped["reply"]) == ("sent", "sent")
+    first, second = door_world.worker.resend.sent
+    assert first["text"] == second["text"]
+
+
+async def test_unflagged_mail_gets_no_reply(door_world):
+    replying(door_world)
+    row = await arrive(door_world, subject="Lunch?", text="Are you free on Friday?")
+    assert row["outcome"] == "not_flagged" and row["reply"] == "not_flagged"
+    assert door_world.worker.resend.sent == []
+
+
+async def test_without_reply_from_nothing_is_sent_and_it_says_so(door_world):
+    row = await arrive(door_world)      # the world has no reply_from
+    assert row["outcome"] == "case_opened" and row["reply"] == "not_configured"
+    assert door_world.worker.resend.sent == []
+
+
+async def test_a_silent_change_gets_the_reply(door_world):
+    replying(door_world)
+    row = await arrive(door_world, sender=FROM_COBALT, subject="Invoice CF-88201", message_id="<silent@cobalt.example>",
+                       text=INVOICE.format(routing=ROUTING, account=ACCOUNT))
+    assert row["outcome"] == "case_opened" and row["flagged"] is True and row["reply"] == "sent"
+    assert [s["to"] for s in door_world.worker.resend.sent] == ["ar@cobalt.example"]
+
+
+async def test_an_unauthenticated_flagged_email_gets_no_reply(door_world):
+    replying(door_world)
+    row = await arrive(door_world, authentication={"spf": "pass", "dkim": "fail", "dmarc": "fail"})
+    assert row["outcome"] == "case_opened" and row["reply"] == "unauthenticated"
+    assert door_world.worker.resend.sent == []
+
+
+async def test_a_second_email_from_the_same_sender_is_rate_limited(door_world):
+    replying(door_world)
+    first = await arrive(door_world, notice_sender="Dana <AR@vendor.example>")
+    second = await arrive(door_world, notice_sender="Someone Else <ar@vendor.example>")   # the same address, another display name
+    assert (first["reply"], second["reply"]) == ("sent", "rate_limited")
+    assert len(door_world.worker.resend.sent) == 1
+
+
+async def test_a_sender_is_replied_to_again_after_a_day(door_world):
+    replying(door_world)
+    first = await arrive(door_world)
+    async with system_tx(door_world.pool) as conn:
+        await conn.execute("update app.inbound_emails set received_at = received_at - interval '25 hours' where id = %s", (first["id"],))
+    second = await arrive(door_world)
+    assert second["reply"] == "sent"
+
+
+async def test_the_hourly_cap_counts_every_sender(door_world):
+    replying(door_world)
+    async with system_tx(door_world.pool) as conn:
+        for i in range(20):
+            await conn.execute(
+                """insert into app.inbound_emails (dataset_id, resend_email_id, sender, received_at, has_attachments, outcome, flagged, reply)
+                   values (%s, %s, %s, app.now(%s), false, 'case_opened', true, 'sent')""",
+                (door_world.demo_id, f"old{i}", f"p{i}@elsewhere.example", door_world.demo_id))
+    assert (await arrive(door_world))["reply"] == "rate_limited"
+
+
+async def test_a_send_error_records_failed_and_keeps_the_case(door_world, caplog):
+    replying(door_world)
+    door_world.worker.resend.send_error = RuntimeError("boom sam.judge@gmail.example 000123454821")
+    with caplog.at_level(logging.DEBUG):
+        row = await arrive(door_world)
+    assert row["outcome"] == "case_opened" and row["reply"] == "failed" and row["error"] is None
+    assert len(await cases(door_world)) == 1
+    assert "boom" not in caplog.text and "gmail.example" not in caplog.text and "RuntimeError" in caplog.text
+
+
+async def test_a_crlf_subject_cannot_add_headers_to_the_reply(door_world):
+    replying(door_world)
+    await arrive(door_world, subject="Cobalt Freight bank\r\nBcc: victim@elsewhere.example")
+    [sent] = door_world.worker.resend.sent
+    assert "\r" not in sent["subject"] and "\n" not in sent["subject"]
+
+
+async def test_an_unparseable_from_is_suppressed(door_world):
+    replying(door_world)
+    row = await arrive(door_world, sender="no address here")
+    assert row["outcome"] == "case_opened" and row["reply"] == "suppressed"
+    assert door_world.worker.resend.sent == []

@@ -42,6 +42,7 @@ from ..events import apply_event
 from ..settings import Settings
 from .masking import mask_digit_runs, strip_nul
 from .match import VendorRef, match_vendor
+from .reply import send_reply
 from .resend import ReceivedEmail, ResendPort
 from .rules import (
     MAX_CHARS,
@@ -331,6 +332,15 @@ async def _repeat(conn: AsyncConnection, dataset_id: UUID, vendor_id: UUID, sour
 
 async def handle_email(pool: AsyncConnectionPool, settings: Settings, keys: Keys, resend: ResendPort, dataset_id: UUID,
                        delivery_id: int, email: ReceivedEmail, classifier: ChangeClassifier | None = None) -> str:
+    """Act on the email (`_act`), then, only after its outcome is final and only if it ended flagged, send the
+    fixed reply (spec 0088). The reply never raises, so a reply failure cannot undo the outcome."""
+    outcome = await _act(pool, settings, keys, dataset_id, delivery_id, email, classifier)
+    await send_reply(pool, settings, resend, dataset_id, email)
+    return outcome
+
+
+async def _act(pool: AsyncConnectionPool, settings: Settings, keys: Keys, dataset_id: UUID,
+               delivery_id: int, email: ReceivedEmail, classifier: ChangeClassifier | None = None) -> str:
     """Fill in the delivery's inbound_emails row from the fetched email, act on it, and return its outcome.
     The subject and sender are stored with long digit runs masked (ADR-8); the body is not stored at all.
     A ClassifierFailed, or any error before the ledger write, propagates, so the inbox retries the email."""

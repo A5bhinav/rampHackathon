@@ -46,7 +46,8 @@ class ResendError(Exception):
 class ResendPort(Protocol):
     async def get_received(self, email_id: str) -> ReceivedEmail: ...
 
-    async def send(self, *, sender: str, to: str, subject: str, text: str, in_reply_to: str | None) -> str: ...
+    async def send(self, *, sender: str, to: str, subject: str, text: str, in_reply_to: str | None,
+                   idempotency_key: str) -> str: ...
 
 
 class _TextExtractor(HTMLParser):
@@ -106,9 +107,10 @@ class ResendClient:
     def __init__(self, api_key: str, http: httpx.AsyncClient) -> None:
         self._key, self._http = api_key, http
 
-    async def _call(self, method: str, path: str, **kwargs: Any) -> Any:
+    async def _call(self, method: str, path: str, extra_headers: dict[str, str] | None = None, **kwargs: Any) -> Any:
         try:
-            r = await self._http.request(method, API + path, headers={"Authorization": f"Bearer {self._key}"}, **kwargs)
+            r = await self._http.request(method, API + path, headers={"Authorization": f"Bearer {self._key}", **(extra_headers or {})},
+                                         **kwargs)
         except httpx.HTTPError as exc:
             raise ResendError(f"resend unreachable: {type(exc).__name__}", retryable=True) from None
         if r.status_code >= 300:
@@ -135,9 +137,11 @@ class ResendClient:
             authentication={k: str(auth.get(k) or "unknown") for k in ("spf", "dkim", "dmarc")} if isinstance(auth, dict) else None,
             raw_sha256=_digest(body.get("raw") or ""), has_attachments=bool(body.get("attachments")))
 
-    async def send(self, *, sender: str, to: str, subject: str, text: str, in_reply_to: str | None) -> str:
+    async def send(self, *, sender: str, to: str, subject: str, text: str, in_reply_to: str | None,
+                   idempotency_key: str) -> str:
+        """Send one email. Resend drops a second send with the same Idempotency-Key, so a retry never sends twice."""
         payload: dict[str, Any] = {"from": sender, "to": [to], "subject": subject, "text": text}
         if in_reply_to:
             payload["headers"] = {"In-Reply-To": in_reply_to, "References": in_reply_to}
-        body = await self._call("POST", "/emails", json=payload)
+        body = await self._call("POST", "/emails", extra_headers={"Idempotency-Key": idempotency_key}, json=payload)
         return str(body.get("id") or "")
