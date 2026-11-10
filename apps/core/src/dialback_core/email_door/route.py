@@ -26,6 +26,7 @@ from psycopg.types.json import Jsonb
 from ..db import system_tx
 from ..flags import EmailMode
 from . import signature
+from .masking import mask_digit_runs, strip_nul
 
 log = logging.getLogger(__name__)
 router = APIRouter()
@@ -42,6 +43,17 @@ def _reply(status: int, body: dict) -> JSONResponse:
     return JSONResponse(body, status_code=status)
 
 
+def _no_nul(value):
+    """The same value with NUL removed from every string: Postgres text and jsonb cannot hold it."""
+    if isinstance(value, str):
+        return strip_nul(value)
+    if isinstance(value, list):
+        return [_no_nul(v) for v in value]
+    if isinstance(value, dict):
+        return {strip_nul(k): _no_nul(v) for k, v in value.items()}
+    return value
+
+
 def _kept(raw: bytes) -> str:
     """The parts of a signed notice worth keeping; the subject and attachments are read after the fetch."""
     try:
@@ -51,8 +63,10 @@ def _kept(raw: bytes) -> str:
     if not isinstance(payload, dict):
         return json.dumps({"unreadable": True, "sha256": hashlib.sha256(raw).hexdigest(), "length": len(raw)})
     data = payload.get("data") if isinstance(payload.get("data"), dict) else {}
-    return json.dumps({"type": payload.get("type"), "created_at": payload.get("created_at"),
-                       "data": {k: data.get(k) for k in ("email_id", "message_id", "from", "to") if k in data}})
+    kept = {k: data.get(k) for k in ("email_id", "message_id", "from", "to") if k in data}
+    if isinstance(kept.get("from"), str):  # a display name is typed by a person: it can carry an account number (ADR-8)
+        kept["from"] = mask_digit_runs(kept["from"])
+    return json.dumps(_no_nul({"type": payload.get("type"), "created_at": payload.get("created_at"), "data": kept}))
 
 
 @router.post("/webhooks/email")

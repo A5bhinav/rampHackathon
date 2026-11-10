@@ -8,7 +8,8 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from urllib.parse import quote
 from html.parser import HTMLParser
 from typing import Any, Protocol
 
@@ -17,7 +18,7 @@ import httpx
 API = "https://api.resend.com"
 BLOCK_TAGS = frozenset({"p", "div", "br", "tr", "li", "ul", "ol", "table", "h1", "h2", "h3", "h4", "h5", "h6",
                         "blockquote", "pre", "hr", "section", "article", "header", "footer"})
-SKIPPED_TAGS = frozenset({"script", "style", "head", "title"})
+SKIPPED_TAGS = frozenset({"script", "style", "title"})
 
 
 @dataclass(frozen=True)
@@ -28,7 +29,8 @@ class ReceivedEmail:
     reply_to: tuple[str, ...]
     to: tuple[str, ...]
     subject: str
-    text: str                         # Resend's text, else the html turned into text
+    text: str = field(repr=False)     # Resend's text, else the html turned into text
+    html_text: str = field(repr=False)  # the html part turned into text, "" if none (mail clients show this part)
     headers: dict[str, str]           # lowercase keys
     authentication: dict[str, str] | None   # spf, dkim, dmarc
     raw_sha256: str
@@ -120,17 +122,16 @@ class ResendClient:
         return body
 
     async def get_received(self, email_id: str) -> ReceivedEmail:
-        body = await self._call("GET", f"/emails/receiving/{email_id}")
+        body = await self._call("GET", f"/emails/receiving/{quote(email_id, safe='')}")
         headers = {str(k).lower(): v if isinstance(v, str) else ", ".join(_strings(v))
                    for k, v in (body.get("headers") or {}).items()}
         auth = body.get("authentication")
-        text = body.get("text")
-        if not text:
-            text = html_to_text(body.get("html") or "")
+        html_text = html_to_text(body.get("html") or "")
+        text = body.get("text") or html_text
         return ReceivedEmail(
             email_id=email_id, message_id=str(body.get("message_id") or headers.get("message-id") or ""),
             sender=str(body.get("from") or ""), reply_to=_strings(body.get("reply_to")), to=_strings(body.get("to")),
-            subject=str(body.get("subject") or ""), text=text, headers=headers,
+            subject=str(body.get("subject") or ""), text=text, html_text=html_text, headers=headers,
             authentication={k: str(auth.get(k) or "unknown") for k in ("spf", "dkim", "dmarc")} if isinstance(auth, dict) else None,
             raw_sha256=_digest(body.get("raw") or ""), has_attachments=bool(body.get("attachments")))
 

@@ -3,8 +3,14 @@ from __future__ import annotations
 
 import re
 
-# A run of digits, possibly grouped by single spaces or dashes ("0001 2345 4821", "0001-2345-4821").
-_RUN = re.compile(r"(?<!\d)\d(?:[ -]?\d)*")
+# A run of digits, possibly grouped by 1 to 3 separator characters: whitespace (a no-break space too),
+# `.`, `-`, `/` or `_` ("0001 2345 4821", "0001.2345.4821", "0001  2345").
+_RUN = re.compile(r"(?<!\d)\d(?:[\s.\-/_]{0,3}\d)*")
+
+
+def strip_nul(text: str) -> str:
+    """Postgres text cannot hold NUL; an email can carry one."""
+    return text.replace("\x00", "")
 
 
 def _mask(match: re.Match[str]) -> str:
