@@ -12,6 +12,7 @@ import re
 import anthropic
 import httpx2
 import pytest
+from conftest import no_network
 from dialback_ledger import demo
 from dialback_ledger.custody import custody_for
 from dialback_ledger.flags import ReaderMode, reader_mode
@@ -241,6 +242,18 @@ def test_never_falls_back_to_the_stub(monkeypatch):
     with pytest.raises(ReaderUnavailable):
         ingest_all([BAD], extractor_version="test", reader=reader_for(reader_mode()))
     assert seen == []
+
+
+def test_the_network_guard_fails_a_test_that_reached_for_the_network():
+    # Review G19: the guard's error was retried by the SDK and became ReaderFailed, so a test that
+    # expected a failure passed even with a real client. The guard records the call and fails.
+    real = LlmReader(AnthropicLabelModel(anthropic.Anthropic(api_key="sk-test-key", base_url=API_BASE_URL,
+                                                             max_retries=0)))       # no fake transport
+    with pytest.MonkeyPatch.context() as mp:
+        with (pytest.raises(pytest.fail.Exception, match="reached for the network"), no_network(mp) as blocked,
+              pytest.raises(ReaderFailed)):
+            ingest_all([BAD], extractor_version="test", reader=real)
+        assert blocked == ["api.anthropic.com"]
 
 
 # The demo (its database tests are in test_demo.py) -------------------------------------------------
