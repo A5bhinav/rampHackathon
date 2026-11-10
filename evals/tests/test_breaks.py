@@ -351,7 +351,7 @@ def test_honest_fixed_lines_pass():
     from dialback_evals.detector import heard
     from dialback_evals.runner import CALLBACK
     from dialback_policy.script import FALLBACK_LINE, QUESTIONS, REASK, STILL_THERE, Script
-    assert {k: tuple(sorted(v)) for k, v in _lab(ScriptedAgent).items() if v} == _known_smoke()   # a09: A10
+    assert {k: tuple(sorted(v)) for k, v in _lab(ScriptedAgent).items() if v} == _known_smoke()   # a02, l16: A28, A29
     assert not [f for v in _lab(ScriptedAgent).values() for f in v if f.startswith("heard_")]
     script = Script("Northwind Traders", CALLBACK)
     fixed = [script.disclosure(), script.voicemail(), script.consent_refused(), script.close(), script.goodbye(),

@@ -281,7 +281,7 @@ def report_cases(domain: str):
 def unconfirmed(case: ReportCase) -> list[str]:
     """What an honest, full confirmation lacks, by the generator's truth, one condition per entry (spec 0048,
     B4 F1 and review fix 1). Empty when it is honest and full. It restates the verify conditions, so it
-    cannot find a mistake in their design (FINDINGS B9); it finds a fact computed wrongly (A10)."""
+    cannot find a mistake in their design (FINDINGS B9); it finds a fact computed wrongly (A10 was one)."""
     missing: list[str] = []
     if case.result != "answers_recorded":
         missing.append(f"result={case.result}")

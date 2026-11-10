@@ -128,8 +128,9 @@ def test_reference_matcher_passes_f3():
 
 
 def _added(found_broken, found_production) -> list:
-    """What a double adds over production on the same reports. Production already fails F1 (FINDINGS A10),
-    so a double "failing" F1 proves nothing unless it fails where production does not."""
+    """What a double adds over production on the same reports. Production can fail a check itself (it failed
+    F1 until spec 0082, FINDINGS A10), so a double "failing" it proves nothing unless it fails where production
+    does not."""
     return sorted({(i, lab) for i, labs in found_broken.violations for lab in labs}
                   - {(i, lab) for i, labs in found_production.violations for lab in labs})
 
