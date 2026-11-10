@@ -130,6 +130,22 @@ Specs: 0017 (voice slice lab), 0083 (generative selection pressure; 0033 before 
     WC fails the disruption bar. No rule passes all of them: a single honest warning about a planted
     number and a single attacker label on the real number look the same, so a rule either lets one
     fresh label cancel the call or doesn't.
+  - **Two defects in W, each fixed with a plan addendum written before its run:**
+    - **W2:** W ignored a weak label by relabeling the sighting as the vendor's, so "the bank's
+      line" still counted as evidence for the number (spec 0021's
+      `test_a_banks_or_customers_number_is_refused` world gets called). W2 counts only the vendor's
+      sightings as support. K1: 37 of 2000 draws (28 distinct; 18 unpinned), all an honest warning
+      ignored. W2 then failed its metamorphic bar: `M_lookalike_helped` 3 (v1 0), a lookalike's
+      pull moving an established label into the change context, where it stopped counting (A6's
+      mirror hole), and `M_shared_id_helped` 264 (v1 230).
+    - **W3** judges a label's standing by its own document (counting channel, at or before the
+      request, not the request, its thread, its subject window or a lookalike sender), so the pull
+      can't undo it. `M_lookalike_helped` 0 and the I12 label probe 0 (v1 380). Still over the bar:
+      `M_shared_id_helped` 263, every extra case a first-sorting duplicate id (A5, latent). The stop
+      rule applies; no third fix tried. Otherwise W3 matches W2's results, gives today's output on
+      all 441 label-free worlds, and fails only the three spec 0021 tests that encode the old veto
+      (on the reason; the number is still refused).
+  - **Spec 0090** (`sami/label-bar-spec`) writes up W3 inside spec 0079's guard (WG3).
 - **Open question:** whether such documents reach `select()` depends on how ingestion attaches
   documents to a vendor (`ledger.documents.vendor_id`), which nobody has traced.
 
