@@ -51,17 +51,19 @@ class RampConnector:
         clerk makes one in Ramp, then the mock's webhooks sent now. The account number goes to the mock
         and nowhere else: nothing here logs it, and a refusal says only the status code."""
         if self._settings.ramp_mode is not RampMode.MOCK:
-            raise MockRefused("not the Ramp mock")
+            raise MockRefused("not the Ramp mock", sent=False)
         headers = {"Authorization": f"Bearer {mock_token(self._settings.mock_ramp_secret or b'', dataset_id)}"}
         base = self._settings.ramp_base_url
         try:
             made = await self._http.post(f"{base}/_mock/vendors/{ramp_vendor_id}/bank-change", headers=headers,
                                          json={"routing_number": routing_number, "account_number": account_number,
                                                "actor_user_id": actor_ramp_user_id})
-        except httpx.HTTPError as exc:
-            raise MockRefused(type(exc).__name__) from None  # never the request, which carries the number
-        if made.status_code != 200:
-            raise MockRefused(f"status {made.status_code}")
+        except (httpx.ConnectError, httpx.ConnectTimeout) as exc:  # never reached the mock: nothing was changed
+            raise MockRefused(type(exc).__name__, sent=False) from None  # never the request, which carries the number
+        except httpx.HTTPError as exc:  # it may have saved the change before the answer was lost
+            raise MockRefused(type(exc).__name__, sent=True) from None
+        if made.status_code != 200:  # the mock refused, and a refusal rolls back
+            raise MockRefused(f"status {made.status_code}", sent=False)
         try:  # the change is made; if this fails the mock's sender (or the poller) delivers it soon
             await self._http.post(f"{base}/_mock/webhooks/deliver", headers=headers)
         except httpx.HTTPError:
@@ -69,4 +71,9 @@ class RampConnector:
 
 
 class MockRefused(RuntimeError):
-    """The Ramp mock didn't take a demo bank change. The message never carries the account number."""
+    """The Ramp mock didn't take a demo bank change, or didn't confirm it (`sent`: the change may have
+    been made). The message never carries the account number."""
+
+    def __init__(self, what: str, *, sent: bool) -> None:
+        super().__init__(what)
+        self.sent = sent

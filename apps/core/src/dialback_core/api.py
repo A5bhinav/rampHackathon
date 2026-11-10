@@ -11,6 +11,7 @@ from __future__ import annotations
 import datetime as dt
 import json
 import re
+import time
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
@@ -446,6 +447,8 @@ async def review(case_id: UUID, body: ReviewRequest, request: Request, user: Use
 # A clerk's bank change from the dashboard (spec 0077) ----------------------------------------------
 ROUTING = re.compile(r"^[0-9]{9}$")
 ACCOUNT = re.compile(r"^[0-9]{4,17}$")
+CHANGE_EVERY_SECONDS = 60  # one change a minute per dataset: a shared demo account can't set off a run of calls
+_last_sent: dict[UUID, float] = {}  # dataset -> when this process last sent a change (the core is one container)
 
 
 def aba_valid(routing: str) -> bool:
@@ -465,6 +468,8 @@ async def change_access(conn: AsyncConnection, settings: Any, dataset: dict[str,
         return None, "Bank changes from the dashboard are for demo datasets only. On this dataset, changes come from Ramp."
     if dataset["retired_at"] is not None:
         return None, "This demo has been replaced by a newer one. Bank changes from the dashboard work only on the current demo."
+    if "clerk" not in await roles_of(conn):
+        return None, "Bank changes are entered by a clerk. Sign in as the demo clerk to make one."
     profile = await (await conn.execute("select ramp_user_id from app.user_profiles where user_id = auth.uid()")).fetchone()
     ramp_user = profile["ramp_user_id"] if profile else None
     seeded = set(((dataset["demo_refs"] or {}).get("users") or {}).values())
@@ -518,14 +523,30 @@ async def change_bank_account(dataset_id: UUID, vendor_id: UUID, body: BankChang
         ramp_user, reason = await change_access(conn, settings, dataset)
         if ramp_user is None:
             return problem(403, "forbidden", reason or "You can't send a bank change here.")
-        vendor = await (await conn.execute("select ramp_vendor_id from app.vendors where id = %s and dataset_id = %s",
-                                           (vendor_id, dataset_id))).fetchone()
-    if vendor is None:
-        return problem(404, "not_found", "No such vendor on this dataset.")
+        vendor = await (await conn.execute(
+            "select v.ramp_vendor_id, a.routing_number, a.account_last4 from app.vendors v "
+            "left join lateral (select * from app.bank_accounts a where a.vendor_id = v.id and a.is_current "
+            "  order by a.last_seen_at desc limit 1) a on true where v.id = %s and v.dataset_id = %s",
+            (vendor_id, dataset_id))).fetchone()
+        if vendor is None:
+            return problem(404, "not_found", "No such vendor on this dataset.")
+        if vendor["routing_number"] == body.routing_number and vendor["account_last4"] == body.account_number[-4:]:
+            return problem(422, "invalid_request", "That is already the vendor's account on file. Nothing was changed.")
+        recent = await (await conn.execute(
+            "select 1 from app.bank_change_events where dataset_id = %s and detected_at > now() - make_interval(secs => %s) limit 1",
+            (dataset_id, CHANGE_EVERY_SECONDS))).fetchone()
+        if recent is not None or time.monotonic() - _last_sent.get(dataset_id, -1e9) < CHANGE_EVERY_SECONDS:
+            return problem(409, "transition_refused",
+                           "A bank change on this demo was detected less than a minute ago. Wait a minute, then try again.")
     try:
         await request.app.state.connector.mock_bank_change(dataset_id, vendor["ramp_vendor_id"], body.routing_number,
                                                            body.account_number, ramp_user)
-    except MockRefused:
-        return problem(502, "upstream_unavailable", "The Ramp mock did not accept the change. Nothing was changed; try again.")
+        _last_sent[dataset_id] = time.monotonic()
+    except MockRefused as refused:
+        if refused.sent:
+            _last_sent[dataset_id] = time.monotonic()  # it may have been made: count it
+            return problem(502, "upstream_unavailable",
+                           "The Ramp mock didn't confirm the change. It may have been made: check the vendor's account before trying again.")
+        return problem(502, "upstream_unavailable", "The Ramp mock could not be reached or refused the change. Nothing was changed; try again.")
     return JSONResponse({"vendor_id": str(vendor_id), "account": {"routing_number": body.routing_number,
                                                                   "last4": body.account_number[-4:]}}, status_code=202)
