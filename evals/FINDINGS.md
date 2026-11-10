@@ -165,6 +165,11 @@ These are not reachable today, but each is frozen as a regression.
   - **But those counts are fixed by the phrase bank** (C12): the check accepts every phrase of a
     truth or none. Outside the bank, it accepts "Acme Fasteners Supply Co" and "I used to work at
     Acme Fasteners", and rejects "Acme Fastener" and "Ackme Fasteners".
+  - **Measured with the near-variants (spec 0048 review fixes, Nov 10; seed 0, 2000 reports
+    production can send):** production accepted every answer naming another company that contains
+    the vendor's name (103 of 103) and every past connection (61 of 61), and rejected every singular
+    (0 of 95) and every typo (0 of 144). Over-blocking is 18.3% (533 of 2,920 answers that do name the
+    vendor), all from the singular and the typo.
 
 ### A11. The scripted agent's yes/no reading disagrees with the policy's
 
@@ -402,6 +407,12 @@ These are not reachable today, but each is frozen as a regression.
     control C01, all 443 days past their last clean sighting, because their change requests reply
     on the latest invoice thread.
   - **The change-context fix on its own** changed no demo pick and none of the 20 corpus outcomes.
+
+### A24. A non-name counts as the speaker's name
+
+- **Status:** reported by the spec 0048 build (Nov 10); not reproduced here.
+- **What happens:** a name the policy can't read ("?") is recorded but not grounded, so NR14 fires.
+  But grounded non-names such as "um", "J." or "Mr." count as a name, and the call verifies.
 
 ## B. The fuzz lab (spec 0033)
 
@@ -768,6 +779,28 @@ F1 to F9 hold as built (verified). But the lab still claims more than it shows:
   skipped; calls run the text-line loop, not production's Twilio loop; 30 scenarios set
   `offered_number_from_request: false` where the ledger would answer "unknown".
 
+### C13. Spec 0048 after the review fixes (Nov 10)
+
+- **Status:** all seven fixes on `sami/lab-honest-impl` (8c54e05), main merged in with spec 0043.
+  Not yet re-reviewed.
+- **F1 by condition** (seed 0): negation 49, correction 46, reseller 24, a company whose name
+  contains the vendor's 56, a past connection 50. Two of the review's three planted `call_facts`
+  bugs now fail on their own conditions (14 and 33 reports).
+- **The sweep:** 10 rules seen through production, 5 only through stand-ins (NV04, NR18, V06, NR19,
+  NR21), 22 listed as unreachable.
+- **The reachable domain was wider than production:** before fix 4, 881 of 2,000 "reachable"
+  reports broke production's recording rules.
+- **Three calls for Sami:**
+  - The third planted bug (reading only the first company answer) shows only on reports production
+    never sends, so it is reported but not gated.
+  - The F1 list names five company conditions, not A10's three: the near-variants are real defects
+    (A8, A10) that verify today.
+  - The `unanswered_question` gate exempts code's own `unclear:` endings (spec 0043's design). An
+    agent that ends a call early still fails it.
+- **Left:** `coverage.py` imports private names from `invariants.py`; the oracle's import test
+  checks direct imports only; a fresh checkout needs `uv sync` before `lab` runs; the numbering test
+  (D1); B5's ranking catch is still marginal at seed 3.
+
 ## D. Red teaming
 
 - **Started (Nov 9):** Sami chose number selection as the first target. Spec 0046
@@ -924,6 +957,14 @@ are reproduced here.
   - **G19 (Low).** The test network guard fails quietly: the SDK turns its error into
     `ReaderFailed("api_error")`, so a test expecting a failure would pass with a real client.
   - **G20 (Low).** A malformed held-out set prints its document ids and phone numbers in the error.
+
+- **After the review fixes (Nov 10):** all ten are on `sami/llm-reader` (9aa4eb5). Left:
+  - **G21.** An 11-digit run that libphonenumber reads as a phone ("Acct 12065550142") counts as a
+    phone number, so it still reaches the model.
+  - **G22.** `ANTHROPIC_CUSTOM_HEADERS` still applies to the client.
+  - **G23.** The ordinary-documents bar still passes trivially if every ordinary number is
+    another party's.
+  - No held-out hash file exists yet, so a held-out run refuses until the set is frozen.
 
 ## E. Process and housekeeping
 
