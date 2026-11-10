@@ -620,6 +620,9 @@ F1 to F9 hold as built (verified). But the lab still claims more than it shows:
   (`sami/guided-search`, approved Nov 9) is a guided search on `select()` with no model: it scores each
   world by how much a must-not-help attacker move helped, steers toward higher scores, and fixes
   the measurement that decides whether the steering stays. The model-driven targets below remain.
+- **Spec 0052 (`sami/docgen-spec`, approved Nov 10):** generated documents with a known claim and
+  owner for every number, run through real ingestion and `select()`. This is the first piece named
+  below, and it runs on the stub before any LLM reader exists.
 - **Spec 0046, dev seed 0 (exploratory: one seed, not the result; Nov 9):**
   - Every arm found all 6 `helps` breaks by world 106, before targeting starts at world 200, so the
     primary metric was 0 on that seed by construction. If other seeds look the same, the pass bar
