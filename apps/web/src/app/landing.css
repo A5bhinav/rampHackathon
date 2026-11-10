@@ -125,13 +125,13 @@
 .hero-rings .r-light { --d: 400px; } .hero-rings .r-center { --d: 160px; }
 .hero-text { position: relative; z-index: 1; max-width: 720px; }
 .hero .eyebrow { margin-bottom: 14px; }
-.hero h1 { font-size: 64px; line-height: 64px; letter-spacing: -0.015em; max-width: 14ch; }
+.hero h1 { font-size: 68px; line-height: 70px; font-weight: 700; letter-spacing: -0.05em; max-width: 15ch; }
 .hero .lead { font-size: 19px; line-height: 28px; color: var(--text-2); margin: 20px 0 0; max-width: 56ch; }
 .story-cta { display: flex; gap: 10px; flex-wrap: wrap; margin: 28px 0 0; }
 .story-cta .button-link { min-height: 44px; padding: 0 20px; font-size: 15px; }
 .story-main { padding: 0 var(--pad-x) 64px; max-width: 1280px; margin: 0 auto; }
 .story-section { margin-top: 72px; }
-.story-section > h2 { font-size: 24px; line-height: 30px; letter-spacing: -0.01em; margin-bottom: 8px; }
+.story-section > h2 { font-size: 28px; line-height: 34px; font-weight: 700; letter-spacing: -0.03em; margin-bottom: 8px; }
 .story-intro { max-width: 70ch; margin-bottom: 24px; font-size: 15px; line-height: 22px; }
 .story-sub { font-size: 16px; margin: 40px 0 12px; }
 .story p, .story li { font-size: 15px; line-height: 22px; }
@@ -174,7 +174,7 @@ table.compare td { vertical-align: top; font-size: 14px; }
 @media (max-width: 960px) {
   .public.story { --pad-x: 32px; }
   .hero { min-height: 520px; }
-  .hero h1 { font-size: 48px; line-height: 50px; }
+  .hero h1 { font-size: 52px; line-height: 56px; letter-spacing: -0.045em; }
   .hero-rings { --cx: 60px; --cy: 120px; }
   .hero-shot-section { margin-top: 32px; max-width: none; }
   .scam { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -183,10 +183,12 @@ table.compare td { vertical-align: top; font-size: 14px; }
 }
 @media (max-width: 720px) {
   .public.story { --pad-x: 16px; }
-  .hero { min-height: 0; padding: 48px var(--pad-x) 56px; }
-  .hero h1 { font-size: 38px; line-height: 42px; max-width: none; }
+  .hero { min-height: 0; padding: 184px var(--pad-x) 56px; }
+  .hero h1 { font-size: 40px; line-height: 44px; letter-spacing: -0.04em; max-width: none; }
   .hero .lead { font-size: 16px; line-height: 24px; }
-  .hero-rings { --cx: -40px; --cy: 40px; opacity: .9; }
+  .hero-rings { --cx: 30px; --cy: 50px; }
+  .hero-rings .r-outline { --d: 330px; } .hero-rings .r-deep { --d: 260px; } .hero-rings .r-mid { --d: 190px; }
+  .hero-rings .r-light { --d: 120px; } .hero-rings .r-center { --d: 48px; }
   .hero-text { padding-right: 24px; }
   .scam { grid-template-columns: 1fr; }
   .story-section { margin-top: 48px; }
