@@ -1,4 +1,5 @@
-"""Flagging, bank-detail extraction and redaction for the email door (spec 0086; design sections 3 and 4).
+"""Flagging, bank-detail extraction and the ledger's and the model's copies of an email (spec 0086; design
+sections 3 and 4).
 
 Email text is data, never instructions (R9): these functions only read it. `find_accounts` is the only
 function here that returns a full account number, and nothing here logs (ADR-8).
@@ -13,11 +14,12 @@ from bisect import bisect_left, bisect_right
 from collections.abc import Iterable
 from dataclasses import dataclass
 
+import phonenumbers
 from dialback_ledger.candidates import find_phones
 from dialback_ledger.text import Line
 
 from ..bank import aba_valid
-from .masking import DIGIT_RUN, SEPARATOR, mask_run
+from .masking import DIGIT_RUN, SEPARATOR
 
 # Flagging ------------------------------------------------------------------------------------------
 #
@@ -278,16 +280,17 @@ def _sentence_reasons(tokens: list[str]) -> tuple[list[str], list[str], list[str
 # reference to the last four, not an account. A run is digits grouped by masking.py's separators, so
 # "0001 2345 4821", "0001-2345-4821" and a number split over lines are each one run.
 #
-# Redaction keeps ADR-8 for the ledger's copy of the text. Beyond the labeled accounts it treats as an
-# account (so masks, and never reports as a routing number): any digits that repeat a found account,
-# however grouped; a run whose nearest label on its line is an account label ("Our new acct at
-# Evergreen: 026009593"); and a phone-shaped number on a line that has a payment word and no phone word
-# ("wire to 7783110245"). A line of digits and punctuation only takes the words of the line before it.
-# A phone extension is masked like any other run and is never a routing number. The ledger's stub reader
-# stores the whole of any line on which it finds exactly one phone, so a line that holds a phone keeps
-# no numeric character outside the phones kept, and redact() ends by reading its own output the way the
-# ledger does (_ledger_check): masking can make a phone readable where there was none. The model's copy
-# has no digits at all (redact_for_model).
+# Beyond the labeled accounts, these are treated as an account (so never reported as a routing number,
+# and never kept as a phone): any digits that repeat a found account, however grouped; a run whose
+# nearest label on its line is an account label ("Our new acct at Evergreen: 026009593"); and a
+# phone-shaped number on a line that has a payment word and no phone word ("wire to 7783110245"). A line
+# of digits and punctuation only takes the words of the line before it. A phone extension is never part
+# of a phone and never a routing number.
+#
+# The ledger never ingests the email's text, masked or otherwise (ADR-8; four rounds of masking in place
+# each changed what the ledger's matcher read). ledger_text() builds its document from rebuilt lines
+# only: one line per kept phone, holding the words before the phone and the phone in canonical form.
+# The model's copy has no digits at all (redact_for_model).
 
 _NOT_AN_ACCOUNT = (r"(?!\s+(?:manager|managers|statements?|payable|receivable|team|contacts?|reps?|representative|executive"
                    r"|settings|password|login|portal|balance|summary|history|activity)\b)")
@@ -309,6 +312,7 @@ _NEAREST_LABEL = re.compile(rf"(?P<account>{_ACCOUNT_LABEL})|(?P<routing>{_ROUTI
 _LINE_BREAK = re.compile("[\n\r\x0b\x0c\x1c-\x1e\x85\u2028\u2029]")   # what str.splitlines splits on
 _EXTENSION_MARK = re.compile(r"[ \t]*(?:ext(?:ension)?\.?|x|#)[ \t]*(?=\d)", re.IGNORECASE)   # not a bare comma
 _EXTENSION_RUN = re.compile(rf"\d(?:{SEPARATOR}{{0,5}}\d){{0,11}}")   # at most 12 digits, so the scan stays short
+LEDGER_WORDS = 80   # the ledger line keeps at most this many characters of the words before its phone
 
 
 def find_routing(text: str) -> list[str]:
@@ -324,59 +328,68 @@ def find_accounts(text: str) -> list[str]:
     return _unique(digits for _, _, digits in _accounts(text[:MAX_CHARS]))
 
 
-def redact(text: str, also_mask: Iterable[str] = ()) -> str:
-    """The ledger's copy of the first MAX_CHARS of `text`: every account number (see above) and every
-    other run of 5 or more digits masked to its last four, separators kept. Phone numbers and routing
-    numbers stay, so the ledger can still read them; its stub reader stores a phone's whole line, so
-    nothing else on that line may stay whole. `also_mask` holds accounts found in another field (the
-    body's, when redacting the subject), masked wherever their digits appear. The ledger stores text
-    only from lines that hold a phone number, so on those lines every numeric character outside the
-    phones kept is masked, whatever its format; and the result is read once more the way the ledger
-    reads it (_ledger_check), so a line where the ledger would find a phone that was not kept loses
-    every numeric character."""
+def ledger_text(text: str, also_mask: Iterable[str] = ()) -> str:
+    """The ledger's document for the first MAX_CHARS of `text`, built from rebuilt lines only: one line
+    per phone number kept (see above), holding the words of the phone's original line before it (letters,
+    colons and apostrophes only, nothing numeric, whitespace collapsed, the last LEDGER_WORDS characters),
+    a space, and the phone in phonenumbers' national format for a US number ("(212) 555-0199") or
+    international format otherwise. Nothing else from the email goes in, so every line is words plus one
+    canonical phone and the ledger's stub reader, which stores a line that holds exactly one phone, can
+    store nothing else.
+    `also_mask` holds accounts found in another field (the body's, when building the subject's text): a
+    phone that repeats one is not kept. Lines are joined with newlines; ingest the result unchanged."""
     text = text[:MAX_CHARS]
-    pieces, kept, phone_lines = _pieces(text, also_mask)
-    out = list(text)   # masking replaces characters one for one, so offsets and line breaks are the input's
-    for s, e, kind in pieces:
-        if kind in ("account", "other"):
-            out[s:e] = mask_run(text[s:e])
-    keep = bytearray(len(text))
-    for s, e in kept:
-        keep[s:e] = b"\x01" * (e - s)
-    for s, e in phone_lines:
-        _mask_numerics(out, s, e, keep)
-    _ledger_check(out, text, set(kept), keep)
-    return "".join(out)
-
-
-def _ledger_check(out: list[str], text: str, kept: set[tuple[int, int]], keep: bytearray) -> None:
-    """The last step of redact(): read the masked text the way the ledger's stub reader will, line by
-    line with parse_phone's matcher, since masking can turn a line that held no phone into one that does
-    ("212(555)0199(77777)" is not a phone; "212(555)0199(*7777)" is, and the stub stores its whole
-    line). A line where the matcher finds only phones redact kept loses every other numeric character
-    (str.isnumeric, so CJK numerals too). A line where it finds a phone redact did not keep loses every
-    numeric character, kept phones included (fail safe: the ledger reads nothing from it). A line this
-    changes is read again until nothing changes, which cannot create a phone: a line with no decimal
-    digit never matches, and the fully masked line has none."""
-    offset = 0
+    kept = _pieces(text, also_mask)[1]   # in text order
+    out: list[str] = []
+    formatted: dict[str, str] = {}
+    offset = k = 0
     for line in text.splitlines(keepends=True):
-        s, e = offset, offset + len(line)
-        offset = e
-        while True:
-            found = {(s + c.start, s + c.end) for c in find_phones([Line("".join(out[s:e]), "visible", 0, 0)])}
-            if not found or not _mask_numerics(out, s, e, keep if found <= kept else None):
-                break
+        end = offset + len(line)
+        words = at = None
+        while k < len(kept) and kept[k][0] < end:
+            start, _, e164 = kept[k]
+            k += 1
+            if words is None:
+                words, at = _words(line)
+            stop = at[start - offset]
+            if stop and words[stop - 1] == " ":
+                stop -= 1
+            if e164 not in formatted:
+                formatted[e164] = _canonical(e164)
+            out.append(f"{words[max(0, stop - LEDGER_WORDS):stop].lstrip()} {formatted[e164]}".strip())
+        offset = end
+    return "\n".join(out)
 
 
-def _mask_numerics(out: list[str], start: int, end: int, keep: bytearray | None) -> bool:
-    """Mask every numeric character of out[start:end] not marked in `keep` (all of them when `keep` is
-    None). Whether anything changed."""
-    changed = False
-    for k in range(start, end):
-        if out[k].isnumeric() and not (keep is not None and keep[k]):
-            out[k] = "*"
-            changed = True
-    return changed
+_WORD_MARKS = ":'\u2019"   # the colon splits the stub reader's role words from the rest; apostrophes are in words
+
+
+def _words(line: str) -> tuple[str, list[int]]:
+    """The words of `line`: every numeric character removed, every character that is not a letter or in
+    _WORD_MARKS turned into a space, and each run of spaces collapsed to one (none at the start); and for
+    each index i of `line` the length of that text for line[:i]. Brackets and plus signs go because the
+    ledger's matcher reads them as the start of a phone ("() +44 20 7946 0958" is not a phone to it, and
+    "( (212) 555-0199" is read differently). One pass, so a line of many phones costs about its length."""
+    out: list[str] = []
+    at = [0] * (len(line) + 1)
+    for i, c in enumerate(line):
+        at[i] = len(out)
+        if c.isnumeric():
+            continue
+        if c.isalpha() or c in _WORD_MARKS:
+            out.append(c)
+        elif out and out[-1] != " ":
+            out.append(" ")
+    at[len(line)] = len(out)
+    return "".join(out), at
+
+
+def _canonical(e164: str) -> str:
+    """`e164` as phonenumbers formats it: national for a US number, international otherwise."""
+    number = phonenumbers.parse(e164)
+    national = phonenumbers.region_code_for_number(number) == "US"
+    return phonenumbers.format_number(
+        number, phonenumbers.PhoneNumberFormat.NATIONAL if national else phonenumbers.PhoneNumberFormat.INTERNATIONAL)
 
 
 def redact_for_model(text: str) -> str:
@@ -401,30 +414,26 @@ def _accounts(text: str) -> list[tuple[int, int, str]]:
     return out
 
 
-def _phones(text: str) -> tuple[list[tuple[int, int]], list[tuple[int, int]], list[tuple[int, int]]]:
-    """(the phone numbers the ledger needs, their extensions, the lines that hold a phone number), found
-    the way the ledger finds phones: line by line, with parse_phone's matcher. A phone-shaped number on
-    a line with a payment word and no phone word is left out (it is taken for an account); a line of
-    digits and punctuation only takes the words of the last line before it that has letters. A phone
-    stops before its extension; when the number and its digits cannot be lined up and there are extra
-    digits, the phone is left out. An extension after the match is read up to 12 digits and never into
-    the next phone, so a line of many phones costs about its length."""
-    phones, extensions, phone_lines, offset = [], [], [], 0
+def _phones(text: str) -> tuple[list[tuple[int, int, str]], list[tuple[int, int]]]:
+    """(the phone numbers the ledger needs as (start, end, E.164), their extensions), found the way the
+    ledger finds phones: line by line, with parse_phone's matcher. A phone-shaped number on a line with
+    a payment word and no phone word is left out (it is taken for an account); a line of digits and
+    punctuation only takes the words of the last line before it that has letters. A phone stops before
+    its extension; when the number and its digits cannot be lined up and there are extra digits, the
+    phone is left out. An extension after the match is read up to 12 digits and never into the next
+    phone, so a line of many phones costs about its length."""
+    phones, extensions, offset = [], [], 0
     payment = phone_word = False
     for i, line in enumerate(text.splitlines(keepends=True)):
         if any(c.isalpha() for c in line):
             payment, phone_word = bool(_PAYMENT_WORD.search(line)), bool(_PHONE_LINE.search(line))
-        candidates = find_phones([Line(line, "visible", 0, i)])
-        if candidates:
-            phone_lines.append((offset, offset + len(line)))
-        if payment and not phone_word:
-            candidates = []
+        candidates = [] if payment and not phone_word else find_phones([Line(line, "visible", 0, i)])
         for n, c in enumerate(candidates):
             end = _phone_end(line, c)
             if end is None:
                 extensions.append((offset + c.start, offset + c.end))
                 continue
-            phones.append((offset + c.start, offset + end))
+            phones.append((offset + c.start, offset + end, c.e164))
             extensions.append((offset + end, offset + c.end))
             stop = candidates[n + 1].start if n + 1 < len(candidates) else len(line)
             mark = _EXTENSION_MARK.match(line, c.end, stop)
@@ -432,7 +441,7 @@ def _phones(text: str) -> tuple[list[tuple[int, int]], list[tuple[int, int]], li
             if run:
                 extensions.append((offset + run.start(), offset + run.end()))
         offset += len(line)
-    return phones, extensions, phone_lines
+    return phones, extensions
 
 
 def _phone_end(line: str, candidate) -> int | None:
@@ -452,13 +461,13 @@ def _phone_end(line: str, candidate) -> int | None:
     return None if len(digits) > len(e164) else candidate.end
 
 
-def _pieces(text: str, also_mask: Iterable[str] = ()) -> tuple[list[tuple[int, int, str]], list[tuple[int, int]],
-                                                               list[tuple[int, int]]]:
-    """(pieces, phones kept, lines that hold a phone). The pieces are the digits of `text` as (start,
-    end, kind): each labeled `account`, then every digit run with those accounts and the kept phones
-    cut out of it. A remaining piece is an `account` when it repeats a found account or its nearest
-    label is an account label, else `other` when it is a phone extension, else a `routing` number,
-    else `other`."""
+def _pieces(text: str, also_mask: Iterable[str] = ()) -> tuple[list[tuple[int, int, str]], list[tuple[int, int, str]]]:
+    """(pieces, phones kept as (start, end, E.164)). The pieces are the digits of `text` as (start, end,
+    kind): each labeled `account`, then every digit run with those accounts and the kept phones cut out
+    of it. A remaining piece is an `account` when it repeats a found account or its nearest label is an
+    account label, else `other` when it is a phone extension, else a `routing` number, else `other`.
+    The kept phones are the keep-decision: a phone the ledger's matcher finds on its line (see _phones)
+    that does not repeat a found account or one in `also_mask`."""
     accounts = _accounts(text)
     secrets = {d for _, _, d in accounts} | {_ascii(a) for a in also_mask}
     secrets = {d for d in secrets if len(d) >= 5}   # four digits are the last four ADR-8 keeps anyway
@@ -470,10 +479,10 @@ def _pieces(text: str, also_mask: Iterable[str] = ()) -> tuple[list[tuple[int, i
         digits = _ascii(span)
         return any(digits[i:i + n] in secrets for n in lengths for i in range(len(digits) - n + 1))
 
-    phones, extensions, phone_lines = _phones(text)
-    kept = [(s, e) for s, e in phones if not repeats_an_account(text[s:e])]
+    phones, extensions = _phones(text)
+    kept = [(s, e, e164) for s, e, e164 in phones if not repeats_an_account(text[s:e])]
     taken = bytearray(len(text))
-    for s, e in [(s, e) for s, e, _ in accounts] + kept:
+    for s, e, _ in accounts + kept:
         taken[s:e] = b"\x01" * (e - s)
     extension = bytearray(len(text))
     for s, e in extensions:
@@ -501,7 +510,7 @@ def _pieces(text: str, also_mask: Iterable[str] = ()) -> tuple[list[tuple[int, i
             else:
                 kind = "other"
             out.append((s, e, kind))
-    return out, kept, phone_lines
+    return out, kept
 
 
 def _labeled_as_account(text: str, start: int) -> bool:

@@ -1,4 +1,4 @@
-"""Flagging, bank-detail extraction and redaction for the email door (spec 0086, Task 6)."""
+"""Flagging, bank-detail extraction and the ledger's text for the email door (spec 0086, Task 6)."""
 from __future__ import annotations
 
 import hashlib
@@ -8,16 +8,17 @@ import re
 import time
 import unicodedata
 
+import phonenumbers as pn
 import pytest
 from dialback_core.bank import aba_valid
 from dialback_core.email_door import rules
-from dialback_core.email_door.masking import DIGIT_RUN, mask_digit_runs
+from dialback_core.email_door.masking import DIGIT_RUN
 from dialback_core.email_door.rules import (
     Flag,
     find_accounts,
     find_routing,
     flag,
-    redact,
+    ledger_text,
     requested_fingerprint,
 )
 from dialback_ledger.candidates import find_phones, parse_phone
@@ -31,10 +32,10 @@ def five_digit_pieces_of(account: str) -> set[str]:
     return {account[i:i + 5] for i in range(len(account) - 4)}
 
 
-def surviving_account_digits(redacted: str, account: str = ACCOUNT) -> set[str]:
-    """Every five-digit stretch of `account` that can still be read in `redacted`, separators ignored."""
+def surviving_account_digits(text: str, account: str = ACCOUNT) -> set[str]:
+    """Every five-digit stretch of `account` that can still be read in `text`, separators ignored."""
     found = set()
-    for m in re.finditer(r"\d(?:[^\d*]{0,5}\d)*", redacted):
+    for m in re.finditer(r"\d(?:[^\d*]{0,5}\d)*", text):
         digits = re.sub(r"\D", "", m.group(0))
         found |= {digits[i:i + 5] for i in range(len(digits) - 4)} & five_digit_pieces_of(account)
     return found
@@ -59,8 +60,22 @@ def numeric_runs_outside_the_phones(quote: str) -> list[str]:
     return runs
 
 
-def stored_by_the_ledger(text: str) -> list[str]:
-    return [label["quote"] for label in StubReader().label(redact(text))]
+def numerics(text: str) -> str:
+    return "".join(c for c in text if c.isnumeric())
+
+
+def digits_of(e164: str) -> set[str]:
+    """The digit strings a line holding only `e164` may carry: with the country code or the national part."""
+    return {e164.lstrip("+"), pn.national_significant_number(pn.parse(e164))}
+
+
+def stored(text: str) -> list[tuple[str, str]]:
+    """(quote, phone) for every line the ledger's stub reader would store from the ledger's text of `text`."""
+    return [(label["quote"], parse_phone(label["quote"])[0]) for label in StubReader().label(ledger_text(text))]
+
+
+def phones_on_the_lines_of(text: str) -> set[str]:
+    return {phone for line in text.splitlines() for phone in parse_phone(line)}
 
 
 # Flagging ------------------------------------------------------------------------------------------
@@ -184,6 +199,21 @@ def test_routing_needs_the_aba_checksum():
     assert find_routing("ABA: 026009593\nAcct: 0001 2345 4821") == ["026009593"]
 
 
+def test_a_comma_after_a_phone_is_not_an_extension():
+    assert find_routing("Contact: 212-555-0199, 026009593") == ["026009593"]
+
+
+def test_an_extension_is_never_a_routing_number():
+    text = "Call 212-555-0199 ext. 123454821"                                         # nine digits, valid ABA checksum
+    assert find_routing(text) == [] and ledger_text(text) == "Call (212) 555-0199"
+
+
+def test_a_loosely_labeled_account_is_not_a_routing_number():
+    text = "Our new acct at Evergreen: 026009593"                                      # P9
+    assert find_routing(text) == [] and ledger_text(text) == ""
+    assert find_routing("Account 1234567, routing 026009593") == ["026009593"]
+
+
 # Account numbers -----------------------------------------------------------------------------------
 
 @pytest.mark.parametrize("text", [
@@ -207,135 +237,113 @@ def test_accounts_need_a_label_and_four_to_seventeen_digits():
     assert find_accounts("Account: \uff10\uff10\uff10\uff11\uff12\uff13\uff14\uff15\uff14\uff18\uff12\uff11") == [ACCOUNT]
 
 
-def test_redact_is_fast_on_a_long_email():
-    # Many found accounts, and many runs that repeat none of them: each run is checked against every account.
-    text = "".join(f"Account: {7783110000 + i}. Wire {5000000000 + i} or {6000000000 + i}.\n" for i in range(8300))
-    assert len(text) > 431_000
-    start = time.perf_counter()
-    rules.redact(text)
-    assert time.perf_counter() - start < 1.0
+def test_a_last_four_reference_is_not_an_account():
+    assert find_accounts("the account ending 8888 is closed; new account 000088889999") == ["000088889999"]
+    assert find_accounts("Acct last four: 4821") == []
 
 
 def test_every_text_function_reads_only_the_first_50000_characters():
     pad = "x" * 50_000
     assert rules.MAX_CHARS == 50_000
     assert find_accounts(pad + " Account: 000123454821") == [] and find_routing(pad + " ABA 026009593") == []
-    assert redact(pad + " Account: 000123454821") == pad and rules.redact_for_model(pad + " 1234") == pad
+    assert ledger_text(pad + " Call 212-555-0199") == "" and rules.redact_for_model(pad + " 1234") == pad
     assert not flag("", pad + " We have changed our bank.").flagged
 
 
-def test_a_last_four_reference_is_not_an_account():
-    assert find_accounts("the account ending 8888 is closed; new account 000088889999") == ["000088889999"]
-    assert find_accounts("Acct last four: 4821") == []
+# The ledger's text ---------------------------------------------------------------------------------
+#
+# The ledger never ingests the email's text, masked or not. ledger_text() rebuilds one line per phone the
+# keep-decision keeps: the words of the original line before that phone (nothing numeric, whitespace
+# collapsed, the last 80 characters), a space, and the phone in phonenumbers' national (US) or
+# international format. So every stored quote is words plus one canonical phone, by construction.
+
+def test_the_ledger_line_is_the_words_before_the_phone_and_the_phone_in_canonical_form():
+    assert ledger_text("Call 212-555-0199") == "Call (212) 555-0199"
+    assert ledger_text("Call  \t 2125550199 now, or 617.555.0143.") == "Call (212) 555-0199\nCall now or (617) 555-0143"
+    assert ledger_text("Ref 12 ab3c: 212(555)0199") == "Ref abc: (212) 555-0199"
+    # Only letters, colons and apostrophes stay: brackets and plus signs change how the matcher reads the phone.
+    assert ledger_text("Jane (AR) | +1 Dana's ext: 212-555-0199") == "Jane AR Dana's ext: (212) 555-0199"
+    assert ledger_text("Please pay (9677329484)) 212(555)0199 (+44 20 7946 0958 ext 12345 -") == (
+        "Please pay (212) 555-0199\nPlease pay +44 20 7946 0958")                   # seed 105 of the property test
+    assert ledger_text("Tel +44 20 7946 0958") == "Tel +44 20 7946 0958"                 # not US: international
+    assert ledger_text("Call 416-555-0199") == "Call +1 416-555-0199"                   # Canada
+    assert ledger_text("No phone here, account 000123454821.") == ""
+    assert ledger_text("212-555-0199") == "(212) 555-0199"
 
 
-# Redaction -----------------------------------------------------------------------------------------
+def test_the_words_before_the_phone_are_its_last_80_characters():
+    text = "x" * 100 + " AR desk: 212-555-0199"
+    words = ("x" * 100 + " AR desk:")[-80:]
+    assert len(words) == 80 and ledger_text(text) == words + " (212) 555-0199"
+
+
+def test_role_words_reach_the_stub_reader():
+    assert StubReader().label(ledger_text("AR line: 212-555-0199")) == [
+        {"quote": "AR line: (212) 555-0199", "role": "ar", "party": "vendor"}]
+    assert ledger_text("Accounts Payable: 212-555-0199") == "Accounts Payable: (212) 555-0199"
+    assert ledger_text("Remittance desk Ph: 617-555-0143") == "Remittance desk Ph: (617) 555-0143"
+
 
 @pytest.mark.parametrize(("text", "expected"), [
-    ("Account: 0001 2345 4821", "Account: **** **** 4821"),
-    ("Account number 0001-2345-4821 from today", "Account number ****-****-4821 from today"),
-    ("Acct #: 000123454821", "Acct #: ********4821"),
-    ("Account Number\n0001\n2345\n4821\n", "Account Number\n****\n****\n4821\n"),
+    ("Accounts Payable: 212-555-0199", "Accounts Payable: (212) 555-0199"),
+    ("Jane Doe | Accounts Receivable | Acme Corp | 617-555-0143", "Jane Doe Accounts Receivable Acme Corp (617) 555-0143"),
+    ("Account manager: Dana 212-555-0199", "Account manager: Dana (212) 555-0199"),
+    ("Remittance desk Ph: 617-555-0143", "Remittance desk Ph: (617) 555-0143"),
 ])
-def test_redact_leaves_only_the_last_four(text, expected):
-    out = redact(text)
-    assert out == expected
-    assert surviving_account_digits(out) == set()
-    assert "4821" in out
+def test_signature_lines_keep_their_phones(text, expected):
+    assert ledger_text(text) == expected
 
 
-def test_redact_keeps_phone_and_routing():
-    text = ("New routing 026009593, account 0001-2345-4821.\n"
-            "AR direct: (617) 555-0143\nCall Dana at 212-555-0199 with questions.")
-    out = redact(text)
-    assert "026009593" in out and find_routing(out) == ["026009593"]
-    assert parse_phone(out) == ["+16175550143", "+12125550199"]
-    assert "****-****-4821" in out and surviving_account_digits(out) == set()
+def test_a_phone_on_a_line_with_a_phone_word_or_no_payment_word_is_kept():
+    assert ledger_text("Our office: 212-555-0199") == "Our office: (212) 555-0199"
+    assert ledger_text("Questions about the wire? Call 212-555-0199.") == "Questions about the wire Call (212) 555-0199"
+    assert ledger_text("Call 212-555-0199, then wire it to 987654321098 today") == "Call (212) 555-0199"
 
 
-def test_redact_masks_an_unlabeled_number_on_a_phone_line():
-    # The ledger's stub reader stores a phone's whole line, so an unlabeled number there must be masked too.
-    line = "Call 212-555-0199, then wire it to 987654321098 today"
-    out = redact(line)
-    assert parse_phone(out) == ["+12125550199"]
-    assert out == "Call 212-555-0199, then wire it to ************ today"      # a phone line keeps only its phone
-    assert surviving_account_digits(out, "987654321098") == set()
-    # Run together with the phone by a single space, the number is still masked and the phone still parses.
-    out = redact("Call 212-555-0199 987654321098")
-    assert parse_phone(out) == ["+12125550199"] and surviving_account_digits(out, "987654321098") == set()
-
-
-def test_redact_keeps_a_valid_routing_number_and_masks_an_invalid_one():
-    assert redact("ABA 026009593") == "ABA 026009593"
-    assert redact("ABA 026009594") == "ABA *****9594"
-
-
-def test_a_labeled_account_is_masked_even_when_it_looks_like_a_phone_or_a_routing_number():
-    assert redact("Account: 212-555-0199") == "Account: ***-***-****"       # a phone line keeps only its kept phones
-    assert redact("Account: 026009593") == "Account: *****9593"
-
-
-def test_redact_masks_at_least_what_masking_masks():
-    # Every digit that mask_digit_runs hides stays hidden, except phones and routing numbers.
-    text = "Inv 2291 for 18,450.00. Wire 5530 7781 02 or 44100-99231 by Friday."
-    assert redact(text) == mask_digit_runs(text)
-
-
-@pytest.mark.parametrize(("text", "account"), [
-    ("Account: 7783110245.\nTo confirm, wire to 7783110245 today.", "7783110245"),
-    ("Account: 7783110245.\nTo confirm, it is 7783110245.", "7783110245"),       # no payment word on line 2
-    ("Account: 778 311 0245\nTo confirm, it is (778) 311-0245.", "7783110245"),  # grouped differently
-    ("Account: 026009593\nTo confirm, it is 026009593.", "026009593"),           # nine digits, valid ABA checksum
+@pytest.mark.parametrize("text", [
+    "Please wire to 7783110245 at Evergreen Bank.",                                # P1
+    "Account at Chase: 2299100477",                                                # P2
+    "Send the ACH to 12125550199 tomorrow.",                                       # P5
+    "Account: 212-555-0199",
 ])
-def test_a_found_account_is_masked_wherever_it_repeats(text, account):
-    out = rules.redact(text)
-    assert surviving_account_digits(out, account) == set()
-    assert find_routing(text) == [] and parse_phone(out) == []
+def test_a_phone_shaped_number_on_a_payment_line_without_a_phone_word_is_not_kept(text):
+    assert ledger_text(text) == ""
 
 
-def test_redact_masks_accounts_found_in_another_field():
-    # Task 8 passes the body's accounts when it redacts the subject.
-    assert rules.redact("Re: wire to 7783110245", also_mask=["7783110245"]) == "Re: wire to **********"
-    assert rules.redact("Re: 778-311-0245 is ours", also_mask=["7783110245"]) == "Re: ***-***-**** is ours"
-
-
-@pytest.mark.parametrize(("text", "account"), [
-    ("Please wire to 7783110245 at Evergreen Bank.", "7783110245"),             # P1
-    ("Account at Chase: 2299100477", "2299100477"),                             # P2
-    ("Send the ACH to 12125550199 tomorrow.", "12125550199"),                   # P5
+@pytest.mark.parametrize("text", [
+    "Account: 7783110245.\nTo confirm, wire to 7783110245 today.",
+    "Account: 7783110245.\nTo confirm, it is 7783110245.",                         # no payment word on line 2
+    "Account: 778 311 0245\nTo confirm, it is (778) 311-0245.",                    # grouped differently
+    "Account: 026009593\nTo confirm, it is 026009593.",                            # nine digits, valid ABA checksum
 ])
-def test_a_phone_shaped_number_on_a_payment_line_is_masked(text, account):
-    out = redact(text)
-    assert surviving_account_digits(out, account) == set() and parse_phone(out) == []
+def test_a_phone_that_repeats_a_found_account_is_not_kept(text):
+    assert ledger_text(text) == "" and find_routing(text) == []
 
 
-def test_a_phone_on_a_line_with_a_phone_word_or_no_payment_word_stays():
-    assert redact("Call 212-555-0199") == "Call 212-555-0199"
-    assert redact("Our office: 212-555-0199") == "Our office: 212-555-0199"
-    assert parse_phone(redact("Questions about the wire? Call 212-555-0199.")) == ["+12125550199"]
+def test_accounts_found_in_another_field_are_not_kept():
+    # Task 8 may pass the body's accounts when it builds the subject's ledger text.
+    assert ledger_text("Re: call 7783110245", also_mask=["7783110245"]) == ""
+    assert ledger_text("Re: 778-311-0245 is ours", also_mask=["7783110245"]) == ""
+    assert ledger_text("Re: call 7783110245") == "Re: call +1 778-311-0245"
 
 
-def test_a_phone_extension_is_masked_whatever_its_length():
-    out = redact("Call 212-555-0199 ext. 000123454821")
-    assert surviving_account_digits(out) == set() and parse_phone(out) == ["+12125550199"]
-    assert redact("Call 212-555-0199 ext. 4821") == "Call 212-555-0199 ext. ****"     # a phone line keeps only its phone
-
-
-@pytest.mark.parametrize(("text", "phone"), [
-    ("Tel +44 (0)20 7946 0958 ext 000123454821", "+442079460958"),
-    ("Call 011 44 20 7946 0958 ext. 000123454821", "+442079460958"),
-    ("Call 212-555-0199 x000123454821", "+12125550199"),
-    ("Call 212-555-0199 #000123454821", "+12125550199"),
+@pytest.mark.parametrize("text", [
+    "Call 212-555-0199 ext. 000123454821",
+    "Call 212-555-0199 ext. 4821",
+    "Call 212-555-0199 x000123454821",
+    "Call 212-555-0199 #000123454821",
+    "Call 212-555-0199x4821 now",                                                  # glued on: kept, the extension dropped
 ])
-def test_an_extension_is_masked_in_any_form(text, phone):
-    out = redact(text)
-    assert surviving_account_digits(out) == set() and phone in parse_phone(out)
+def test_an_extension_is_never_part_of_the_phone(text):
+    assert ledger_text(text) == "Call (212) 555-0199"
 
 
-def test_an_extension_is_never_a_routing_number():
-    text = "Call 212-555-0199 ext. 123454821"                                         # nine digits, valid ABA checksum
-    out = redact(text)
-    assert "123454821" not in out and find_routing(text) == [] and parse_phone(out) == ["+12125550199"]
+@pytest.mark.parametrize(("text", "expected"), [
+    ("Tel +44 (0)20 7946 0958 ext 000123454821", "Tel +44 20 7946 0958"),
+    ("Call 011 44 20 7946 0958 ext. 000123454821", "Call +44 20 7946 0958"),
+])
+def test_a_prefixed_phone_keeps_only_its_number(text, expected):
+    assert ledger_text(text) == expected
 
 
 @pytest.mark.parametrize("text", [
@@ -347,116 +355,177 @@ def test_an_extension_is_never_a_routing_number():
     "Please wire the payment to the account below:\n\n(778) 311-0245",
 ])
 def test_a_number_alone_on_a_line_takes_the_words_of_the_line_before(text):
-    assert surviving_account_digits(redact(text), "7783110245") == set()
+    assert ledger_text(text) == ""
 
 
-def test_a_phone_alone_on_a_line_after_a_phone_word_stays():
-    assert parse_phone(redact("Please wire the payment, and if anything is unclear call me on\n212-555-0199")) == ["+12125550199"]
-
-
-@pytest.mark.parametrize(("text", "phone"), [
-    ("Accounts Payable: 212-555-0199", "+12125550199"),
-    ("Jane Doe | Accounts Receivable | Acme Corp | 617-555-0143", "+16175550143"),
-    ("Account manager: Dana 212-555-0199", "+12125550199"),
-    ("Remittance desk Ph: 617-555-0143", "+16175550143"),
-])
-def test_signature_lines_keep_their_phones(text, phone):
-    assert redact(text) == text and parse_phone(text) == [phone]
-
-
-def test_a_comma_after_a_phone_is_not_an_extension():
-    assert find_routing("Contact: 212-555-0199, 026009593") == ["026009593"]
-
-
-def test_the_phone_scan_is_fast_on_one_long_line_of_phones():
-    line = ",".join(["212-555-0199"] * 3846)
-    for function in (redact, find_routing):
-        start = time.perf_counter()
-        function(line)
-        assert time.perf_counter() - start < 0.3, function.__name__
+def test_a_phone_alone_on_a_line_after_a_phone_word_is_kept():
+    assert ledger_text("Please wire the payment, and if anything is unclear call me on\n212-555-0199") == "(212) 555-0199"
 
 
 @pytest.mark.parametrize("text", [
     "Call 212-555-0199. Account: 7783|1102|45",
     "Account: 0001  --  2345  --  4821, call 212-555-0199",
     "Call 212-555-0199 or 778\u00b7311\u00b70245",
+    "Call 212-555-0199 or \u4e03\u4e03\u516b\u4e09\u4e00\u4e00\u3007\u4e8c\u56db\u4e94",   # CJK numerals
 ])
-def test_a_phone_line_keeps_no_digit_but_its_phone(text):
-    out = redact(text)
-    assert parse_phone(out) == ["+12125550199"] and "212-555-0199" in out
-    assert not any(c.isdigit() for c in out.replace("212-555-0199", "", 1))
+def test_nothing_else_on_a_phone_line_reaches_the_ledger(text):
+    out = ledger_text(text)
+    assert [quote for quote, _ in stored(text)] == [out] and parse_phone(out) == ["+12125550199"]
+    assert numerics(out) == "2125550199"
 
 
-# The ledger's final check: redact() decides "phone line" on its input, the ledger on redact()'s output,
-# and masking can turn a line that was not a phone line into one (212(555)0199(77777) is not a phone,
-# 212(555)0199(*7777) is). So redact() ends by reading its output the way the ledger does.
+# Repros from every fix round: lines where masking the email's text in place let the ledger store an
+# account, or a phone-shaped account, next to a phone, or stored a line masking had turned into a phone line.
 
-@pytest.mark.parametrize(("text", "account"), [
-    ("Ref 212(555)0199(77777) Our new account: 7783|1102|45", "7783110245"),
-    ("Ph 212(555)0199(77777), acct 778·311·0245", "7783110245"),
-])
-def test_the_ledger_stores_no_line_that_masking_turned_into_a_phone_line(text, account):
-    out = redact(text)
-    assert parse_phone(text) == []                        # not a phone line on the way in
-    assert parse_phone(out) == []                         # and not one on the way out
-    assert not any(c.isnumeric() for c in out)            # a phone the ledger reads and redact did not keep: whole line masked
-    assert surviving_account_digits(out, account) == set()
-    assert all(numeric_runs_outside_the_phones(quote) == [] for quote in stored_by_the_ledger(text))
-
-
-def test_cjk_numerals_are_masked_on_a_phone_line():
-    text = "Call 212-555-0199 or 七七八三一一〇二四五"
-    out = redact(text)
-    assert out == "Call 212-555-0199 or **********"
-    assert stored_by_the_ledger(text) == [out]
-    # On a line without a phone they are not decimal digits, so nothing masks them, and the stub stores nothing.
-    assert stored_by_the_ledger("Account: 七七八三一一〇二四五") == []
-
-
-def test_a_phone_with_an_unspaced_extension_is_lost_to_the_ledger():
-    # Known minor loss, recorded in spec 0086: the extension is masked, and "0199x****" no longer reads as a phone.
-    out = redact("Call 212-555-0199x4821 now")
-    assert out == "Call 212-555-0199x**** now" and parse_phone(out) == []
-    assert parse_phone(redact("Call 212-555-0199 x4821 now")) == ["+12125550199"]
+REPROS = [
+    "Ref 212(555)0199(77777) Our new account: 7783|1102|45",                          # round 4: masking made a phone
+    "Ph 212(555)0199(77777), acct 778\u00b7311\u00b70245",
+    "Call 2125550199)\u4e03\u4e03\u516b\u4e09\u4e00\u4e00\u3007\u4e8c\u56db\u4e94x",  # round 4: CJK beside a phone
+    "Ref 212-555-0199, 2125550199x\u4e03\u4e03\u516b\u4e09\u4e00\u4e00\u3007\u4e8c\u56db\u4e94 21569.",
+    "Ph 212-555-0199, 77777/(617) 555-0143x51826279-",                                # round 5: a hidden phone
+    "Account (call 212-555-0199 to confirm): 7783110245x1",                           # round 5: the account stored
+    "Call 212-555-0199, then wire it to 987654321098 today",                           # round 1
+    "Call 212-555-0199 987654321098",
+    "Account: 7783110245.\nTo confirm, wire to 7783110245 today.",
+    "Please wire to 7783110245 at Evergreen Bank.",
+    "Call 212-555-0199 ext. 000123454821",
+    "Tel +44 (0)20 7946 0958 ext 000123454821",                                        # round 2
+    "Call 011 44 20 7946 0958 ext. 000123454821",
+    "Please wire the payment to the account below:\n\n(778) 311-0245",
+    "Call 212-555-0199. Account: 7783|1102|45",                                        # round 3
+    "Account: 0001  --  2345  --  4821, call 212-555-0199",
+    "Call 212-555-0199 or 778\u00b7311\u00b70245",
+    "Contact: 212-555-0199, 026009593",
+    "Call 212-555-0199 x4821, acct 000123454821, routing 026009593",
+]
 
 
-PHONES = ["212-555-0199", "(617) 555-0143", "+44 20 7946 0958", "617.555.0143", "2125550199"]
-ODD_ACCOUNTS = ["7783|1102|45", "778·311·0245", "0001  --  2345  --  4821", "2299 1004 77",
-                "七七八三一一〇二四五", "000123454821", "77777"]
-GLUE = ["(", ")", "-", ".", "/", " ", "", "x", ", "]
-LINE_WORDS = ["Ref", "Ph", "Call", "Our new account:", "acct", "Wire to", "Tel", "Account number", ""]
+@pytest.mark.parametrize("text", REPROS)
+def test_every_stored_quote_is_words_and_one_phone(text):
+    for quote, phone in stored(text):
+        assert numerics(quote) in digits_of(phone), quote
+        assert numeric_runs_outside_the_phones(quote) == []
+    for account in find_accounts(text):
+        assert surviving_account_digits(ledger_text(text), account) == set()
 
 
-def test_stored_quotes_hold_no_numeric_run_but_their_phone():
-    # A few hundred generated lines: phones glued to digit runs with ( ) - . / x and odd-format accounts.
-    # Whatever the ledger stores, the only run of 5 or more numeric characters in it is the stored phone.
-    rng = random.Random(86)
-    leaks = []
-    for _ in range(400):
+def test_the_round_4_repros_hold_no_phone_so_the_ledger_gets_nothing():
+    for text in REPROS[:2]:
+        assert parse_phone(text) == [] and ledger_text(text) == ""
+
+
+# A property test over generated text: every format the rounds found (212(555)0199, "(digits)" glue,
+# x/ext/# extensions, ~ | and middle-dot joins, phone-shaped labeled and unlabeled accounts, CJK and
+# fullwidth numerals, several phones per line). The generator is shown to produce the bug class first.
+
+PHONE_FORMS = ["212-555-0199", "(617) 555-0143", "+44 20 7946 0958", "617.555.0143", "2125550199", "212(555)0199",
+               "212 555 0199", "+1 212 555 0199", "416-555-0199"]
+EXTENSIONS = ["", "", "", " x51826279", "x4821", " ext. 000123454821", " ext 12345", "#77777", " #1234"]
+ACCOUNT_FORMS = ["7783110245", "2299100477", "778-311-0245", "(778) 311-0245", "7783|1102|45", "778\u00b7311\u00b70245",
+                 "0001  --  2345  --  4821", "000123454821", "\u4e03\u4e03\u516b\u4e09\u4e00\u4e00\u3007\u4e8c\u56db\u4e94",
+                 "\uff17\uff17\uff18\uff13\uff11\uff11\uff10\uff12\uff14\uff15", "026009593", "987654321098", "77777", "51826279"]
+LABELS = ["Account:", "Acct #", "Our new account:", "Account (call us to confirm):", "a/c", "Account number is"]
+JOINS = [" ", ", ", "~", "|", "\u00b7", "/", "", " - ", ") ", " ("]
+LINE_WORDS = ["Ref", "Ph", "Call", "Tel", "Wire to", "AR line:", "Accounts Payable:", "Remittance desk Ph:",
+              "Please pay", "Bank:", "Account:", "acct", ""]
+
+
+def generated(seed: int) -> str:
+    rng = random.Random(seed)
+    lines = []
+    for _ in range(rng.randint(1, 3)):
         parts = []
-        for _ in range(rng.randint(2, 4)):
+        for _ in range(rng.randint(1, 4)):
             kind = rng.random()
-            if kind < 0.4:
-                parts.append(rng.choice(PHONES))
-            elif kind < 0.7:
-                parts.append("".join(rng.choice("0123456789") for _ in range(rng.randint(5, 12))))
+            if kind < 0.45:
+                parts.append(rng.choice(PHONE_FORMS) + rng.choice(EXTENSIONS))
+            elif kind < 0.65:
+                parts.append(rng.choice(LABELS) + " " + rng.choice(ACCOUNT_FORMS))
+            elif kind < 0.85:
+                parts.append(rng.choice(ACCOUNT_FORMS))
+            elif kind < 0.95:
+                parts.append("(" + "".join(rng.choice("0123456789") for _ in range(rng.randint(4, 11))) + ")")
             else:
-                parts.append(rng.choice(ODD_ACCOUNTS))
-        line = rng.choice(LINE_WORDS) + " " + "".join(p + rng.choice(GLUE) for p in parts)
-        for quote in stored_by_the_ledger(line):
-            if numeric_runs_outside_the_phones(quote):
-                leaks.append((line, quote))
-    assert leaks == []
+                parts.append("".join(rng.choice("0123456789") for _ in range(rng.randint(5, 12))))
+        lines.append((rng.choice(LINE_WORDS) + " " + "".join(p + rng.choice(JOINS) for p in parts)).strip())
+    return "\n".join(lines)
 
 
-def test_a_loosely_labeled_account_is_not_a_routing_number():
-    text = "Our new acct at Evergreen: 026009593"                                      # P9
-    assert find_routing(text) == [] and "026009593" not in redact(text)
-    assert find_routing("Account 1234567, routing 026009593") == ["026009593"]
+SEEDS = range(200)
 
+
+def leaks_in(text: str) -> list[tuple[str, str]]:
+    """Stored quotes from `text` as the stub reads it that carry a numeric run outside their phone, or whose
+    phone is a labeled account."""
+    accounts = {a for a in find_accounts(text) if len(a) >= 5}
+    out = []
+    for label in StubReader().label(text):
+        phone = parse_phone(label["quote"])[0]
+        if numeric_runs_outside_the_phones(label["quote"]) or any(a in phone for a in accounts):
+            out.append((label["quote"], phone))
+    return out
+
+
+def test_the_generator_produces_the_bug_class_on_the_original_text():
+    leaks = [leak for seed in SEEDS for leak in leaks_in(generated(seed))]
+    assert len(leaks) >= 20, leaks[:5]
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_every_stored_line_is_words_and_one_kept_phone(seed):
+    text = generated(seed)
+    out = ledger_text(text)
+    labels = StubReader().label(out)
+    kept = [e164 for _, _, e164 in rules._pieces(text)[1]]
+    assert len(labels) == (out.count("\n") + 1 if out else 0)                 # every rebuilt line is stored
+    assert [parse_phone(label["quote"])[0] for label in labels] == kept         # as the phone the keep-decision kept
+    on_the_lines = phones_on_the_lines_of(text)
+    accounts = {a for a in find_accounts(text) if len(a) >= 5}
+    for label in labels:
+        quote, phone = label["quote"], parse_phone(label["quote"])[0]
+        assert phone in on_the_lines                                           # a phone of the original, never made up
+        assert numerics(quote) in digits_of(phone), quote                      # nothing numeric but the phone
+        assert not any(a in numerics(quote) for a in accounts), quote
+
+
+def test_the_property_test_runs_in_a_few_seconds():
+    start = time.perf_counter()
+    for seed in SEEDS:
+        ledger_text(generated(seed))
+    assert time.perf_counter() - start < 3.0
+
+
+def test_the_phone_scan_is_fast_on_one_long_line_of_phones():
+    line = ",".join(["212-555-0199"] * 3846)                                      # 50 KB
+    assert len(line) > 49_000
+    for function in (ledger_text, find_routing):
+        start = time.perf_counter()
+        function(line)
+        assert time.perf_counter() - start < 0.3, function.__name__
+
+
+def test_the_phone_scan_is_fast_on_many_phone_lines():
+    text = "AR line: 212-555-0199\n" * 2270                                      # 50 KB, under MAX_CHARS
+    assert len(text) > 49_000
+    start = time.perf_counter()
+    out = ledger_text(text)
+    assert time.perf_counter() - start < 0.3
+    assert out.count("\n") == 2269
+
+
+def test_ledger_text_is_fast_on_a_long_email():
+    # Many found accounts, and many runs that repeat none of them: each run is checked against every account.
+    text = "".join(f"Account: {7783110000 + i}. Wire {5000000000 + i} or {6000000000 + i}.\n" for i in range(8300))
+    assert len(text) > 431_000
+    start = time.perf_counter()
+    ledger_text(text)
+    assert time.perf_counter() - start < 1.0
+
+
+# The model's copy ----------------------------------------------------------------------------------
 
 # P3 was not spelled out in the review message; these two stand in for it: an unlabeled valid routing
-# number and a plain phone, both of which redact() keeps for the ledger and the model must not see.
+# number and a plain phone, both of which the ledger may see and the model must not.
 MODEL_PROBES = [
     "Please wire to 7783110245 at Evergreen Bank.",                                  # P1
     "Account at Chase: 2299100477",                                                  # P2
