@@ -207,6 +207,8 @@ def test_v05_is_retired_and_its_ids_still_render():
 
 
 def test_nr03_has_its_new_sentence_and_is_the_company_answers_only_rule():
+    # True under both meanings NR03 has had, so a decision-1.0.0 decision that recorded it (a company answer
+    # that didn't match) doesn't read as the vendor denying it (review fix, Nov 10).
     assert TEMPLATES["NR03_wrong_company"] == \
-        "The company answer says the person is not with this vendor, or only works with it."
+        "The company answer did not name this vendor, or said the person is not with it or only works with it."
     assert rules.SLOT_RULES["company_named"] == ("NR03_wrong_company",)

@@ -166,8 +166,10 @@ NOT_VERIFIED: tuple[Rule, ...] = (
 # Block 2: Needs review --------------------------------------------------------------------------
 
 NEEDS_REVIEW: tuple[Rule, ...] = (
-    # Spec 0082, D7b: company_matches is False only for an answer with a refusal word (D7a).
-    Rule("NR03_wrong_company", "The company answer says the person is not with this vendor, or only works with it.",
+    # Spec 0082, D7b: company_matches is False only for an answer with a refusal word (D7a). The sentence is
+    # true under both meanings NR03 has had, so a decision-1.0.0 NR03 (no match) still reads correctly.
+    Rule("NR03_wrong_company",
+         "The company answer did not name this vendor, or said the person is not with it or only works with it.",
          lambda f, m: f.company_matches is False),
     Rule("NR04_speaker_from_change_thread", "The person first appeared in the change request thread.",
          lambda f, m: f.speaker_in_change_thread is True),
