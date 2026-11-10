@@ -127,10 +127,13 @@ def _redact(text: str, phones: list[tuple[int, int, str]]) -> str:
 
 
 def llm_version(*, model: str = MODEL, system: str = SYSTEM_PROMPT,
-                user: tuple[str, str] = (USER_BEFORE, USER_AFTER), schema: dict = SCHEMA) -> str:
+                user: tuple[str, str] = (USER_BEFORE, USER_AFTER), schema: dict = SCHEMA,
+                effort: str = EFFORT, max_tokens: int = MAX_TOKENS) -> str:
     """The stored `extractor_version`: the reader mode plus a short hash of the model id, the prompt
-    (the system prompt and the user turn around the document) and the schema (spec 0049, decision 7)."""
-    return "llm-" + hashlib.sha256(rfc8785.dumps([model, system, list(user), schema])).hexdigest()[:12]
+    (the system prompt and the user turn around the document), the schema (spec 0049, decision 7),
+    the effort and max_tokens (review G17)."""
+    config = [model, system, list(user), schema, effort, max_tokens]
+    return "llm-" + hashlib.sha256(rfc8785.dumps(config)).hexdigest()[:12]
 
 
 def matches_schema(data: object) -> bool:

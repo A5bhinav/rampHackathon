@@ -398,5 +398,7 @@ def test_extractor_version_tracks_model_prompt_and_schema():
     schema = copy.deepcopy(SCHEMA)
     schema["properties"]["labels"]["items"]["properties"]["role"]["enum"].append("sales")
     assert llm_version(schema=schema) != v
+    assert llm_version(effort="medium") != v                      # review G17
+    assert llm_version(max_tokens=MAX_TOKENS * 2) != v
     assert reader_for(ReaderMode.LLM, env=KEY).version == v       # the reader names its configuration
     assert StubReader().version == "stub"
