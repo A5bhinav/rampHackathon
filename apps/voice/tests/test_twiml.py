@@ -80,6 +80,19 @@ def test_keys_pressed_while_the_agent_speaks_still_reach_the_relay():
     assert 'dtmfDetection="true"' in xml
 
 
+def test_speaker_events_are_subscribed():
+    # Spec 0051, D3: Twilio reports when the agent stops speaking (agentSpeaking) and when the caller
+    # speaks (clientSpeaking), so the relay's quiet clock can start and be postponed. The settings
+    # spec 0043 relies on stay as they are.
+    path = f"/twilio/twiml/{CALL}"
+    r = _client().get(path, headers={"X-Twilio-Signature": _sign(BASE + path, {})})
+    assert r.status_code == 200, r.text
+    xml = r.text
+    assert 'events="speaker-events"' in xml
+    for attr in ('dtmfDetection="true"', 'interruptible="false"', 'reportInputDuringAgentSpeech="dtmf"'):
+        assert attr in xml, attr
+
+
 def test_a_forged_twiml_fetch_is_rejected_and_mints_no_token():
     path = f"/twilio/twiml/{CALL}"
     r = _client().get(path, headers={"X-Twilio-Signature": "forged"})
