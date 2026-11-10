@@ -138,6 +138,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/datasets/{dataset_id}/mail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The mail Dialback received for this dataset, newest first (email door)
+         * @description One row per stored inbound email, newest first, at most 200. A row says what Dialback did
+         *     with the email (`outcome`), whether a reply went out (`reply`), the red flags it noticed,
+         *     and the vendor and case it led to, if any. The routing number and last four are shown when
+         *     the email gave a new account; a full account number never appears (ADR-8). The email body
+         *     is never returned.
+         */
+        get: operations["listMail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/datasets/{dataset_id}/vendors/{vendor_id}/bank-change": {
         parameters: {
             query?: never;
@@ -357,6 +381,47 @@ export interface components {
             routing_number: string;
             last4: string;
         };
+        /**
+         * @description What Dialback did with one inbound email. `pending` until it has been handled.
+         * @enum {string}
+         */
+        MailOutcome: "pending" | "not_flagged" | "door_off" | "not_demo_vendor" | "no_vendor" | "several_vendors" | "no_routing_number" | "no_account_number" | "same_as_on_file" | "repeat_request" | "case_opened" | "joined_case" | "failed";
+        /**
+         * @description Whether the reply to the sender went out, and if not, why.
+         * @enum {string}
+         */
+        ReplyStatus: "not_flagged" | "sent" | "not_configured" | "unauthenticated" | "suppressed" | "rate_limited" | "failed";
+        /**
+         * @description A reason an email looks like fraud. Decided by code, never by a model.
+         * @enum {string}
+         */
+        RedFlag: "lookalike_domain" | "sender_off_domain" | "reply_to_differs" | "sender_unauthenticated" | "unknown_phone";
+        /** @description The email that started a case. Never its body. */
+        EmailInfo: {
+            sender: string;
+            subject: string | null;
+            received_at: components["schemas"]["Timestamp"];
+            red_flags: components["schemas"]["RedFlag"][];
+        };
+        /** @description One inbound email and what Dialback did with it. No body field, ever. */
+        MailItem: {
+            id: number;
+            received_at: components["schemas"]["Timestamp"];
+            sender: string;
+            subject: string | null;
+            /** @description Whether the email asks to change bank details. */
+            flagged: boolean;
+            outcome: components["schemas"]["MailOutcome"];
+            reply: components["schemas"]["ReplyStatus"];
+            red_flags: components["schemas"]["RedFlag"][];
+            vendor: {
+                id: components["schemas"]["Uuid"];
+                legal_name: string;
+            } | null;
+            case_id: components["schemas"]["Uuid"] | null;
+            routing_number: string | null;
+            last4: string | null;
+        };
         ChangeInfo: {
             /** @enum {string} */
             detected_via: "webhook" | "poll" | "email";
@@ -365,6 +430,8 @@ export interface components {
             new_account: components["schemas"]["AccountRef"];
             changed_by: components["schemas"]["Person"] | null;
             unknown_changer: boolean;
+            /** @description For a case an email opened (`detected_via` email), the email; otherwise absent or null. Optional. */
+            email?: components["schemas"]["EmailInfo"] | null;
         };
         HoldInfo: {
             status: components["schemas"]["HoldStatus"];
@@ -511,6 +578,8 @@ export interface components {
             can_approve: boolean;
             can_reject: boolean;
             can_review: boolean;
+            /** @description Whether the signed-in user may dismiss this case. Optional. */
+            can_dismiss?: boolean;
             /** @description Why an action is not offered, one templated sentence each. */
             reasons: string[];
         };
@@ -1064,6 +1133,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["VendorAccounts"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listMail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dataset_id: components["parameters"]["DatasetId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "items": [
+                     *         {
+                     *           "id": 2,
+                     *           "received_at": "2026-11-10T15:04:05Z",
+                     *           "sender": "ar@acme-supply.example",
+                     *           "subject": "Updated remittance details",
+                     *           "flagged": false,
+                     *           "outcome": "no_vendor",
+                     *           "reply": "not_flagged",
+                     *           "red_flags": [],
+                     *           "vendor": null,
+                     *           "case_id": null,
+                     *           "routing_number": null,
+                     *           "last4": null
+                     *         },
+                     *         {
+                     *           "id": 1,
+                     *           "received_at": "2026-11-10T14:58:41Z",
+                     *           "sender": "billing@acme-suppIy.example",
+                     *           "subject": "Our bank account has changed",
+                     *           "flagged": true,
+                     *           "outcome": "case_opened",
+                     *           "reply": "sent",
+                     *           "red_flags": [
+                     *             "lookalike_domain",
+                     *             "reply_to_differs"
+                     *           ],
+                     *           "vendor": {
+                     *             "id": "3f6a9d2e-8b14-4c7a-a5e0-1d2c3b4a5f60",
+                     *             "legal_name": "Acme Supply Co"
+                     *           },
+                     *           "case_id": "7b1e4c2a-5d3f-4a8e-9c61-2f0d8b7a4e15",
+                     *           "routing_number": "026009593",
+                     *           "last4": "0001"
+                     *         }
+                     *       ]
+                     *     }
+                     */
+                    "application/json": {
+                        items: components["schemas"]["MailItem"][];
+                    };
                 };
             };
             401: components["responses"]["Unauthenticated"];
