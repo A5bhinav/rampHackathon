@@ -158,6 +158,9 @@ These are not reachable today, but each is frozen as a regression.
   - F3 (the company check against the truth) accepted negations 60 times, corrections 40 and
     resellers 48, but never another company named outright.
   - It rejected 0 of 3,375 answers that do name the vendor.
+  - **But those counts are fixed by the phrase bank** (C12): the check accepts every phrase of a
+    truth or none. Outside the bank, it accepts "Acme Fasteners Supply Co" and "I used to work at
+    Acme Fasteners", and rejects "Acme Fastener" and "Ackme Fasteners".
 
 ### A11. The scripted agent's yes/no reading disagrees with the policy's
 
@@ -724,6 +727,43 @@ F1 to F9 hold as built (verified). But the lab still claims more than it shows:
 - **Not shown on this machine:** the core's database tests (112 need Postgres; CI's `py` job runs
   them).
 
+### C12. Spec 0048's build review (fresh session, Nov 10): not ready yet
+
+- **Status:** read-only review of `sami/lab-honest-impl` at 0268cce. The headline numbers reproduce.
+- **High:**
+  - **The known-failures list hides every new F1 bug in `lab-reports`.** A10's entry lists the bare
+    F1 label, and any hit showing only listed labels counts as known. Three planted `call_facts`
+    bugs raised F1 hits from 82 to 98, 115 and 93, and `lab reports` still exited 0. One of them
+    (reading only the first company answer) also passes `lab run`. Fix: F1's label names the failed
+    condition, and only A10's three are listed.
+  - **The branch goes red against current main.** Spec 0043 (keypad-only digits) has landed on
+    main, so spec 0048's D5 is out of date. On a throwaway merge, `lab run` scored 28/31 and exited
+    1 (a15 and l17 fail, unlisted). Fix: merge main, make the oracle never count spoken digits,
+    refreeze.
+- **Medium:**
+  - **The F3 numbers can't come out any other way.** Production's check accepts every phrase of a
+    given truth or none (vendor 152/152, negation 36/36, reseller 36/36, correction 24/24, other
+    0/36, partial 0/36). So 60/40/48 just count draws, "0 rejected" holds because every vendor phrase
+    contains the full name, and the 3,375 adds both domains together.
+  - **The "reachable" domain includes reports production never sends:** offered numbers, any flag,
+    answers kept after consent "no", out-of-order answers. 531 of 2,000 break those rules
+    (exploratory). Without them, NR02 and NV04 are no longer seen, so at most 11 of the 15 "seen"
+    rules come from reports production could send.
+  - **F1 doesn't cover every verify condition:** no check for flags, an offered number, name and
+    role, one person, or answer order. Dropping every flag lets 30 more reports verify and F1 stays
+    at 82. The spec's own F1 list has the same gap.
+  - **The sweep test counts a rule seen only through stand-ins** (contract-only reports or a
+    declared scenario) as seen.
+- **Low:** V09's reason in `UNREACHABLE.md` describes the generators, not production (a
+  punctuation-only name fails V09 alone); two B5 catches depend on the seed; the detector misses
+  "four double-two one", "4 then 8 then 2 then 1" and keycap digits; an unquoted `last4: 0142` loads
+  as "98" (YAML reads it as an octal number); CI triggers leave out `origination.py`, `ports.py` and
+  `uv.lock`; `test_numbering.py` (D1) doesn't exist yet.
+- **Still built by hand instead of production's code:** the stored report is the raw dict, not
+  production's cleaned copy, and digits aren't hashed; `calls.py`'s report-rejection checks are
+  skipped; calls run the text-line loop, not production's Twilio loop; 30 scenarios set
+  `offered_number_from_request: false` where the ledger would answer "unknown".
+
 ## D. Red teaming
 
 - **Started (Nov 9):** Sami chose number selection as the first target. Spec 0046
@@ -785,6 +825,30 @@ F1 to F9 hold as built (verified). But the lab still claims more than it shows:
     - The gain share is computed on whatever seeds run.
     - Default `lab fuzz` draws stay put only because no new int literal between 100 and 800 exists.
   - Scratch files are under `.../c52163f2-.../scratchpad/rv/`.
+- **Spec 0046, a second code review (fresh session, Nov 10; dev seed 0 only, exploratory).** Beyond
+  the review above:
+  - **An arm can get more worlds than archive,** which pushes toward a false pass. Against D06,
+    `guided-new` evaluated 832 distinct worlds and archive 820, with a score of 0 on every one. So
+    "guided always gets fewer" (above) is not always true. Fix: stop every arm at exactly N distinct
+    worlds, and refuse a result whose counts differ.
+  - **`gain` steers into the real rule's own open defects.** Against D06, 533 of guided's 782
+    worlds (68%) were ones the real rule already fails, against 67 of archive's 820 (8%). Guided
+    found D06 in none, archive in 7. This explains "guided lost D06", and biases toward a false
+    fail.
+  - **The pinned rule still imports the working tree's `lookalike.py`,** and the generator takes
+    `Settings` defaults from the working tree. A simulated `lookalike.py` change moved labels on 1
+    of 99 worlds. Latent: neither file has changed since e3d57b5.
+  - **The commit-order check can be fooled on purpose:** writing the score under another name and
+    renaming it to `guided.py` later passes, and so does editing `breaks.json` with git's
+    skip-worktree flag. No commit check can show the breaks were written blind, since the spec with
+    the score formula was in the breaks session's checkout.
+  - **Correction to the review above:** a run does record the Hypothesis version
+    (`redteam.py:378`). It doesn't refuse a version that differs from the lock file, and it doesn't
+    record the HEAD commit.
+  - **"Found" compares labels per world,** so in principle it could hide a break. On D06 it hid
+    nothing; not measured for the `helps` breaks.
+  - **Verdict:** not safe to run the held-out measurement as built. Moot while the spec is closed;
+    fix these before any new spec reuses the harness.
 - **Spec 0052 (`sami/docgen-spec`, approved Nov 10):** generated documents with a known claim and
   owner for every number, run through real ingestion and `select()`. This is the first piece named
   below, and it runs on the stub before any LLM reader exists.
@@ -830,6 +894,32 @@ are reproduced here.
 - **G7. Redaction is literal.** Only runs of 7 or more digits are replaced, so an account number
   written with spaces or dashes still reaches the model.
 - **G8. The prompt is a first draft** that has never run against the real model.
+
+- **Review (fresh session, Nov 10): not ready for Inesh yet.** The reader holds up: it fails
+  closed, sends nothing secret and logs nothing sensitive. The problems are in the scoring script and
+  one error path.
+  - **G9 (Medium).** `reader_eval.py` never scores a visible number the labeled set leaves out.
+    With a bank's number left out and labeled `vendor`, the "no new unsafe" bar passed.
+  - **G10 (Medium).** A repeated document or number counts twice. Listing 3 hard documents twice
+    turned the McNemar bar from p=0.125 (fail) into p=0.0156 (pass).
+  - **G11 (Medium).** `--runs -1` made 0 requests and printed `passed: true`, because the pass check
+    is `all()` over an empty list. `--runs 1` is accepted on held-out, though the spec says 3.
+  - **G12 (Medium).** Malformed 200 replies (invalid JSON, a `text/plain` body, `content: null`, a
+    text block with no `text`, deeply nested JSON) raise plain Python errors, not `ReaderFailed`.
+    Nothing is stored and nothing leaks, but the demo exits with a traceback, the warning isn't
+    logged, and `reader_eval` crashes instead of counting a failed document.
+  - **G13 (Low).** The held-out hash comes from the command line, not a committed file.
+  - **G14 (Low).** The ordinary-documents bar passes when there are no ordinary documents (0 <= 0).
+  - **G15 (Low).** Long digit runs in a phone extension ("ext. 000123456789") reach the model.
+  - **G16 (Low).** `ANTHROPIC_BASE_URL` and `ANTHROPIC_CUSTOM_HEADERS` on the host decide where
+    document text goes. Fix: pin the base URL.
+  - **G17 (Low).** `extractor_version` leaves out effort and `max_tokens`, and ingestion takes the
+    version separately from the reader.
+  - **G18 (Low, a spec question).** A true fax line labeled (fax, unknown) still counts as an
+    over-block, though the rule refuses fax lines whatever their party: the same reasoning as G1.
+  - **G19 (Low).** The test network guard fails quietly: the SDK turns its error into
+    `ReaderFailed("api_error")`, so a test expecting a failure would pass with a real client.
+  - **G20 (Low).** A malformed held-out set prints its document ids and phone numbers in the error.
 
 ## E. Process and housekeeping
 
