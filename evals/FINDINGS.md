@@ -37,6 +37,22 @@ Specs: 0017 (voice slice lab), 0033 (generative selection pressure), 0021 (the s
   - Without a planted number it fails safe: no call, and the case goes to manual review.
 - **Spec:** 0079 (`sami/refuse-dont-redirect`, approved Nov 10): when the change context would
   change who is called, nobody is called and a person reviews the case (`withheld`).
+- **The alternative, "choose only from history before the request" (rule U), was measured and
+  rejected (Nov 10).** The plan was written before the run, and the results are exploratory.
+  - **What U is:** drop everything received at or after the request, drop lookalike-domain
+    emails, and count old messages in the request's thread as history.
+  - **It calls a fraudster's number where today's rule doesn't:**
+    - in 1 frozen world (`lookalike-erased-by-first-sorting-twin`);
+    - in 91 of 2000 generated worlds as the pick (pinned draws; 23 unpinned), and as a backup in
+      many more.
+    - The main cause is that removing the lookalike pull lets planted numbers count.
+  - **It only fixes A1 when the attacker's label arrives at or after the request.** Sending the
+    "Bank verification line" email the day before the change request still vetoes the real line.
+    In the over-block grid's `bank_label_in_thread` rows (30 to 730 days), U and today's rule both
+    pick the planted number, while spec 0079 withholds.
+  - **Kept for comparison:** U changed no corpus outcome or demo pick, and fixed the A6 world.
+  - Scripts and outputs are under `.../c52163f2-.../scratchpad/umeasure/`; the plan is in
+    `measure_u_plan.md`.
 
 ### A2. Honest change requests that mention the vendor's number are refused
 
