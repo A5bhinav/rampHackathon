@@ -12,7 +12,7 @@ None.
 
 ## Acceptance
 
-- [ ] Task 5: 90 tuning and 90 held-out labeled emails exist, one JSON file each (`subject`, `sender`, `text`, `label`, `vendor`, `note`), and the held-out half is sealed by a SHA-256.
+- [ ] Task 5: 92 tuning and 100 held-out labeled emails exist, one JSON file each (`subject`, `sender`, `text`, `label`, `vendor`, `note`), and the held-out half is sealed by a SHA-256.
 - [ ] Flagging, extraction and redaction: to be completed by Task 6.
 - [ ] Vendor matching: to be completed by Task 7.
 
@@ -20,12 +20,12 @@ None.
 
 Fixtures live in `apps/core/tests/email_door/fixtures/`.
 
-- `tuning/`: 30 `change_request` and 60 `ordinary` emails (`cr-NN.json`, `ord-NN.json`). Three of the change requests are the `vendors.*.request` emails of `packages/ledger/src/dialback_ledger/demo_seed.json`, span text joined by newlines. The flagging code may be tuned against these.
-- `heldout/`: 30 `change_request` and 60 `ordinary` emails, written to the same brief with no sentence shared with the tuning half. Not to be read or run against until the flagging code is final.
+- `tuning/`: 30 `change_request` and 62 `ordinary` emails (`cr-NN.json`, `ord-NN.json`). Three of the change requests are the `vendors.*.request` emails of `packages/ledger/src/dialback_ledger/demo_seed.json`, span text joined by newlines. The flagging code may be tuned against these.
+- `heldout/`: 35 `change_request` and 65 `ordinary` emails, written to the same brief with no sentence shared with the tuning half. Five of the change requests (cr-31..35) use scenarios absent from the tuning half, and several ordinary emails carry full routing and account digits. Not to be read or run against until the flagging code is final.
 - `heldout.sha256` holds the output of `cat $(ls heldout/*.json | sort) | shasum -a 256`, so any later edit to the held-out half is visible:
 
 ```
-d82bb04a8ba098a2157d4350db1e2414b1aea4be46b543264aab7312c0ddb608  -
+6235aebe8431bfa4a907b6022e85af011c596480bc2885ec646f86ef39242edb  -
 ```
 
 | Acceptance item | Test |

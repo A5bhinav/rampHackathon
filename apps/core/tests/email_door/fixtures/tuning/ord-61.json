@@ -1,0 +1,8 @@
+{
+  "subject": "Invoice 3415 with payment info",
+  "sender": "Brightline Billing <billing@brightline.example>",
+  "text": "Invoice 3415, $688.20, due Dec 3.\n\nPay to Brightline Office Supply Inc, routing 021000021, account 000044445555 (this is the account you already pay).",
+  "label": "ordinary",
+  "vendor": "brightline",
+  "note": "Invoice with full on-file details, stated as the existing account."
+}
