@@ -28,7 +28,7 @@ def test_every_attack_class_is_covered():
     assert {"hijacked_thread_new_number", "line_takeover", "legit_bank_switch"} <= covered
     attack_classes = {s.scenario_class for s in scenarios if s.is_attack}
     assert len(attack_classes) >= 6               # the attack classes are well represented
-    assert len(scenarios) >= 10                   # the dev split floor (Q136)
+    assert len(scenarios) >= 10                   # the dev split floor (Q138)
 
 
 def test_the_whole_dev_split_upholds_every_gate():

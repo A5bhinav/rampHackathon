@@ -7,7 +7,7 @@ none is lost. Last updated Nov 9. Each entry says how sure we are:
 - **confirmed (read)**: checked in the code, not run.
 - **reported**: from a review, not yet re-checked.
 
-Specs: 0017 (voice slice lab), 0082 (generative selection pressure; 0033 before it landed), 0021 (the selection rule), 0022
+Specs: 0017 (voice slice lab), 0083 (generative selection pressure; 0033 before it landed), 0021 (the selection rule), 0022
 (ingestion). Frozen cases live in `evals/corpus-generated/`.
 
 ## A. The product
@@ -57,7 +57,7 @@ Specs: 0017 (voice slice lab), 0082 (generative selection pressure; 0033 before 
 
 ### A4. Labels from non-counting documents outside the change context also refuse a number
 
-- **Status:** confirmed (read). Not probed by the lab (spec 0082, Q141).
+- **Status:** confirmed (read). Not probed by the lab (spec 0083, Q143).
 - **What happens:** an email from an unrelated domain, outside the thread, that labels the real
   number someone else's also vetoes it.
 - **Open question:** whether such documents reach `select()` depends on how ingestion attaches
@@ -436,7 +436,7 @@ These are not reachable today, but each is frozen as a regression.
   the `withheld` outcome, and its selection invariants need to learn it. Whichever of the two
   lands second makes those changes.
 
-## B. The fuzz lab (spec 0082)
+## B. The fuzz lab (spec 0083)
 
 ### B1. I12 never probes the change-request email itself
 
@@ -540,7 +540,7 @@ These are not reachable today, but each is frozen as a regression.
 
 ### B9. The direct checks catch regressions, not design mistakes
 
-- **Status:** confirmed (read). The oracle's docstring and spec 0082 (decision 2) both say so.
+- **Status:** confirmed (read). The oracle's docstring and spec 0083 (decision 2) both say so.
 - **What it means:**
   - Where no document id is shared, I1 to I7 and I9 follow `select()`'s own reading of the spec
     exactly. If that reading is wrong, the check is wrong with it.
@@ -695,7 +695,7 @@ The acceptance test is the 16-break experiment: every break must be caught.
 F1 to F9 hold as built (verified). But the lab still claims more than it shows:
 
 - **a07 rests on a fact production never computes** (A7): the scorecard reports a blocked line
-  takeover that production would verify. It also contradicts the spec's Q137 ("everything else stays
+  takeover that production would verify. It also contradicts the spec's Q139 ("everything else stays
   None"). Other declared facts production never reports this way: a04's `dialed_number_is_pick:
   false` (the relay sets it true on every call), a06's `direction: inbound` (no production path), a01's
   `offered_number_from_request: true` with no number offered.
@@ -1005,7 +1005,7 @@ are reproduced here.
     The lab's `0033-generative-selection-pressure` would be the third. Main also has two `0034`s.
   - The lab spec's open questions Q60, Q61 and Q65 are already used on main: Q60 and Q61 in
     `0029-voice-call-lookup-and-store.md`, Q65 in `0034-live-call-blockers.md`. A4 above cites
-    the lab's, now "spec 0082, Q141".
+    the lab's, now "spec 0083, Q143".
   - Main uses up to Q68. PR #91 takes Q69 to Q75, the `sami/onboarding-anchors` branch takes
     Q76 and Q77, spec 0043 (`sami/keypad-only-digits`) takes Q78 to Q82, and spec 0044
     (`sami/line-risk`) takes Q83 to Q86.
@@ -1023,9 +1023,10 @@ are reproduced here.
   - Spec 0051 (`sami/call-check-in`) takes Q117 and Q118. Spec 0052 (`sami/docgen-spec`, generated
     documents) takes Q119 to Q122. The next free numbers are spec 0053 and Q123.
   - **Renumbered on landing (Nov 10; main then went up to spec 0077 and Q116, the branches up to
-    spec 0081 and Q135):** the lab's 0033 is spec 0082; spec 0017's Q56, Q57 and Q58 are Q136, Q137
-    and Q138; spec 0082's Q60, Q61 and Q65 are Q139, Q140 and Q141; spec 0046's Q87 to Q91 are Q142
-    to Q146. Spec 0082's Q62 to Q64 and spec 0048's Q101 to Q105 collided with nothing and stay.
+    spec 0081 and Q135, and an uncommitted spec 0082 in another session's worktree used Q136 and
+    Q137):** the lab's 0033 is spec 0083; spec 0017's Q56, Q57 and Q58 are Q138, Q139 and Q140; spec
+    0083's Q60, Q61 and Q65 are Q141, Q142 and Q143; spec 0046's Q87 to Q91 are Q144 to Q148. Spec
+    0083's Q62 to Q64 and spec 0048's Q101 to Q105 collided with nothing and stay.
     `evals/tests/test_numbering.py` fails if a lab spec or question number is used by another spec.
 
 ## F. How other services verify a bank change (Nov 9)
