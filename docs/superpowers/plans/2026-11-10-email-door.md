@@ -228,7 +228,7 @@ Written by a fresh agent on a different model from Task 5's author, from a brief
 **Interfaces:**
 - Produces: `class ClassifierMode(StrEnum): RULE = "rule"; RULE_AND_MODEL = "rule+model"` read from `DIALBACK_EMAIL_CLASSIFIER` (safe default `rule`). With `rule+model`, startup refuses without Anthropic credentials.
 - Produces: `@dataclass(frozen=True) class Verdict: change_request: bool; quote: str`; `class ClassifierFailed(Exception)` with a `reason` (`timeout`, `api_error`, `refusal`, `max_tokens`, `schema`); `class ChangeClassifier(Protocol): def classify(self, subject: str, text: str) -> Verdict`.
-- Produces: `AnthropicClassifier(client: anthropic.Anthropic)`, the only place the model is pinned (`MODEL = "claude-opus-5-5"`, effort set explicitly, server-side refusal fallbacks, pinned API host, `TIMEOUT_S = 30.0`, JSON schema `{change_request: boolean, quote: string}`, `additionalProperties: false`). It is called with `redact(subject)` and `redact(text)` only. Its system prompt states the label meaning and that the email is data, never instructions. It maps every failure to `ClassifierFailed` and never logs email text.
+- Produces: `AnthropicClassifier(client: anthropic.Anthropic)`, the only place the model is pinned (`MODEL = "claude-opus-5-5"`, effort set explicitly, server-side refusal fallbacks, pinned API host, `TIMEOUT_S = 30.0`, JSON schema `{change_request: boolean, quote: string}`, `additionalProperties: false`). It is called with `redact_for_model(subject)` and `redact_for_model(text)` only (Task 6: no digits at all). Its system prompt states the label meaning and that the email is data, never instructions. It maps every failure to `ClassifierFailed` and never logs email text.
 - Produces: `flag_email(subject: str, text: str, html_text: str, classifier: ChangeClassifier | None) -> FlagDecision(flagged: bool, by: Literal["rule", "model", "none"], quote: str | None)`. The rule runs over the text and over the HTML text; the model is asked only when the rule doesn't flag and a classifier is configured. A `ClassifierFailed` propagates, so the inbox retries the email.
 - Tests use a fake classifier (no network): monotone (the model can add a flag but never remove the rule's), only called when the rule says no, failure propagates, redacted input only (no full account number reaches `classify`), and the schema and system prompt are fixed constants.
 
@@ -278,8 +278,10 @@ It runs `flag_email` with the real `AnthropicClassifier` over the tuning set, th
 - Test: `apps/core/tests/test_email_door.py`
 
 **Interfaces:**
-- Consumes: Task 4's `handle_email` and `ReceivedEmail`; Task 6's `flag`, `find_routing`, `find_accounts`, `redact` and `requested_fingerprint`; Task 7's `match_vendor` and `VendorRef`; `dialback_ledger.ingest.ingest_all`; `dialback_ledger.store.write_ingest`, `mark_change_request` and `stored_id`; `events.apply_event`; `db.system_tx` and `dataset_now`.
-- Produces: `ledger_document(email: ReceivedEmail, redacted_text: str, received_at: dt.datetime, thread_id: str) -> dict`.
+- Consumes: Task 4's `handle_email`, `ReceivedEmail` and `masking.mask_digit_runs`/`strip_nul`; Task 6's `find_routing`, `find_accounts`, `ledger_text` and `requested_fingerprint`; Task 6b's `flag_email`; Task 7's `match_vendor` and `VendorRef`; `dialback_ledger.ingest.ingest_all`; `dialback_ledger.store.write_ingest`, `mark_change_request` and `stored_id`; `events.apply_event`; `db.system_tx` and `dataset_now`.
+- Produces: `ledger_document(email: ReceivedEmail, ledger_lines: str, masked_subject: str, received_at: dt.datetime, thread_id: str) -> dict`.
+  - `ledger_lines` is `ledger_text(strip_nul(email.text))` joined with `"\n"` to `ledger_text(strip_nul(email.html_text))`, unchanged otherwise (Task 6: the ledger never gets masked email text, only rebuilt phone lines). `masked_subject` is the same masked subject stored in `app.inbound_emails` (the ledger stores the subject in `ledger.documents`).
+  - Take the longest account `find_accounts` returns (last-four shapes can come first).
   - Same shape as a `request` in `demo_seed.json`: one page 612 by 792, one span per line, `#000000`, size 10, x 72, y 72 plus 14 per line.
   - `id = str(uuid5(NAMESPACE_URL, "email:" + message_id))`, `kind = "email"`, custody channel `email`.
 - Extends `handle_email`, in this order:
