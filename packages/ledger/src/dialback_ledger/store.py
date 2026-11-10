@@ -26,7 +26,14 @@ from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
 from .ingest import IngestResult
-from .select import ChangeRequest, DocumentRef, Sighting, active_rule_version, change_context_documents, select
+from .select import (
+    ChangeRequest,
+    DocumentRef,
+    Sighting,
+    active_rule_version,
+    change_context_documents,
+    select,
+)
 
 log = logging.getLogger(__name__)
 NAMESPACE = UUID("3b8e1f6a-2c4d-4e7f-9a1b-5c6d7e8f9a0b")
