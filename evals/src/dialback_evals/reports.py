@@ -212,6 +212,33 @@ def coverage(cases: Iterable[ReportCase]) -> dict[str, set[str]]:
     return seen
 
 
+def honest(domain: str = "reachable", legal_name: str = "Acme Fasteners LLC") -> ReportCase:
+    """One honest, full confirmation, the generator's starting point, built without Hypothesis (for tests)."""
+    def answer(slot: str, value: str, turn: int, method: str = "speech") -> dict:
+        return {"slot": slot, "value": value, "turn_id": turn, "tool_call_id": f"t{turn}_{slot}",
+                "captured_at": f"2026-11-01T17:{turn:02d}:00Z", "capture_method": method}
+    answers = (answer("recording_consent", "yes", 1), answer("company_named", "Acme Fasteners", 3),
+               answer("department", "Accounts payable", 5), answer("speaker_name", "Jordan Lee", 7),
+               answer("speaker_role", "AP clerk", 9), answer("change_requested", "yes", 11),
+               answer("account_last4", "4821", 13, "keypad"))
+    return ReportCase(domain=domain, result="answers_recorded", answers=answers, checks=dict(CLEAN_CHECKS),
+                      verified_setup=True, direction="outbound", answered_by="human",
+                      dialed_number_is_pick=True if domain == "contract" else None, pick_current=True,
+                      new_last4="4821", old_last4="7730", legal_name=legal_name, trade_names=(), earlier=(),
+                      speaker_in_change_thread=False, offered_number_from_request=False,
+                      truth={"company": ["vendor"], "speaker_from_thread": False, "offered_from_request": False,
+                             "earlier_concern": False})
+
+
+def with_case(case: ReportCase, **changes) -> ReportCase:
+    return dataclasses.replace(case, **changes)
+
+
+def with_company(case: ReportCase, said: str, truth: str) -> ReportCase:
+    """The case with every company answer replaced by `said`, whose truth is `truth`."""
+    return _set_values(case, "company_named", said, truth)
+
+
 def report_cases(domain: str):
     """The Hypothesis strategy for one domain (imported here so `lab run` never needs Hypothesis)."""
     from .reportgen import report_cases as strategy
@@ -220,24 +247,58 @@ def report_cases(domain: str):
 
 # ---- F1: verified only on an honest, full confirmation ----------------------------------------------
 
+def unconfirmed(case: ReportCase) -> list[str]:
+    """What an honest, full confirmation lacks, by the generator's truth, one condition per entry (spec 0048,
+    B4 F1 and review fix 1). Empty when it is honest and full. It restates the verify conditions, so it
+    cannot find a mistake in their design (FINDINGS B9); it finds a fact computed wrongly (A10)."""
+    missing: list[str] = []
+    if case.result != "answers_recorded":
+        missing.append(f"result={case.result}")
+    if case.answered_by != "human":
+        missing.append(f"answered_by={case.answered_by or 'unknown'}")
+    if case.direction != "outbound":
+        missing.append(f"direction={case.direction or 'unknown'}")
+    if case.domain == "reachable" and not case.verified_setup:
+        missing.append("setup=unverified")
+    if not case.pick_current:
+        missing.append("pick=stale")
+    if case.domain == "contract" and case.dialed_number_is_pick is not True:
+        missing.append(f"pick_reported={case.dialed_number_is_pick}")
+    for slot, name in (("recording_consent", "consent"), ("change_requested", "change")):
+        values = case.values(slot)
+        if set(values) != {"yes"}:
+            missing.append(f"{name}={'+'.join(sorted(set(values))) or 'missing'}")
+    company = case.truth["company"]
+    if not company:
+        missing.append("company=missing")
+    missing += [f"company={truth}" for truth in sorted(set(company) - {"vendor"})]
+    digits = case.values("account_last4")
+    if not digits:
+        missing.append("digits=missing")
+    elif len(set(digits)) > 1:
+        missing.append("digits=two_values")
+    elif digits[0] != case.new_last4:
+        missing.append("digits=not_the_new_account")
+    elif case.old_last4 == case.new_last4:
+        missing.append("digits=accounts_end_alike")
+    if case.checks is None or (case.domain == "reachable" and not case.verified_setup):
+        missing.append("checks=missing")
+    else:
+        missing += [f"checks={k}" for k, v in CLEAN_CHECKS.items() if case.checks[k] != v]
+    for key, name in (("speaker_from_thread", "speaker_from_thread"), ("offered_from_request", "offered_from_request"),
+                      ("earlier_concern", "earlier_concern")):
+        if case.truth[key]:
+            missing.append(name)
+    return missing
+
+
 def honest_full(case: ReportCase) -> bool:
-    """The generator's truth, condition by condition (spec 0048, B4 F1). It restates the verify conditions,
-    so it cannot find a mistake in their design (FINDINGS B9); it finds a fact computed wrongly (A10)."""
-    consent, change, digits = case.values("recording_consent"), case.values("change_requested"), case.values("account_last4")
-    dialed_pick = case.pick_current and (case.verified_setup if case.domain == "reachable"
-                                         else case.dialed_number_is_pick is True)
-    checks_passed = case.checks is not None and (case.verified_setup or case.domain == "contract") \
-        and all(case.checks[k] == v for k, v in CLEAN_CHECKS.items())
-    return (case.result == "answers_recorded" and case.answered_by == "human" and case.direction == "outbound"
-            and (case.verified_setup or case.domain == "contract") and dialed_pick
-            and bool(consent) and set(consent) == {"yes"} and bool(change) and set(change) == {"yes"}
-            and bool(case.truth["company"]) and set(case.truth["company"]) == {"vendor"}
-            and len(set(digits)) == 1 and digits[0] == case.new_last4 and case.old_last4 != case.new_last4
-            and checks_passed and not case.truth["speaker_from_thread"] and not case.truth["offered_from_request"]
-            and not case.truth["earlier_concern"])
+    return not unconfirmed(case)
 
 
-F1 = "F1_verified_without_full_confirmation"
+def f1_label(condition: str) -> str:
+    """F1's label names the condition that failed (spec 0048 review fix 1), e.g. "F1:company=negation"."""
+    return f"F1:{condition}"
 
 
 @dataclasses.dataclass
@@ -250,8 +311,8 @@ class Found:
 def check_f1(cases: Iterable[ReportCase], decide=None) -> Found:
     found = Found()
     for i, case in enumerate(cases):
-        if run(case, decide).decision.outcome == "verified" and not honest_full(case):
-            found.violations.append((i, [F1]))
+        if run(case, decide).decision.outcome == "verified" and (lacking := unconfirmed(case)):
+            found.violations.append((i, [f1_label(c) for c in lacking]))
     return found
 
 
@@ -553,7 +614,7 @@ def _load_case(data: dict) -> ReportCase:
 def freeze(case: ReportCase, found: list[str], out_dir: Path, why: str, domain: str | None = None) -> Path:
     """Write the case under `<out_dir>/<name>/report.json`. A frozen case is never replaced, and its labels
     record what failed when it was frozen (as the fuzz lab's frozen worlds)."""
-    name = f"reports-{found[0].lower().replace('_', '-')}-{case_digest(case)[:8]}"
+    name = f"reports-{re.sub(r'[^a-z0-9]+', '-', found[0].lower()).strip('-')}-{case_digest(case)[:8]}"
     folder = Path(out_dir) / name
     if (folder / FILE).is_file():
         return folder
@@ -664,8 +725,9 @@ def run_checks(*, examples: int, seed: int, out_dir: Path | None = None, decide=
                     done.first.setdefault((domain, label), cases[i])
         if domain == "reachable":
             done.reachable_hits = [sorted(labs) for _, labs in sorted(per_report.items())]
-    if out_dir is not None:
-        known = {label for f in load_all(out_dir) for label in f.labels}
+    if out_dir is not None:      # known: what each frozen case recorded, and what it shows now (labels can be renamed)
+        known = {label for f in load_all(out_dir) for label in f.labels} | \
+            {label for _, now in rerun(out_dir, decide, matcher) for label in now}
         order = {"reachable": 0, "contract": 1}          # a finding is frozen from the gated domain when it shows there
         for (domain, label), case in sorted(done.first.items(), key=lambda item: (order[item[0][0]], item[0][1])):
             if label in known:

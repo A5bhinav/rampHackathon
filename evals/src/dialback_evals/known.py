@@ -89,12 +89,15 @@ def judge(entries: Iterable[Entry], failing: Mapping[str, Iterable[str]], hits: 
         if extra:
             v.problems.append(f"{case} fails with {', '.join(extra)}, which the known-failures list does not hold")
     every = set().union(*listed.values()) if listed else set()
+    unlisted: dict[tuple[str, ...], int] = {}
     for hit in hits:
-        extra = sorted(set(hit) - every)
+        extra = tuple(sorted(set(hit) - every))
         if extra:
-            v.problems.append(f"a new search hit shows {', '.join(extra)}, which no listed entry holds")
+            unlisted[extra] = unlisted.get(extra, 0) + 1
         else:
             v.known_hits += 1
+    v.problems += [f"{count} new search hit(s) show {', '.join(extra)}, which no listed entry holds"
+                   for extra, count in sorted(unlisted.items())]
     return v
 
 

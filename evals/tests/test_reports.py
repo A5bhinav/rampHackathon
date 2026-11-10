@@ -9,6 +9,7 @@ first shown failing on a broken double; then each runs on production at seed 0 o
 from __future__ import annotations
 
 from functools import lru_cache
+from pathlib import Path
 
 import pytest
 from dialback_core.calls import CallEndedRequest
@@ -16,6 +17,7 @@ from dialback_evals import reports
 from dialback_evals.draws import sample
 
 SEED, EXAMPLES = 0, 2000
+ROOT = Path(__file__).resolve().parents[2]
 
 
 @lru_cache(maxsize=2)
@@ -112,10 +114,74 @@ def test_findings_are_frozen_and_rerun(tmp_path):
     out = tmp_path / "reports-generated"
     first = reports.run_checks(examples=200, seed=SEED, out_dir=out, decide=reports.doubles.v07_accepts_unsure_nr09_off)
     frozen = reports.load_all(out)
-    assert first.new_frozen and {label for case in frozen for label in case.labels} >= {"F1_verified_without_full_confirmation"}
-    shrunk = next(case for case in frozen if "F1_verified_without_full_confirmation" in case.labels)
+    assert first.new_frozen and {label for case in frozen for label in case.labels} >= {"F1:change=unsure"}
+    shrunk = next(case for case in frozen if "F1:change=unsure" in case.labels)
     assert len(shrunk.case.answers) <= 7                                # at most one answer per question
     again = reports.rerun(out, decide=reports.doubles.v07_accepts_unsure_nr09_off)
     assert [(c.name, labels) for c, labels in again if labels]              # still failing under the double
     second = reports.run_checks(examples=200, seed=SEED, out_dir=out, decide=reports.doubles.v07_accepts_unsure_nr09_off)
     assert second.new_frozen == []                                      # re-finding a frozen label adds nothing
+
+
+# ---- spec 0048 review fix 1: F1's label names the condition that failed ---------------------------------
+
+def test_f1_labels_name_the_failed_condition():
+    base = reports.honest()
+    assert reports.unconfirmed(base) == [] and reports.run(base).decision.outcome == "verified"
+    negated = reports.with_company(base, "Not Acme Fasteners, this is Globex Logistics", "negation")
+    assert reports.unconfirmed(negated) == ["company=negation"]
+    assert reports.check_f1([negated]).violations == [(0, ["F1:company=negation"])]      # production verifies it (A10)
+    stale = reports.with_case(base, pick_current=False)
+    assert reports.unconfirmed(stale) == ["pick=stale"]
+    assert reports.check_f1([stale]).violations == []                                      # production refuses it (V01)
+
+
+def test_the_known_failures_list_names_only_a10s_three_f1_conditions():
+    from dialback_evals import known
+    entries = known.load(ROOT / "evals" / "known-failures.json")["lab-reports"]
+    f1 = {label for e in entries for label in e.labels if label.startswith("F1")}
+    assert f1 == {"F1:company=negation", "F1:company=correction", "F1:company=reseller"}
+
+
+def _bugged(bug):
+    """call_facts with one planted bug (the fresh review's three), for lab reports to catch."""
+    import dataclasses
+
+    import dialback_core.call_facts as core_facts
+    real = core_facts.call_facts
+
+    def call_facts(report, case, generation, context):
+        if bug == "unknown_speaker_not_in_thread" and context.speaker_in_change_thread is None:
+            context = dataclasses.replace(context, speaker_in_change_thread=False)
+        if bug == "stale_pick_counted_current":         # the first pick read as this version's, not the last
+            first = next(e for e in generation if e["type"] == "number_resolved")
+            generation = [first] + [e for e in generation if e["type"] != "number_resolved"]
+        if bug == "first_company_answer_only" and report.get("answers"):
+            answers, seen = [], False
+            for a in report["answers"]["answers"]:
+                if a["slot"] == "company_named":
+                    if seen:
+                        continue
+                    seen = True
+                answers.append(a)
+            report = {**report, "answers": {**report["answers"], "answers": answers}}
+        return real(report, case, generation, context)
+    return call_facts
+
+
+@pytest.mark.parametrize("bug", [None, "unknown_speaker_not_in_thread", "stale_pick_counted_current",
+                                 "first_company_answer_only"])
+def test_planted_call_facts_bugs_turn_lab_reports_red(bug, tmp_path, monkeypatch):
+    # Spec 0048 review fix 1: each of the review's three planted call_facts bugs turns lab-reports red with the
+    # repo's known-failures list; without a bug it holds.
+    import shutil
+
+    import dialback_core.call_facts as core_facts
+    from dialback_evals.cli import main
+    out = tmp_path / "reports-generated"
+    shutil.copytree(ROOT / "evals" / "reports-generated", out)
+    if bug:
+        monkeypatch.setattr(core_facts, "call_facts", _bugged(bug))
+    code = main(["reports", "--examples", "2000", "--seed", "0", "--out", str(out),
+                 "--known-failures", str(ROOT / "evals" / "known-failures.json")])
+    assert code == (1 if bug else 0)
