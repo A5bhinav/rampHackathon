@@ -8,10 +8,12 @@ Recorded references for spec 0046's tests. Nothing here is read by the lab itsel
   rule module, so they keep meaning the same thing after `select.py` is fixed, and in CI's shallow
   checkout, where that commit is absent.
 - `labels-before-0046.json`: what `all_violations()` returned before spec 0046 exposed the probe
-  outputs (recorded at 7ef40df, Hypothesis 6.170.14), on that pinned rule: the 300 worlds
-  `worldgen.worlds()` draws at seed 0 (`max_examples` 300, each by its `world_digest` and labels), and
-  the nine frozen cases then in `evals/corpus-generated`, with their worlds, so later additions or
-  deletions there do not change it.
+  outputs (the oracle as of 7ef40df, recorded from a checkout of 11e203d, Hypothesis 6.170.14), on that
+  pinned rule: the 300 worlds `worldgen.worlds()` draws at seed 0 (`max_examples` 300, with pinned
+  draws as `guided.pinned_draws()` makes them; each by its `world_digest` and labels), and the nine
+  frozen cases then in `evals/corpus-generated`, with their worlds, so later additions or deletions
+  there do not change it. Pinned draws matter: without them Hypothesis mixes in literals mined from
+  whatever first-party modules are loaded, and pytest loads different ones than a script does.
 
 `test_guided.py::test_exposing_probes_keeps_every_label` compares today's oracle with this record. If
 it fails because the generator, the oracle's checks or Hypothesis changed on purpose, re-record it
