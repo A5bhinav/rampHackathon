@@ -100,3 +100,19 @@ What no longer reaches the ledger at all: anything on a line without a kept phon
 **For Task 8:** ingest `ledger_text(strip_nul(text))` unchanged: no joins, no normalization and no other text after it, since every guarantee above is about that exact string read line by line. `ledger_text` reads the first 50,000 characters of the text, so the ledger's document for a longer email comes from its first 50,000 characters only.
 
 `test_ledger_text_is_fast_on_a_long_email` mostly checks the 50,000-character cap: the input is 431 KB, so the cap does most of the bounding, not the linear repeat check.
+
+## Evaluation (Task 6c)
+
+The procedure is fixed here before any model run. The script is `apps/core/tests/email_door/eval_flagger.py`; it runs the combined flagger (`flag_email` with the model) and reports counts and file names only. Every run spends money, so Sami approves each one.
+
+1. Haiku (`claude-haiku-5-5`) runs first, on the tuning set and the development set (the old held-out half). These runs are exploratory. The prompt may be revised at most twice, judged on those two sets, and every revision and its result is logged here, including the ones that did not help.
+2. After the prompt is frozen, Haiku runs on the sealed fresh held-out set (`heldout2`) once. The script checks `fixtures/heldout2.sha256` first and refuses on a mismatch.
+3. The bar: every change request flagged, not counting `cr-36.json`, and at most 3 ordinary emails flagged. `cr-36.json` is reported separately, and the result is shown both with and without it. A model failure (timeout, refusal, bad reply) counts as not flagged, so on a change request it is a miss.
+4. If Haiku fails the bar on `heldout2`, Opus (`claude-opus-5-5`) runs once on `heldout2` with the identical prompt. Choosing between two pre-named models on the same held-out set makes the chosen number slightly optimistic, and that is stated with the result.
+5. If neither passes, stop and report to Sami. No prompt change follows any `heldout2` run.
+
+Results (to fill in after the runs):
+
+| Model | Set | Change requests flagged | Ordinary flagged | Failures | cr-36 | Bar | Cost |
+|---|---|---|---|---|---|---|---|
+| | | | | | | | |

@@ -499,3 +499,52 @@ async def test_the_lifespan_closes_the_classifier_even_when_the_worker_failed(mo
         async with app.router.lifespan_context(app):
             pass
     assert sdk.closed and len(opened) == 2 and all(o.closed for o in opened)
+
+
+# The model switch and token usage (Task 6c) -----------------------------------------------------------
+
+class FakeBothEndpoints(FakeAnthropic):
+    """TEST DOUBLE: both the beta endpoint and the plain one, each recording which was called."""
+
+    def __init__(self, reply: object) -> None:
+        super().__init__(reply)
+        self.plain_calls = []
+        self.messages = SimpleNamespace(create=self.create_plain)
+
+    def create_plain(self, **kwargs):
+        self.plain_calls.append(kwargs)
+        return self.reply
+
+
+def test_haiku_uses_the_plain_endpoint_without_betas_or_fallbacks():
+    client = FakeBothEndpoints(message(reply(False, "")))
+    AnthropicClassifier(client, model="claude-haiku-5-5").classify("S", "T")
+    assert client.calls == []
+    (sent,) = client.plain_calls
+    assert set(sent) == {"model", "max_tokens", "system", "messages", "output_config"}
+    assert sent["model"] == "claude-haiku-5-5" and sent["max_tokens"] == 8192 and sent["system"] == SYSTEM_PROMPT
+    assert sent["output_config"] == {"effort": "medium", "format": {"type": "json_schema", "schema": SCHEMA}}
+
+
+def test_the_default_model_keeps_the_beta_request():
+    client = FakeBothEndpoints(message(reply(False, "")))
+    AnthropicClassifier(client).classify("S", "T")
+    assert client.plain_calls == []
+    (sent,) = client.calls
+    assert sent["model"] == MODEL == "claude-opus-5-5"
+    assert sent["betas"] == ["server-side-fallback-2026-07-01"] and sent["fallbacks"] == "default"
+
+
+def test_token_usage_accumulates_over_successful_calls():
+    model = AnthropicClassifier(FakeBothEndpoints(message(reply(False, ""))))
+    assert (model.input_tokens, model.output_tokens, model.calls) == (0, 0, 0)
+    model.classify("S", "T")
+    model.classify("S", "T")
+    assert (model.input_tokens, model.output_tokens, model.calls) == (20, 10, 2)
+
+
+def test_a_failed_call_adds_no_usage():
+    model = AnthropicClassifier(FakeBothEndpoints(anthropic.APIConnectionError(request=httpx2.Request("POST", "https://x"))))
+    with pytest.raises(ClassifierFailed):
+        model.classify("S", "T")
+    assert (model.input_tokens, model.output_tokens, model.calls) == (0, 0, 0)

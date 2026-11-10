@@ -12,11 +12,13 @@ from __future__ import annotations
 
 import json
 import logging
-from dataclasses import dataclass
+import threading
+from dataclasses import dataclass, field
 from typing import Literal, Protocol
 
 import anthropic
 import httpx2
+from anthropic.types import Message
 from anthropic.types.beta import BetaMessage
 
 MODEL = "claude-opus-5-5"   # pinned here and nowhere else
@@ -26,6 +28,7 @@ MAX_TOKENS = 8192            # thinking tokens count against it
 TIMEOUT_S = 30.0             # per attempt; the SDK's default retries apply
 FALLBACK_BETA = "server-side-fallback-2026-07-01"
 FALLBACKS = "default"        # a refused request is re-run server-side on the model Anthropic picks for its category
+NO_FALLBACK_MODELS = frozenset({"claude-haiku-5-5"})   # no server-side refusal fallback: use the plain endpoint
 
 SCHEMA = {
     "type": "object", "additionalProperties": False, "required": ["change_request", "quote"],
@@ -112,16 +115,30 @@ _STOPS = {"end_turn", "max_tokens", "stop_sequence", "tool_use", "pause_turn", "
 _CATEGORIES = {"cyber", "bio", "frontier_llm", "reasoning_extraction", "general_harms"}
 
 
-@dataclass(frozen=True)
+@dataclass
 class AnthropicClassifier:
     """ChangeClassifier over the Messages API (beta, for the server-side refusal fallbacks), through the
-    official SDK: no tools, no sampling parameters, structured output in SCHEMA's shape. Each error is
-    built inside its `except` clause and raised after it, so it carries no cause or context."""
+    official SDK: no tools, no sampling parameters, structured output in SCHEMA's shape. A model with no
+    server-side fallback (NO_FALLBACK_MODELS) is called on the plain endpoint, with no betas and no
+    fallbacks. Each error is built inside its `except` clause and raised after it, so it carries no cause
+    or context. `input_tokens`, `output_tokens` and `calls` total the usage of every reply received."""
 
     client: anthropic.Anthropic
+    model: str = MODEL
+    input_tokens: int = field(default=0, init=False)
+    output_tokens: int = field(default=0, init=False)
+    calls: int = field(default=0, init=False)
+    _lock: threading.Lock = field(default_factory=threading.Lock, init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         quiet_sdk_logs()
+
+    def _record(self, msg: object) -> None:
+        usage = getattr(msg, "usage", None)
+        with self._lock:
+            self.calls += 1
+            self.input_tokens += getattr(usage, "input_tokens", 0) or 0
+            self.output_tokens += getattr(usage, "output_tokens", 0) or 0
 
     def classify(self, subject: str, text: str) -> Verdict:
         if any(c.isnumeric() for c in subject) or any(c.isnumeric() for c in text):
@@ -129,12 +146,15 @@ class AnthropicClassifier:
             raise ClassifierFailed("schema", detail="the input holds a numeral (send redact_for_model's copy only)")
         quiet_sdk_logs()   # again, in case something raised them since
         failure: ClassifierFailed | None = None
+        request = {
+            "model": self.model, "max_tokens": MAX_TOKENS, "system": SYSTEM_PROMPT,
+            "messages": [{"role": "user", "content": user_turn(subject, text)}],
+            "output_config": {"effort": EFFORT, "format": {"type": "json_schema", "schema": SCHEMA}}}
         try:
-            msg = self.client.beta.messages.create(
-                model=MODEL, max_tokens=MAX_TOKENS, system=SYSTEM_PROMPT,
-                messages=[{"role": "user", "content": user_turn(subject, text)}],
-                output_config={"effort": EFFORT, "format": {"type": "json_schema", "schema": SCHEMA}},
-                betas=[FALLBACK_BETA], fallbacks=FALLBACKS)
+            if self.model in NO_FALLBACK_MODELS:
+                msg = self.client.messages.create(**request)
+            else:
+                msg = self.client.beta.messages.create(**request, betas=[FALLBACK_BETA], fallbacks=FALLBACKS)
         except anthropic.APITimeoutError:      # before APIConnectionError, its base class
             failure = ClassifierFailed("timeout")
         except anthropic.APIStatusError as exc:
@@ -145,11 +165,12 @@ class AnthropicClassifier:
             failure = ClassifierFailed("api_error", detail=f"an unreadable reply ({type(exc).__name__})")
         if failure is not None:
             raise failure
+        self._record(msg)
         return _verdict(msg)
 
 
 def _verdict(msg: object) -> Verdict:
-    if not isinstance(msg, BetaMessage):       # a non-JSON content type comes back as a bare string
+    if not isinstance(msg, (BetaMessage, Message)):       # a non-JSON content type comes back as a bare string
         raise ClassifierFailed("api_error", detail=f"a reply that isn't a message ({type(msg).__name__})")
     rid = getattr(msg, "_request_id", None)   # set by the SDK from the response; absent on a message built otherwise
     if msg.stop_reason == "refusal":           # every model in the fallback chain declined
