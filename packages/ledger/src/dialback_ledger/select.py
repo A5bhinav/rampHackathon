@@ -246,6 +246,11 @@ def _select_v1(*, case_id: uuid.UUID, dataset_id: uuid.UUID, vendor_id: uuid.UUI
     return out
 
 
+def active_rule_version() -> str:
+    """The rule `select()` runs under the current flag: today's alone when DIALBACK_CONTEXT_GUARD is off."""
+    return RULE_VERSION if context_guard() else RULE_VERSION_V1
+
+
 def _calls(out: dict) -> list[str]:
     """What a selection would call, in order: the pick, then its alternates."""
     return ([out["e164"]] if out.get("e164") else []) + [a["e164"] for a in out.get("alternates", [])]

@@ -173,6 +173,21 @@ def test_flag_default_and_unknown_values_give_the_new_rule(monkeypatch, value):
     assert run(_a1())["outcome"] == "withheld"
 
 
+@pytest.mark.parametrize(("value", "version"), [("off", "ledger-select-v1"), (None, RULE_VERSION), ("on", RULE_VERSION)])
+def test_a_refusal_names_the_rule_the_flag_runs(monkeypatch, value, version):
+    # A refusal before the rule runs (here, no database) names the rule that would have run: with the
+    # flag off, today's rule (the review's item 6).
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    if value is None:
+        monkeypatch.delenv("DIALBACK_CONTEXT_GUARD", raising=False)
+    else:
+        monkeypatch.setenv("DIALBACK_CONTEXT_GUARD", value)
+    got = asyncio.run(select_number(case_id=uuid.uuid4(), dataset_id=uuid.uuid4(), vendor_id=uuid.uuid4(),
+                                    cutoff=dt.datetime.now(dt.UTC)))
+    assert got.get("contact_point_id") is None, "a refusal never names a number"
+    assert got["rule_version"] == version and "no number is provable" in got["reason"]
+
+
 # Storage (decision 4), on a real migrated Postgres ------------------------------------------------
 
 def a1_documents(now: dt.datetime) -> list[dict]:
