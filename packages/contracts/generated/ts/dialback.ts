@@ -154,7 +154,8 @@ export interface paths {
          *     Dialback then detects the change the way it detects any change in Ramp, and the person who
          *     sent it is the change's author, so they can't release it (R5). The full account number passes
          *     through to the mock and is never stored, logged or returned (ADR-8). A refusal sends nothing
-         *     to Ramp.
+         *     to Ramp. Only a clerk can send a change, and a dataset takes at most one change a minute (409),
+         *     so a shared demo account can't set off a run of holds and calls.
          */
         post: operations["changeVendorBankAccount"];
         delete?: never;
@@ -1103,8 +1104,12 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             422: components["responses"]["InvalidRequest"];
-            /** @description The Ramp mock refused the change or could not be reached; nothing was changed */
+            /**
+             * @description The Ramp mock refused the change, could not be reached, or did not confirm it. The message
+             *     says which: only a refusal or an unreachable mock means nothing was changed.
+             */
             502: {
                 headers: {
                     [name: string]: unknown;
@@ -1113,7 +1118,7 @@ export interface operations {
                     /**
                      * @example {
                      *       "code": "upstream_unavailable",
-                     *       "message": "The Ramp mock did not accept the change. Nothing was changed; try again."
+                     *       "message": "The Ramp mock could not be reached. Nothing was changed; try again."
                      *     }
                      */
                     "application/json": components["schemas"]["Error"];
