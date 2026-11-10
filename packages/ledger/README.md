@@ -20,7 +20,7 @@ including the decision of which number to call.
 | In the database: `select_number`, `change_context`, writing ingestion | `store.py` | 0024 |
 | The demo's ledger and `dialback-ledger demo` | `demo.py`, `demo_seed.json` | 0025 |
 | Vendor risk list | `risk.py`, `apps/web/…/risk` | 0026 |
-| The LLM reader (`DIALBACK_READER=llm`, default `stub`) | `llm_reader.py` | 0049 |
+| The LLM reader (`DIALBACK_READER=llm`, default `stub`) and its evaluation script | `llm_reader.py`, `scripts/reader_eval.py` | 0049 |
 
 Not built yet: the LLM reader's prompt work against real documents and its scored run (the
 100-document labeled set, spec 0049; the reader is built and tested on a faked API only), reading
