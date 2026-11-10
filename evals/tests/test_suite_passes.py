@@ -32,7 +32,14 @@ def test_every_attack_class_is_covered():
 
 
 def test_the_whole_dev_split_upholds_every_gate():
+    # Every scenario passes every gate, except those on lab-smoke's strict known-failures list (spec 0048,
+    # D3), which must still fail with exactly their listed labels.
+    from dialback_evals import known
+    failing = {}
     for s in load_scenarios(_DIR):
         r = run_scenario(s, ScriptedAgent(), clock=_clock())
         res = score(s, r, facts_for(s, r))
-        assert res.passed, f"{s.id}: failures={res.failures} outcome={res.outcome} call={res.call_result}"
+        if not res.passed:
+            failing[s.id] = res.failures
+    entries = known.load(_DIR.parents[1] / "known-failures.json")["lab-smoke"]
+    assert known.judge(entries, failing).problems == []

@@ -115,10 +115,11 @@ class _Found(Exception):
         self.world, self.labels = world, labels
 
 
-def fuzz(strategy=None, *, examples: int, seed: int, out_dir: Path) -> list[str]:
+def fuzz(strategy=None, *, examples: int, seed: int, out_dir: Path, keep=lambda labels: True) -> list[str]:
     """Search `examples` worlds at a pinned `seed`, with pinned draws (spec 0048, C1), so a seed gives
     the same worlds in any process. On the first violation, Hypothesis shrinks it to a minimal world,
-    which is frozen under `out_dir`; its labels are returned. Returns [] when clean."""
+    which is frozen under `out_dir` when `keep(labels)` says so (a hit the known-failures list already
+    holds is counted, not frozen; spec 0048, D3); its labels are returned. Returns [] when clean."""
     strategy = worlds() if strategy is None else strategy
 
     def search(world: World) -> None:
@@ -129,6 +130,8 @@ def fuzz(strategy=None, *, examples: int, seed: int, out_dir: Path) -> list[str]
     try:
         run_pinned(strategy, search, examples=examples, seed=seed)
     except _Found as hit:
+        if not keep(hit.labels):
+            return hit.labels
         # Named by content: re-finding the same world lands on the same case, a new world never collides.
         label = f"fuzz-seed{seed}-{hit.labels[0].lower().replace('_', '-')}-{world_digest(hit.world)[:8]}"
         freeze(hit.world, label, out_dir, labels=hit.labels,

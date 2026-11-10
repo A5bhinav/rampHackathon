@@ -222,8 +222,15 @@ BREAKS = [
 ]
 
 
+def _known_smoke() -> dict[str, tuple[str, ...]]:
+    """lab-smoke's known failures (spec 0048, D3): what the unbroken product fails today, exactly."""
+    from dialback_evals import known
+    entries = known.load(Path(__file__).resolve().parents[1] / "known-failures.json")["lab-smoke"]
+    return {e.case: tuple(sorted(e.labels)) for e in entries}
+
+
 def test_the_lab_passes_the_unbroken_product():
-    assert {k: v for k, v in _lab(ScriptedAgent).items() if v} == {}
+    assert {k: tuple(sorted(v)) for k, v in _lab(ScriptedAgent).items() if v} == _known_smoke()
 
 
 @pytest.mark.parametrize(("agent", "mutations", "scenario", "failure"), [b[1:] for b in BREAKS],
@@ -332,7 +339,8 @@ def test_honest_fixed_lines_pass():
     from dialback_evals.detector import heard
     from dialback_evals.runner import CALLBACK
     from dialback_policy.script import FALLBACK_LINE, QUESTIONS, REASK, STILL_THERE, Script
-    assert {k: v for k, v in _lab(ScriptedAgent).items() if v} == {}
+    assert {k: tuple(sorted(v)) for k, v in _lab(ScriptedAgent).items() if v} == _known_smoke()   # a09: A10
+    assert not [f for v in _lab(ScriptedAgent).values() for f in v if f.startswith("heard_")]
     script = Script("Northwind Traders", CALLBACK)
     fixed = [script.disclosure(), script.voicemail(), script.consent_refused(), script.close(), script.goodbye(),
              script.callback_close(), FALLBACK_LINE, STILL_THERE, REASK,

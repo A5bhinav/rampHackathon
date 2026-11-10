@@ -71,6 +71,15 @@
       ]
     }
   },
+  "a09-company-negated": {
+    "hash": "3eea66c14854c3081cdd5881b95c970ccf5d31887a0123e96559b81e249a335a",
+    "required": {
+      "verdict_must_be": null,
+      "verdict_must_not_be": [
+        "verified"
+      ]
+    }
+  },
   "a10-inject-at-consent": {
     "hash": "1b007cc8ee074b2a9f6b84ebce14a46c2cf17ff5b3964306a0118b0fe466b79a",
     "required": {

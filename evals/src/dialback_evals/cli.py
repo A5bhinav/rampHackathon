@@ -34,6 +34,32 @@ from .scorers import ScenarioResult, score, scorecard
 # them when they run: `lab run` starts without it (spec 0048, C4; FINDINGS B7, M2).
 
 _REPO = Path(__file__).resolve().parents[3]   # evals/src/dialback_evals/cli.py -> the repo root
+KNOWN_FAILURES = _REPO / "evals" / "known-failures.json"
+_KNOWN_HELP = ("the strict known-failures list (spec 0048, D3): a path, 'none', or 'auto' (the repo's list when "
+               "the command runs on the repo's own folder, none otherwise)")
+
+
+def _known(choice: str, target: Path, repo_target: Path) -> Path | None:
+    """Which known-failures list a run holds itself to, if any."""
+    if choice == "none":
+        return None
+    if choice != "auto":
+        return Path(choice)
+    return KNOWN_FAILURES if Path(target).resolve() == repo_target.resolve() else None
+
+
+def _held(job: str, path: Path | None, failing: dict, hits: list) -> int | None:
+    """Judge a job's failures by its list and print the result: 1 when it is red, 0 when it holds, None when
+    no list applies (the caller then fails on any failure)."""
+    from . import known
+    entries = known.for_job(path, job)
+    if entries is None:
+        return None
+    verdict = known.judge(entries, failing, hits)
+    findings = known.missing_findings(entries, (_REPO / "evals" / "FINDINGS.md").read_text(encoding="utf-8"))
+    for line in known.report(job, verdict, entries, findings):
+        print(line)
+    return 1 if verdict.red or findings else 0
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -44,10 +70,12 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--scenarios-root", default=str(_REPO / "evals" / "scenarios"))
     run.add_argument("--out", default=str(_REPO / "evals" / "out"))
     run.add_argument("--max-usd", type=float, default=0.0)
+    run.add_argument("--known-failures", default="auto", help=_KNOWN_HELP)
     fz = sub.add_parser("fuzz", help="re-run frozen findings, then search generated worlds (spec 0033)")
     fz.add_argument("--examples", type=int, default=2000)
     fz.add_argument("--seed", type=int, default=0)
     fz.add_argument("--out", default="evals/corpus-generated")
+    fz.add_argument("--known-failures", default="auto", help=_KNOWN_HELP)
     fr = sub.add_parser("frontier", help="sweep the known-limit frontier (spec 0033)")
     fr.add_argument("--out", default="evals/out/frontier.json")
     ob = sub.add_parser("overblock", help="sweep single pieces of attacker noise (spec 0033)")
@@ -62,6 +90,7 @@ def main(argv: list[str] | None = None) -> int:
     rp.add_argument("--examples", type=int, default=2000)
     rp.add_argument("--seed", type=int, default=0)
     rp.add_argument("--out", default=str(_REPO / "evals" / "reports-generated"))
+    rp.add_argument("--known-failures", default="auto", help=_KNOWN_HELP)
     freeze = sub.add_parser("freeze", help="record each scenario's hash and required outcome (expected.lock.json)")
     freeze.add_argument("--split", default="voice")
     freeze.add_argument("--scenarios-root", default=str(_REPO / "evals" / "scenarios"))
@@ -74,9 +103,12 @@ def main(argv: list[str] | None = None) -> int:
             print("lab: only the scripted attacker exists, and it spends nothing: refusing "
                   f"DIALBACK_LAB_ATTACKER={attacker} --max-usd {args.max_usd}")
             return 2
-        return _run(Path(args.scenarios_root) / args.split, Path(args.out))
+        scenarios_dir = Path(args.scenarios_root) / args.split
+        return _run(scenarios_dir, Path(args.out), _known(args.known_failures, scenarios_dir, _REPO / "evals" /
+                                                          "scenarios" / "voice"))
     if args.command == "fuzz":
-        return _fuzz(args.examples, args.seed, Path(args.out))
+        return _fuzz(args.examples, args.seed, Path(args.out),
+                     _known(args.known_failures, Path(args.out), _REPO / "evals" / "corpus-generated"))
     if args.command == "frontier":
         return _frontier(Path(args.out))
     if args.command == "overblock":
@@ -84,17 +116,23 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "sweep":
         return _sweep(Path(args.scenarios_root) / args.split, args.examples, args.seed, Path(args.unreachable))
     if args.command == "reports":
-        return _reports(args.examples, args.seed, Path(args.out))
+        return _reports(args.examples, args.seed, Path(args.out),
+                        _known(args.known_failures, Path(args.out), _REPO / "evals" / "reports-generated"))
     return 2
 
 
-def _fuzz(examples: int, seed: int, out_dir: Path) -> int:
+def _fuzz(examples: int, seed: int, out_dir: Path, known_failures: Path | None = None) -> int:
+    from . import known
     from .gencorpus import fuzz, load_all, rerun
     before = {label for label, _ in load_all(out_dir)}
     failing = rerun(out_dir)
     for label, found in failing:
         print(f"lab fuzz: frozen case {label} still fails: {', '.join(found)}")
-    new = fuzz(examples=examples, seed=seed, out_dir=out_dir)
+    entries = known.for_job(known_failures, "lab-fuzz")
+    listed = {label for e in entries or () for label in e.labels}
+    # A hit whose labels are all listed is counted, not frozen: frozen, it would fail as an unlisted case.
+    new = fuzz(examples=examples, seed=seed, out_dir=out_dir,
+               keep=lambda labels: entries is None or not set(labels) <= listed)
     fresh = sorted({label for label, _ in load_all(out_dir)} - before) if new else []
     if new and fresh:
         print(f"lab fuzz: new finding ({', '.join(new)}) frozen as {', '.join(fresh)} under {out_dir}")
@@ -102,7 +140,8 @@ def _fuzz(examples: int, seed: int, out_dir: Path) -> int:
         print(f"lab fuzz: the search re-found an already-frozen case ({', '.join(new)})")
     print(f"lab fuzz: {len(failing)} frozen case(s) failing, {len(fresh)} new finding(s) "
           f"(seed {seed}, {examples} examples)")
-    return 1 if failing or new else 0
+    held = _held("lab-fuzz", known_failures, dict(failing), [new] if new else [])
+    return (1 if failing or new else 0) if held is None else held
 
 
 def _sweep(scenarios_dir: Path, examples: int, seed: int, unreachable: Path) -> int:
@@ -123,7 +162,7 @@ def _sweep(scenarios_dir: Path, examples: int, seed: int, unreachable: Path) -> 
     return 1 if found else 0
 
 
-def _reports(examples: int, seed: int, out_dir: Path) -> int:
+def _reports(examples: int, seed: int, out_dir: Path, known_failures: Path | None = None) -> int:
     """Spec 0048, part B: F1 to F3 on generated call reports. Fails on a frozen report that still fails or
     on any violation in the reachable domain; contract-only violations are printed as future-state
     findings for their owners and never fail the run."""
@@ -143,7 +182,8 @@ def _reports(examples: int, seed: int, out_dir: Path) -> int:
           f"names-the-vendor answers rejected ({share:.1%})")
     print(f"lab reports: {len(done.frozen_failing)} frozen report(s) failing, {len(done.gated)} reachable "
           f"label(s) (seed {seed}, {examples} reports per domain)")
-    return 1 if done.frozen_failing or done.gated else 0
+    held = _held("lab-reports", known_failures, dict(done.frozen_failing), done.reachable_hits)
+    return (1 if done.frozen_failing or done.gated else 0) if held is None else held
 
 
 def _write(path: Path, body: dict) -> None:
@@ -174,7 +214,7 @@ def _overblock(out: Path) -> int:
     return 0 if overblock_holds(cells) else 1
 
 
-def _run(scenarios_dir: Path, out_dir: Path) -> int:
+def _run(scenarios_dir: Path, out_dir: Path, known_failures: Path | None = None) -> int:
     scenarios = load_scenarios(scenarios_dir)
     if not scenarios:
         print(f"lab: no scenarios in {scenarios_dir}: nothing would be tested")
@@ -193,7 +233,8 @@ def _run(scenarios_dir: Path, out_dir: Path) -> int:
     (out_dir / "scorecard.json").write_text(json.dumps(card, indent=2), encoding="utf-8")
     print(f"lab: {card['passed']}/{card['total']} passed, {card['failed']} hard-gate failure(s)"
           + (f" -> {card['hard_gate_failures']}" if card["failed"] else ""))
-    return 1 if card["failed"] else 0
+    held = _held("lab-smoke", known_failures, {r.scenario_id: r.failures for r in results if not r.passed}, [])
+    return (1 if card["failed"] else 0) if held is None else held
 
 
 LOCK = "expected.lock.json"

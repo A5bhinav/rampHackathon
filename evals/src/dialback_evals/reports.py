@@ -626,6 +626,7 @@ class Checked:
     new_frozen: list[str] = dataclasses.field(default_factory=list)
     vendor_answers: int = 0
     vendor_rejected: int = 0
+    reachable_hits: list[list[str]] = dataclasses.field(default_factory=list)   # each violating report's labels
 
     @property
     def gated(self) -> list[str]:
@@ -658,12 +659,16 @@ def run_checks(*, examples: int, seed: int, out_dir: Path | None = None, decide=
         f3 = check_f3(cases, matcher)
         done.vendor_answers += f3.vendor_answers
         done.vendor_rejected += f3.vendor_rejected
+        per_report: dict[int, set[str]] = {}
         for found in (check_f1(cases, decide), check_f2(cases, decide), f3):
             for i, labs in found.violations:
+                per_report.setdefault(i, set()).update(labs)
                 for label in labs:
                     done.hits.setdefault(domain, {}).setdefault(label, 0)
                     done.hits[domain][label] += 1
                     done.first.setdefault((domain, label), cases[i])
+        if domain == "reachable":
+            done.reachable_hits = [sorted(labs) for _, labs in sorted(per_report.items())]
     if out_dir is not None:
         known = {label for f in load_all(out_dir) for label in f.labels}
         order = {"reachable": 0, "contract": 1}          # a finding is frozen from the gated domain when it shows there

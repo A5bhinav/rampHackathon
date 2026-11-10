@@ -228,3 +228,39 @@ def test_lab_sweep_starts_without_hypothesis():
     done = _without_hypothesis(["sweep", "--help"])
     assert done.returncode == 0, done.stdout + done.stderr
     assert "--unreachable" in done.stdout
+
+
+
+# Spec 0048, D3: each command holds itself to its job's strict known-failures list.
+
+def _list(tmp_path, job, entries):
+    path = tmp_path / "known.json"
+    path.write_text(json.dumps({job: entries}))
+    return str(path)
+
+
+def test_lab_run_holds_the_known_failures_list(tmp_path):
+    root = _split(tmp_path, slip=_SLIP)
+    args = ["run", "--split", "voice", "--scenarios-root", str(root.parent), "--out", str(tmp_path / "out")]
+    assert main(args) == 1                                             # no list: any failure is red
+    held = {"case": "slip-01", "labels": ["verified_attack"], "finding": "A10", "owner": "Abhi"}
+    assert main([*args, "--known-failures", _list(tmp_path, "lab-smoke", [held])]) == 0
+    wrong = {**held, "labels": ["verified_attack", "spoke_digits"]}       # listed, but no longer fails like that
+    assert main([*args, "--known-failures", _list(tmp_path, "lab-smoke", [wrong])]) == 1
+    assert main([*args, "--known-failures", _list(tmp_path, "lab-smoke", [])]) == 1   # unlisted
+    orphan = {**held, "finding": "A99"}                                  # no such finding in FINDINGS.md
+    assert main([*args, "--known-failures", _list(tmp_path, "lab-smoke", [orphan])]) == 1
+
+
+def test_lab_fuzz_counts_a_known_hit_and_does_not_freeze_it(tmp_path, monkeypatch, capsys):
+    from dialback_evals.gencorpus import load_all
+    monkeypatch.setattr("dialback_evals.gencorpus.all_violations", lambda w: ["M_shared_id_helped"])
+    entry = {"case": "elsewhere", "labels": ["M_shared_id_helped"], "finding": "A5", "owner": "Inesh"}
+    out = tmp_path / "corpus"
+    listed = _list(tmp_path, "lab-fuzz", [entry])
+    monkeypatch.setattr("dialback_evals.gencorpus.rerun", lambda d: [("elsewhere", ["M_shared_id_helped"])])
+    assert main(["fuzz", "--examples", "5", "--seed", "0", "--out", str(out), "--known-failures", listed]) == 0
+    assert load_all(out) == [] and "1 search hit(s) showed only listed labels" in capsys.readouterr().out
+    monkeypatch.setattr("dialback_evals.gencorpus.all_violations", lambda w: ["I5_too_young_eligible"])
+    assert main(["fuzz", "--examples", "5", "--seed", "0", "--out", str(out), "--known-failures", listed]) == 1
+    assert len(load_all(out)) == 1                                      # an unlisted hit is frozen, and red
