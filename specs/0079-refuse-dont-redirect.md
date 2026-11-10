@@ -201,6 +201,12 @@ committed. The generated worlds are drawn once, so both rules see the same world
 | Corpus | 20 scenarios | Every outcome, pick, candidate and call list is today's |
 | Demo | Acme, Brightline, Cobalt | Acme calls +12065550142 and Cobalt +16175550142, each with today's backup; Brightline gets no call |
 
+The A6 gate adds nothing the prefix gate doesn't already give: today's rule never calls X in any A6
+variant (it calls the real line, or no one), so a rule whose call list is a prefix of today's can't
+call X either. What the A6 world really shows is the known cost: the new rule withholds at the 30-
+and 100-day probes, where today's rule calls the real line. (Added after the review, Nov 10; no bar
+or number changed.)
+
 Two consistency checks, not bars, held on every world above:
 - with the flag off, `select()` is byte for byte the frozen copy;
 - the new rule's outcome and call list match decision 3 recomputed from the frozen copy.
