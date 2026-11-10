@@ -160,8 +160,12 @@ The person who checks the evaluation set labels by this table, and the prompt te
 - **Unsafe label** (the security metric): a number the text doesn't present as the vendor's, labeled
   party `vendor`.
 - **Over-block** (the accuracy metric): a number the text presents as the vendor's, labeled so that
-  the rule refuses it: a party other than `vendor`, or the role `fax`. (vendor, unknown) is not an
-  over-block, because the rule doesn't refuse it.
+  the rule refuses it. That means a party other than `vendor`, or the role `fax` when the text
+  doesn't call it a fax line.
+  - (vendor, unknown) is not an over-block, because the rule doesn't refuse it.
+  - A true fax line labeled `fax` is not an over-block either. The label is right, and the rule
+    refuses fax lines by design. (Corrected Nov 10, before any scored run: the first wording counted
+    it, which punished the right answer.)
 - **Role accuracy:** reported only for numbers with an explicit role word.
 - **"Us" mentions:** reported on their own, since the reader can't see the author.
 
