@@ -30,11 +30,48 @@ Specs: 0017 (voice slice lab), 0083 (generative selection pressure; 0033 before 
   4. If the attacker planted a provable number in the vendor's records earlier (2 counting
      sources, at least 90 days old: the known limit K01), the call goes to it.
 - **Why it matters:**
-  - It works in production today.
+  - **It is not reachable with live data today** (checked Nov 10 on main `b4cbd21`). Nothing
+    ingests live emails or uploads. The only code that writes ledger documents is
+    `dialback-ledger demo load` (the demo seed) and `dialback-ledger demo request` (the seed's
+    scripted change-request email). So A1 happens only in demo data and in the lab, and becomes
+    real when an email or upload door is built.
   - It removes K01's hardest condition: the planted number no longer has to be older than the real one.
   - Without a planted number it fails safe: no call, and the case goes to manual review.
 - **Spec:** 0079 (`sami/refuse-dont-redirect`, approved Nov 10): when the change context would
   change who is called, nobody is called and a person reviews the case (`withheld`).
+- **Alternatives measured (Nov 10; each plan written before its run; exploratory, one seed,
+  fixture dates).** Scripts and outputs are in the session scratchpad under `umeasure/`
+  (`measure_u_plan.md`, `measure_t_plan.md`).
+  - **Rule U, "choose only from history before the request": rejected.** U drops everything at or
+    after the request and every lookalike-domain email, removes the lookalike pull, and counts old
+    messages in the request's thread as history. As the pick, it calls a fraudster's number where
+    today's rule doesn't in 1 frozen world (`lookalike-erased-by-first-sorting-twin`) and 95 of
+    2000 generated draws (80 distinct worlds; pinned draws; 23 unpinned), mainly because removing
+    the pull lets planted numbers count. (An earlier note on `sami/attack-lab-generative` said 91,
+    which matches no output.) Because it keeps old thread messages, a label in an earlier message of
+    the request's thread still vetoes the real line (the over-block `bank_label_in_thread` rows).
+  - **Rule T, "ignore the change email and its whole thread" (Sami's rule as stated).** U had
+    differed from it on the thread. T is today's rule with the request and every message in its
+    thread dropped, and the same-subject window off; the lookalike pull and the rest stay.
+    - **Fixes:** the label in the request (real number picked), and a label in an earlier message
+      of the same thread (real number picked; today's rule and U pick the planted number). On an
+      honest request that mentions the real number (A2), it calls the real number, where today's
+      rule and spec 0079 call nobody.
+    - **Misses:** a label in a separate follow-up email after the request (frozen
+      `planted-number-picked-after-follow-up-email`: T picks the planted number, 0079 withholds).
+    - **Calls a fraudster's number where today's rule doesn't, as the pick:** 0 in the corpus,
+      demo, frozen, over-block and frontier sets; 16 of 2000 generated draws (13 distinct worlds;
+      12 unpinned). In 14 draws, a non-vendor label on the attacker's number sat only in the
+      thread, an honest warning T ignores. In 2, a lookalike email inside the thread set today's
+      pull, and dropping it undid the pull.
+    - **T2** (T, plus lookalike senders treated as ordinary) does that in 45 draws (39 distinct;
+      25 unpinned) and in the frozen `lookalike-erased-by-first-sorting-twin`.
+    - **Calls nobody, of the 2000 pinned worlds:** today's rule 816, T 701, spec 0079 948.
+    - Corpus outcomes and demo picks are unchanged under T and T2. By the pre-registered bars,
+      which count backups, T fails the A1 and A3 checks like U, because the planted number stays a
+      valid backup. Read as the pick only, T fails 1 of 3 A1 cases (the follow-up email) and passes
+      A3.
+  - **None of the rules stops the label in a separate email sent before the request.** See A4.
 
 ### A2. Honest change requests that mention the vendor's number are refused
 
@@ -58,9 +95,21 @@ Specs: 0017 (voice slice lab), 0083 (generative selection pressure; 0033 before 
 
 ### A4. Labels from non-counting documents outside the change context also refuse a number
 
-- **Status:** confirmed (read). Not probed by the lab (spec 0083, Q144).
+- **Status:** confirmed (read). Not probed by the lab (spec 0083, Q144). Its A1 form is confirmed
+  (ran) on one hand-built world, Nov 10.
 - **What happens:** an email from an unrelated domain, outside the thread, that labels the real
   number someone else's also vetoes it.
+- **With a planted number, this is A1 that no rule here stops** (confirmed (ran), Nov 10).
+  - **The world:** the frozen `planted-number-picked-after-follow-up-email`, with the attacker's
+    "bank line" email moved to 1 day before the request, in its own thread, under its own subject,
+    from the vendor's domain.
+  - **Result:** today's rule, spec 0079's real `select()` (`9148c5f`, flag on), rule U and rule T
+    all pick the planted number.
+  - **Why:** the change context is drawn by thread, subject, sender domain and time, and the sender
+    chooses all four. Any label outside it vetoes as history.
+  - **An idea to measure, not yet tried:** a label younger than `min_age_days` (90) may cancel a
+    call but not move it, by spec 0079's compare-and-withhold applied to young labels anywhere
+    instead of to the change context. Moving a call would then cost what planting a number costs.
 - **Open question:** whether such documents reach `select()` depends on how ingestion attaches
   documents to a vendor (`ledger.documents.vendor_id`), which nobody has traced.
 
