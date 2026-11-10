@@ -1,0 +1,26 @@
+{
+  "set": "dev",
+  "model": "claude-haiku-5-5",
+  "emails": 100,
+  "change_requests_total": 35,
+  "change_requests_flagged": 35,
+  "change_requests_by_rule": 30,
+  "change_requests_by_model": 5,
+  "ordinary_total": 65,
+  "ordinary_flagged": 2,
+  "ordinary_by_rule": 2,
+  "ordinary_by_model": 0,
+  "failures": {},
+  "failed": {},
+  "missed": [],
+  "false_flags": [
+    "ord-29.json",
+    "ord-54.json"
+  ],
+  "calls": 68,
+  "input_tokens": 42218,
+  "output_tokens": 2164,
+  "cost_usd": 0.0053038,
+  "latency_p50_s": 1.0627497910172679,
+  "latency_p95_s": 1.5310634579509497
+}

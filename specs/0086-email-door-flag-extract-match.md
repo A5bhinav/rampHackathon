@@ -111,10 +111,18 @@ The procedure is fixed here before any model run. The script is `apps/core/tests
 4. If Haiku fails the bar on `heldout2`, Opus (`claude-opus-5-5`) runs once on `heldout2` with the identical prompt. Choosing between two pre-named models on the same held-out set makes the chosen number slightly optimistic, and that is stated with the result.
 5. If neither passes, stop and report to Sami. No prompt change follows any `heldout2` run.
 
-Results (to fill in after the runs):
+Results (prompt v1, never revised):
 
 | Model | Set | Change requests flagged | Ordinary flagged | Failures | cr-36 | Bar | Cost |
 |---|---|---|---|---|---|---|---|
-| | | | | | | | |
+| claude-haiku-5-5 | tuning (exploratory) | 30/30 (rule 30, model 0) | 0/62 | 0 | n/a | met | $0.0046 |
+| claude-haiku-5-5 | dev (exploratory) | 35/35 (rule 30, model 5) | 2/65 (rule 2: ord-29, ord-54) | 0 | n/a | met | $0.0053 |
+| claude-haiku-5-5 | heldout2 (confirmation, once) | 39/39 (rule 32, model 7) | 23/70 (rule 20, model 3) | 0 | not flagged | **FAIL** (precision) | $0.0059 |
+
+Model-call latency: p50 about 1.0 s, p95 1.4 to 3.1 s.
+
+The Opus run in step 4 was not made: the model is asked only when the rule says no, so the rule's 20 false flags on `heldout2` happen whatever the model, and no model could bring the ordinary count to 3 or fewer. Running it would have spent money to confirm a determined failure. Per step 5, this stopped for Sami's decision.
+
+Exploratory reading of `heldout2`'s 23 false flags (after the run; descriptive, not a confirmation): the rule's 20 are ordinary emails dense with bank-change vocabulary that request no change (fraud-awareness newsletters, security training quoting sample scams, "nothing changed" confirmations, a mailbox-compromise warning, address, terms and portal-contact changes, spam, a policy reminder, a customer's own bank switch). The model's 3 are two customer refund emails with the customer's own bank details and one new-vendor onboarding. None of the 23 carries new bank details for a known vendor (one lists the account on file), so none would open a case; a false flag costs the fixed reply when replies are on.
 
 Notes on the numbers (Task 6c, fix round 1). The Opus run uses the server-side fallback `"default"`, so an email the model refuses may be answered by another model; the result is for "Opus with its fallbacks", not Opus alone. The reported cost is a lower bound: it counts the tokens of the replies received, not retries or timed-out attempts. The result files in `apps/core/tests/email_door/eval_results/` (counts and file names only, with a `failed` map of file to failure reason) are committed as the record, and a result file is never overwritten.
