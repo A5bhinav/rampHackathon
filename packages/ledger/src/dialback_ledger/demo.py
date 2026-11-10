@@ -7,11 +7,13 @@ Run `load` after `dialback-core demo reset`; it writes each seeded vendor's hist
 domain into the current demo dataset. At beat 2, run `request --vendor REF` right before
 `dialback-core demo change --vendor REF`, so the change-request email arrives first.
 
-`--phone REF=+1...` swaps that vendor's fictional AR line for a team phone in the documents'
-text, before ingestion, so the rule, the lineage panel and the voice service all see the same
-number. Give it on the command line only: team numbers are never committed.
+`--phone REF=+1...` swaps that vendor's fictional AR line for a team phone in the stored rows,
+so the rule, the lineage panel and the voice service all see the same number. The reader labels
+the documents as the seed wrote them, so a team phone never reaches a model (spec 0049). Give it
+on the command line only: team numbers are never committed.
 
-Uses DATABASE_URL, like the core. Every check runs before anything is written.
+Uses DATABASE_URL, like the core, and DIALBACK_READER (ANTHROPIC_API_KEY for `llm`). Every check
+runs before anything is written.
 """
 from __future__ import annotations
 
@@ -29,10 +31,11 @@ import phonenumbers as pn
 import psycopg
 from psycopg.rows import dict_row
 
-from .ingest import ingest_all
+from .custody import document_sha256
+from .flags import reader_mode
+from .ingest import IngestResult, ingest_all
+from .reader import Reader, ReaderFailed, ReaderUnavailable, reader_for
 from .store import add_vendor_domain, mark_change_request, stored_id, write_ingest
-
-EXTRACTOR = "demo-seed-v1"
 
 
 class DemoError(Exception):
@@ -52,19 +55,66 @@ def _formats(e164: str) -> list[str]:
     return [f"({area}) {exch}-{line}", f"{area}-{exch}-{line}", f"{area}.{exch}.{line}"]
 
 
-def _prepare(doc: dict, delta: dt.timedelta, swap: tuple[str, str] | None) -> dict:
-    """Shift a document's receive time by `delta`, and swap a phone number in its text."""
+def _prepare(doc: dict, delta: dt.timedelta) -> dict:
+    """Shift a document's receive time by `delta`."""
     d = copy.deepcopy(doc)
     d["custody"]["received_at"] = (_when(d["custody"]["received_at"]) + delta).isoformat()
-    if swap:
-        old, new = swap
-        pairs = list(zip(_formats(old), _formats(new))) if new.startswith("+1") and len(new) == 12 else \
-            [(f, new) for f in _formats(old)]
-        for page in d["pages"]:
-            for span in page["spans"]:
-                for a, b in pairs:
-                    span["text"] = span["text"].replace(a, b)
     return d
+
+
+def _swap_text(text: str, swap: tuple[str, str]) -> str:
+    """Replace the fictional number `swap[0]` with the team phone `swap[1]`, in each format the seed writes."""
+    old, new = swap
+    pairs = list(zip(_formats(old), _formats(new))) if new.startswith("+1") and len(new) == 12 else \
+        [(f, new) for f in _formats(old)]
+    for a, b in pairs:
+        text = text.replace(a, b)
+    return text
+
+
+def _with_phone(doc: dict, swap: tuple[str, str]) -> dict:
+    """A copy of `doc` with the team phone in its text: what the stored rows describe."""
+    d = copy.deepcopy(doc)
+    for page in d["pages"]:
+        for span in page["spans"]:
+            span["text"] = _swap_text(span["text"], swap)
+    return d
+
+
+def labeled(documents: list[dict], reader: Reader, swap: tuple[str, str] | None = None) -> IngestResult:
+    """Ingest documents with `reader`, storing its version as `extractor_version`. The reader sees
+    the documents as the seed wrote them, so a team phone never reaches a model (spec 0049, decision
+    5). With `swap` = (fictional AR line, team phone), the team phone then goes into the rows: the
+    numbers, the quotes and the documents' hashes, exactly as if it had been in the text.
+
+    A document the reader can't label stops everything (spec 0049, decision 4): the DemoError rolls
+    back the caller's transaction, so nothing is written."""
+    try:
+        result = ingest_all(documents, extractor_version=reader.version, reader=reader)
+    except ReaderFailed as exc:
+        raise DemoError(f"{exc}; nothing was written") from None
+    if swap is None:
+        return result
+    old, new = swap
+    hashes = {d["id"]: document_sha256(_with_phone(d, swap)) for d in documents}
+    for row in result.documents:
+        row["sha256"] = hashes[row["id"]]
+    for o in result.observations:
+        if o["value_normalized"] == old:
+            o["value_normalized"] = new
+        if o["quote"] is not None:
+            o["quote"] = _swap_text(o["quote"], swap)
+    return result
+
+
+def _reader(reader: Reader | None) -> Reader:
+    """The given reader, else the one DIALBACK_READER names; `llm` without its key refuses to start."""
+    if reader is not None:
+        return reader
+    try:
+        return reader_for(reader_mode())
+    except ReaderUnavailable as exc:
+        raise DemoError(str(exc)) from None
 
 
 def _phones(given: dict[str, str], seed: dict) -> dict[str, str]:
@@ -119,15 +169,15 @@ async def _dataset(conn: psycopg.AsyncConnection, dataset_id: UUID | None, seed:
     return row["id"], vendors
 
 
-async def _request(conn, seed: dict, dataset_id: UUID, ref: str, vendor_id: UUID, now: dt.datetime) -> bool:
+async def _request(conn, seed: dict, dataset_id: UUID, ref: str, vendor_id: UUID, now: dt.datetime,
+                   reader: Reader) -> bool:
     req = seed["vendors"][ref]["request"]
     exists = await (await conn.execute("select 1 from ledger.change_requests where dataset_id = %s and document_id = %s",
                                        (dataset_id, stored_id(dataset_id, req["id"])))).fetchone()
     if exists:
         return False
-    doc = _prepare(req, now - _when(seed["anchor"]), None)
-    await write_ingest(conn, dataset_id=dataset_id, vendor_id=vendor_id,
-                       result=ingest_all([doc], extractor_version=EXTRACTOR))
+    doc = _prepare(req, now - _when(seed["anchor"]))
+    await write_ingest(conn, dataset_id=dataset_id, vendor_id=vendor_id, result=labeled([doc], reader))
     await mark_change_request(conn, dataset_id=dataset_id, vendor_id=vendor_id, document_id=req["id"])
     return True
 
@@ -140,8 +190,10 @@ def _url(database_url: str | None) -> str:
 
 
 async def load(database_url: str | None = None, *, phones: dict[str, str], dataset_id: UUID | None = None,
-               with_requests: bool = False, now: dt.datetime | None = None) -> dict:
-    """Write each seeded vendor's history and domain (and, with `with_requests`, its request)."""
+               with_requests: bool = False, now: dt.datetime | None = None, reader: Reader | None = None) -> dict:
+    """Write each seeded vendor's history and domain (and, with `with_requests`, its request).
+    `reader` defaults to the one DIALBACK_READER names."""
+    reader = _reader(reader)
     seed = load_seed()
     swaps = _phones(phones, seed)
     now = now or dt.datetime.now(dt.UTC)
@@ -154,11 +206,10 @@ async def load(database_url: str | None = None, *, phones: dict[str, str], datas
             swap = (v["phones"]["ar"], swaps[ref]) if ref in swaps else None
             loaded = await (await conn.execute("select 1 from ledger.documents where id = %s",
                                                (stored_id(ds, v["documents"][0]["id"]),))).fetchone()
-            docs = [_prepare(d, delta, swap) for d in v["documents"]]
-            n = await write_ingest(conn, dataset_id=ds, vendor_id=vendor_id,
-                                   result=ingest_all(docs, extractor_version=EXTRACTOR))
+            docs = [_prepare(d, delta) for d in v["documents"]]
+            n = await write_ingest(conn, dataset_id=ds, vendor_id=vendor_id, result=labeled(docs, reader, swap))
             await add_vendor_domain(conn, dataset_id=ds, vendor_id=vendor_id, domain=v["domain"])
-            requested = with_requests and await _request(conn, seed, ds, ref, vendor_id, now)
+            requested = with_requests and await _request(conn, seed, ds, ref, vendor_id, now, reader)
             # A reload adds nothing, so a different --phone can't take effect: say so (reset to change it).
             phone = "already loaded: unchanged" if loaded else ("team" if swap else "fictional")
             summary[ref] = {"observations": n, "request": requested, "phone": phone}
@@ -166,8 +217,10 @@ async def load(database_url: str | None = None, *, phones: dict[str, str], datas
 
 
 async def request(database_url: str | None = None, *, vendor: str, dataset_id: UUID | None = None,
-                  now: dt.datetime | None = None) -> bool:
-    """Ingest one vendor's change-request email and mark it (beat 2). False if it was already in."""
+                  now: dt.datetime | None = None, reader: Reader | None = None) -> bool:
+    """Ingest one vendor's change-request email and mark it (beat 2). False if it was already in.
+    `reader` defaults to the one DIALBACK_READER names."""
+    reader = _reader(reader)
     seed = load_seed()
     if vendor not in seed["vendors"]:
         raise DemoError(f"the demo seed has no vendor {vendor!r} (it has {', '.join(seed['vendors'])})")
@@ -175,7 +228,7 @@ async def request(database_url: str | None = None, *, vendor: str, dataset_id: U
         ds, vendors = await _dataset(conn, dataset_id, seed)
         if vendor not in vendors:
             raise DemoError(f"vendor {vendor!r} isn't in this demo dataset")
-        return await _request(conn, seed, ds, vendor, vendors[vendor], now or dt.datetime.now(dt.UTC))
+        return await _request(conn, seed, ds, vendor, vendors[vendor], now or dt.datetime.now(dt.UTC), reader)
 
 
 def _pair(text: str) -> tuple[str, str]:

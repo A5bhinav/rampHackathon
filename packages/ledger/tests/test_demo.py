@@ -6,9 +6,13 @@ import uuid
 
 import psycopg
 import pytest
-from dialback_ledger import select_number
+from dialback_ledger import demo, select_number
 from dialback_ledger.demo import DemoError, load, load_seed, request
+from dialback_ledger.llm_reader import for_the_model
+from dialback_ledger.reader import StubReader
+from dialback_ledger.text import lines, visible_text
 from psycopg.rows import dict_row
+from test_llm_reader import http_error, like_the_stub, llm_reader, refusal
 from test_store import open_case
 
 REFS = ("acme", "brightline", "cobalt")
@@ -149,6 +153,53 @@ def test_cobalts_ar_line_swaps_too_and_a_reload_reports_it_changed_nothing(datab
     assert again["vendors"]["cobalt"]["phone"] == "already loaded: unchanged"
     assert counts() == before and before[1] == 3
     assert selection(database_url, d, "cobalt")["e164"] == "+12025550100"
+
+
+def rows(url: str, dataset_id) -> dict:
+    with psycopg.connect(url) as c:
+        return {t: c.execute(f"select count(*) from ledger.{t} where dataset_id = %s", (dataset_id,)).fetchone()[0]
+                for t in ("documents", "observations", "vendor_domains", "change_requests")}
+
+
+def calls_the_model(doc: dict) -> bool:
+    return for_the_model(visible_text(lines(doc)))[1] > 0
+
+
+def test_a_failed_document_rolls_back_the_load(database_url, monkeypatch, capsys):
+    # Spec 0049, decision 4. The model labels every acme document, then refuses brightline's first,
+    # after acme's rows went into the same transaction.
+    d = demo_dataset(database_url)
+    seed = load_seed()
+    acme = [doc for doc in seed["vendors"]["acme"]["documents"] if calls_the_model(doc)]
+    failing = next(doc for doc in seed["vendors"]["brightline"]["documents"] if calls_the_model(doc))
+    calls = []
+    reader = llm_reader(lambda r: refusal(r) if len(calls) > len(acme) else like_the_stub(r), calls)
+    monkeypatch.setattr(demo, "reader_for", lambda mode: reader)
+    monkeypatch.setenv("DIALBACK_READER", "llm")
+    monkeypatch.setenv("DATABASE_URL", database_url)
+    assert demo.main(["demo", "load", "--with-requests"]) == 2
+    err = capsys.readouterr().err
+    assert f"document {failing['id']}" in err and "refusal" in err
+    assert len(calls) == len(acme) + 1                     # it stopped at the failed document
+    assert rows(database_url, d["dataset_id"]) == {"documents": 0, "observations": 0, "vendor_domains": 0,
+                                                   "change_requests": 0}
+
+
+def test_a_failed_request_writes_nothing(database_url, monkeypatch, capsys):
+    # Cobalt's change request is the seed's only one that holds a phone number (the offered line); the
+    # others make no model call at all.
+    d = demo_dataset(database_url, refs=("cobalt",))
+    request_doc = load_seed()["vendors"]["cobalt"]["request"]
+    assert calls_the_model(request_doc)
+    run(load(database_url, phones={}, reader=StubReader()))      # the history is in; beat 2 hasn't run
+    before = rows(database_url, d["dataset_id"])
+    monkeypatch.setattr(demo, "reader_for", lambda mode: llm_reader(http_error(500)))
+    monkeypatch.setenv("DIALBACK_READER", "llm")
+    monkeypatch.setenv("DATABASE_URL", database_url)
+    assert demo.main(["demo", "request", "--vendor", "cobalt"]) == 2
+    err = capsys.readouterr().err
+    assert f"document {request_doc['id']}" in err and "api_error" in err
+    assert rows(database_url, d["dataset_id"]) == before and before["change_requests"] == 0
 
 
 def test_a_retired_demo_dataset_is_refused(database_url):
