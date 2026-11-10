@@ -4,10 +4,15 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import multiprocessing
 import re
+import subprocess
+import sys
 from collections import Counter
+from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
+from dialback_evals.draws import world_digests
 from dialback_evals.invariants import _fax, _frame, _near_flagged
 from dialback_evals.worldgen import NumberSpec, clean_worlds, make_world, profile, run, worlds
 from hypothesis import given, settings
@@ -26,7 +31,7 @@ KNOBS = {"no_request", "late", "shared_id", "reply_subject", "subdomain", "looka
 
 def test_generated_world_runs_and_validates():
     @given(worlds())
-    @settings(max_examples=200, deadline=None)
+    @settings(max_examples=200, deadline=None, derandomize=True, database=None)   # a fixed seed (B7, M6)
     def check(world):
         out = run(world)
         assert list(Draft202012Validator(SCHEMA).iter_errors(out)) == []
@@ -111,3 +116,65 @@ def test_clean_worlds_have_no_attacker_knob():
         assert all(s.visibility == "visible" and s.party == "vendor" and s.role != "fax"
                    for s in world.kwargs["sightings"])
     check()
+
+
+# Spec 0048, C1 (FINDINGS B10): Hypothesis 6.170 also draws literals it mined from every first-party
+# module loaded at that moment, so one seed drew different worlds in a bare script, in the CLI's
+# process, in a bench worker and under pytest. Under pinned draws a seed gives the same worlds in all.
+PIN_EXAMPLES = 60
+_DIGESTS = """
+import json
+{imports}
+from dialback_evals.draws import world_digests
+print(json.dumps(world_digests(examples={examples}, seed=0)))
+"""
+
+
+def _digests_in_a_subprocess(imports: str) -> list[str]:
+    code = _DIGESTS.format(imports=imports, examples=PIN_EXAMPLES)
+    done = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=True, cwd=ROOT)
+    return json.loads(done.stdout)
+
+
+def test_a_seed_pins_the_worlds():
+    import dialback_evals.cli  # noqa: F401  everything the CLI loads is loaded here too
+    here = world_digests(examples=PIN_EXAMPLES, seed=0)                 # under pytest, in process
+    bare = _digests_in_a_subprocess("")                                # only the generator and its oracle
+    cli = _digests_in_a_subprocess("import dialback_evals.cli")       # what `lab` loads
+    with ProcessPoolExecutor(1, mp_context=multiprocessing.get_context("spawn")) as pool:
+        worker = pool.submit(world_digests, examples=PIN_EXAMPLES, seed=0).result()   # a bench worker
+    assert len(set(here)) > PIN_EXAMPLES // 2          # a real sample, not one world drawn again and again
+    assert {"bare script": bare == here, "cli": cli == here, "worker": worker == here} == {
+        "bare script": True, "cli": True, "worker": True}
+
+
+def test_property_tests_draw_pinned():
+    # C1: every test here runs inside pinned_draws (evals/tests/conftest.py), so a property test's
+    # sample does not depend on what the test session happened to import.
+    from dialback_evals import draws
+    assert draws._providers._get_local_constants is draws._Constants
+
+
+def _given_tests() -> dict[str, bool]:
+    """Every @given test function under evals/tests, and whether it has a fixed seed (derandomize or @seed)."""
+    import ast
+    found = {}
+    for path in sorted((ROOT / "evals" / "tests").glob("test_*.py")):
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            if not isinstance(node, ast.FunctionDef):
+                continue
+            calls = [d for d in node.decorator_list if isinstance(d, ast.Call)]
+            names = {getattr(d.func, "id", getattr(d.func, "attr", "")) for d in calls}
+            if "given" not in names:
+                continue
+            seeded = "seed" in names or any(k.arg == "derandomize" and getattr(k.value, "value", False) is True
+                                            for d in calls for k in d.keywords)
+            found[f"{path.name}:{node.lineno}:{node.name}"] = seeded
+    return found
+
+
+def test_every_property_test_has_a_fixed_seed():
+    # FINDINGS B7, M6: a property test without a fixed seed draws a new sample on every run.
+    found = _given_tests()
+    assert len(found) >= 8                            # the scan really sees the property tests
+    assert sorted(name for name, seeded in found.items() if not seeded) == []

@@ -16,9 +16,8 @@ import uuid
 from pathlib import Path
 
 from dialback_ledger.select import ChangeRequest, DocumentRef, Settings, Sighting
-from hypothesis import HealthCheck, given, settings
-from hypothesis import seed as pin_seed
 
+from .draws import run_pinned
 from .invariants import all_violations
 from .worldgen import World, fictional, worlds
 
@@ -117,21 +116,18 @@ class _Found(Exception):
 
 
 def fuzz(strategy=None, *, examples: int, seed: int, out_dir: Path) -> list[str]:
-    """Search `examples` worlds at a pinned `seed`. On the first violation, Hypothesis shrinks it to a
-    minimal world, which is frozen under `out_dir`; its labels are returned. Returns [] when clean."""
+    """Search `examples` worlds at a pinned `seed`, with pinned draws (spec 0048, C1), so a seed gives
+    the same worlds in any process. On the first violation, Hypothesis shrinks it to a minimal world,
+    which is frozen under `out_dir`; its labels are returned. Returns [] when clean."""
     strategy = worlds() if strategy is None else strategy
 
-    @pin_seed(seed)
-    @settings(max_examples=examples, deadline=None, database=None, report_multiple_bugs=False,
-              suppress_health_check=[HealthCheck.too_slow])
-    @given(strategy)
     def search(world: World) -> None:
         labels = all_violations(world)
         if labels:
             raise _Found(world, labels)
 
     try:
-        search()
+        run_pinned(strategy, search, examples=examples, seed=seed)
     except _Found as hit:
         # Named by content: re-finding the same world lands on the same case, a new world never collides.
         label = f"fuzz-seed{seed}-{hit.labels[0].lower().replace('_', '-')}-{world_digest(hit.world)[:8]}"

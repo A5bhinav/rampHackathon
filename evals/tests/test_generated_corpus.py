@@ -206,3 +206,18 @@ def test_replace_why_changes_only_why(tmp_path):
     freeze(w, "kept", tmp_path, labels=["M_second"], why="later context", replace_why=True)
     data = json.loads((case / "world.json").read_text())
     assert data["labels"] == ["M_first"] and data["why"] == "later context"
+
+
+# Spec 0048, C1: `lab fuzz --search first` draws the pinned sample, the same worlds `draws.sample` gives
+# at that seed in any process (test_worldgen.py::test_a_seed_pins_the_worlds).
+def test_lab_fuzz_draws_the_pinned_sample(tmp_path, monkeypatch):
+    from dialback_evals.draws import sample
+    from dialback_evals.worldgen import worlds
+    seen: list[str] = []
+
+    def record(world):
+        seen.append(world_digest(world))
+        return []
+    monkeypatch.setattr("dialback_evals.gencorpus.all_violations", record)
+    assert fuzz(examples=40, seed=0, out_dir=tmp_path) == []
+    assert seen == [world_digest(w) for w in sample(worlds(), examples=40, seed=0)]
