@@ -987,6 +987,57 @@ def test_the_callback_time_question_is_asked_again_in_its_own_words() -> None:  
     assert c.state.turns[-1].asked is None    # like the question itself: a "sure" to it is never consent (B1)
 
 
+def test_check_in_follows_the_open_question_at_the_digits_question() -> None:  # review fix 1
+    # The callback-time question asked at the digits question is the open one: the plain check-in,
+    # and no reply ends the call failed (as at any question but the digits one), never NR06.
+    import dialback_policy.step as policy_step
+
+    c = Call()
+    to_last4(c)
+    c.callee("Can you call me back later?")
+    c.agent(tool("schedule_callback", window=None))
+    assert c.said[-1] == "What time would work best for us to call you back?" and c.state.phase is Phase.LAST4
+    asked_callback = c.state
+    c.silence()
+    assert c.said[-1] == STILL_THERE and c.end is None
+    c.silence()
+    assert (c.end.result, c.end.reason) == ("failed", "silence") and c.said[-1] == SCRIPT.goodbye()
+    # The relay times the quiet clock by the same test: the plain timings here, the digits ones at
+    # the digits question itself.
+    assert policy_step.asking_digits(asked_callback) is False
+    c = Call()
+    to_last4(c)
+    assert policy_step.asking_digits(c.state) is True
+
+
+@pytest.mark.parametrize("spoken", ["It's 4821.", "four eight two one"])
+def test_digits_spoken_after_the_digits_check_in_get_the_keypad_line(spoken: str) -> None:  # review fix 6
+    c = Call()
+    to_last4(c)
+    c.silence()
+    p = c.callee(spoken)
+    assert c.request is None                              # never sent to the model
+    assert c.said[-1] == f"{REASK} {KEYPAD_ONLY_LINE}" and c.state.turns[-1].asked is Phase.LAST4
+    assert c.state.turns[p].presence is True and c.slots() == BEFORE_DIGITS
+    assert c.state.reasked == frozenset()                 # the one more try is untouched
+    c.keys("4821")
+    assert c.end.result == "answers_recorded" and c.state.answers[-1]["value"] == "4821"
+
+
+def test_presence_keys_are_labeled_keys_not_an_entry() -> None:  # review fix 8
+    for press, label in (("keys", "[keys]"), ("star", "[keys reset]")):
+        c = Call()
+        to_change(c)
+        c.silence()
+        p = c.keys("1") if press == "keys" else c.reset()
+        assert c.state.turns[p].text == label and c.state.turns[p].presence is True, press
+    c = Call()                                            # a real entry at the digits question is unchanged
+    to_last4(c)
+    c.silence()
+    t = c.keys("4821")
+    assert c.state.turns[t].text == "[keypad]" and c.state.turns[t].presence is False
+
+
 @pytest.mark.parametrize("where", ["consent", "change", "digits"])
 def test_no_reply_after_check_in_ends_closed(where: str) -> None:  # D6
     c = Call()
