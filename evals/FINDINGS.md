@@ -344,6 +344,11 @@ These are not reachable today, but each is frozen as a regression.
   the first failure. Until `select()` is fixed, the search cannot report any other new defect.
 - **Spec:** 0046 on `sami/guided-search` (draft): a search that runs its whole budget and keeps the
   first world for every label.
+- **Anomaly (not reconciled):** the I12 failure rate differs by source: about 18% here, 454 of 2000
+  (23%) in A6, and 82 of 300 (27%) at seed 0 in spec 0046's census. These are probably different
+  samples and oracle versions, but nothing checks that.
+- **Open labels (Nov 9):** 8 of the 9 frozen cases still fail, on `M_incontext_label_moved_pick`
+  (I12), `M_shared_id_helped` (I11) and `M_lookalike_helped`.
 
 ### B4. Frozen-case history was overwritten
 
