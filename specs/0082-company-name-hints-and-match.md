@@ -97,6 +97,27 @@ say (Part B), and keeps the clear-mismatch signal.
 
 ### Part B (`apps/core`, Abhi's code; Sami builds, Abhi reviews): accept the short name
 
+**Status (Nov 10, after the code review): on hold, not landing.** The implementation on
+`sami/company-name-matcher` does exactly what D6 says. But the reviewer showed that D6 accepts
+clearly different companies well beyond D9's accepted costs. All of these were `False` before and
+`True` after:
+
+| Kind | Said | Vendor |
+|---|---|---|
+| first two words, even common ones | "This is Globex on Main Street" | Main Street Supply LLC |
+| | "This is the United States Postal Service" | United States Steel Corp |
+| ordinary sentence words | "This is Globex" | This Old House LLC |
+| | "Hello, Globex speaking" | Hello Fresh LLC |
+| | "Thanks for calling Globex" | Calling Cards Inc |
+| a person's name | "Globex, this is Mike Johnson" | Johnson Controls Inc |
+| digits and letters | "Globex, established 2020" | 2020 Office Supply LLC |
+| | "This is Globex, we are a B Corp" | A & B Supply |
+
+The guard's variant list was built to catch the agent saying the vendor's name, where matching too
+much is safe. It is not a judge of what a caller says. This is the second loosening of the
+matcher to fail review on whole-sentence answers; the first was the draft's one-letter and
+first-word rule (D8). So no third rule is attempted here. Q137 asks for a decision instead.
+
 5. **The input is a sentence.** The matcher reads the caller's whole turn, so any loosening applies
    to every word of it. That rules out fuzzy word matching (D8).
 6. **One more way to match.** An answer is `True` if:
@@ -224,7 +245,7 @@ the vendor unless stated:
 ## Landing
 
 Two small PRs, each independent of the other: Part A (hints) and Part B (matcher, which Abhi
-reviews). Part A edits the same `build_connect_twiml` attribute line as open PR #102, so whichever
+reviews). Part B is on hold (Q137); its branch stays unopened. Part A edits the same `build_connect_twiml` attribute line as open PR #102, so whichever
 merges second rebases and keeps both attributes.
 
 ## Out of scope
@@ -242,8 +263,15 @@ merges second rebases and keeps both attributes.
   - Which provider does this account use? The TwiML doesn't set `transcriptionProvider`, so the
     account default applies: Deepgram (nova-3), or Google for accounts that used ConversationRelay
     before Sep 12, 2025.
-- **Q137 (Abhi):** accept Part B (D5 to D10), including its accepted costs (D9), with the
-  measurement in D10 if it is run?
+- **Q137 (Sami, then Abhi):** Part B is on hold (see its status note). Which way?
+  - (a) **Demote the company check.** NR03 and V05 stop deciding the outcome. The company answer
+    stays on the record, where the person who releases the payment (R5) sees it.
+  - (b) **Keep today's strict rule.** Rely on Part A's hints, and on callers saying the full name.
+  - (c) **A later spec** that extracts the company name from the sentence: a model read, grounded
+    in the turn by code, so a negated name fails grounding.
+- **Q139 (Sami):** a possessive or hyphenated first word gets no first-word hint ("Mike's Plumbing
+  LLC", "Acme-Fasteners LLC"). Only the full name is sent. Should "Mike's" or "Mike" be sent too?
+  Possessive names are common for small vendors.
 - **Q138 (Abhi, Sami):** should hints and the matcher use the vendor's name as it was before the
   change (a snapshot on the case), rather than Ramp's current record? A clerk can edit both in the
   same session.
