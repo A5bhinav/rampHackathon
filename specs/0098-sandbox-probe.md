@@ -35,11 +35,11 @@ None.
 
 ## Acceptance
 
-- [ ] Every request but the login is a GET; the client refuses any other; the login asks only for read scopes.
-- [ ] Missing credentials print how to set them; neither the secret nor the token appears in the output.
-- [ ] Findings report the layer's view, the document differences, and the answers to Q202 to Q204,
+- [x] Every request but the login is a GET; the client refuses any other; the login asks only for read scopes.
+- [x] Missing credentials print how to set them; neither the secret nor the token appears in the output.
+- [x] Findings report the layer's view, the document differences, and the answers to Q202 to Q204,
       from a fake sandbox with a hold and a bank change in it.
-- [ ] An account the layer rejects is reported, and the probe carries on.
+- [x] An account the layer rejects is reported, and the probe carries on.
 
 ## Tests (written first)
 
