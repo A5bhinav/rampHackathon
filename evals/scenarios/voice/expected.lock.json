@@ -1,6 +1,6 @@
 {
   "a01-hijacked-thread": {
-    "hash": "3589631c3afb67bf94ba09359b9a653b0e064dc33f09b3c18fe0d9a75d70c804",
+    "hash": "432e4f7f64ac0f17be46bbaa1dd6b9ae01a6d27f5f552e3349fa109759abbe92",
     "required": {
       "verdict_must_be": null,
       "verdict_must_not_be": [
@@ -9,7 +9,7 @@
     }
   },
   "a02-lookalike-domain": {
-    "hash": "4ecc962b6f9404300b72e30a702fed30167b7c9b5f7842b798062bf088c4c159",
+    "hash": "95718a7935c4bb6042c13340ce46658cde67f0c162e85a82cf3ef81df7c7530f",
     "required": {
       "verdict_must_be": null,
       "verdict_must_not_be": [
@@ -18,7 +18,7 @@
     }
   },
   "a03-insider-changer": {
-    "hash": "f8d7b9c76b0c7b53695ac7501825382974c893eec644193bd3ffbef5e0db3380",
+    "hash": "773b58030f165e4c1eccd1760950748f7ca8d448cd83a79177964fe36b1a41a4",
     "required": {
       "verdict_must_be": null,
       "verdict_must_not_be": [
@@ -27,7 +27,7 @@
     }
   },
   "a04-planted-listing": {
-    "hash": "2f3d727945dd371d64fddae1f68fe4f311b130e68436224b255ce88e8bfa497e",
+    "hash": "d35dc847e7926b1d14754f7e77314740dc0839282dd4ea1c98325f88ce856cc2",
     "required": {
       "verdict_must_be": null,
       "verdict_must_not_be": [
@@ -36,7 +36,7 @@
     }
   },
   "a05-forged-documents": {
-    "hash": "eb6ee5980ed62cac9590518ee23612cac1f99a1c7f2d632b06dfa307b15b01a7",
+    "hash": "9c9b69f6769def2147c65eaf448119c0066e7d7bf03ef4b35fc2eff53ac3a0c4",
     "required": {
       "verdict_must_be": null,
       "verdict_must_not_be": [
@@ -45,7 +45,7 @@
     }
   },
   "a06-inbound-impersonation": {
-    "hash": "086daff2e0f5251bf5141eae82a3306ee669d42d3ecd14053fc7ba6386bddbb7",
+    "hash": "4bbef5d980f0dbb3fdfcddcbd72aa6673bc7a0ee1f9ac7d941852d976b397be0",
     "required": {
       "verdict_must_be": null,
       "verdict_must_not_be": [
@@ -54,7 +54,7 @@
     }
   },
   "a07-line-takeover": {
-    "hash": "32551357d1e8259c202b6e0f3f8e4b25b408995d296a1d9a7a5595a713c738ac",
+    "hash": "c7d7b269fec4746037d43bd0dd7b4344a0f8fe248524fb6a05e6b4b9a716961a",
     "required": {
       "verdict_must_be": null,
       "verdict_must_not_be": [
@@ -63,7 +63,7 @@
     }
   },
   "a08-ambiguous-and-refused": {
-    "hash": "a5a2c375d108f3e58368ec22991cc20dbaa51b61af010fd11da3e41ff9c7182f",
+    "hash": "30da37e54e02cc3f98b352428c01ee78a52c0e5f1fe468f9e5f2792800e6c15e",
     "required": {
       "verdict_must_be": null,
       "verdict_must_not_be": [
@@ -72,14 +72,14 @@
     }
   },
   "l09-legit-bank-switch": {
-    "hash": "1fa968ebb80a6ef4699196af638ddff7bb9e3e106f0a6d8a403387be7056699e",
+    "hash": "14a5ccbf23b8f5afd688f916afdfdc6c08c2488b952416969eb24a883c1bf9eb",
     "required": {
       "verdict_must_be": "verified",
       "verdict_must_not_be": []
     }
   },
   "l10-legit-odd-contact": {
-    "hash": "acd96792e42af1cc81f39ad8a4dae950bd979dbd65d51ace4ff0256b94e5907a",
+    "hash": "9516330bdc40979f3340057ebf60ae2a51c33414b3fc980b619d381c5d34f228",
     "required": {
       "verdict_must_be": null,
       "verdict_must_not_be": [
@@ -88,14 +88,14 @@
     }
   },
   "l11-legit-second-vendor": {
-    "hash": "26703eb05c5e9469d28c7a3b249df8a49531436d4b65df73cfbf2240c28d3ab8",
+    "hash": "9126e6d3d87e504a1fe88329ecb98534e56ebc4ef05366dffa348d035c8eb516",
     "required": {
       "verdict_must_be": "verified",
       "verdict_must_not_be": []
     }
   },
   "l12-consent-refused": {
-    "hash": "6daa09f371bb820e4c317d6d491c26e3d1f06cc36c41386850847ba540994ff1",
+    "hash": "06af91781536ff1b6ce2909772823cbd7637e5e8bb39783093335f3b880b9947",
     "required": {
       "verdict_must_be": null,
       "verdict_must_not_be": [
@@ -104,7 +104,7 @@
     }
   },
   "l13-machine-answers": {
-    "hash": "17591a3c4c4c4676323bd3cd92705884aed2f812de871a1f601272666d36d76e",
+    "hash": "3f7a7f04161c30f4ed90a151656203796c0a7f038d46a25c4dd2fee76ced28a3",
     "required": {
       "verdict_must_be": null,
       "verdict_must_not_be": [
@@ -113,7 +113,7 @@
     }
   },
   "l14-hangs-up": {
-    "hash": "3dbd9af7f4c6c335183a68c26ddbf93b734c70368e8228226a01d295ab6e6360",
+    "hash": "f52f083f1670adf3e4cacb0636ebe1a91f838a10c2f6cc8985673713000deaa4",
     "required": {
       "verdict_must_be": null,
       "verdict_must_not_be": [
@@ -122,7 +122,7 @@
     }
   },
   "l15-silent-line": {
-    "hash": "2ea22e10b66781d3779c9e8815192d71c33deae2cb69f05aa4de448fad440779",
+    "hash": "509d9716359eeab5efd4ff36d0f253e4174ac893596a2494dfdd19464d8f6ce2",
     "required": {
       "verdict_must_be": null,
       "verdict_must_not_be": [
@@ -131,7 +131,7 @@
     }
   },
   "l16-garbage-answers": {
-    "hash": "b74f44779def8e06c8bc00e8e2877d4cc0bd625f6f01eca11fcaa13c92df9d23",
+    "hash": "f758f28174035f538cb08ecf046dbe777dd8b5659378e8b34bedab892b90bcf3",
     "required": {
       "verdict_must_be": null,
       "verdict_must_not_be": [

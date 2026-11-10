@@ -28,6 +28,7 @@ facts:
   dialed_number_is_pick: false
   speaker_in_change_thread: true
   offered_number_from_request: true
+declared: [dialed_number_is_pick, offered_number_from_request]   # spec 0048, A3: production never computes these
 """
 
 
@@ -84,3 +85,47 @@ def test_duplicate_scenario_ids_are_an_error(tmp_path):
     (tmp_path / "b.yaml").write_text(_VALID_YAML)
     with pytest.raises(ValueError, match="hijack-01"):
         load_scenarios(tmp_path)
+
+
+# Spec 0048, A3: a scenario whose verdict rests on a fact production never computes that way says so.
+
+@pytest.mark.parametrize(("fact", "line"), [
+    ("line_risk", "  line_risk: true\n"),
+    ("dialed_number_is_pick", "  dialed_number_is_pick: false\n"),
+    ("direction", "  direction: inbound\n"),
+    ("offered_number_from_request", "  offered_number_from_request: true\n"),
+])
+def test_uncomputed_fact_must_be_declared(tmp_path, fact, line):
+    plain = (_VALID_YAML.replace("  dialed_number_is_pick: false\n", "  dialed_number_is_pick: true\n")
+             .replace("  offered_number_from_request: true\n", "  offered_number_from_request: false\n")
+             .replace("declared: [dialed_number_is_pick, offered_number_from_request]", "declared: []"))
+    (tmp_path / "plain.yaml").write_text(plain)
+    assert load_scenarios(tmp_path)[0].declared == ()                # nothing uncomputed, nothing declared
+    sets = plain.replace("facts:\n", "facts:\n" + line).replace("  dialed_number_is_pick: true\n", "", 1) \
+        if fact == "dialed_number_is_pick" else plain.replace("facts:\n", "facts:\n" + line, 1)
+    sets = sets.replace("  offered_number_from_request: false\n", "", 1) if fact == "offered_number_from_request" else sets
+    (tmp_path / "plain.yaml").write_text(sets)
+    with pytest.raises(ValueError, match=f"{fact}.*declare"):
+        load_scenarios(tmp_path)                                      # set without declaring it
+    (tmp_path / "plain.yaml").write_text(sets.replace("declared: []", f"declared: [{fact}]"))
+    assert load_scenarios(tmp_path)[0].declared == (fact,)
+
+
+def test_declaring_a_fact_production_computes_is_an_error(tmp_path):
+    (tmp_path / "s.yaml").write_text(_VALID_YAML.replace(
+        "declared: [dialed_number_is_pick, offered_number_from_request]",
+        "declared: [dialed_number_is_pick, offered_number_from_request, line_risk]"))
+    with pytest.raises(ValueError, match="line_risk"):
+        load_scenarios(tmp_path)
+    (tmp_path / "s.yaml").write_text(_VALID_YAML.replace(
+        "declared: [dialed_number_is_pick, offered_number_from_request]", "declared: [dialed_eligible_number]"))
+    with pytest.raises(ValueError, match="dialed_eligible_number"):
+        load_scenarios(tmp_path)
+
+
+def test_the_shipped_scenarios_declare_what_production_never_computes():
+    from pathlib import Path
+    shipped = {s.id: s.declared for s in load_scenarios(Path(__file__).resolve().parents[1] / "scenarios" / "voice")}
+    assert {k: v for k, v in shipped.items() if v} == {
+        "a01-hijacked-thread": ("offered_number_from_request",), "a04-planted-listing": ("dialed_number_is_pick",),
+        "a06-inbound-impersonation": ("direction",), "a07-line-takeover": ("line_risk",)}

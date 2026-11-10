@@ -24,3 +24,6 @@ facts:                                # the ledger's view this scenario stands i
   dialed_number_is_pick: false
   speaker_in_change_thread: true
   offered_number_from_request: true
+# Facts production never computes this way (evals/src/dialback_evals/declared.py): a scenario that sets
+# one must declare it, and the scorecard then reports it apart from the per-class rows (spec 0048, A3).
+declared: [dialed_number_is_pick, offered_number_from_request]

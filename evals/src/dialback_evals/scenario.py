@@ -15,6 +15,8 @@ from typing import Any
 import yaml
 from dialback_policy.script import Phase
 
+from .declared import UNCOMPUTED, uncomputed
+
 # The nine scenario classes (evals/README.md). The list lives here, not in a schema, so a new
 # class needs no contract change.
 CLASSES = frozenset({
@@ -76,6 +78,7 @@ class Scenario:
     facts: DeclaredFacts
     expect_rule: str | None = None      # the decision rule that must fire (the defense under test)
     expect_end: str = "answers_recorded"  # how the call must end
+    declared: tuple[str, ...] = ()      # facts production never computes this way (declared.UNCOMPUTED; A3)
 
 
 def load_scenarios(directory: str | Path) -> list[Scenario]:
@@ -92,7 +95,7 @@ def load_scenarios(directory: str | Path) -> list[Scenario]:
 
 # The keys a scenario may use: anything else (a typo such as `injct`) is an error, not ignored (F7).
 _KEYS = frozenset({"id", "class", "is_attack", "customer_name", "vendor_name", "caller", "facts", "expect_rule",
-                   "expect_end"})
+                   "expect_end", "declared"})
 _CALLER_KEYS = frozenset({"consent", "company", "department", "name", "role", "change", "last4_mode", "last4",
                           "answered_by", "inject", "inject_phase", "offer_other_number", "hang_up_at", "silent"})
 _FACT_KEYS = frozenset({"dialed_eligible_number", "new_last4", "old_last4", "dialed_number_is_pick",
@@ -173,6 +176,18 @@ def _parse(path: Path) -> Scenario:
     expect_rule = raw.get("expect_rule")
     if expect_rule is not None and not _RULE_ID.fullmatch(str(expect_rule)):
         raise ValueError(f"{path.name}: expect_rule '{expect_rule}' is not a decision rule id")
+    declared = raw.get("declared") or []
+    if not isinstance(declared, list) or not all(isinstance(d, str) for d in declared):
+        raise ValueError(f"{path.name}: declared must be a list of fact names")
+    if unknown := sorted(set(declared) - set(UNCOMPUTED)):
+        raise ValueError(f"{path.name}: declared {unknown}: production computes these; only "
+                         f"{sorted(UNCOMPUTED)} can be declared")
+    sets = uncomputed(facts, caller)
+    if missing := sorted(sets - set(declared)):
+        raise ValueError(f"{path.name}: sets {missing} to a value production never computes; declare it "
+                         "under `declared` (spec 0048, A3)")
+    if extra := sorted(set(declared) - sets):
+        raise ValueError(f"{path.name}: declared {extra} but does not set it to an uncomputed value")
     return Scenario(
         id=str(need("id", raw)),
         scenario_class=scenario_class,
@@ -183,6 +198,7 @@ def _parse(path: Path) -> Scenario:
         facts=facts,
         expect_rule=None if expect_rule is None else str(expect_rule),
         expect_end=one_of(raw.get("expect_end", "answers_recorded"), _ENDS, "expect_end"),
+        declared=tuple(sorted(declared)),
     )
 
 

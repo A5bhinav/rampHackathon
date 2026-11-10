@@ -20,3 +20,4 @@ facts:
   dialed_number_is_pick: false
   speaker_in_change_thread: false
   offered_number_from_request: false
+declared: [dialed_number_is_pick]   # spec 0048, A3: the voice service reports true on every verified call

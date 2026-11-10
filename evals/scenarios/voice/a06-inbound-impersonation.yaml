@@ -23,3 +23,4 @@ facts:
   dialed_number_is_pick: true
   speaker_in_change_thread: false
   offered_number_from_request: false
+declared: [direction]   # spec 0048, A3: no production path reports an inbound verification call

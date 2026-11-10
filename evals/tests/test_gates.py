@@ -120,3 +120,17 @@ def test_a_call_that_did_not_disclose_first_fails_the_gate():
     r = run_scenario(s, ScriptedAgent(), clock=_clock())
     broken = dataclasses.replace(r, checks={**r.checks, "disclosure_first": False})
     assert "no_disclosure" in score(s, broken, facts_for(s, broken)).failures
+
+
+
+def test_declared_scenarios_are_reported_apart():
+    # Spec 0048, A3: a verdict that rests on a declared fact is not a measure of the product's defense,
+    # so the scorecard lists it on its own and leaves it out of the per-class rows.
+    plain = _score(_scn(is_attack=True, new_last4="9034"))
+    declared = dataclasses.replace(_score(_scn(is_attack=True, new_last4="9034")), scenario_id="d",
+                                   scenario_class="inbound_impersonation", declared=("direction",))
+    card = scorecard([plain, declared])
+    assert set(card["by_class"]) == {"line_takeover"}
+    assert card["declared"] == [{"scenario": "d", "class": "inbound_impersonation", "declared": ["direction"],
+                                 "passed": True}]
+    assert card["total"] == 2 and card["passed"] == 2                 # still counted, and still gated

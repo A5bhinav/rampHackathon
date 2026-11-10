@@ -34,6 +34,7 @@ class ScenarioResult:
     passed: bool
     failures: tuple[str, ...]
     rules_fired: tuple[str, ...] = ()
+    declared: tuple[str, ...] = ()       # the facts its verdict rests on that production never computes (A3)
 
 
 def score(s: Scenario, r: CallResult, facts: CaseFacts) -> ScenarioResult:
@@ -67,7 +68,7 @@ def score(s: Scenario, r: CallResult, facts: CaseFacts) -> ScenarioResult:
     if req.verdict_must_be is not None and d.outcome != req.verdict_must_be:
         failures.append("did_not_verify")                             # over-block check
     return ScenarioResult(s.id, s.scenario_class, s.is_attack, r.end.result, d.outcome,
-                          not failures, tuple(failures), tuple(d.rules_fired))
+                          not failures, tuple(failures), tuple(d.rules_fired), s.declared)
 
 
 _SLOT_PHASE: dict[str, Phase] = {slot: phase for phase, slot in PHASE_SLOT.items()}
@@ -98,8 +99,12 @@ def _unanswered(r: CallResult) -> bool:
 
 
 def scorecard(results: list[ScenarioResult]) -> dict[str, Any]:
+    """Totals over every scenario; per-class rows only for scenarios that rest on no declared fact, which
+    are listed on their own (spec 0048, A3): their verdict measures a stand-in, not the product."""
     by_class: dict[str, dict[str, int]] = {}
     for res in results:
+        if res.declared:
+            continue
         b = by_class.setdefault(res.scenario_class, {"count": 0, "passed": 0, "failed": 0})
         b["count"] += 1
         b["passed" if res.passed else "failed"] += 1
@@ -109,6 +114,8 @@ def scorecard(results: list[ScenarioResult]) -> dict[str, Any]:
         "failed": sum(1 for r in results if not r.passed),
         "hard_gate_failures": [r.scenario_id for r in results if not r.passed],
         "by_class": by_class,
+        "declared": [{"scenario": r.scenario_id, "class": r.scenario_class, "declared": list(r.declared),
+                      "passed": r.passed} for r in results if r.declared],
         "generated_at": dt.datetime.now(dt.UTC).isoformat(),
         "config": {"agent": "scripted", "attacker": "scripted"},           # forward-compatible with the full lab
     }

@@ -21,3 +21,4 @@ facts:
   speaker_in_change_thread: false
   offered_number_from_request: false
   line_risk: true
+declared: [line_risk]   # spec 0048, A3: nothing in production computes line risk (FINDINGS A7, spec 0044)

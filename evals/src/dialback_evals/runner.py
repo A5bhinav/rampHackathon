@@ -22,9 +22,10 @@ scenario. Each one:
 - Twilio's setup: the call's `direction` and its machine detection (the caller's `answered_by`);
 - the case's accounts: `new_last4` and `old_last4`.
 
-Facts production never computes this way (`declared.UNCOMPUTED`: `line_risk`, a false
-`dialed_number_is_pick`) are applied where production would carry them, and only when the scenario
-declares them (spec 0048, A3).
+Facts production never computes this way (`declared.UNCOMPUTED`) are applied where production would
+carry them, and only when the scenario declares them (spec 0048, A3): a false `dialed_number_is_pick`
+on the report, `line_risk` on the facts; an inbound `direction` and an `offered_number_from_request`
+with no number offered arrive through the declared inputs above.
 """
 from __future__ import annotations
 
@@ -80,8 +81,8 @@ def chain(s: Scenario, r: CallResult) -> Chained:
     setup = {"direction": "outbound-api" if s.facts.direction == "outbound" else "inbound",
              "customParameters": {"answered_by": s.caller.answered_by}}
     voice_app.with_connect_facts(body, setup, r)
-    if s.facts.dialed_number_is_pick is False:                    # declared: production always says true
-        body["dialed_number_is_pick"] = False
+    if "dialed_number_is_pick" in s.declared:                     # production always says true (A3)
+        body["dialed_number_is_pick"] = s.facts.dialed_number_is_pick
     CallEndedRequest.model_validate(body)                         # the core's own check of the report
     report = {k: v for k, v in body.items() if k not in ("case_id", "answers")}
     if "answers" in body:
@@ -95,7 +96,7 @@ def chain(s: Scenario, r: CallResult) -> Chained:
     context = ChangeFacts(speaker_in_change_thread=s.facts.speaker_in_change_thread,
                           offered_number_from_request=s.facts.offered_number_from_request)
     facts = core_facts.call_facts(report, case, generation, context)
-    if s.facts.line_risk is not None:                             # declared: nothing in production computes it
+    if "line_risk" in s.declared:                                 # nothing in production computes it (A3)
         facts = dataclasses.replace(facts, line_risk=s.facts.line_risk)
     return Chained(report, facts)
 
