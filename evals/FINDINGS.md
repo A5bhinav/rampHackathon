@@ -597,6 +597,10 @@ F1 to F9 hold as built (verified). But the lab still claims more than it shows:
 - Scratch worktrees exist under `/private/tmp/claude-501/...` (`fixtrial`, `voicereview`,
   `mainrun`). They are temporary, and the reproduction scripts in them may disappear.
 - The 44 Postgres-backed ledger tests can't run on this machine; CI's `py` job runs them.
+- Every document is a JSON page model (spans with position, size and colour), not a rendered
+  file: nothing reads a real PDF, email or scan yet (ledger README; spec 0022, out of scope). So the
+  lab's hidden-text results hold for the page model only. Separately, `dialback_ledger/text.py` says
+  reading real PDFs is "a later spec (0016)", but spec 0016 on main is the voice service entrypoint.
 - **Spec and question numbers collide with main** (checked Nov 9 against origin/main da057f8):
   - `0033` is taken twice on main already (`0033-how-it-works-page`, `0033-stricter-passwords`).
     The lab's `0033-generative-selection-pressure` would be the third. Main also has two `0034`s.
