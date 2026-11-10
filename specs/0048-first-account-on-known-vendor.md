@@ -14,6 +14,8 @@ change with no previous account, and it opens a case through the normal path: ho
 call, decision. The design already says "a new account writes one bank_change_events row and
 opens a case" (design doc, Ramp adapter and change detection).
 
+This spec refines spec 0002, D4: "no history in our mirror" now means no `app.vendors` row.
+
 ## Decisions
 
 1. **First sight is the vendor row, not the accounts.** Phase 1 reads whether the vendor row
@@ -65,19 +67,44 @@ None.
 
 Items 5 to 8 pass before the fix too; they guard behavior the fix must keep.
 
+**Test limits.** The race test (item 6) catches a fix that decides first sight in phase 3. It
+does not catch phase 1 split into two statements, because nothing can pause a sync between
+them. The single statement is the guard, and the comment in `sync_vendor` says so.
+
 ## Out of scope
 
-- A reactivated old account (Ramp turns a mirrored account active again). The decision rules'
-  "digits match the old account" check would misfire for a genuine revert.
-- An account edited in place under the same Ramp account id.
+- A reactivated old account (Ramp turns a mirrored account active again). The mirror can't tell
+  a genuine revert from an account that was mirrored inactive and never verified, and the
+  decision rules' "digits match the old account" check would misfire for a genuine revert.
+- An account first mirrored while inactive, then activated. Every sync mirrors inactive accounts
+  too, so it is already in `known` and no case opens, for any vendor. This gap existed before
+  this spec. Open question Q104.
+- An account edited in place under the same Ramp account id. The fingerprint covers routing,
+  last four and Ramp's id, so the sync inserts a second mirror row with the same
+  `ramp_account_id`, and opens no case because that id is already known.
+- Several accounts appearing at once on a known vendor. Each gets its own change row (with
+  `old_account_id` null for a check vendor), each moves the case to a new version, and the call
+  verifies only the account Ramp listed last. This already happens for vendors that have
+  accounts (there every row names the same previous account); this spec makes it reachable from
+  check vendors. Open question Q103.
 - Holding a brand-new vendor's first payment (spec 0002, Q2): first sight of the vendor stays a
   silent baseline.
+
+## Deploy note
+
+On a long-lived dataset, a check vendor's first account that the old code already baselined
+stays silent. That account is in `known` now, so this fix does not open a case for it after the
+fact.
 
 ## Open questions
 
 | # | Question | Who answers |
 |---|---|---|
 | Q102 | Does Ramp log a vendor's first bank account as `VENDOR_BANK_ACCOUNT_UPDATED` (the type the actor lookup reads), or as another audit-log type? If another, every first-account case has an unknown changer and needs two approvers. That fails closed, but it is stricter than intended. | Ramp sandbox; then Abhi |
+| Q103 | When several new accounts appear at once on a known vendor, should the case go straight to a person instead of a call that verifies only the last one? | Abhi and Sami |
+| Q104 | Can Ramp create a vendor bank account inactive? If so, an account mirrored inactive and activated later opens no case. | Ramp sandbox; then Abhi |
+| Q105 | When a vendor's first account is added, does Ramp send `vendors.updated` and move the vendor's `updated_at`? If not, only the nightly sweep finds it. | Ramp sandbox; then Abhi |
+| Q106 | In Ramp's audit event for a first account, is the account's id under `payload.new_account_id`? If not, the changer is unknown and two approvers are needed. That fails closed, like Q102. | Ramp sandbox; then Abhi |
 
 ## Commands
 
