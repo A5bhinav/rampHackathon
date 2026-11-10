@@ -1,0 +1,42 @@
+name: lab-reports
+
+# The attack lab's call-report fuzzer (spec 0048, part B): generated call reports through the voice
+# service's report, the core's arrival step, call_facts and decide(), checked by F1 (verified only on an
+# honest, full confirmation), F2 (less certainty never helps) and F3 (the company check against the phrase
+# bank's truth). It re-runs every frozen report in evals/reports-generated, then checks 2000 reports per
+# domain at seed 0. Only the reachable domain gates; contract-only findings are printed for their owners.
+on:
+  pull_request:
+    paths:
+      - "packages/decision/**"
+      - "apps/core/src/dialback_core/worker.py"
+      - "apps/core/src/dialback_core/calls.py"
+      - "apps/core/src/dialback_core/company.py"
+      - "apps/core/src/dialback_core/call_facts.py"
+      - "apps/core/src/dialback_core/answers.py"
+      - "apps/voice/src/dialback_voice/app.py"
+      - "evals/**"
+      - ".github/workflows/lab-reports.yml"
+  push:
+    branches: [main]
+
+jobs:
+  lab-reports:
+    name: attack lab, call reports
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Install the Python workspace
+        run: uv sync --all-packages --locked
+      - name: Lab checks that must stay green
+        run: cd evals && uv run pytest -q -m "not selection_gate and not report_gate"
+      - name: Lab reports (frozen reports, then 2000 reports per domain at seed 0)
+        if: always()
+        run: uv run lab reports --examples 2000 --seed 0
+      - name: Keep the findings for a local repro
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lab-reports-findings
+          path: evals/reports-generated

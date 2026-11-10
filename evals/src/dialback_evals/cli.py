@@ -5,6 +5,10 @@ writes `results.jsonl` and `scorecard.json`, prints a one-line summary, and exit
 hard gate fails. Deterministic (the production ScriptedAgent, scripted callers), so CI is reproducible
 and needs no key. `--max-usd` is accepted for forward compatibility; the scripted slice never spends.
 
+`lab reports` (spec 0048, part B) checks generated call reports: it re-runs the frozen ones under
+`--out`, then checks `--examples` reports per domain at `--seed`, freezing the first report for each new
+label; it exits non-zero on a frozen report that still fails or any reachable-domain violation.
+
 `lab fuzz` re-runs every frozen finding under `--out`, then searches `--examples` generated worlds at
 `--seed`, freezing the first shrunk violation there; it exits non-zero on any frozen case that still
 fails or any new finding. `lab frontier` and `lab overblock` write the two measurement tables and exit
@@ -48,6 +52,10 @@ def main(argv: list[str] | None = None) -> int:
     fr.add_argument("--out", default="evals/out/frontier.json")
     ob = sub.add_parser("overblock", help="sweep single pieces of attacker noise (spec 0033)")
     ob.add_argument("--out", default="evals/out/overblock.json")
+    rp = sub.add_parser("reports", help="re-run frozen report findings, then check generated call reports (spec 0048)")
+    rp.add_argument("--examples", type=int, default=2000)
+    rp.add_argument("--seed", type=int, default=0)
+    rp.add_argument("--out", default=str(_REPO / "evals" / "reports-generated"))
     freeze = sub.add_parser("freeze", help="record each scenario's hash and required outcome (expected.lock.json)")
     freeze.add_argument("--split", default="voice")
     freeze.add_argument("--scenarios-root", default=str(_REPO / "evals" / "scenarios"))
@@ -67,6 +75,8 @@ def main(argv: list[str] | None = None) -> int:
         return _frontier(Path(args.out))
     if args.command == "overblock":
         return _overblock(Path(args.out))
+    if args.command == "reports":
+        return _reports(args.examples, args.seed, Path(args.out))
     return 2
 
 
@@ -85,6 +95,29 @@ def _fuzz(examples: int, seed: int, out_dir: Path) -> int:
     print(f"lab fuzz: {len(failing)} frozen case(s) failing, {len(fresh)} new finding(s) "
           f"(seed {seed}, {examples} examples)")
     return 1 if failing or new else 0
+
+
+def _reports(examples: int, seed: int, out_dir: Path) -> int:
+    """Spec 0048, part B: F1 to F3 on generated call reports. Fails on a frozen report that still fails or
+    on any violation in the reachable domain; contract-only violations are printed as future-state
+    findings for their owners and never fail the run."""
+    from .reports import run_checks
+    done = run_checks(examples=examples, seed=seed, out_dir=out_dir)
+    for name, found in done.frozen_failing:
+        print(f"lab reports: frozen report {name} still fails: {', '.join(found)}")
+    for domain in ("reachable", "contract"):
+        for label, count in sorted(done.hits.get(domain, {}).items()):
+            print(f"lab reports: {domain} {label} on {count} of {examples} reports")
+    if done.future_state:
+        print(f"lab reports: contract-only future-state findings (not gated): {', '.join(done.future_state)}")
+    if done.new_frozen:
+        print(f"lab reports: new finding(s) frozen under {out_dir}: {', '.join(done.new_frozen)}")
+    share = done.vendor_rejected / done.vendor_answers if done.vendor_answers else 0.0
+    print(f"lab reports: over-blocking (reported, not gated): {done.vendor_rejected} of {done.vendor_answers} "
+          f"names-the-vendor answers rejected ({share:.1%})")
+    print(f"lab reports: {len(done.frozen_failing)} frozen report(s) failing, {len(done.gated)} reachable "
+          f"label(s) (seed {seed}, {examples} reports per domain)")
+    return 1 if done.frozen_failing or done.gated else 0
 
 
 def _write(path: Path, body: dict) -> None:

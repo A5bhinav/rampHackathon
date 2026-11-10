@@ -72,3 +72,19 @@ def test_the_lab_docs_do_not_overclaim():
     assert "lab run --split dev" not in spec + readme
     l13 = (ROOT / "evals" / "scenarios" / "voice" / "l13-machine-answers.yaml").read_text(encoding="utf-8")
     assert "text line only" in l13
+
+
+def test_lab_reports_runs_on_what_turns_answers_into_outcomes():
+    # Spec 0048, B7: its own job, on the decision engine, the worker, the report's arrival, the company
+    # check, the voice service's report and the lab; the green steps deselect report_gate everywhere.
+    triggers, runs = _workflow("lab-reports.yml")
+    paths = triggers["pull_request"]["paths"]
+    for path in ("packages/decision/**", "apps/core/src/dialback_core/worker.py", "apps/core/src/dialback_core/calls.py",
+                 "apps/core/src/dialback_core/company.py", "apps/core/src/dialback_core/call_facts.py",
+                 "apps/voice/src/dialback_voice/app.py", "evals/**"):
+        assert path in paths, path
+    assert any("lab reports" in r and "--examples 2000" in r and "--seed 0" in r for r in runs)
+    for name in ("lab-smoke.yml", "lab-fuzz.yml", "lab-reports.yml"):
+        _, runs = _workflow(name)
+        tests = [r for r in runs if "pytest" in r]
+        assert tests and all("not selection_gate" in r and "not report_gate" in r for r in tests), name
