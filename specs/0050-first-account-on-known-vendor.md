@@ -1,4 +1,4 @@
-# 0048: A known vendor's first bank account is a change
+# 0050: A known vendor's first bank account is a change
 
 **Owner:** Sami (author; `apps/core` is Abhi's, and Abhi reviews)  **Slice:** money path  **Target day:** Mon Nov 9
 
@@ -78,7 +78,7 @@ them. The single statement is the guard, and the comment in `sync_vendor` says s
   decision rules' "digits match the old account" check would misfire for a genuine revert.
 - An account first mirrored while inactive, then activated. Every sync mirrors inactive accounts
   too, so it is already in `known` and no case opens, for any vendor. This gap existed before
-  this spec. Open question Q104.
+  this spec. Open question Q114.
 - An account edited in place under the same Ramp account id. The fingerprint covers routing,
   last four and Ramp's id, so the sync inserts a second mirror row with the same
   `ramp_account_id`, and opens no case because that id is already known.
@@ -86,7 +86,7 @@ them. The single statement is the guard, and the comment in `sync_vendor` says s
   `old_account_id` null for a check vendor), each moves the case to a new version, and the call
   verifies only the account Ramp listed last. This already happens for vendors that have
   accounts (there every row names the same previous account); this spec makes it reachable from
-  check vendors. Open question Q103.
+  check vendors. Open question Q113.
 - Holding a brand-new vendor's first payment (spec 0002, Q2): first sight of the vendor stays a
   silent baseline.
 
@@ -100,11 +100,11 @@ fact.
 
 | # | Question | Who answers |
 |---|---|---|
-| Q102 | Does Ramp log a vendor's first bank account as `VENDOR_BANK_ACCOUNT_UPDATED` (the type the actor lookup reads), or as another audit-log type? If another, every first-account case has an unknown changer and needs two approvers. That fails closed, but it is stricter than intended. | Ramp sandbox; then Abhi |
-| Q103 | When several new accounts appear at once on a known vendor, should the case go straight to a person instead of a call that verifies only the last one? | Abhi and Sami |
-| Q104 | Can Ramp create a vendor bank account inactive? If so, an account mirrored inactive and activated later opens no case. | Ramp sandbox; then Abhi |
-| Q105 | When a vendor's first account is added, does Ramp send `vendors.updated` and move the vendor's `updated_at`? If not, only the nightly sweep finds it. | Ramp sandbox; then Abhi |
-| Q106 | In Ramp's audit event for a first account, is the account's id under `payload.new_account_id`? If not, the changer is unknown and two approvers are needed. That fails closed, like Q102. | Ramp sandbox; then Abhi |
+| Q112 | Does Ramp log a vendor's first bank account as `VENDOR_BANK_ACCOUNT_UPDATED` (the type the actor lookup reads), or as another audit-log type? If another, every first-account case has an unknown changer and needs two approvers. That fails closed, but it is stricter than intended. | Ramp sandbox; then Abhi |
+| Q113 | When several new accounts appear at once on a known vendor, should the case go straight to a person instead of a call that verifies only the last one? | Abhi and Sami |
+| Q114 | Can Ramp create a vendor bank account inactive? If so, an account mirrored inactive and activated later opens no case. | Ramp sandbox; then Abhi |
+| Q115 | When a vendor's first account is added, does Ramp send `vendors.updated` and move the vendor's `updated_at`? If not, only the nightly sweep finds it. | Ramp sandbox; then Abhi |
+| Q116 | In Ramp's audit event for a first account, is the account's id under `payload.new_account_id`? If not, the changer is unknown and two approvers are needed. That fails closed, like Q112. | Ramp sandbox; then Abhi |
 
 ## Commands
 

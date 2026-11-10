@@ -80,7 +80,7 @@ async def test_a_bank_change_walks_all_the_way_to_release(world):
     ("1111", "mismatch", "not_verified", "blocked"),
 ], ids=["new-account-digits", "other-digits"])
 async def test_a_first_account_case_walks_the_money_path(world, digits, last_four, outcome, state):
-    """Spec 0048: a vendor paid by check gets its first bank account. There is no previous account,
+    """Spec 0050: a vendor paid by check gets its first bank account. There is no previous account,
     and the case takes the same path as any other."""
     await add_vendor(world, "birch", "Birch Supply Co",
                      bills=[{"ref": "birch-bill", "invoice_number": "B-1", "amount_cents": 50000, "payment_date": "2026-11-06"}])

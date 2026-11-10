@@ -133,7 +133,7 @@ async def test_a_second_change_joins_the_open_case(world):
     assert [(c["version"], c["has_unknown_changer"], c["state"]) for c in cases] == [(2, True, "open")]
 
 
-# Spec 0048: first sight is the vendor, not its accounts ---------------------------------------
+# Spec 0050: first sight is the vendor, not its accounts ---------------------------------------
 
 async def counts(world) -> tuple[int, int]:
     """How many change rows and cases this test's dataset has."""

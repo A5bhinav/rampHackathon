@@ -63,7 +63,7 @@ async def sync_vendor(pool: AsyncConnectionPool, ramp: RampPort, keys: Keys, dat
 
     # Phase 1: have we synced this vendor before, and which of Ramp's accounts do we know?
     # One statement, so both answers come from one snapshot: a webhook and a poll racing at
-    # first sight can't see the vendor row without the accounts written with it (spec 0048).
+    # first sight can't see the vendor row without the accounts written with it (spec 0050).
     async with system_tx(pool) as conn:
         rows = await (await conn.execute(
             "select b.ramp_account_id from app.vendors v left join app.bank_accounts b on b.vendor_id = v.id "
@@ -72,7 +72,7 @@ async def sync_vendor(pool: AsyncConnectionPool, ramp: RampPort, keys: Keys, dat
     # First sight of the vendor itself (no row yet) is a baseline, not a change. That is only
     # safe after the dataset's initial import (spec 0002, D4 and Q2). A vendor we synced before
     # is never a baseline, even with no account on file: its first account is a change with no
-    # previous account ("we're moving from checks to ACH", spec 0048).
+    # previous account ("we're moving from checks to ACH", spec 0050).
     baseline = not rows
     new_active = [] if baseline else [a for a in accounts if a.is_active and a.id not in known]
 

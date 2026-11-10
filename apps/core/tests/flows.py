@@ -19,7 +19,7 @@ async def case_of(world):
 
 async def add_vendor(world, ref, name, accounts=(), bills=()) -> str:
     """Add a vendor to this test's mock business (the mock's seed only adds). Returns its Ramp id.
-    With no accounts it is a vendor paid by check: no bank account on file (spec 0048)."""
+    With no accounts it is a vendor paid by check: no bank account on file (spec 0050)."""
     body = {"vendors": [{"ref": ref, "name": name, "accounts": list(accounts), "bills": list(bills)}]}
     r = await world.mock.post("/_mock/seed", json=body, headers=world.auth)
     assert r.status_code == 200, r.text

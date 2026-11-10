@@ -110,7 +110,7 @@ async def test_queue_detail_and_release(world):
 
 
 async def test_a_first_account_change_shows_no_previous_account(world):
-    """Spec 0048: a vendor paid by check gets its first bank account. The detail has no old
+    """Spec 0050: a vendor paid by check gets its first bank account. The detail has no old
     account, matches the contract, and the timeline reads as for any change."""
     await add_vendor(world, "birch", "Birch Supply Co")
     await import_all(world.pool, world.ramp, world.keys, world.dataset.id)
