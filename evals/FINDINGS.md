@@ -374,6 +374,7 @@ These are not reachable today, but each is frozen as a regression.
   - `<` instead of `<=` at the subject window.
 - **Fix:** knobs for a request without a thread, a requested cutoff earlier than the request, and
   ages exactly at each threshold.
+- **Spec:** 0048 on `sami/lab-honest` (approved Nov 9), part C.
 
 ### B6. Coverage floor and test notes
 
@@ -430,6 +431,7 @@ These are not reachable today, but each is frozen as a regression.
     and 26.
 - **Fixed so far:** only spec 0046's new searches, which turn it off (`guided.pinned_draws()`).
   `--search first`, which CI runs, still draws unpinned. Spec 0048 should pin it.
+- **Spec:** 0048 (approved Nov 9), part C1, pins every lab sample.
 
 ## C. The voice lab (spec 0017)
 
@@ -569,6 +571,8 @@ F1 to F9 hold as built (verified). But the lab still claims more than it shows:
   line; no scenario speaks the digits; one injection scenario only; the spec still says the lab
   imports no core; the README shows `--split dev`; moving `every_name_matches` and
   `spoken_last_four` into `packages/decision` would spare the lab an app dependency.
+- **Spec:** 0048 on `sami/lab-honest` (approved Nov 9), part A, plus a call-report fuzzer (part B)
+  and the plan for landing the lab on main (part D).
 
 ### C10. The voice lab runs the dev double, not the live agent
 
