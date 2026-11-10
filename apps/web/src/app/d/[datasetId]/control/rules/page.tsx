@@ -1,5 +1,5 @@
 import { CardHead, PageHead } from "@/components/page";
-import type { CallScript, SelectionView } from "@/lib/api-types";
+import type { CallScript, CaseSummary, SelectionView } from "@/lib/api-types";
 import { core } from "@/lib/core";
 import { SLOT_LABEL } from "@/lib/call";
 import { GUARANTEES, NOT_REPORTED, policyFrom } from "@/lib/settings";
@@ -9,7 +9,7 @@ import { GUARANTEES, NOT_REPORTED, policyFrom } from "@/lib/settings";
 // The full decision rule table waits for a generated rules.json (spec 0073).
 export default async function RulesPage({ params }: { params: Promise<{ datasetId: string }> }) {
   const { datasetId } = await params;
-  const cases = await core.allCases(datasetId);
+  const cases = await core.allCases(datasetId).catch((): CaseSummary[] => []);  // a Settings page never fails on case data
   const newest = [...cases].sort((a, b) => b.opened_at.localeCompare(a.opened_at))[0];
   const [script, view] = newest ? await Promise.all([
     core.case(newest.id).then((d) => d.call_script ?? null).catch((): CallScript | null => null),
@@ -44,7 +44,7 @@ export default async function RulesPage({ params }: { params: Promise<{ datasetI
                 </ol>
                 {p.note ? <p className="muted sub">{p.note}</p> : null}
               </>
-            ) : <p className="muted sub">The call script is {NOT_REPORTED}: no case on this dataset has one.</p>}
+            ) : <p className="muted sub">The call script is {NOT_REPORTED}: the newest case doesn&apos;t carry one.</p>}
           </div>
         </section>
         <section className="card" aria-labelledby="sel-h">
@@ -54,11 +54,11 @@ export default async function RulesPage({ params }: { params: Promise<{ datasetI
               <dl className="facts">
                 <dt>Rule</dt><dd className="mono">{p.rule.version}</dd>
                 <dt>Source types</dt><dd>at least {p.rule.settings.min_source_types}, independent</dd>
-                <dt>Minimum age</dt><dd>{p.rule.settings.min_age_days} days before the request</dd>
-                <dt>Near miss</dt><dd>{p.rule.settings.near_miss_distance} digit</dd>
+                <dt>Minimum age</dt><dd>{p.rule.settings.min_age_days} days before the cutoff</dd>
+                <dt>Near miss</dt><dd>{p.rule.settings.near_miss_distance} digit{p.rule.settings.near_miss_distance === 1 ? "" : "s"} off, or two adjacent digits swapped</dd>
                 <dt>Same-subject window</dt><dd>{p.rule.settings.same_subject_window_days} days</dd>
               </dl>
-            ) : <p className="muted sub">The selection rule&apos;s settings are {NOT_REPORTED}: no case on this dataset has a selection.</p>}
+            ) : <p className="muted sub">The selection rule&apos;s settings are {NOT_REPORTED}: the newest case has no selection recorded.</p>}
           </div>
         </section>
       </div>

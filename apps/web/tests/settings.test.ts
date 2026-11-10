@@ -14,7 +14,7 @@ test("R1 to R9, each with where it is enforced", () => {
 test("integrations with no case data: Ramp and the chain from the API, the rest not reported", () => {
   const rows = integrationRows({ kind: "demo", chain: { ok: true, checked: 0 }, lastCheck: null, alerts: [] });
   const by = Object.fromEntries(rows.map((r) => [r.name, r]));
-  assert.equal(by["Ramp"].value, "Ramp mock (demo dataset)");
+  assert.equal(by["Ramp"].value, "demo dataset; mock or sandbox not reported yet");  // the API doesn't say which Ramp
   assert.equal(by["Evidence chain"].tone, "ok");
   assert.equal(by["Scheduled chain check"].value, "not run yet");
   assert.equal(by["Open alerts"].value, "none");

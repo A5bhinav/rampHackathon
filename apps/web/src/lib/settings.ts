@@ -29,7 +29,7 @@ export function integrationRows({ kind, chain, lastCheck, alerts }: {
   const n = (s: string) => alerts.filter((a) => a.severity === s).length;
   const parts = [["critical", n("critical")], ["warning", n("warning")], ["info", n("info")]].filter(([, c]) => c).map(([s, c]) => `${c} ${s}`);
   return [
-    { name: "Ramp", value: `Ramp mock (${kind} dataset)`, tone: "muted" },
+    { name: "Ramp", value: `${kind} dataset; mock or sandbox ${NOT_REPORTED}`, tone: "muted" },
     { name: "Evidence chain", value: chain.ok ? `intact, ${chain.checked} rows` : `broken at row #${chain.first_bad_seq ?? "?"}`, tone: chain.ok ? "ok" : "bad" },
     { name: "Scheduled chain check", value: lastCheck?.finished_at ? (lastCheck.ok ? "intact" : lastCheck.ok === false ? "found a break" : "unknown") : "not run yet",
       tone: lastCheck?.ok === false ? "bad" : lastCheck?.ok ? "ok" : "muted" },

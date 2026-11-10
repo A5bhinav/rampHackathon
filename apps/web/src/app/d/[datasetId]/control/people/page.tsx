@@ -10,7 +10,7 @@ export default async function PeoplePage() {
   const rows = peopleRows(me, demoAccounts(process.env) !== null);
   return (
     <main>
-      <PageHead eyebrow="Control · settings" title="People" lead="Who can see and act on this dataset." />
+      <PageHead eyebrow="Control · settings" title="People" lead="You, and the shared demo accounts." />
       <section className="card flush" aria-labelledby="people-h">
         <CardHead marker="Roles" title="People" id="people-h" />
         <div className="table-wrap">

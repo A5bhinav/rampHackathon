@@ -1,4 +1,4 @@
-// The public "How it works" page's stations and the demo links (spec 0033). `pnpm test`.
+// The demo links and where sign-in may send someone back to (specs 0033, 0063). `pnpm test`.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { DEMO_STORIES, caseFor, demoStory, newestDemo, safeNext } from "../src/lib/story.ts";
@@ -48,4 +48,6 @@ test("a dataset page is a safe place to come back to after switching demo accoun
 test("the front door's Control button survives sign-in (spec 0063)", () => {
   assert.equal(safeNext("/app/control"), "/app/control");
   for (const bad of ["/app/control/x", "/app/controls", "/app/control?x=1"]) assert.equal(safeNext(bad), "/app", bad);
+  const control = "/d/0c9e8d7f-6a5b-4c3d-8e2f-1a0b9c8d7e6f/control/trust-ledger";  // "Viewing as" on a Control page
+  assert.equal(safeNext(control), control);
 });

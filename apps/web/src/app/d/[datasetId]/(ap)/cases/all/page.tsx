@@ -28,7 +28,7 @@ export default async function CasesPage({ params, searchParams }: {
   return (
     <main className="inbox cases-all">
       <PageHead eyebrow={`${dataset?.label ?? "Dataset"} · Accounts payable`} title="Cases"
-        lead={`${all.length} case${all.length === 1 ? "" : "s"} on this dataset.`} />
+        lead={all.length >= 200 ? "Showing the first 200 cases on this dataset." : `${all.length} case${all.length === 1 ? "" : "s"} on this dataset.`} />
       <div className="tabs-row">
         <nav className="tabs" aria-label="Filter cases by state">
           {TABS.map((t) => (
