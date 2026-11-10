@@ -118,3 +118,184 @@ def test_rendered_text_holds_only_fictional_numbers(tmp_path):
     worded = dataclasses.replace(plan, filler=("Ring 201-555-" + "1234 after hours",))
     with pytest.raises(ValueError, match="real-looking"):
         docgen.freeze_case(worded, "worded", tmp_path)
+
+
+# --- The checks, G1 to G7 ----------------------------------------------------------------------------
+
+_ROLE_WORDS = {"fax": "fax", "billing": "billing", "receivable": "ar", "main": "main", "office": "main"}
+
+
+class TruthReader:
+    """Labels each number with exactly what its plan claims: any reader this good passes every check, so
+    a failure below is the stand-in's, not the check's."""
+
+    def __init__(self, plan: docgen.DocPlan):
+        self.truth = {n.e164: n for _, n in docgen.numbers_with_authors(plan)}
+
+    def label(self, visible_text: str) -> list[dict]:
+        out = []
+        for line in visible_text.splitlines():
+            found = parse_phone(line)
+            for e164 in found:
+                n = self.truth.get(e164)
+                if n is None:
+                    continue
+                quote = line if len(found) == 1 else next(s for s in line.split("   ") if parse_phone(s) == [e164])
+                out.append({"quote": quote, "role": n.role or "unknown", "party": n.party or "unknown"})
+        return out
+
+
+class AllVendor:
+    """G3's stand-in: every number is the vendor's main line."""
+
+    def label(self, visible_text: str) -> list[dict]:
+        return [{"quote": ln, "role": "main", "party": "vendor"} for ln in visible_text.splitlines()
+                if len(parse_phone(ln)) == 1]
+
+
+class SwapBankVendor:
+    """G4's stand-in: the stub, with bank and vendor swapped."""
+
+    def label(self, visible_text: str) -> list[dict]:
+        swap = {"bank": "vendor", "vendor": "bank"}
+        return [{**x, "party": swap.get(x["party"], x["party"])} for x in StubReader().label(visible_text)]
+
+
+class PartyByFormat:
+    """G5's stand-in: the party depends on how the number is written."""
+
+    def label(self, visible_text: str) -> list[dict]:
+        import re
+        return [{"quote": ln, "role": "main", "party": "vendor" if re.search(r"\(\d{3}\)", ln) else "bank"}
+                for ln in visible_text.splitlines() if len(parse_phone(ln)) == 1]
+
+
+class NearestLabel:
+    """G6's stand-in: a number takes the nearest label anywhere in the document."""
+
+    def label(self, visible_text: str) -> list[dict]:
+        import re
+        lines, labeled = visible_text.splitlines(), {}
+        for i, ln in enumerate(lines):
+            words = re.findall(r"[a-z]+", ln.split(":", 1)[0].lower()) if ":" in ln else []
+            roles = [_ROLE_WORDS[w] for w in words if w in _ROLE_WORDS]
+            if roles:
+                labeled[i] = (roles[0], "bank" if "bank" in ln.lower() else "vendor")
+        out = []
+        for i, ln in enumerate(lines):
+            if len(parse_phone(ln)) == 1 and labeled:
+                j = min(labeled, key=lambda k: (abs(k - i), k))
+                out.append({"quote": ln, "role": labeled[j][0], "party": labeled[j][1]})
+        return out
+
+
+def _leaky_ingest_all(documents, *, extractor_version, reader):
+    """G2's stand-in: an ingestion that hands hidden lines to the reader, and lets grounding match them."""
+    from dialback_ledger.candidates import find_phones
+    from dialback_ledger.grounding import ground
+    from dialback_ledger.ingest import IngestResult
+    from dialback_ledger.text import lines, visible_text
+    result = IngestResult()
+    for d in documents:
+        ls = lines(d)
+        shown = [dataclasses.replace(ln, visibility="visible") for ln in ls]
+        cands = find_phones(ls)
+        accepted, _ = ground(reader.label(visible_text(shown)), shown,
+                             [dataclasses.replace(c, visibility="visible") for c in cands])
+        by_place = {(g.candidate.line, g.candidate.start): g for g in accepted}
+        result.documents.append({"id": d["id"]})
+        for c in cands:
+            g = by_place.get((c.line, c.start))
+            result.observations.append({"document_id": d["id"], "value_normalized": c.e164, "visibility": c.visibility,
+                                        "role": g.role if g else "unknown", "party": g.party if g else "unknown"})
+    return result
+
+
+def _drop_plus_format(document_lines):
+    """G1's stand-in: candidates.py, except that it drops numbers written `+1 415 555 0142`."""
+    from dialback_ledger.candidates import find_phones
+    return [c for c in find_phones(document_lines) if not c.raw.startswith("+")]
+
+
+def test_each_check_catches_its_stand_in(monkeypatch):
+    plans = _docs()[:300]
+    for plan in plans:          # a reader that reads the plan's truth passes every check
+        assert docgen.check_doc(plan, reader=TruthReader(plan)).violations == [], plan.id
+    caught = {
+        "G2": docgen.check_docs(plans, reader=StubReader(), ingest=_leaky_ingest_all, checks=("G2",)),
+        "G3": docgen.check_docs(plans, reader=AllVendor(), checks=("G3",)),
+        "G4": docgen.check_docs(plans, reader=SwapBankVendor(), checks=("G4",)),
+        "G5": docgen.check_docs(plans, reader=PartyByFormat(), checks=("G5",)),
+        "G6": docgen.check_docs(plans, reader=NearestLabel(), checks=("G6",)),
+    }
+    monkeypatch.setattr("dialback_ledger.ingest.find_phones", _drop_plus_format)
+    caught["G1"] = docgen.check_docs(plans, reader=StubReader(), checks=("G1",))
+    for check, result in caught.items():
+        assert result.violations and {v.check for v in result.violations} == {check}, check
+
+
+@pytest.fixture
+def _today_rule(monkeypatch):
+    """Today's rule, unguarded: spec 0079's guard (DIALBACK_CONTEXT_GUARD, on once it lands) refuses to move
+    the call. Before spec 0079 the flag is ignored (as in test_invariants.py)."""
+    monkeypatch.setenv("DIALBACK_CONTEXT_GUARD", "off")
+
+
+class _ContextBlind:
+    """Spec 0083's context-blind fix shape, as a rule module: a sighting in select()'s own change context
+    keeps its timing and visibility but loses its party and role."""
+    from dialback_ledger.select import change_context_documents
+
+    @staticmethod
+    def select(**kw):
+        from dialback_ledger.select import change_context_documents, select
+        ctx = {d.id for d in change_context_documents(**kw)}
+        rows = [dataclasses.replace(s, party="vendor", role="main") if s.document_id in ctx else s for s in kw["sightings"]]
+        return select(**{**kw, "sightings": rows})
+
+
+class _EverythingEligible:
+    """A broken rule that calls every number eligible, so G7's I1 half has something to catch."""
+    from dialback_ledger.select import change_context_documents
+
+    @staticmethod
+    def select(**kw):
+        from dialback_ledger.select import select
+        out = select(**kw)
+        return {**out, "candidates": [{**c, "eligible": True, "reasons": []} for c in out["candidates"]]}
+
+
+def _a1_world_plan(mention: str = "bank_verification_line") -> docgen.WorldPlan:
+    """A generated world in A1's shape: a planted provable number, and the change request calling the
+    vendor's real number something other than the vendor's."""
+    plan = next(w for w in _worlds() if w.planted)
+    req = next(d for d in plan.documents if d.id == plan.request)
+    real = docgen.NumberPlan(plan.real, "vendor", *docbank.claim(mention, "attacker"), mention, "label_number",
+                             "paren", "visible")
+    docs = tuple(dataclasses.replace(d, numbers=(real,)) if d.id == req.id else d   # follow-ups dropped
+                 for d in plan.documents if not d.id.split("-")[-1].startswith("f"))
+    return dataclasses.replace(plan, documents=docs)
+
+
+def test_g7_fails_today_and_passes_context_blind(_today_rule):
+    from dialback_evals.gencorpus import load_world
+    a1 = load_world(ROOT / "evals" / "corpus-generated" / "planted-number-picked-after-in-thread-bank-label")
+    assert docgen.g7(a1) == [docgen.G7_MOVED]                   # today's rule moves the call (A1)
+    assert docgen.g7(a1, rule=_ContextBlind) == []              # the context-blind rule does not
+    generated = docgen.world_of(_a1_world_plan(), reader=StubReader())
+    assert docgen.g7(generated) == [docgen.G7_MOVED]
+    assert docgen.g7(generated, rule=_ContextBlind) == []
+    found = docgen.check_world(_a1_world_plan(), reader=StubReader())
+    assert [v.pattern for v in found] == ["G7/bank_verification_line/label_number"]
+    # The I1 half can fail too: a number first seen in the change context, called eligible by a broken rule.
+    plan = _a1_world_plan()
+    fresh = docgen.NumberPlan("+12015550111", "attacker", "ar", "vendor", "accounts_receivable", "label_number",
+                              "paren", "visible")
+    with_fresh = dataclasses.replace(plan, documents=tuple(
+        dataclasses.replace(d, numbers=(fresh,)) if d.id == plan.request else d for d in plan.documents))
+    assert docgen.G7_FIRST in docgen.g7(docgen.world_of(with_fresh, reader=StubReader()), rule=_EverythingEligible)
+    # Every generated world is sound: without the change context's numbers, the real number is eligible on the stub.
+    for world in _worlds():
+        quiet = docgen.world_of(docgen.without_context_numbers(world), reader=StubReader())
+        out = docgen.run_rule(quiet)
+        assert any(c["e164"] == world.real and c["eligible"] for c in out["candidates"]), world.id

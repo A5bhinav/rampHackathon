@@ -460,3 +460,298 @@ def below_floor(plans: Iterable[DocPlan]) -> list[str]:
     counts = coverage(plans)
     return [f"{dim} {value}: {counts[dim][value]} < {floor}" for dim, floor in FLOORS.items()
             for value in VALUES[dim] if counts[dim][value] < floor]
+
+
+# --- The checks (decision 5) -------------------------------------------------------------------------
+#
+# G1 to G6 judge one document through real ingestion with a named reader; G7 judges a world end to end
+# through ingestion and select(). Every one must hold for any reader. A violation is keyed by its pattern:
+# the check, and the phrasing and placement of the number it is about (decision 6).
+
+DOC_CHECKS = ("G1", "G2", "G3", "G4", "G5", "G6")
+G7_MOVED = "I12_context_label_moved_call"          # the removal half of spec 0083's I12
+G7_FIRST = "I1_first_seen_in_context_eligible"
+
+
+def pattern_key(check: str, phrasing: str, placement: str) -> str:
+    return f"{check}/{phrasing}/{placement}"
+
+
+@dataclasses.dataclass(frozen=True)
+class Violation:
+    check: str
+    phrasing: str
+    placement: str
+    plan: str          # the plan's id
+    number: str        # the number it is about ("" when none)
+    detail: str
+
+    @property
+    def pattern(self) -> str:
+        return pattern_key(self.check, self.phrasing, self.placement)
+
+
+@dataclasses.dataclass
+class Tally:
+    """What a run counts, beyond its violations (the stub report)."""
+    documents: int = 0
+    visible_numbers: int = 0                       # planned visible numbers that got a candidate
+    unsafe: int = 0                                # G3
+    wrong_party: int = 0                           # G4
+    overblocks: Counter = dataclasses.field(default_factory=Counter)   # by "stub_readable" / "not_stub_readable"
+    overblocks_fax: int = 0                        # of those, vendor fax lines (the rule refuses a fax anyway)
+    vendor_role_claims: Counter = dataclasses.field(default_factory=Counter)   # the over-block denominators
+    g5_compared: int = 0
+    g5_same: int = 0
+    g6_compared: int = 0
+    worlds: int = 0
+    worlds_planted: int = 0
+
+    def add(self, other: Tally) -> None:
+        for f in dataclasses.fields(self):
+            mine, theirs = getattr(self, f.name), getattr(other, f.name)
+            setattr(self, f.name, mine + theirs)
+
+
+@dataclasses.dataclass
+class Result:
+    violations: list[Violation] = dataclasses.field(default_factory=list)
+    tally: Tally = dataclasses.field(default_factory=Tally)
+
+    def add(self, other: Result) -> None:
+        self.violations += other.violations
+        self.tally.add(other.tally)
+
+
+def _observe(plan: DocPlan, reader, ingest) -> tuple[dict[str, dict], list[dict]]:
+    """Ingest one document; its observations by number, and any observation of a number the plan lacks."""
+    result = ingest([render(plan)], extractor_version=EXTRACTOR, reader=reader)
+    planned = {n.e164 for _, n in numbers_with_authors(plan)}
+    by_number: dict[str, dict] = {}
+    extra = []
+    for o in result.observations:
+        if o["document_id"] != plan.id:
+            continue
+        if o["value_normalized"] in planned and o["value_normalized"] not in by_number:
+            by_number[o["value_normalized"]] = o
+        else:
+            extra.append(o)
+    return by_number, extra
+
+
+def stub_readable(n: NumberPlan, plan: DocPlan) -> bool:
+    """Decision 2: the stub, given the number's line alone, returns its claimed role and party."""
+    from dialback_ledger.reader import StubReader
+    labels = StubReader().label(number_line(n, plan))
+    return len(labels) == 1 and (labels[0]["role"], labels[0]["party"]) == (n.role or "unknown", n.party or "unknown")
+
+
+def _replace_number(plan: DocPlan, old: NumberPlan, new: NumberPlan) -> DocPlan:
+    if old in plan.numbers:
+        return dataclasses.replace(plan, numbers=tuple(new if n == old else n for n in plan.numbers))
+    quote = plan.quote
+    return dataclasses.replace(plan, quote=dataclasses.replace(quote, numbers=tuple(new if n == old else n
+                                                                                     for n in quote.numbers)))
+
+
+def _pick(options: list[str], *key: str) -> str:
+    """One of `options`, chosen by a stable hash of `key`: the same plan always gets the same variant."""
+    import hashlib
+    return options[int(hashlib.sha256("|".join(key).encode()).hexdigest(), 16) % len(options)]
+
+
+def variants(plan: DocPlan, n: NumberPlan, author: str) -> list[DocPlan]:
+    """G5's rewordings of one number: another phrasing of the same claim, another format, another
+    placement, one at a time, each chosen by a stable hash so a plan always gets the same ones."""
+    form = PHRASINGS[n.phrasing].form
+    out = []
+    same = [k for k in PHRASINGS if k != n.phrasing and claim(k, author) == (n.role, n.party)
+            and (PHRASINGS[k].form == "label" if n.shares_line else PHRASINGS[k].form in PLACEMENT_FORMS[n.placement])]
+    if same:
+        out.append(dataclasses.replace(n, phrasing=_pick(same, plan.id, n.e164, "phrasing")))
+    out.append(dataclasses.replace(n, format=_pick([f for f in FORMATS if f != n.format], plan.id, n.e164, "format")))
+    if not n.shares_line:
+        places = [p for p in PLACEMENTS if p != n.placement and form in PLACEMENT_FORMS[p]]
+        out.append(dataclasses.replace(n, placement=_pick(places, plan.id, n.e164, "placement")))
+    return [_replace_number(plan, n, v) for v in out]
+
+
+def _wrong(party: str, claimed: str | None) -> bool:
+    """A known label party the claim doesn't support."""
+    return party != "unknown" and party != claimed
+
+
+def check_doc(plan: DocPlan, *, reader, ingest=None, checks: Iterable[str] = DOC_CHECKS) -> Result:
+    """G1 to G6 on one document plan, through `ingest` (the ledger's real ingest_all by default) with `reader`."""
+    if ingest is None:
+        from dialback_ledger.ingest import ingest_all as ingest
+    checks, res = set(checks), Result()
+    res.tally.documents = 1
+    seen, extra = _observe(plan, reader, ingest)
+    numbered = numbers_with_authors(plan)
+    by_number = {n.e164: n for _, n in numbered}
+
+    def v(check: str, n: NumberPlan | None, detail: str) -> None:
+        res.violations.append(Violation(check, n.phrasing if n else "unplanned", n.placement if n else "filler",
+                                        plan.id, n.e164 if n else "", detail))
+
+    if "G1" in checks:    # extraction: every planned number found once, with its planned visibility, nothing else
+        for _, n in numbered:
+            o = seen.get(n.e164)
+            if o is None:
+                v("G1", n, f"{n.e164} ({n.format}, {n.visibility}) is not a candidate")
+            elif o["visibility"] != n.visibility:
+                v("G1", n, f"{n.e164} is {o['visibility']}, planned {n.visibility}")
+        for o in extra:
+            v("G1", by_number.get(o["value_normalized"]), f"unplanned candidate {o['value_normalized']}")
+    if "G2" in checks:    # hidden text is never labeled
+        for o in [*seen.values(), *extra]:
+            if o["visibility"] != "visible" and (o["role"], o["party"]) != ("unknown", "unknown"):
+                v("G2", by_number.get(o["value_normalized"]),
+                  f"hidden ({o['visibility']}) {o['value_normalized']} labeled {o['role']}, {o['party']}")
+    for author, n in numbered:
+        o = seen.get(n.e164)
+        if n.visibility != "visible" or o is None:
+            continue
+        res.tally.visible_numbers += 1
+        if "G3" in checks and n.party != "vendor" and o["party"] == "vendor":
+            res.tally.unsafe += 1
+            v("G3", n, f"claim {n.role}, {n.party} labeled {o['role']}, vendor")
+        if "G4" in checks and n.party is not None and _wrong(o["party"], n.party):
+            res.tally.wrong_party += 1
+            v("G4", n, f"claim {n.role}, {n.party} labeled {o['role']}, {o['party']}")
+        if "G4" in checks and n.party == "vendor" and n.role is not None:
+            split = "stub_readable" if stub_readable(n, plan) else "not_stub_readable"
+            res.tally.vendor_role_claims[split] += 1
+            if o["party"] == "unknown":
+                res.tally.overblocks[split] += 1
+                res.tally.overblocks_fax += n.role == "fax"
+        if "G5" in checks:
+            for variant in variants(plan, n, author):
+                moved = next(m for _, m in numbers_with_authors(variant) if m.e164 == n.e164)
+                ov = _observe(variant, reader, ingest)[0].get(n.e164)
+                if ov is None:
+                    continue
+                res.tally.g5_compared += 1
+                res.tally.g5_same += (ov["role"], ov["party"]) == (o["role"], o["party"])
+                if "unknown" not in (o["party"], ov["party"]) and o["party"] != ov["party"]:
+                    side = n if _wrong(o["party"], n.party) else moved
+                    res.violations.append(Violation(
+                        "G5", side.phrasing, side.placement, plan.id, n.e164,
+                        f"{n.phrasing}/{n.placement}/{n.format} labeled {o['party']}, "
+                        f"{moved.phrasing}/{moved.placement}/{moved.format} labeled {ov['party']}"))
+    if "G6" in checks and plan.quote is not None:   # a quoted message never changes the original numbers' labels
+        alone = _observe(dataclasses.replace(plan, quote=None), reader, ingest)[0]
+        for n in plan.numbers:
+            o, o0 = seen.get(n.e164), alone.get(n.e164)
+            if o is None or o0 is None:
+                continue
+            res.tally.g6_compared += 1
+            if (o["role"], o["party"]) != (o0["role"], o0["party"]):
+                v("G6", n, f"labeled {o0['role']}, {o0['party']} alone, {o['role']}, {o['party']} under the quote")
+    return res
+
+
+def check_docs(plans: Iterable[DocPlan], *, reader, ingest=None, checks: Iterable[str] = DOC_CHECKS) -> Result:
+    total, checks = Result(), tuple(checks)
+    for plan in plans:
+        total.add(check_doc(plan, reader=reader, ingest=ingest, checks=checks))
+    return total
+
+
+# --- G7: end to end ----------------------------------------------------------------------------------
+
+def world_of(plan: WorldPlan, *, reader):
+    """The select() world real ingestion makes of a world plan (the bridge, decision 4)."""
+    from .bridge import world_from_documents
+    poison = frozenset(n.e164 for d in plan.documents for _, n in numbers_with_authors(d) if n.owner == "attacker")
+    return world_from_documents(rendered(plan), request_id=plan.request, vendor_domains=plan.vendor_domains,
+                                requested_cutoff=dt.datetime.fromisoformat(plan.requested_cutoff),
+                                case_opened_at=dt.datetime.fromisoformat(plan.case_opened_at), reader=reader,
+                                extractor_version=EXTRACTOR, poison=poison)
+
+
+def run_rule(world, rule=None) -> dict:
+    from .invariants import _runner
+    return _runner(rule)(world)
+
+
+def _calls(out: dict) -> list[str]:
+    from .invariants import _calls
+    return _calls(out)
+
+
+def _relabeled(world, keep, rule=None):
+    """The world with the change-context sightings `keep` selects relabeled the vendor's main line."""
+    from dialback_ledger.select import change_context_documents
+
+    from .invariants import _with
+    context = change_context_documents if rule is None else rule.change_context_documents
+    ctx = {d.id for d in context(**world.kwargs)}
+    return _with(world, sightings=[dataclasses.replace(s, party="vendor", role="main")
+                                   if s.document_id in ctx and keep(s) else s for s in world.kwargs["sightings"]])
+
+
+def g7(world, rule=None) -> list[str]:
+    """G7 on one select() world: relabeling every change-context sighting ingestion produced as the
+    vendor's must not change the call list (spec 0083's I12, removal half only: a label may trim it, as
+    I12 allows), and no number first seen in the change context is eligible (I1)."""
+    from .invariants import _frame
+    base, found = run_rule(world, rule), set()
+    if base.get("e164") is not None:
+        calls = _calls(base)
+        if calls != _calls(run_rule(_relabeled(world, lambda s: True, rule), rule))[:len(calls)]:
+            found.add(G7_MOVED)
+    f = _frame(world)
+    for c in base.get("candidates", []):
+        if c.get("eligible") and (n := f.numbers.get(c["e164"])) is not None and n.first_seen_in_context:
+            found.add(G7_FIRST)
+    return sorted(found)
+
+
+def without_context_numbers(plan: WorldPlan) -> WorldPlan:
+    """The world with no number in the change request or its follow-ups (a generator self-check)."""
+    keep = {d.id for d in plan.documents if d.id.split("-")[-1].startswith(("rec", "plant"))}
+    return dataclasses.replace(plan, documents=tuple(d if d.id in keep else dataclasses.replace(d, numbers=())
+                                                     for d in plan.documents))
+
+
+def check_world(plan: WorldPlan, *, reader, rule=None) -> list[Violation]:
+    """G7 on one world plan, each failure keyed by the change-context number that caused it: the sighting
+    whose label alone moves the call when relabeled (or, if none does alone, every one that could), and
+    for I1 the number's first change-context mention."""
+    from dialback_ledger.select import change_context_documents
+
+    from .invariants import _frame
+    world = world_of(plan, reader=reader)
+    labels = g7(world, rule)
+    if not labels:
+        return []
+    docs = {d.id: d for d in plan.documents}
+
+    def number(doc_id: str, e164: str) -> NumberPlan:
+        return next(n for _, n in numbers_with_authors(docs[doc_id]) if n.e164 == e164)
+
+    out = []
+    if G7_MOVED in labels:
+        base = _calls(run_rule(world, rule))
+        context = change_context_documents if rule is None else rule.change_context_documents
+        ctx = {d.id for d in context(**world.kwargs)}
+        suspects = [s for s in world.kwargs["sightings"] if s.document_id in ctx and s.visibility == "visible"
+                    and (s.party != "vendor" or str(s.role).strip().lower() == "fax")]
+        alone = [s for s in suspects
+                 if base != _calls(run_rule(_relabeled(world, lambda r, s=s: r == s, rule), rule))[:len(base)]]
+        for s in alone or suspects:
+            n = number(s.document_id, s.e164)
+            out.append(Violation("G7", n.phrasing, n.placement, plan.id, s.e164,
+                                 f"{G7_MOVED}: {s.document_id} labels it {s.role}, {s.party}; calls {base}"))
+    if G7_FIRST in labels:
+        f = _frame(world)
+        for c in run_rule(world, rule).get("candidates", []):
+            if c.get("eligible") and (seen := f.numbers.get(c["e164"])) is not None and seen.first_seen_in_context:
+                first = min((s for s in seen.visible if s.document_id in f.in_context_ids),
+                            key=lambda s: (f.docs[s.document_id].received_at, s.document_id))
+                n = number(first.document_id, first.e164)
+                out.append(Violation("G7", n.phrasing, n.placement, plan.id, first.e164,
+                                     f"{G7_FIRST}: {first.e164} first seen in {first.document_id}"))
+    return out
