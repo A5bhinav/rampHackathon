@@ -122,8 +122,9 @@ dialback-core demo change --vendor acme
 ## 5. Answering the call (for the teammate on the phone)
 
 Before the agent speaks, Twilio's answering-machine detection listens to how you answer and labels
-the call. Only a call labeled `human` can reach Verified on its own (V03); with a `machine` or
-`unknown` label, even a perfect call goes to review.
+the call. Only a call labeled `human` can reach Verified on its own (V03). With an `unknown` label,
+even a perfect call goes to review. With a `machine` label it goes to review, or is called again
+if Twilio's own report of the call reaches the core first.
 
 - **A greeting of up to about 4 seconds is fine**, from one short "Hello?" to "Acme accounts
   payable, this is Jane, how can I help you?". Then stay quiet: after about 1.2 seconds of quiet,
@@ -135,10 +136,11 @@ the call. Only a call labeled `human` can reach Verified on its own (V03); with 
   then answer.
 
 The label is in the voice service's deploy log on Railway, one line per call, written when Twilio
-fetches the call's instructions:
+fetches the call's instructions. Search the log for `twiml fetch`; Railway shows the line with a
+`INFO:dialback_voice.app:` prefix:
 
 ```
-twiml fetch for call <call id>: AnsweredBy=human MachineDetectionDuration=absent
+INFO:dialback_voice.app:twiml fetch for call <call id>: AnsweredBy=human MachineDetectionDuration=absent
 ```
 
 `AnsweredBy` is Twilio's label (`human`, `machine_start`, `machine_end_beep`,
@@ -203,7 +205,8 @@ finished") are educated guesses. The first calls test them. This check was writt
   - (b) A business-style greeting of about 4 seconds: "Acme accounts payable, this is Jane, how
     can I help you?"
   - (c) The phone's voicemail greeting (let the call go to voicemail). For information only:
-    either label is fine.
+    either label is fine. Run it last, then reset (section 3): a call that reaches voicemail is
+    redialed later while the case has attempts left, so the team phone may ring again.
 - **Record for each call:**
   - the `AnsweredBy` and `MachineDetectionDuration` values from the log line;
   - whether the account is a trial account. On a trial account, say your greeting only after

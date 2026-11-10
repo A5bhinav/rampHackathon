@@ -93,6 +93,8 @@ The plan:
    - **`duration`:** the `MachineDetectionDuration` value when `re.fullmatch(r"[0-9]{1,6}", v)`
      matches (ASCII digits only, no trailing newline). It is `absent` when missing or blank, and
      `other` for anything else.
+   - "Blank" means the empty string. A whitespace-only value is `other`, like any other value
+     outside the lists (clarified after review; the code already behaved this way).
    - The line never carries a phone number, the call token, the CallSid or any other parameter.
      Both values are treated as data (R9).
    - Twilio documents `MachineDetectionDuration` for the asynchronous callback, but does not say

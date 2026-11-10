@@ -243,7 +243,33 @@ def test_dial_request_carries_the_detection_settings():
         "MachineDetectionSilenceTimeout": ["5000"],
     }                                                       # so no MachineDetectionTimeout either
     assert not [k for k in form if k.startswith("AsyncAmd")]  # detection stays synchronous (D1)
-    # A2: the values are the module's named constants, not literals buried in the request.
+    # A2: the module's named constants hold these values; the next test shows the request is built
+    # from them, not from literals.
     assert origination.AMD_SPEECH_THRESHOLD_MS == 4500
     assert origination.AMD_SPEECH_END_THRESHOLD_MS == 1200
     assert origination.AMD_SILENCE_TIMEOUT_MS == 5000
+
+
+def test_dial_request_uses_the_named_detection_constants(monkeypatch):
+    """Spec 0080, A2: changing a constant changes what is sent, so the request reads the constants
+    (one place to tune) rather than literals that could drift from them."""
+    monkeypatch.setattr(origination, "AMD_SPEECH_THRESHOLD_MS", 4400)
+    monkeypatch.setattr(origination, "AMD_SPEECH_END_THRESHOLD_MS", 1300)
+    monkeypatch.setattr(origination, "AMD_SILENCE_TIMEOUT_MS", 4900)
+    seen: dict[str, str] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["body"] = request.content.decode()
+        return httpx.Response(201, json={"sid": "CA99999999999999999999999999999999", "status": "queued"})
+
+    async def run():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as http:
+            orig = TwilioOriginator(http, account_sid="ACtest00000000000000000000000000", auth_token=b"secret")
+            return await orig.originate(to=NUMBER, from_=FROM,
+                                        twiml_url=f"{BASE}/twilio/twiml/x", status_url=f"{BASE}/twilio/status/x")
+
+    asyncio.run(run())
+    form = urllib.parse.parse_qs(seen["body"], keep_blank_values=True)
+    assert form["MachineDetectionSpeechThreshold"] == ["4400"]
+    assert form["MachineDetectionSpeechEndThreshold"] == ["1300"]
+    assert form["MachineDetectionSilenceTimeout"] == ["4900"]

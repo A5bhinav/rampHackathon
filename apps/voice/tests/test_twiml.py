@@ -180,6 +180,7 @@ def test_twiml_fetch_for_an_unknown_call_still_logs(caplog):
     [
         ("Human", "123\n", "other", "other"),
         ("human\n", "-5", "other", "other"),
+        (" ", " ", "other", "other"),                        # blank means empty; spaces are other (D3)
         ("machine", "1234567", "other", "other"),            # the report's word, not one of Twilio's
         (CALL_SID, "\u0661\u0662\u0663", "other", "other"),  # Arabic-Indic digits are not [0-9]
         (NUMBER, NUMBER, "other", "other"),
@@ -191,7 +192,7 @@ def test_twiml_fetch_for_an_unknown_call_still_logs(caplog):
         ("unknown", "0", "unknown", "0"),
         ("human", "123456", "human", "123456"),              # six digits is the longest kept
     ],
-    ids=["Human", "human-newline", "machine", "callsid-arabic-digits", "number-number", "decimal",
+    ids=["Human", "human-newline", "whitespace", "machine", "callsid-arabic-digits", "number-number", "decimal",
          "blank-duration", "blank-answered", "both-blank", "both-missing", "zero", "six-digits"],
 )
 def test_unexpected_detection_values_are_logged_as_other_or_absent(
