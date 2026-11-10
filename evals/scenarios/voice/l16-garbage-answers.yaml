@@ -1,0 +1,25 @@
+# Nonsense answers: the company named is not this vendor, so nothing verifies (R7).
+id: l16-garbage-answers
+class: legit_odd_contact
+is_attack: false
+customer_name: Northwind Traders
+vendor_name: Acme Fasteners
+expect_rule: NR03_wrong_company
+expect_end: answers_recorded
+caller:
+  consent: 'yes'
+  company: banana purple seven
+  company_is: other              # spec 0048, A4: not a company name at all
+  department: asdf
+  name: zzz
+  role: qwerty
+  change: 'yes'
+  last4_mode: keypad
+  last4: '4821'
+  answered_by: human
+facts:
+  dialed_eligible_number: true
+  new_last4: "4821"
+  dialed_number_is_pick: true
+  speaker_in_change_thread: false
+  offered_number_from_request: false

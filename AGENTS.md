@@ -63,6 +63,9 @@ second owner (the partner) who reviews it.
 | Corpus: committed files match the generator, truth unchanged | `python3 corpus/generator/build.py --check` |
 | Call policy tests (script, tools, speech guard) | `cd packages/policy && uv run pytest` |
 | Voice service tests (text line, agent port, fail-closed) | `cd apps/voice && uv run pytest` |
+| Attack lab tests | `cd evals && uv run pytest -q` |
+| Attack lab: run the voice scenarios (scripted callers, no spend) | `uv run lab run --split voice` |
+| Attack lab: re-freeze the voice scenarios' hashes and required outcomes after a reviewed change | `uv run lab freeze --split voice` |
 | Run the whole skeleton locally (Postgres, Ramp mock, core with worker; seeded demo dataset) | `uv run python scripts/dev/stack.py --changes` |
 | End-to-end smoke run (the demo-smoke CI job) | `uv run python scripts/dev/stack.py --smoke` |
 | Rehearse the demo beats (reset, change, release, tamper) on the local stack | `uv run python scripts/dev/demo_rehearsal.py` |

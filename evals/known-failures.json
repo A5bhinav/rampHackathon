@@ -1,0 +1,8 @@
+{
+  "_about": "Spec 0048, D3: each job's strict known-failures list. An entry is added only with its finding written in evals/FINDINGS.md, and removed only when the job says it now passes.",
+  "lab-smoke": [
+    {"case": "a09-company-negated", "labels": ["expected_rule_missing", "verified_attack"], "finding": "A10", "owner": "Abhi"}
+  ],
+  "lab-fuzz": [],
+  "lab-reports": []
+}
