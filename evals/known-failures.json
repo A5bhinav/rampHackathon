@@ -15,7 +15,7 @@
   ],
   "lab-reports": [
     {"case": "reports-f1-verified-without-full-confirmation-32ff9024", "labels": ["F1:company=negation", "F3_company_accepted_negation"], "finding": "A10", "owner": "Abhi"},
-    {"case": "reports-f2-company-negation-helped-1151901e", "labels": ["F2_company_negation_helped"], "finding": "A10", "owner": "Abhi"},
+    {"case": "reports-f2-company-negation-helped-9192c077", "labels": ["F2_company_negation_helped"], "finding": "A10", "owner": "Abhi"},
     {"case": "reports-f3-company-accepted-correction-b13c0c07", "labels": ["F3_company_accepted_correction"], "finding": "A10", "owner": "Abhi"},
     {"case": "reports-f3-company-accepted-reseller-c51eb22f", "labels": ["F3_company_accepted_reseller"], "finding": "A10", "owner": "Abhi"},
     {"case": "reports-f1-company-correction-8b4be5b5", "labels": ["F1:company=correction", "F3_company_accepted_correction"], "finding": "A10", "owner": "Abhi"},

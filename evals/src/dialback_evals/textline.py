@@ -3,7 +3,7 @@
 `AdversarialLine` answers a call phase by phase like the voice service's `ScriptedVendor`, but it
 can play an injection line at a chosen phase (R9: the caller trying to redirect the record) and it
 sets who answered (human | machine). It implements the voice service's `Line` protocol, so the
-runner drives it with the real `run_call`. `offer_other_number` is recorded only by the live agent;
+runner drives it with the real `run_call`. No production agent records an offered number (spec 0048 review fix 4);
 the scripted slice tests the offered-number rule through the declared fact instead, so the line
 leaves it alone here."""
 from __future__ import annotations

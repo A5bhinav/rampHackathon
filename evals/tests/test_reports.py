@@ -8,6 +8,7 @@ first shown failing on a broken double; then each runs on production at seed 0 o
 (`report_gate`). Violations are frozen under evals/reports-generated/ and re-run."""
 from __future__ import annotations
 
+import dataclasses
 from functools import lru_cache
 from pathlib import Path
 
@@ -56,6 +57,60 @@ def test_reachable_domain_matches_production():
     assert any(any("answers" in e for e in c.earlier) for c in contract)
 
 
+def _recordable(case) -> list[str]:
+    """Why a report's answers are ones production never records (empty when it could), judged here, apart
+    from reports.py (spec 0048 review fix 4)."""
+    order = ["recording_consent", "company_named", "department", "speaker_name", "speaker_role",
+             "change_requested", "account_last4"]
+    why = []
+    slots = [a["slot"] for a in case.answers]
+    if any(s not in order and s != "flag" for s in slots):
+        why.append("a slot no production agent records")                 # an offered number, for one
+    if any(slots.count(s) > 1 for s in order):
+        why.append("an answer recorded twice")                            # only the current question's answer
+    if any(a["value"] != "pressure_to_approve" for a in case.answers if a["slot"] == "flag"):
+        why.append("a flag other than code's pressure flag")
+    consent = [a for a in case.answers if a["slot"] == "recording_consent"]
+    if not consent and case.answers:
+        why.append("answers without consent")
+    if consent and consent[0]["value"] == "no" and len(case.answers) > 1:
+        why.append("answers after consent no")
+    present = [s for s in order if s in slots]
+    if present != order[:len(present)]:
+        why.append("a question skipped")                                  # the call asks every question in turn
+    turns = [next(a["turn_id"] for a in case.answers if a["slot"] == s) for s in present]
+    if turns != sorted(set(turns)) or len(set(turns)) != len(turns):
+        why.append("answers out of order")
+    if consent and any(a["turn_id"] < consent[0]["turn_id"] for a in case.answers if a["slot"] == "flag"):
+        why.append("a flag before consent")
+    return why
+
+
+def test_reachable_answers_are_what_production_records():
+    # Spec 0048 review fix 4: a reachable report holds only what production's call records; everything else
+    # (offered numbers, other flags, answers twice, after a refused consent or out of order) is contract-only.
+    reach, contract = _sample("reachable"), _sample("contract")
+    assert [(i, _recordable(c)) for i, c in enumerate(reach) if _recordable(c)] == []
+    seen = {why for c in contract for why in _recordable(c)}
+    assert seen >= {"a slot no production agent records", "an answer recorded twice",
+                    "a flag other than code's pressure flag", "answers after consent no", "answers out of order"}
+    assert any(c.values("flag") == ["pressure_to_approve"] for c in reach)          # code's flag stays reachable
+    assert any(c.values("recording_consent") == ["no"] for c in reach)              # a refused consent too
+
+
+def test_f2_and_shrinking_keep_reachable_reports_reachable():
+    reach = _sample("reachable", 400)
+    for case in reach[:200]:
+        for name, move in reports.MOVES.items():
+            moved = move(case)
+            if moved is not None and reports.reachable(case) and reports.reachable(moved):
+                assert _recordable(moved) == [], (name, _recordable(moved))
+    stale = reports.with_case(reports.honest(), pick_current=False)
+    small = reports.shrink(stale, "F1:pick=stale", decide=lambda f: reports.dialback_decision.decide(
+        dataclasses.replace(f, dialed_eligible_number=True)))
+    assert _recordable(small) == [] and reports.reachable(small)
+
+
 def test_the_generator_reaches_every_value():
     # Every answer value, comparison result, company truth, call result and answerer comes up.
     seen = reports.coverage(_sample("reachable") + _sample("contract"))
@@ -86,13 +141,18 @@ def test_each_check_catches_its_broken_double():
     # F2: one double per move, each letting that move's less certain value through. Where production
     # already fails a move the same way (company_negation: production accepts "Not Acme, this is Globex",
     # FINDINGS A10), the check is shown failing on production itself and the double has nothing to add.
+    # A move production can't record from a reachable report (a second answer, answers after a refused
+    # consent; review fix 4) is shown on the contract-only domain, where it applies.
     missed, on_production = [], []
     for move in reports.MOVES:
-        cases = contract if move in reports.CONTRACT_MOVES else reach
-        production = reports.check_f2(cases, moves=(move,))
-        if production.violations:
-            on_production.append(move)
-        elif not _added(reports.check_f2(cases, decide=reports.doubles.lets_through(move), moves=(move,)), production):
+        for cases in ((contract,) if move in reports.CONTRACT_MOVES else (reach, contract)):
+            production = reports.check_f2(cases, moves=(move,))
+            if production.violations:
+                on_production.append(move)
+                break
+            if _added(reports.check_f2(cases, decide=reports.doubles.lets_through(move), moves=(move,)), production):
+                break
+        else:
             missed.append(move)
     assert missed == [], missed
     assert set(on_production) <= {"company_negation"}, on_production   # anything else is a new finding
@@ -169,11 +229,14 @@ def _bugged(bug):
     return call_facts
 
 
-@pytest.mark.parametrize("bug", [None, "unknown_speaker_not_in_thread", "stale_pick_counted_current",
-                                 "first_company_answer_only"])
-def test_planted_call_facts_bugs_turn_lab_reports_red(bug, tmp_path, monkeypatch):
-    # Spec 0048 review fix 1: each of the review's three planted call_facts bugs turns lab-reports red with the
-    # repo's known-failures list; without a bug it holds.
+@pytest.mark.parametrize(("bug", "code"), [(None, 0), ("unknown_speaker_not_in_thread", 1),
+                                           ("stale_pick_counted_current", 1), ("first_company_answer_only", 0)])
+def test_planted_call_facts_bugs_turn_lab_reports_red(bug, code, tmp_path, monkeypatch, capsys):
+    # Spec 0048 review fix 1: the review's planted call_facts bugs, with the repo's known-failures list. The first
+    # two turn lab-reports red. The third (only the first company answer read) cannot show on a reachable report:
+    # production records the company answer once (review fix 4), so it shows only on contract-only reports, which
+    # spec B2 reports and never gates. That contradicts the review-fix acceptance ("each turns lab-reports red")
+    # and is reported as a spec conflict; this pins what happens until Sami decides.
     import shutil
 
     import dialback_core.call_facts as core_facts
@@ -182,9 +245,11 @@ def test_planted_call_facts_bugs_turn_lab_reports_red(bug, tmp_path, monkeypatch
     shutil.copytree(ROOT / "evals" / "reports-generated", out)
     if bug:
         monkeypatch.setattr(core_facts, "call_facts", _bugged(bug))
-    code = main(["reports", "--examples", "2000", "--seed", "0", "--out", str(out),
-                 "--known-failures", str(ROOT / "evals" / "known-failures.json")])
-    assert code == (1 if bug else 0)
+    assert main(["reports", "--examples", "2000", "--seed", "0", "--out", str(out),
+                 "--known-failures", str(ROOT / "evals" / "known-failures.json")]) == code
+    if bug == "first_company_answer_only":
+        printed = capsys.readouterr().out
+        assert "future-state findings (not gated): F1:company=other" in printed
 
 
 

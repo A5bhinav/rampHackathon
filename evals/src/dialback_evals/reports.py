@@ -240,6 +240,29 @@ def with_company(case: ReportCase, said: str, truth: str) -> ReportCase:
     return _set_values(case, "company_named", said, truth)
 
 
+def recordable(case: ReportCase) -> bool:
+    """Could production's call have recorded these answers (spec 0048 review fix 4)? Agents record only the
+    current question's answer and questions run in the script's order, so the slots present are a prefix of
+    it, each once, in rising turns; nothing is recorded without consent, and nothing after a refused one; the
+    only flag is code's pressure flag, at or after consent; no production agent records an offered number."""
+    slots = [a["slot"] for a in case.answers if a["slot"] != "flag"]
+    present = [s for s in _ORDER if s in slots]
+    if any(s not in _ORDER for s in slots) or len(slots) != len(set(slots)) or present != list(_ORDER[:len(present)]):
+        return False
+    turns = [next(a["turn_id"] for a in case.answers if a["slot"] == s) for s in present]
+    if any(b <= a for a, b in itertools.pairwise(turns)):
+        return False
+    consent = case.values("recording_consent")
+    if (not consent and case.answers) or (consent == ["no"] and len(case.answers) > 1):
+        return False
+    flags = [a for a in case.answers if a["slot"] == "flag"]
+    return all(a["value"] == "pressure_to_approve" and a["turn_id"] >= turns[0] for a in flags)
+
+
+def reachable(case: ReportCase) -> bool:
+    return case.domain == "reachable" and recordable(case)
+
+
 def report_cases(domain: str):
     """The Hypothesis strategy for one domain (imported here so `lab run` never needs Hypothesis)."""
     from .reportgen import report_cases as strategy
@@ -458,6 +481,8 @@ def check_f2(cases: Iterable[ReportCase], decide=None, moves: Iterable[str] = tu
             if name in CONTRACT_MOVES and case.domain != "contract":
                 continue
             moved = MOVES[name](case)
+            if moved is not None and case.domain == "reachable" and not reachable(moved):
+                continue            # a move production could not record stays in the contract-only domain
             if moved is not None and run(moved, decide).decision.outcome == "verified":
                 labels.append(f2_label(name))
         if labels:
@@ -693,6 +718,8 @@ def shrink(case: ReportCase, label: str, decide=None, matcher=every_name_matches
     while changed:
         changed = False
         for smaller in _honest_step(case):
+            if case.domain == "reachable" and not recordable(smaller):
+                continue                             # a reachable finding stays one production could send
             try:
                 if label in labels(smaller, decide, matcher):
                     case, changed = smaller, True
@@ -755,9 +782,8 @@ def run_checks(*, examples: int, seed: int, out_dir: Path | None = None, decide=
                     done.first.setdefault((domain, label), cases[i])
         if domain == "reachable":
             done.reachable_hits = [sorted(labs) for _, labs in sorted(per_report.items())]
-    if out_dir is not None:      # known: what each frozen case recorded, and what it shows now (labels can be renamed)
-        known = {label for f in load_all(out_dir) for label in f.labels} | \
-            {label for _, now in rerun(out_dir, decide, matcher) for label in now}
+    if out_dir is not None:      # known: what the frozen cases show now (a label can be renamed, a case can go stale)
+        known = {label for _, now in rerun(out_dir, decide, matcher) for label in now}
         order = {"reachable": 0, "contract": 1}          # a finding is frozen from the gated domain when it shows there
         for (domain, label), case in sorted(done.first.items(), key=lambda item: (order[item[0][0]], item[0][1])):
             if label in known:

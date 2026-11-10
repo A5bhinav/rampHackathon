@@ -179,7 +179,47 @@ CHANGES = {
     "pick_stale": lambda d, c: dataclasses.replace(c, pick_current=False),
     "earlier_plain": lambda d, c: _earlier(d, c, with_answers=False),
 }
-REACHABLE_ONLY = {"unverified": _unverified}
+def _consent_refused(d, c: ReportCase) -> ReportCase:
+    """Consent refused: the call ends there, so the consent answer is all it records."""
+    consent = [{**a, "value": "no"} for a in c.answers if a["slot"] == "recording_consent"]
+    return dataclasses.replace(c, answers=tuple(consent), truth={**c.truth, "company": []})
+
+
+_ORDER = ("recording_consent", "company_named", "department", "speaker_name", "speaker_role", "change_requested",
+          "account_last4")
+
+
+def _ended_early(d, c: ReportCase) -> ReportCase:
+    """The call ended before a question was answered (a hang-up, or an answer still unclear after one more
+    ask): every question from there on goes unanswered, as production records it."""
+    cut = d(st.sampled_from(_ORDER))
+    gone = set(_ORDER[_ORDER.index(cut):])
+    kept = tuple(a for a in c.answers if a["slot"] not in gone and not (a["slot"] == "flag" and cut == _ORDER[0]))
+    truth = {**c.truth, "company": []} if "company_named" in gone else c.truth
+    return dataclasses.replace(c, answers=kept, truth=truth)
+
+
+def _pressure_flag(d, c: ReportCase) -> ReportCase:
+    """Code's own flag (step.py): pressure_to_approve, citing a callee turn at or after consent."""
+    consent = [a["turn_id"] for a in c.answers if a["slot"] == "recording_consent"]
+    turns = sorted({a["turn_id"] for a in c.answers if a["slot"] != "flag" and consent and a["turn_id"] >= consent[0]})
+    if not turns or c.values("flag") or c.values("recording_consent") != ["yes"]:     # code flags only after a yes
+        return c
+    flag = {"slot": "flag", "value": "pressure_to_approve", "turn_id": d(st.sampled_from(turns)),
+            "tool_call_id": "code_pressure", "captured_at": "2026-11-01T17:30:00Z", "capture_method": "speech"}
+    return dataclasses.replace(c, answers=(*c.answers, flag))
+
+
+# Spec 0048 review fix 4: the reachable domain draws only what production's call records (only the current
+# question's answer, in the script's order, nothing after a refused consent, code's pressure flag and no other,
+# no offered number). Every other change is contract-only.
+RECORDABLE = ("change_no", "change_unsure", "digits_old", "digits_near_miss", "digits_mismatch", "digits_dont_know",
+              "digits_refused", "digits_short", "digits_ambiguous", "company_other", "company_negation",
+              "company_reseller", "company_correction", "company_partial", "answerer_machine", "answerer_unknown",
+              "direction_unknown", "other_result", "check_fails", "speaker_from_thread", "speaker_unknown",
+              "offered_unknown", "pick_stale", "earlier_plain")
+REACHABLE_ONLY = {"unverified": _unverified, "consent_refused": _consent_refused, "ended_early": _ended_early,
+                  "pressure_flag": _pressure_flag}
 CONTRACT_ONLY = {
     "inbound": lambda d, c: dataclasses.replace(c, direction="inbound"),
     "pick_false": lambda d, c: dataclasses.replace(c, dialed_number_is_pick=False),
@@ -194,7 +234,8 @@ def report_cases(draw, domain: str) -> ReportCase:
     if domain not in ("reachable", "contract"):
         raise ValueError(f"unknown domain {domain!r}")
     case = _honest(draw, domain)
-    changes = {**CHANGES, **(REACHABLE_ONLY if domain == "reachable" else CONTRACT_ONLY)}
+    changes = ({**{k: CHANGES[k] for k in RECORDABLE}, **REACHABLE_ONLY} if domain == "reachable"
+               else {**CHANGES, **CONTRACT_ONLY})
     count = draw(st.sampled_from([0, 1, 1, 2, 3]))
     for name in draw(st.lists(st.sampled_from(sorted(changes)), min_size=count, max_size=count)):
         case = changes[name](draw, case)

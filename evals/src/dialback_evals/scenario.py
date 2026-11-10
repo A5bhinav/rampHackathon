@@ -170,8 +170,8 @@ def _parse(path: Path) -> Scenario:
     if caller.inject is not None and caller.inject_phase is None:
         raise ValueError(f"{path.name}: inject without inject_phase would never be played")
     if caller.offer_other_number:
-        raise ValueError(f"{path.name}: offer_other_number: the scripted line cannot play it (only the live agent "
-                         "records an offered number)")
+        raise ValueError(f"{path.name}: offer_other_number: the scripted line cannot play it, and no production "
+                         "agent records an offered number")
     f = only(need("facts", raw), _FACT_KEYS, "facts")
     new_last4, old_last4 = str(need("new_last4", f)), f.get("old_last4")
     for what, digits in (("new_last4", new_last4), ("old_last4", old_last4)):
