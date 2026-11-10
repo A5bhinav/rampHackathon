@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { OutcomeBadge, StateBadge } from "./badges";
 import { MiniRail } from "./flow";
+import { stationsFromEvidence, type StationView } from "@/lib/stations";
 import type { CaseState, CaseSummary } from "@/lib/api-types";
 import { brief, date, dueLabel, relative, when } from "@/lib/format";
 
@@ -35,7 +36,9 @@ function Held({ c }: { c: CaseSummary }) {
   return <><span className="held-n">{c.bills_held}</span> <span className="muted sub">{c.bills_held === 1 ? "bill" : "bills"}</span></>;
 }
 
-export function QueueTable({ id, title, cases, datasetId, now }: { id: string; title: string; cases: CaseSummary[]; datasetId: string; now: Date }) {
+export function QueueTable({ id, title, cases, datasetId, now, rails }: {
+  id: string; title: string; cases: CaseSummary[]; datasetId: string; now: Date; rails?: Map<string, StationView[]>;
+}) {
   return (
     <section id={id} className="card queue-group" aria-label={title}>
       <div className="card-head">
@@ -57,7 +60,7 @@ export function QueueTable({ id, title, cases, datasetId, now }: { id: string; t
                     <div className="mono cell-meta" title={when(c.opened_at)}>v{c.version} · opened {brief(c.opened_at)}</div>
                     {c.unknown_changer ? <div className="cell-note"><span className="badge tone-warn">two approvers</span></div> : null}
                   </td>
-                  <td><StateBadge state={c.state} /><MiniRail state={c.state} /></td>
+                  <td><StateBadge state={c.state} /><MiniRail views={rails?.get(c.id) ?? stationsFromEvidence([], c)} /></td>
                   <td><OutcomeBadge outcome={c.outcome} /></td>
                   <td className="num nowrap"><Held c={c} /></td>
                   <td className="nowrap">

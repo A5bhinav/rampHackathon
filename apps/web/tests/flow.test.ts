@@ -1,32 +1,11 @@
-// The rail's station counts and the held-payments chart's day window (spec 0032). `pnpm test`.
+// The hold gate and the held-payments chart's day window (spec 0032). The stations are tested in stations.test.ts (spec 0064). `pnpm test`.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { HoldStatus } from "../src/lib/api-types.ts";
-import { STATIONS, dayWindow, heldLanes, holdGate, miniRail, place, stationCounts } from "../src/lib/flow.ts";
+import { dayWindow, heldLanes, holdGate, place } from "../src/lib/flow.ts";
 
 type Lane = { id: string; hold_status: HoldStatus | null; next_payment_date: string | null };
 
-const at = (state: string) => ({ state }) as { state: Parameters<typeof stationCounts>[0][number]["state"] };
-
-test("five stations, each with a plain meaning", () => {
-  assert.deepEqual(STATIONS.map((s) => s.key), ["hold", "call", "decision", "person", "release"]);
-  for (const s of STATIONS) assert.ok(s.meaning.length > 10, s.key);
-});
-
-test("each open change counts at its station; sign-off splits by what it waits for", () => {
-  const counts = stationCounts([
-    at("open"), at("held"), at("calling"), at("retry_wait"), at("deciding"),
-    at("needs_review"), at("awaiting_release"), at("awaiting_release"), at("blocked"), at("releasing"), at("released"),
-  ]);
-  assert.deepEqual(counts.map((c) => c.count), [1, 3, 1, 4, 2]);
-  assert.deepEqual(counts[3].split, { needs_review: 1, awaiting_release: 2, blocked: 1, other: 0 });
-});
-
-test("an unknown state counts at sign-off, never at release, and says it needs a person", () => {
-  const counts = stationCounts([at("mystery"), at("constructor"), at("blocked")]);
-  assert.deepEqual(counts.map((c) => c.count), [0, 0, 0, 3, 0]);
-  assert.deepEqual(counts[3].split, { needs_review: 0, awaiting_release: 0, blocked: 1, other: 2 });
-});
 
 test("the window runs from a week before today to two weeks after, widened to fit, capped", () => {
   const now = new Date("2026-11-09T15:00:00Z");
@@ -71,11 +50,3 @@ test("the held-payments chart shows only changes whose hold is in place, soonest
   assert.equal(capped.shown[0].id, "x0");
 });
 
-test("the queue's mini rail comes from the station alone", () => {
-  assert.deepEqual(miniRail("calling"), ["done", "current", "todo", "todo", "todo"]);
-  assert.deepEqual(miniRail("needs_review"), ["done", "done", "done", "review", "todo"]);
-  assert.deepEqual(miniRail("blocked"), ["done", "done", "done", "failed", "todo"]);
-  assert.deepEqual(miniRail("awaiting_release"), ["done", "done", "done", "current", "todo"]);
-  assert.deepEqual(miniRail("released"), ["done", "done", "done", "done", "done"]);
-  assert.deepEqual(miniRail("on_ice" as never), ["done", "done", "done", "review", "todo"]);  // unknown: a person looks
-});

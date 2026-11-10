@@ -1,32 +1,28 @@
 import Link from "next/link";
 import type { CaseSummary } from "@/lib/api-types";
-import { dayWindow, heldLanes, miniRail, place, type StationCount } from "@/lib/flow";
-import type { CaseState } from "@/lib/api-types";
-import { date, dueLabel, when } from "@/lib/format";
-import type { Stage } from "@/lib/progress";
+import { dayWindow, heldLanes, place } from "@/lib/flow";
+import { STATIONS, type StationCount, type StationView } from "@/lib/stations";
+import { brief, date, dueLabel, when } from "@/lib/format";
 import { Icon } from "./icons";
 
-// The money path as a rail (spec 0032): the same five stations on the queue (how many changes
-// sit at each) and on a case (where this one is). Each station says what happens there.
+// The seven stations (specs 0032, 0064): the same rail on the Inbox (how many changes sit at each),
+// on each queue row (a short bar per station) and on a case (where this one is). Every status and
+// marker comes from lib/stations.ts, which reads the core's evidence events.
 
-/** The queue's rail: a count per station, sign-off split by what it waits for. */
+/** The Inbox's rail: a count per station, with the branch markers of the cases sitting there. */
 export function QueueRail({ counts }: { counts: StationCount[] }) {
   return (
     <section className="rail-card" aria-labelledby="rail-h">
       <h2 id="rail-h" className="sr-only">Where every change stands</h2>
-      <ol className="rail">
-        {counts.map((s) => (
+      <ol className="rail rail-7">
+        {counts.map((s, i) => (
           <li key={s.key} className={`station ${s.count ? "has-count" : "is-empty"}`}>
-            <span className="station-node"><Icon name={s.key} size={15} /></span>
+            <span className="station-node"><Icon name={STATIONS[i].icon} size={15} /></span>
             <span className="station-label">{s.label}</span>
-            <span className="station-meaning">{s.meaning}</span>
             <span className="station-count">{s.count}<span className="sr-only"> {s.count === 1 ? "change" : "changes"}</span></span>
-            {s.split ? (
+            {s.markers.length ? (
               <span className="station-split">
-                {s.split.needs_review ? <span className="badge tone-warn">{s.split.needs_review} needs review</span> : null}
-                {s.split.awaiting_release ? <span className="badge tone-ok">{s.split.awaiting_release} awaiting approver</span> : null}
-                {s.split.blocked ? <span className="badge tone-bad">{s.split.blocked} blocked</span> : null}
-                {s.split.other ? <span className="badge tone-warn">{s.split.other} needs a person</span> : null}
+                {s.markers.map((m) => <span key={m.label} className={`badge tone-${m.tone}`}>{m.count} {m.label.toLowerCase()}</span>)}
               </span>
             ) : null}
           </li>
@@ -36,27 +32,29 @@ export function QueueRail({ counts }: { counts: StationCount[] }) {
   );
 }
 
-/** A queue row's mini rail: one short bar per station, from the case's state alone. */
-export function MiniRail({ state }: { state: CaseState }) {
+const SEG: Record<StationView["status"], string> = { done: "done", current: "current", todo: "todo", branched: "branched" };
+
+/** A queue row's mini rail: one short bar per station. */
+export function MiniRail({ views }: { views: StationView[] }) {
   return (
     <span className="mini-rail" aria-hidden="true">
-      {miniRail(state).map((seg, i) => <span key={i} className={`seg-${seg}`} />)}
+      {views.map((v) => <span key={v.key} className={`seg-${SEG[v.status]}${v.status === "branched" ? ` tone-${v.tone}` : ""}`} />)}
     </span>
   );
 }
 
-/** A case's stepper: this change's status at each station (spec 0031's progress rules). */
-export function CaseRail({ steps }: { steps: Stage[] }) {
+/** A case's stepper: this change's status at each of the seven stations. */
+export function CaseRail({ steps }: { steps: StationView[] }) {
   return (
     <section className="stepper-card" aria-label="Progress">
-      <ol className="stepper">
+      <ol className="stepper stepper-7">
         {steps.map((s) => (
-          <li key={s.key} className={`step is-${s.status} st-${s.tone}`} aria-current={s.status === "current" ? "step" : undefined}>
+          <li key={s.key} className={`step is-${s.status === "branched" ? "failed" : s.status} st-${s.tone}`} aria-current={s.status === "current" ? "step" : undefined}>
             <span className="step-node" aria-hidden="true">
-              {s.status === "done" ? <Check /> : s.status === "failed" ? "✕" : null}
+              {s.status === "done" ? <Check /> : s.status === "branched" ? (s.tone === "bad" ? "✕" : "!") : null}
             </span>
             <span className="step-label">{s.label}<span className="sr-only">: {s.status === "todo" ? "not reached" : s.status}</span></span>
-            <span className="step-note">{s.note || (s.status === "todo" ? "—" : "")}</span>
+            <span className="step-note">{s.marker ?? (s.at ? brief(s.at) : s.status === "current" ? "Now" : "—")}</span>
           </li>
         ))}
       </ol>

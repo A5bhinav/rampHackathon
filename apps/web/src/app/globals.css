@@ -862,3 +862,20 @@ ol.script-list li:last-child { border-bottom: 0; }
   .app-switch { order: 2; }
   ol.script-list li { grid-template-columns: 1fr; gap: 2px; }
 }
+
+/* Seven stations (spec 0064) ---------------------------------------------------------------- */
+.rail-7, .stepper-7 { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.rail-7 { gap: 0 12px; }
+.rail-7 .station-count { margin-top: 4px; }
+.step.is-failed.st-warn .step-node { background: var(--fill-warn); border-color: var(--fill-warn); }
+.step.is-failed.st-warn .step-note, .step.is-failed.st-warn .step-label { color: var(--warn); }
+.step.is-failed.st-bad .step-label { color: var(--bad); }
+.step.is-current.st-warn .step-node { border-color: var(--warn); box-shadow: 0 0 0 5px var(--warn-bg); }
+.mini-rail span { width: 12px; }
+.mini-rail .seg-branched.tone-bad { background: var(--fill-bad); }
+.mini-rail .seg-branched.tone-warn { background: var(--fill-warn); }
+@media (max-width: 1100px) { .stepper-7 .step-note { font-size: 12px; } }
+@media (max-width: 860px) { .rail-7 { grid-template-columns: minmax(0, 1fr); gap: 12px; } }
+@media (max-width: 720px) { .stepper-7 { grid-template-columns: 1fr; } }
+.station-split .badge { height: auto; min-height: 22px; padding: 3px 8px; white-space: normal; line-height: 16px; align-items: flex-start; }
+.station-split .badge::before { margin-top: 5px; }

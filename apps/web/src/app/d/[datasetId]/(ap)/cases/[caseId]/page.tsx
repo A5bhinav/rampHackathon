@@ -4,6 +4,7 @@ import { ChainBadge, OutcomeBadge, StateBadge } from "@/components/badges";
 import { CallCard } from "@/components/call";
 import { DecisionConsole } from "@/components/console";
 import { DecisionDetail } from "@/components/decision";
+import { AutoRefresh } from "@/components/auto-refresh";
 import { CaseRail } from "@/components/flow";
 import { Icon } from "@/components/icons";
 import { PaymentPath } from "@/components/path";
@@ -12,7 +13,7 @@ import type { CaseDetail, Candidate, SelectionView } from "@/lib/api-types";
 import { CoreError, core } from "@/lib/core";
 import { brief, datasetNow, date, dueLabel, relative, when, words } from "@/lib/format";
 import { phone, seenBefore, sourceLabel, split } from "@/lib/lineage";
-import { progress, visitedThisVersion } from "@/lib/progress";
+import { REFRESH_STATES, stations } from "@/lib/stations";
 import { stateLabel } from "@/lib/states";
 import { releaseAction, reviewAction } from "./actions";
 
@@ -50,15 +51,7 @@ export default async function CaseDetailPage({ params, searchParams }: {
   const lastStep = detail.timeline.at(-1);  // its summary is the core's template, so the reason is never guessed here
   const nextDue = dueLabel(c.next_payment_date, now);
 
-  const visited = visitedThisVersion(detail.timeline, c.version);
-  const steps = progress({ state: c.state, visited, holdStatus: hold?.status ?? null, hasDecision: Boolean(decision) }).map((s) => {
-    if (s.status !== "done") return s;
-    if (s.key === "hold") return { ...s, note: brief(hold?.confirmed_at) };
-    if (s.key === "call") return { ...s, note: "Answered" };
-    if (s.key === "decision" && decision) return { ...s, note: words(decision.outcome) };
-    if (s.key === "release") return { ...s, note: brief(hold?.released_at) || "Released" };
-    return s;
-  });
+  const steps = stations(detail.timeline, c.state, decision?.outcome ?? null);
 
   return (
     <main className="case-page">
@@ -98,6 +91,7 @@ export default async function CaseDetailPage({ params, searchParams }: {
       ) : null}
 
       <CaseRail steps={steps} />
+      <AutoRefresh active={REFRESH_STATES.has(c.state)} />
 
       <div className="case-grid">
         <div className="case-main">
