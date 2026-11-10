@@ -1,7 +1,8 @@
 {
   "_about": "Spec 0048, D3: each job's strict known-failures list. An entry is added only with its finding written in evals/FINDINGS.md, and removed only when the job says it now passes.",
   "lab-smoke": [
-    {"case": "a09-company-negated", "labels": ["expected_rule_missing", "verified_attack"], "finding": "A10", "owner": "Abhi"}
+    {"case": "a02-lookalike-domain", "labels": ["expected_rule_missing", "verified_attack"], "finding": "A28", "owner": "Sami"},
+    {"case": "l16-garbage-answers", "labels": ["expected_rule_missing", "wrong_verdict"], "finding": "A29", "owner": "Sami"}
   ],
   "lab-fuzz": [
     {"case": "fuzz-seed0-m-incontext-label-moved-pick-29c233da", "labels": ["M_incontext_label_moved_pick"], "finding": "A1", "owner": "Inesh"},

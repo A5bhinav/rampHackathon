@@ -1,3 +1,6 @@
+# A look-alike company ("Acme Fastners LLC") that otherwise confirms cleanly. Since spec 0082 (D6, a
+# distinctive first word matches; D7b, a company answer no longer has to match) it verifies, a cost the
+# decision knowingly accepted: on lab-smoke's known-failures list, FINDINGS A28. Its expectation is unchanged.
 id: a02-lookalike-domain
 class: lookalike_domain
 is_attack: true
