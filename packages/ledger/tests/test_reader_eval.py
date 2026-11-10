@@ -67,12 +67,12 @@ def test_counting():
     out, failed = ev.score(labeled, reader)
     assert failed == 0
     by = {o.key: o for o in out}
-    assert by[("o1", 2, "+12065550199")].over_block       # role fax: the rule refuses it (as the spec counts it)
+    assert not by[("o1", 2, "+12065550199")].over_block   # a true fax line labeled fax is right (spec f33499d)
     assert not by[("o1", 1, "+12065550142")].over_block
     assert by[("o1", 3, "+12065550186")].unsafe and by[("h1", 2, "+12065550177")].unsafe
     assert by[("h1", 1, "+12065550117")].over_block and by[("h1", 1, "+12065550117")].us
     c = ev.count(out, failed)
-    assert c == {"numbers": 5, "unsafe": 2, "over_block": {"ordinary": 1, "hard": 1},
+    assert c == {"numbers": 5, "unsafe": 2, "over_block": {"ordinary": 0, "hard": 1},
                  "role_accuracy": {"correct": 2, "of": 2},
                  "us": {"numbers": 1, "unsafe": 0, "over_block": 1}, "failed_documents": 0}
 
@@ -86,6 +86,20 @@ def test_vendor_unknown_is_not_an_over_block_and_a_skipped_number_counts_as_unkn
     by = {o.key[2]: o for o in out}
     assert not by["+12065550117"].over_block and by["+12065550117"].role_correct is False
     assert by["+12065550142"].over_block                  # the reader skipped it: (unknown, unknown)
+
+
+def test_a_true_fax_line_labeled_fax_is_not_an_over_block():
+    # Spec 0049, corrected at f33499d before any scored run: the role fax over-blocks only when the
+    # text doesn't call the number a fax line.
+    labeled = {"split": "dev", "documents": [
+        doc("o1", "ordinary", ["Hello", "Fax: (206) 555-0199", "Main: (206) 555-0117"], [
+            truth(1, "+12065550199", "fax", "vendor", explicit_role=True),
+            truth(2, "+12065550117", "main", "vendor", explicit_role=True)])]}
+    out, _ = ev.score(labeled, Fixed({"Hello": [lab("Fax: (206) 555-0199", "fax", "vendor"),
+                                                lab("Main: (206) 555-0117", "fax", "vendor")]}))
+    by = {o.key[2]: o for o in out}
+    assert by["+12065550199"].role_correct and not by["+12065550199"].over_block   # right, and refused by design
+    assert by["+12065550117"].role_correct is False and by["+12065550117"].over_block   # a main line called fax
 
 
 def test_a_failed_document_counts_every_number_in_it_as_unknown():
