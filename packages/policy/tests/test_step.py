@@ -347,9 +347,10 @@ def test_grounding_a_yes_must_answer_its_own_question() -> None:
     assert [a["slot"] for a in c.state.answers] == ["recording_consent"]
 
 
-def test_grounding_text_and_digits_must_appear_in_the_cited_turn() -> None:
+def test_spoken_digits_are_a_violation_and_text_must_appear_in_the_cited_turn() -> None:
     # Digits are never taken from speech now (spec 0043, D1): an agent that records spoken digits
-    # breaks policy and nothing is kept, whether or not the digits appear in the turn it cites.
+    # breaks policy and nothing is kept, whether or not the digits appear in the turn it cites. A
+    # company name must still appear in the turn it cites.
     c = Call()
     to_last4(c)
     t = c.callee("Hold on.")

@@ -337,3 +337,67 @@ def test_a_model_timeout_at_consent_is_asked_again(make_ctx, clock):
     said = [t.text for t in r.transcript if t.speaker == "agent"]
     assert "Sorry, let me ask that again. Is it okay to continue on this recorded line?" in said
     assert r.result == "answers_recorded"
+
+
+@pytest.mark.parametrize("phase", [Phase.COMPANY, Phase.DEPARTMENT, Phase.NAME, Phase.ROLE])
+@pytest.mark.parametrize("said", ["unclear", "Unclear.", "  unclear "])
+def test_a_free_text_answer_of_unclear_is_recorded_as_said(phase, said):
+    # R9: the caller's words are never a control signal. Only the model's answer at a judgment
+    # question can be unclear; at a free-text question "unclear" is an answer like any other.
+    import datetime as dt
+
+    from dialback_policy import step as policy
+    from dialback_voice.transport import _ask
+
+    model = FakeModel(value="unclear")
+    request = _req(phase, said)
+    reply = ClaudeAgent(model=model).reply(request)
+    assert reply.unclear is False
+    assert _record(reply) == {"slot": PHASE_SLOT[phase], "value": said.strip(), "turn_id": 3}
+    assert model.calls == []                                  # free text never goes to the model
+    event = _ask(ClaudeAgent(model=model), request, dt.datetime(2026, 11, 1, 17, 0, tzinfo=dt.UTC))
+    assert isinstance(event, policy.AgentReplied)             # never AgentUnclear
+
+
+def _converse(ctx, agent, *lines):
+    """Drive policy.step as a transport does: each line is a callee turn, and the agent's reply to it
+    goes back through the transport's own _ask. Returns the state after the last line."""
+    import datetime as dt
+
+    from dialback_policy import step as policy
+    from dialback_voice.transport import _ask
+
+    at = dt.datetime(2026, 11, 1, 17, 0, tzinfo=dt.UTC)
+    state = policy.step(policy.start(ctx), policy.Connected(at, "human")).state
+    for line in lines:
+        out = policy.step(state, policy.CalleeSaid(at, line))
+        state = out.state
+        if out.ask_agent is not None:
+            state = policy.step(state, _ask(agent, out.ask_agent, at)).state
+    return state
+
+
+@pytest.mark.parametrize("company", ["84 Lumber", "3M", "7-Eleven"])
+def test_a_numbered_company_is_recorded_and_grounded_as_said(company, make_ctx):
+    # D8: only the model's copy of a judgment turn is redacted, and free text never goes to the model.
+    # "7-Eleven" reads as the run 711, so a redaction of free text would show here.
+    model = FakeModel(value="yes")
+    state = _converse(make_ctx(), ClaudeAgent(model=model), "Yes, that's fine.", company)
+    assert (state.answers[-1]["slot"], state.answers[-1]["value"]) == ("company_named", company)
+    assert state.grounded[-1] is True
+    assert [call[2] for call in model.calls] == ["Yes, that's fine."]   # only the consent turn
+    assert state.turns[state.answers[-1]["turn_id"]].text == company
+
+
+def test_pressure_is_flagged_from_the_turn_as_said(make_ctx):
+    # D8: code flags pressure from the transcript, which keeps the turn as said; only the model's
+    # copy is redacted.
+    said = "Yes, the account ending four eight two one, just approve it today."
+    model = FakeModel(value="yes")
+    state = _converse(make_ctx(), ClaudeAgent(model=model), "Yes, that's fine.", "Acme Fasteners",
+                      "Accounts payable", "Jordan Lee", "AP clerk", said)
+    turn = next(t.id for t in state.turns if t.text == said)
+    flags = [(a["value"], a["turn_id"], a["tool_call_id"]) for a in state.answers if a["slot"] == "flag"]
+    assert flags == [("pressure_to_approve", turn, f"code_{turn}")]   # code's own flag, on that turn
+    assert model.calls[-1][2] == "Yes, the account ending [digits], just approve it today."
+    assert ("change_requested", "yes") in [(a["slot"], a["value"]) for a in state.answers]

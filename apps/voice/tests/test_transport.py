@@ -162,6 +162,24 @@ def test_double_reads_yes_no_like_the_policy(phase, said, expected):
         assert _double_value(phase, said) == read_yes_no(said, allow_unsure=phase is Phase.CHANGE)
 
 
+@pytest.mark.parametrize("phase", [Phase.COMPANY, Phase.DEPARTMENT, Phase.NAME, Phase.ROLE])
+@pytest.mark.parametrize("said", ["unclear", "Unclear.", "  unclear "])
+def test_the_double_records_a_free_text_unclear_as_said(phase, said):
+    # R9: the caller's words are never a control signal; only a judgment question can be unclear.
+    import datetime as dt
+
+    from dialback_policy import step as policy
+    from dialback_voice.transport import _ask
+
+    assert _double_value(phase, said) == said.strip()
+    request = AgentRequest(phase=phase, goal="the goal", wording="the wording", next_goal=None,
+                           customer_name="Northwind Traders", vendor_name="Acme Fasteners",
+                           callback_number="(415) 555-0100",
+                           transcript=((0, "agent", "A question."), (1, "callee", said)))
+    event = _ask(ScriptedAgent(), request, dt.datetime(2026, 11, 1, 17, 0, tzinfo=dt.UTC))
+    assert isinstance(event, policy.AgentReplied)             # never AgentUnclear
+
+
 def test_clean_keypad_call_verifies(make_ctx, clock):
     r = _run(make_ctx, clock, VendorScript(last4=NEW_LAST4, last4_mode="keypad"))
     assert r.end.result == "answers_recorded" and _by_slot(r)["account_last4"]["capture_method"] == "keypad"
