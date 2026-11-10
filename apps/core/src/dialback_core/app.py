@@ -16,7 +16,9 @@ from .auth import TokenVerifier, verifier_from_settings
 from .calls import router as calls_router
 from .db import open_pool
 from .detection import Keys
+from .email_door.resend import ResendClient
 from .email_door.route import router as email_router
+from .flags import EmailMode
 from .ports import (
     CallPlacer,
     ChangeContext,
@@ -47,7 +49,9 @@ def create_app(settings: Settings, pool: AsyncConnectionPool | None = None, conn
                             resolver or LedgerResolver(settings.resolver_mode),
                             caller or (VoiceServiceClient(settings.voice_base_url, settings.internal_api_token, http)
                                        if settings.voice_base_url else NoVoiceService()),
-                            change_context=change_context)
+                            change_context=change_context,
+                            resend=ResendClient(settings.resend_api_key, http)
+                            if settings.email_mode is EmailMode.RESEND and settings.resend_api_key else None)
             task = asyncio.create_task(worker.run_forever(stop))
         try:
             yield

@@ -33,6 +33,8 @@ from .calling_window import CallingWindow
 from .company import every_name_matches
 from .db import dataset_now, system_tx
 from .detection import Keys, process_inbound_webhooks
+from .email_door.inbox import process_inbound_emails
+from .email_door.resend import ResendPort
 from .events import TransitionRefused, apply_event
 from .jobs import Jobs, unique_worker_name
 from .ports import CallerError, CallPlacer, ChangeContext, LedgerChangeContext, NumberResolver, PreDialRefused
@@ -121,8 +123,9 @@ select type, body_jcs::jsonb -> 'body' as body
 class Worker:
     def __init__(self, pool: AsyncConnectionPool, settings: Settings, connector: RampConnector, resolver: NumberResolver,
                  caller: CallPlacer, name: str | None = None, sleep=asyncio.sleep,
-                 change_context: ChangeContext | None = None) -> None:
+                 change_context: ChangeContext | None = None, resend: ResendPort | None = None) -> None:
         self.pool, self.settings, self.connector = pool, settings, connector
+        self.resend = resend
         self.resolver, self.caller, self.name, self._sleep = resolver, caller, name or unique_worker_name(), sleep
         self.change_context = change_context or LedgerChangeContext()
         self.keys = Keys(settings.fingerprint_key, settings.fingerprint_key_version)
@@ -138,6 +141,8 @@ class Worker:
 
     async def tick(self, dataset_id: UUID | None = None) -> int:
         done = await process_inbound_webhooks(self.pool, self.connector, self.keys, dataset_id=dataset_id)
+        if self.resend is not None:  # the email door (spec 0085)
+            done += await process_inbound_emails(self.pool, self.settings, self.resend, self.keys, dataset_id=dataset_id)
         if self.settings.run_jobs:
             done += await self.jobs.run_due(dataset_id)  # the poller and reconciliation (spec 0003)
         done += await self.fire_timers(dataset_id)
