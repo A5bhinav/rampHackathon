@@ -137,20 +137,26 @@ place:
 
 | The agent asks | You say | If you say something else |
 |---|---|---|
-| Disclosure, then "Is it okay to continue on this recorded line?" | "Yes." | Anything that is not a clear yes, even "Hello?" or "Sorry?", is read as no: the call ends with "we won't continue" (NR02) |
+| Disclosure, then "Is it okay to continue on this recorded line?" | "Yes." | A clear no ends the call with "we won't continue" (NR02). An answer the agent can't make out, like "Hello?" or "Sorry?", is asked once more ("Sorry, let me ask that again."); a second one ends the call, and the core calls again later while the case has attempts left |
 | "Could you tell me the name of the company I've reached?" | "Acme Fasteners." | Every word of the vendor's name, without "LLC", is needed. "Acme" alone goes to review (NR03) |
 | "Which department or team am I speaking with?" | "Accounts receivable." | Any answer works |
 | "May I have your name?" | "Jordan Lee." | A name made only of words from the change email's senders (Dana Whitfield, "Acme Fasteners LLC Accounts Receivable") goes to review (NR04) |
 | "And what's your role there?" | "AR clerk." | Any role works; a name and a role are both needed (V06) |
-| "Has your company recently asked [customer] to change how you get paid?" | "Yes." | "I think so" goes to review (NR09 or NR14) |
-| "For the account you'd like to be paid into, what are the last four digits?" | Key `0` `0` `0` `1` on the keypad | See the digits trap below |
+| "Has your company recently asked [customer] to change how you get paid?" | "Yes." | "I think so" goes to review (NR09 or NR14). An answer the agent can't make out is asked once more, as at consent |
+| "For the account you'd like to be paid into, please use your phone's keypad to enter the last four digits, then press the pound key. To start over, press the star key." | Key `0` `0` `0` `1`, then `#` | See the keypad steps below |
 | "Thank you, that's everything I needed." | Hang up | The line may cut off mid-sentence; the answers are already in |
 
-The digits trap:
+The keypad steps (`specs/0043-keypad-only-digits.md`):
 
-- **Use the keypad.** It is read exactly. Spoken digits are read from the whole utterance, and the
-  last four digit words win: "zero zero zero one, those are the last four" becomes 0014. If you do
-  speak them, say "zero, zero, zero, one" and nothing else.
+- **Type the four digits, then press `#`.** Only the keypad counts. Nothing goes in at the fourth
+  key; if you forget `#`, the entry goes in 5 seconds after your last key.
+- **A slip? Press `*` and type all four again.** The agent says "Okay, let's start over." This
+  costs nothing.
+- **Do not say the digits.** Spoken digits are never recorded. The agent asks once for the keypad
+  ("Please don't say the digits..."); a second time, the call finishes without digits and the case
+  goes to review (NR06).
+- **Exactly four.** An entry of any other length is asked once more; a second wrong-length entry
+  finishes the call without digits (NR06).
 - **Do not take the digits from the change email.** It says "ending 4821" (the ledger's demo
   seed, and the text line's scripted vendor), but the bank change `demo change` makes ends `0001`
   (`scripts/demo/seed.json`, `changes.acme`), and the call is checked against that. 4821 or 2222
@@ -170,8 +176,8 @@ Acme's case should show `"state": "awaiting_release"` and `"outcome": "verified"
 releases it from the dashboard, and the state moves to `released` once the hold comes off.
 
 **To try again**, after a call that ended in review or Not verified: the case is not called again
-(only a dropped call is redialed), so run sections 3 and 4 again (a new reset, load, request and
-change).
+(only a dropped call, or one that ended after two unclear answers at consent or the change
+question, is called again), so run sections 3 and 4 again (a new reset, load, request and change).
 
 ## When it goes wrong
 
@@ -189,7 +195,8 @@ on the dashboard says "The voice service checked the call and did not place it (
 | The phone never rings, with no refusal | The voice service is on the text line (it accepts the call and dials nobody), or a trial account and an unverified number | Section 2's `401` check; the Twilio call log |
 | It rings, then "an application error has occurred" | The TwiML fetch failed: a 401 (`DIALBACK_PUBLIC_BASE_URL` must be exactly the public `https://` address Twilio calls), a 404 (the voice service could not look the call up, for example its database is unreachable), or the AI/ML addendum is not accepted (95250) | The Twilio call log's error code, then the voice log |
 | Silence after the disclosure | The socket failed (`DIALBACK_WS_BASE_URL` must be `wss://` on the same domain), or the voice service rejected the socket's setup (`setup_rejected`) | Voice log |
-| "We won't continue" right after consent | Consent was read as no: the answer was not a clear yes, or the model call failed (an invalid key, an API error, or a reply slower than 8 seconds). A missing key does not cause this | Voice log |
+| "We won't continue" right after consent | Consent was read as a clear no | Voice log |
+| "Sorry, let me ask that again", then "Thanks for your time. Goodbye." | Two answers to the consent question, or to the change question, could not be made out, or the model call failed twice (an invalid key, an API error, or a reply slower than 8 seconds). A missing key does not cause this. The call ends `failed`, and the core calls again after its wait (2 hours) while the case has attempts left | Voice log |
 | The call finishes, but the case goes to review or is blocked | One rule decided it | The decision page names the rule. Common ones: NR01 or V03 (not detected as a person), NR03 (partial company name), NV02 or NV03 (wrong digits, blocked), NR10 (a pressure word), NR14 (an answer not found in the turn it cites) |
 
 Not checked yet: a call on a real line. The steps above come from the code on main (Nov 8), not
