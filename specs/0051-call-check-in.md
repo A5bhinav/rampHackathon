@@ -196,6 +196,14 @@ Existing tests whose expectations change (each because of D2 or D6, stated in th
   first live call. Until then, D3's estimate carries the clock.
 - **Q118. The estimate.** Is 1 second plus 1 second per 12 characters, plus 3 seconds, right for the
   TTS voice in use? It only matters when Q117's message doesn't arrive.
+- **Q119. Two gaps the review found, left open.**
+  - **A split reply.** Only the first callee turn after a check-in is presence. Twilio could split
+    "Yes. Yes, I'm here" into two final prompts. If the second lands before the re-ask plays, it
+    could be grounded against the re-ask. The typed digits still gate verification. A fix needs
+    Twilio's timing (Q117): for example, treat turns before the re-ask's agentSpeaking "off" as
+    presence.
+  - **A non-string field (pre-existing).** A `voicePrompt` or `digit` that is not a string still
+    raises out of `run_relay`.
 
 ## Rulings (the author's calls, for Sami to check)
 
