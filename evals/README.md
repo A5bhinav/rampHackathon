@@ -19,7 +19,7 @@ uv run lab overblock                          # measurement: what a defense cost
 uv run lab reports --examples 2000 --seed 0   # call reports: frozen findings, then F1 to F3 (spec 0048)
 uv run lab docs --examples 1000 --seed 0      # documents: frozen cases, then G1 to G7 through ingestion (spec 0052)
 uv run lab sweep                              # remove each decision rule: seen, or in UNREACHABLE.md
-cd evals && uv run pytest -q -m "not selection_gate and not report_gate"   # the checks that must stay green
+cd evals && uv run pytest -q -m "not selection_gate and not report_gate and not docs_gate"   # the checks that must stay green
 ```
 
 `lab run` writes `results.jsonl` and `scorecard.json`, and exits non-zero when a hard gate

@@ -1,0 +1,40 @@
+name: lab-docs
+
+# The attack lab's generated documents (spec 0052): documents with a known claim and owner for every phone
+# number, run through real ingestion with the stub reader (no network call), then select(), and held to
+# checks G1 to G7. It re-runs every frozen case in evals/docs-generated, then checks 1000 documents (and
+# 100 worlds) at seed 0, and holds the failing patterns to its strict known-failures list
+# (evals/known-failures.json, lab-docs, keyed by check, phrasing and placement): the stub's failures (A19,
+# A20) and the rule's (A1) stay listed while they fail, and their fixes belong in packages/ledger, not here.
+on:
+  pull_request:
+    paths:
+      - "packages/ledger/**"
+      - "evals/**"
+      - "uv.lock"
+      - ".github/workflows/lab-docs.yml"
+  push:
+    branches: [main]
+
+jobs:
+  lab-docs:
+    name: attack lab, generated documents
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Install the Python workspace
+        run: uv sync --all-packages --locked
+      - name: The docs gate's tests (G1 to G7 on the stub, held to the known-failures list)
+        run: cd evals && uv run pytest -q -m docs_gate
+      - name: Lab docs (frozen cases, then 1000 documents and 100 worlds at seed 0)
+        if: always()
+        run: uv run lab docs --examples 1000 --seed 0
+      - name: Keep the findings for a local repro
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lab-docs-findings
+          path: |
+            evals/docs-generated
+            evals/out/docs-report.json

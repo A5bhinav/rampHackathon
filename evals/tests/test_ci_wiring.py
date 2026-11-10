@@ -115,3 +115,25 @@ def test_the_lab_jobs_trigger_on_everything_they_run():
     triggers, _ = _workflow("lab-smoke.yml")
     for path in ("apps/core/src/dialback_core/ports.py", "uv.lock"):
         assert path in triggers["pull_request"]["paths"], path
+
+
+def test_the_green_steps_deselect_the_docs_gate():
+    # Spec 0052, decision 8: the must-stay-green steps deselect the docs_gate tests, as they do selection_gate,
+    # and the docs gate is a registered marker.
+    for name in ("lab-fuzz.yml", "lab-smoke.yml", "lab-reports.yml"):
+        _, runs = _workflow(name)
+        tests = [r for r in runs if "pytest" in r]
+        assert tests and all("not selection_gate" in r and "not docs_gate" in r for r in tests), name
+    pyproject = (ROOT / "evals" / "pyproject.toml").read_text(encoding="utf-8")
+    assert '"docs_gate:' in pyproject
+
+
+def test_lab_docs_runs_the_docs_gate_with_its_list():
+    # Spec 0052, decision 8: a lab-docs job, triggered by the ledger and the lab, runs the docs_gate tests and
+    # lab docs at seed 0 with 1000 documents, which holds the known-failures list.
+    triggers, runs = _workflow("lab-docs.yml")
+    paths = triggers["pull_request"]["paths"]
+    assert "packages/ledger/**" in paths and "evals/**" in paths
+    assert any("pytest" in r and "-m docs_gate" in r for r in runs)
+    assert any("lab docs" in r and "--examples 1000" in r and "--seed 0" in r and "--known-failures none" not in r
+               for r in runs)
