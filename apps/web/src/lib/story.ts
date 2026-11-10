@@ -1,47 +1,6 @@
-// The public "How it works" page (spec 0033): the pipeline's seven stations in words, and the
-// demo links. Copy only: nothing here decides anything, and no figure here was computed by the
-// system, so none is shown.
+// The demo's stories and links (specs 0033, 0063): the seeded vendors, where sign-in may send someone
+// back to, and finding the newest demo dataset and its case. Nothing here decides anything.
 import type { CaseSummary, Dataset } from "./api-types";
-
-export type StoryKey = "change" | "detect" | "hold" | "number" | "call" | "decide" | "release";
-export type StoryStation = { key: StoryKey; label: string; does: string; stops: string; rules: string };
-
-/** The seven stations a bank change passes through, each with what it stops. */
-export const STORY_STATIONS: StoryStation[] = [
-  { key: "change", label: "A bank change", rules: "",
-    does: "A vendor's bank details change in Ramp: a clerk types in new details from an email, or someone else changes them.",
-    stops: "Nothing yet. This is where the fraud gets in, so everything after it assumes the change may be fake." },
-  { key: "detect", label: "Detect", rules: "",
-    does: "Ramp's webhook, a poller and a nightly sweep all compare Ramp's accounts with Dialback's own history, and agree on one case per change.",
-    stops: "A missed or forged webhook letting a change slip past: the webhook is only a hint, the comparison is the truth." },
-  { key: "hold", label: "Hold", rules: "R1",
-    does: "As soon as the change is detected, payments to the vendor are put on hold in Ramp and their dates are saved. Dialback reads the hold back from Ramp before it does anything else.",
-    stops: "Money leaving for the new account while anyone is still checking. A hold Ramp won't confirm is an alarm for a person." },
-  { key: "number", label: "Pick a provable number", rules: "R2",
-    does: "The Trust Ledger picks a phone number seen in at least two independent sources before the request arrived.",
-    stops: "Calling the number in the email. A number first seen in the change thread, one digit off a known number, or too new is refused; with none left, nobody is called and a person reviews." },
-  { key: "call", label: "Disclosed AI call", rules: "R4 and R8",
-    does: "An AI agent calls that number. Its first sentence says it is an AI on a recorded line. It asks who they are, whether they asked for the change, and the new account's last four digits.",
-    stops: "A fraudster on the line learning what to say: the agent never says the new details, the digits or what it is checking." },
-  { key: "decide", label: "Code decides", rules: "R3",
-    does: "A fixed rule table turns the recorded answers into Verified, Not verified or Needs review, and writes a sentence for every rule that fired.",
-    stops: "A smooth talker persuading a model. The model only records answers; no tool it has can set an outcome." },
-  { key: "release", label: "A second person releases", rules: "R5",
-    does: "An approver who did not enter the change reads the evidence and, with a written reason, releases (the hold lifts) or rejects (the case is blocked and the hold stays).",
-    stops: "One person moving money alone. Postgres refuses the person who entered the change, whatever the page shows." },
-];
-
-/** The pieces every station leans on. */
-export const ACROSS = [
-  { title: "Postgres is the referee", rules: "R1 and R5",
-    text: "The case state machine, the hold check and the four-eyes release are SQL functions. A bug in the services above can't skip a state or release a payment." },
-  { title: "A hash-chained evidence log", rules: "R6",
-    text: "Every state change is appended to a log where each row carries the hash of the one before. Editing any row breaks the chain, and a scheduled check names the row." },
-  { title: "Fail closed", rules: "R7",
-    text: "An error, a timeout, an unclear answer or a hold Ramp won't confirm all end the same way: the hold stays on and a person reviews." },
-  { title: "Text is data", rules: "R9",
-    text: "Emails, documents and what is said on a call are read as data, never followed as instructions, so a planted \"ignore your rules\" does nothing." },
-];
 
 export type DemoStory = { ref: string; legal_name: string; title: string; story: string };
 
@@ -60,6 +19,7 @@ export const DEMO_STORIES: DemoStory[] = [
 export function safeNext(raw: unknown): string {
   if (typeof raw !== "string") return "/app";
   if (/^\/tour\/[1-8]$/.test(raw)) return raw;  // the guided demo (spec 0039)
+  if (raw === "/app/control") return raw;  // the front door's Control button (spec 0063)
   // A dataset page, for "Viewing as" (spec 0041): a uuid, then plain lower-case path segments only.
   if (/^\/d\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(\/[a-z0-9-]+)*$/.test(raw)) return raw;
   const m = /^\/demo\/([a-z]+)$/.exec(raw);

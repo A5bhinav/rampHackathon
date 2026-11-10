@@ -1,17 +1,7 @@
-// The public "How it works" page's stations and the demo links (spec 0033). `pnpm test`.
+// The demo links and where sign-in may send someone back to (specs 0033, 0063). `pnpm test`.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { DEMO_STORIES, STORY_STATIONS, caseFor, demoStory, newestDemo, safeNext } from "../src/lib/story.ts";
-
-test("seven stations in pipeline order, each saying what it stops and the rule it rests on", () => {
-  assert.deepEqual(STORY_STATIONS.map((s) => s.key),
-    ["change", "detect", "hold", "number", "call", "decide", "release"]);
-  for (const s of STORY_STATIONS) {
-    assert.ok(s.does.length > 20, s.key);
-    assert.ok(s.stops.length > 20, s.key);
-  }
-  for (const s of STORY_STATIONS.slice(2)) assert.match(s.rules, /^R\d( and R\d)?$/, s.key);
-});
+import { DEMO_STORIES, caseFor, demoStory, newestDemo, safeNext } from "../src/lib/story.ts";
 
 test("three demo stories, one per seeded vendor, each with a ref and a legal name", () => {
   assert.deepEqual(DEMO_STORIES.map((s) => s.ref), ["acme", "brightline", "cobalt"]);
@@ -53,4 +43,11 @@ test("a dataset page is a safe place to come back to after switching demo accoun
   for (const ok of [ds, `${ds}/cases`, `${ds}/cases/3f6a9d2e-8b14-4c7a-a5e0-1d2c3b4a5f60/lineage`, `${ds}/evidence`]) assert.equal(safeNext(ok), ok, ok);
   for (const bad of [`${ds}//evil.example`, `${ds}/../x`, `${ds}/cases?x=1`, `${ds}/cases#x`, `/d/0c9e8d7f/cases`, `${ds}\\x`])
     assert.equal(safeNext(bad), "/app", bad);
+});
+
+test("the front door's Control button survives sign-in (spec 0063)", () => {
+  assert.equal(safeNext("/app/control"), "/app/control");
+  for (const bad of ["/app/control/x", "/app/controls", "/app/control?x=1"]) assert.equal(safeNext(bad), "/app", bad);
+  const control = "/d/0c9e8d7f-6a5b-4c3d-8e2f-1a0b9c8d7e6f/control/trust-ledger";  // "Viewing as" on a Control page
+  assert.equal(safeNext(control), control);
 });

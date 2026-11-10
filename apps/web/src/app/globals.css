@@ -839,3 +839,26 @@ ul.reason-chips li { font-size: 12px; padding: 1px 8px; border-radius: var(--rad
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; animation: none !important; }
 }
+
+/* The two apps (spec 0063) ------------------------------------------------------------------ */
+.app-badge { margin-left: 8px; height: 20px; font-size: 11px; }
+.app-badge::before { display: none; }
+.app-switch { display: grid; grid-template-columns: 1fr 1fr; padding: 2px; gap: 2px; border-radius: var(--radius-sm);
+  background: var(--paper-active); border: 1px solid var(--paper-line); }
+.app-switch a { display: flex; align-items: center; justify-content: center; min-height: 30px; padding: 0 8px; border-radius: var(--radius-xs);
+  font-size: 13px; font-weight: 500; color: var(--text-2); white-space: nowrap; }
+.app-switch a:hover { color: var(--ink); text-decoration: none; }
+.app-switch a[aria-current] { background: var(--surface); color: var(--ink); box-shadow: 0 0 0 1px var(--line-strong); }
+.app-control .side { background: #f1efe8; }
+.tab.is-on { color: var(--ink); font-weight: 500; border-bottom-color: var(--ink); }
+ol.script-list { list-style: none; margin: 0 0 12px; padding: 0; }
+ol.script-list li { display: grid; grid-template-columns: 140px minmax(0, 1fr); gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--line-soft); font-size: 13px; }
+ol.script-list li:last-child { border-bottom: 0; }
+.int-list { list-style: none; margin: 0; padding: 0; }
+.int-list li { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 14px 20px; border-bottom: 1px solid var(--line-soft); }
+.int-list li:last-child { border-bottom: 0; }
+.int-name { font-weight: 500; }
+@media (max-width: 720px) {
+  .app-switch { order: 2; }
+  ol.script-list li { grid-template-columns: 1fr; gap: 2px; }
+}

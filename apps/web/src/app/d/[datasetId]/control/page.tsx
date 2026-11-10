@@ -34,7 +34,7 @@ export default async function OverviewPage({ params }: { params: Promise<{ datas
     <main>
       <PageHead eyebrow="Control" title="Overview" lead={`${dataset?.label ?? "This dataset"}. Times in UTC.`} />
       <dl className="stats" aria-label="Health">
-        <div className="stat"><dt>Evidence chain</dt><dd><Link className="badge-link" href={`/d/${datasetId}/evidence`}><ChainBadge chain={log.chain} /></Link></dd>
+        <div className="stat"><dt>Evidence chain</dt><dd><Link className="badge-link" href={`/d/${datasetId}/control/evidence`}><ChainBadge chain={log.chain} /></Link></dd>
           <dd className="stat-sub">{log.chain.checked} rows recomputed</dd></div>
         <div className="stat"><dt>Last chain check</dt><dd className="stat-small">{log.last_check?.finished_at ? when(log.last_check.finished_at) : "not run yet"}</dd></div>
         <div className={`stat${notConfirmed ? " is-bad" : ""}`}><dt>Holds not confirmed</dt><dd>{notConfirmed}</dd></div>

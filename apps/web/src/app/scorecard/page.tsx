@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Icon } from "@/components/icons";
+import { ScorecardEmpty } from "@/components/scorecard";
 import { PublicHeader } from "@/components/public-header";
 import { RingBand } from "@/components/ring-band";
 
@@ -11,7 +11,7 @@ export const metadata: Metadata = { title: "Dialback: scorecard" };
 export default function ScorecardPage() {
   return (
     <div className="public">
-      <PublicHeader links={[{ href: "/", label: "How it works" }, { href: "/corpus", label: "Frozen test cases" }]} />
+      <PublicHeader links={[{ href: "/", label: "Front door" }, { href: "/corpus", label: "Frozen test cases" }]} />
       <main>
         <RingBand
           eyebrow="Scorecard"
@@ -23,11 +23,7 @@ export default function ScorecardPage() {
             don&apos;t display a result the system didn&apos;t compute.
           </>}
         />
-        <section className="card empty-state" aria-label="No lab run">
-          <span className="empty-icon"><Icon name="clock" size={28} /></span>
-          <p className="empty-title">No lab run on this commit yet</p>
-          <p className="muted sub">Results appear here only from a lab run&apos;s own output, never from sample numbers.</p>
-        </section>
+        <ScorecardEmpty />
         <section className="two-up">
           <div className="card">
             <div className="card-head"><h2>What the scorecard will show</h2></div>

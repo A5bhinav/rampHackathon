@@ -16,7 +16,7 @@ Show each case's evidence, take the release decision, and show the scorecard.
 | Case detail | `/d/[datasetId]/cases/[caseId]` | The change, the hold and saved dates (due-soon flags), the decision grouped by rule (not verified, sent to a person, not shown, shown) with rule ids, the deadline, the second-approver state, the chain badge, the timeline from evidence (spec 0009) | Abhi | built |
 | Release console | on case detail | A required reason, then approve or reject (and clear or block from review), sent with the version the person saw | Abhi | built |
 | Number lineage | `/d/[datasetId]/cases/[caseId]/lineage` (suggested) | The chosen number with its sources, every rejected number with its reason | Inesh | to build |
-| Vendor risk list | `/d/[datasetId]/risk` (suggested) | Vendors whose number on file is provable, unproven, a near miss, or missing | Inesh | to build |
+| Trust Ledger (vendor risk) | `/d/[datasetId]/control/trust-ledger` (old `/risk` redirects, spec 0063) | Vendors whose number on file is provable, unproven, a near miss, or missing | Inesh | built |
 | Call view | `/d/[datasetId]/calls/[callId]` (suggested) | The transcript with recorded answers, the recording, speech-guard trips | Sami | to build |
 | Scorecard | `/d/[datasetId]/scorecard` (suggested) | The latest run's gates, rates with intervals, results by attack class | Sami | to build |
 
