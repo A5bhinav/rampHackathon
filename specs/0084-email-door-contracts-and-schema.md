@@ -16,7 +16,7 @@ A bank-change email will open a Dialback case on its own (design: `docs/superpow
 ## Acceptance
 
 - [ ] Task 1: the contract validates, `pnpm gen:api`, `pnpm check:api` and `pnpm typecheck` pass, and no existing required list changed.
-- [ ] Task 2: `app.datasets.email_door_vendors uuid[] not null default '{}'` and table `app.inbound_emails` exist (columns per the plan's Task 2; `unique (dataset_id, resend_email_id)`; checks on `outcome`, `reply` and `last4`). An authenticated person reads their own dataset's rows only; only `service_role` writes.
+- [ ] Task 2: `app.datasets.email_door_vendors uuid[] not null default '{}'` and table `app.inbound_emails` exist (columns per the plan's Task 2; `unique (dataset_id, resend_email_id)`; checks on `outcome`, `reply` and `last4`; `raw_sha256` is null until the email is fetched). An authenticated person reads the rows (the repo has no per-person dataset membership), a demo account only those of demo datasets; only `service_role` writes.
 - [ ] Failure path: an unknown `outcome`, a duplicate `(dataset_id, resend_email_id)` or an insert by `authenticated` is rejected.
 
 ## Tests (written first)
