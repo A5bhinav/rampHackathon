@@ -9,12 +9,16 @@ when either:
   suffix, run together, its first two words, or a distinctive first word) appears in it as a run of
   whole words ("This is Acme", "AcmeFasteners").
 
-Nothing is fuzzy: "acne" is not "Acme" (D8). Anything else is not a match, and the case goes to a
-person; an answer with no readable words is unknown.
+Nothing is fuzzy: "acne" is not "Acme" (D8).
 
-An answer that says the person is not with the vendor, or only works with it, is not a match even
-when it names the vendor (D7a): "Not Acme, this is Globex", "We're a reseller for Acme", "I used to
-work at Acme". Bare "no" and "sorry" never count, and a word in the vendor's own name doesn't count.
+An answer that says the person is not with the vendor, or only works with it, is False even when
+it names the vendor (D7a): "Not Acme, this is Globex", "We're a reseller for Acme", "I used to work
+at Acme". Bare "no" and "sorry" never count, and a word in the vendor's own name doesn't count.
+False fires NR03, and the case goes to a person.
+
+Anything else is unknown (None), and blocks nothing (D7b): another company ("This is Globex"), a
+garbled name ("acne"), nonsense, or no readable words. Code can't tell another company's name from
+a garbled vendor name; the person who releases sees the answer on the call record.
 """
 from __future__ import annotations
 
@@ -70,12 +74,12 @@ def company_matches(named: str | None, legal_name: str, trade_names: Iterable[st
         return True
     if _says_a_variant(named, names):
         return True
-    return False if said else None
+    return None  # not a match and not a refusal: unknown, never False (D7b)
 
 
 def every_name_matches(named: Iterable[str], legal_name: str, trade_names: Iterable[str] = ()) -> bool | None:
-    """Every company the person named must match (spec 0005, D7): False if any doesn't, unknown
-    if none was given or any can't be read, else True."""
+    """Every company answer counts (spec 0005, D7): False if any holds a refusal word, unknown if
+    none was given or any other answer isn't a match, else True (spec 0082, D7b)."""
     results = [company_matches(n, legal_name, tuple(trade_names)) for n in named]
     if any(r is False for r in results):
         return False
