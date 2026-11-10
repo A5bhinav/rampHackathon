@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import type { ActionState } from "@/app/d/[datasetId]/cases/[caseId]/actions";
+import type { ActionState } from "@/app/d/[datasetId]/(ap)/cases/[caseId]/actions";
 
 type Props = {
   title: string;

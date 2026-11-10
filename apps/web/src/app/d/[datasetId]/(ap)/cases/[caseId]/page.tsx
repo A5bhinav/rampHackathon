@@ -78,7 +78,7 @@ export default async function CaseDetailPage({ params, searchParams }: {
       >
         <div className="tags">
           <StateBadge state={c.state} />
-          <Link className="badge-link" href={`/d/${datasetId}/evidence${detail.chain.ok ? "" : `#row-${detail.chain.first_bad_seq}`}`}>
+          <Link className="badge-link" href={`/d/${datasetId}/control/evidence${detail.chain.ok ? "" : `#row-${detail.chain.first_bad_seq}`}`}>
             <ChainBadge chain={detail.chain} />
           </Link>
           {c.unknown_changer ? <span className="badge tone-warn">Unknown changer: two approvers</span> : null}
@@ -148,7 +148,7 @@ export default async function CaseDetailPage({ params, searchParams }: {
 
           <section className="card flush" aria-labelledby="timeline-h">
             <CardHead marker="Record" title={<>Evidence trail <span className="count">{detail.timeline.length}</span></>} id="timeline-h"
-              meta={<Link href={`/d/${datasetId}/evidence`}>Open in Evidence</Link>} />
+              meta={<Link href={`/d/${datasetId}/control/evidence`}>Open in Evidence</Link>} />
             <div className="table-wrap">
               <table className="trail stack-sm">
                 <thead><tr><th className="num">#</th><th>Event</th><th>State</th><th>By</th><th>Time</th><th>Hash</th></tr></thead>
@@ -354,7 +354,7 @@ function ActionRail({ detail, path, datasetId, firstApproval, lastStepSummary }:
                 <blockquote>{releasedBy.reason}</blockquote>
               </div>
             ) : null}
-            <p><Link href={`/d/${datasetId}/evidence`}>View evidence</Link></p>
+            <p><Link href={`/d/${datasetId}/control/evidence`}>View evidence</Link></p>
           </div>
         </section>
       ) : null}

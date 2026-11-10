@@ -1,23 +1,29 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Fragment } from "react";
+import { isCurrent } from "@/lib/apps";
 import { Icon, type IconName } from "./icons";
 
-export type NavLink = { href: string; label: string; icon?: IconName; count?: number };
+export type NavLink = { href: string; label: string; icon?: IconName; count?: number; group?: string; exact?: boolean; not?: string[] };
 
-// The shell's page links: the current page is marked for screen readers and drawn filled.
+// A sidebar's page links (spec 0063): the current page is marked for screen readers and drawn
+// filled; a group label (Settings) starts its run of items.
 export function NavLinks({ links }: { links: NavLink[] }) {
   const path = usePathname();
   return (
     <>
-      {links.map((l) => {
-        const current = path === l.href || path.startsWith(`${l.href}/`);
+      {links.map((l, i) => {
+        const current = isCurrent(l, path);
         return (
-          <Link key={l.label} className="nav-item" href={l.href} aria-current={current ? "page" : undefined}>
-            {l.icon ? <Icon name={l.icon} size={16} /> : <span className="nav-blank" aria-hidden="true" />}
-            <span className="nav-label">{l.label}</span>
-            {l.count ? <span className="nav-count">{l.count}</span> : null}
-          </Link>
+          <Fragment key={l.label}>
+            {l.group && links[i - 1]?.group !== l.group ? <p className="side-group">{l.group}</p> : null}
+            <Link className="nav-item" href={l.href} aria-current={current ? "page" : undefined}>
+              {l.icon ? <Icon name={l.icon} size={16} /> : <span className="nav-blank" aria-hidden="true" />}
+              <span className="nav-label">{l.label}</span>
+              {l.count ? <span className="nav-count">{l.count}</span> : null}
+            </Link>
+          </Fragment>
         );
       })}
     </>
@@ -28,7 +34,7 @@ export function NavLinks({ links }: { links: NavLink[] }) {
 export function Crumbs({ datasetId }: { datasetId: string }) {
   const path = usePathname();
   const base = `/d/${datasetId}`;
-  const m = new RegExp(`^${base}/cases/([^/]+)(/lineage)?$`).exec(path);
+  const m = new RegExp(`^${base}/cases/(?!all$)([^/]+)(/lineage)?$`).exec(path);  // /cases/all is the Cases list, not a case
   if (!m) return <span />;
   const kase = `${base}/cases/${m[1]}`;
   return (

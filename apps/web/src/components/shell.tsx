@@ -1,50 +1,46 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { AlertBanners } from "@/components/alerts";
-import { BrandMark, Crumbs, NavLinks, type NavLink } from "@/components/nav";
-import { ViewingAs } from "@/components/viewing-as";
+import { AlertBanners } from "./alerts";
+import { BrandMark, Crumbs, NavLinks } from "./nav";
+import { ViewingAs } from "./viewing-as";
 import type { Dataset, Me } from "@/lib/api-types";
+import { canSeeControl, navFor, switchTargets, type AppKey } from "@/lib/apps";
 import { demoAccounts } from "@/lib/auth-mode";
 import { CoreError, core } from "@/lib/core";
 
-// The shell (spec 0041): a paper sidebar with the dataset, navigation and who is signed in, a
-// slim utility bar, then the alert banners on every page. Pages plug in under /d/[datasetId]/.
-export default async function DatasetShell({ children, params }: { children: React.ReactNode; params: Promise<{ datasetId: string }> }) {
-  const { datasetId } = await params;
+// The two apps' shell (spec 0063): a paper sidebar with the app switch, the dataset, that app's
+// navigation and who is signed in; a slim utility bar; then the alert banners. AP workspace and
+// Control share it and differ only in their navigation and the "Control" badge.
+export async function Shell({ app, datasetId, children }: { app: AppKey; datasetId: string; children: React.ReactNode }) {
   // An unknown dataset (404) or one that isn't an id (422) is a not-found page, not an error.
   const [me, datasets, alerts] = await Promise.all([core.me(), core.datasets(), core.alerts(datasetId).catch((e) => {
     if (e instanceof CoreError && (e.status === 404 || e.status === 422)) notFound();
     throw e;
   })]);
   const current = datasets.find((d) => d.id === datasetId);
-  const base = `/d/${datasetId}`;
-  const ap: NavLink[] = [{ href: `${base}/cases`, label: "Inbox", icon: "inbox" }];
-  const control: NavLink[] = [
-    { href: `${base}/overview`, label: "Overview", icon: "grid" },
-    { href: `${base}/risk`, label: "Trust Ledger", icon: "shield" },
-    { href: `${base}/evidence`, label: "Evidence", icon: "link" },
-    { href: "/corpus", label: "Assurance", icon: "check-circle" },
-  ];
+  const control = app === "control" || canSeeControl(me.roles, current?.kind ?? "");
+  const go = switchTargets(datasetId);
   const demo = demoAccounts(process.env) !== null;
   return (
-    <div className="app">
+    <div className={`app app-${app}`}>
       <aside className="side" aria-label="Sidebar">
         <div className="side-top">
-          <Link className="brand" href={`${base}/cases`}><BrandMark />Dialback</Link>
+          <Link className="brand" href={go[app]}><BrandMark />Dialback{app === "control" ? <span className="badge tone-muted app-badge">Control</span> : null}</Link>
           <details className="side-more">
             <summary>Menu</summary>
-            <DatasetCard current={current} datasets={datasets} />
+            <DatasetCard current={current} datasets={datasets} app={app} />
             <Person me={me} />
           </details>
         </div>
-        <div className="side-desk"><DatasetCard current={current} datasets={datasets} /></div>
-        <nav className="side-nav" aria-label="Main">
-          <p className="side-group">Accounts payable</p>
-          <NavLinks links={ap} />
-          <p className="side-group">Control</p>
-          <NavLinks links={control} />
-          <span className="side-gap" />
-          <NavLinks links={[{ href: "/", label: "How it works", icon: "book" }]} />
+        {control ? (
+          <nav className="app-switch" aria-label="Apps">
+            <Link href={go.ap} aria-current={app === "ap" ? "true" : undefined}>AP workspace</Link>
+            <Link href={go.control} aria-current={app === "control" ? "true" : undefined}>Control</Link>
+          </nav>
+        ) : null}
+        <div className="side-desk"><DatasetCard current={current} datasets={datasets} app={app} /></div>
+        <nav className="side-nav" aria-label={app === "ap" ? "AP workspace" : "Control"}>
+          <NavLinks links={navFor(app, datasetId)} />
         </nav>
         <div className="side-foot side-desk">
           {current ? <p className="side-status"><span className="dot" aria-hidden="true" />Ramp Bill Pay · {current.kind} dataset</p> : null}
@@ -63,7 +59,7 @@ export default async function DatasetShell({ children, params }: { children: Rea
   );
 }
 
-function DatasetCard({ current, datasets }: { current: Dataset | undefined; datasets: Dataset[] }) {
+function DatasetCard({ current, datasets, app }: { current: Dataset | undefined; datasets: Dataset[]; app: AppKey }) {
   return (
     <div className="dataset-card" title={current?.sim_now ? "This dataset runs on simulated time" : undefined}>
       <span className="dataset-name">{current ? current.label : "Unknown dataset"}</span>
@@ -72,7 +68,7 @@ function DatasetCard({ current, datasets }: { current: Dataset | undefined; data
         <details className="switch">
           <summary>Switch</summary>
           <ul className="plain">
-            {datasets.map((d) => <li key={d.id}><Link href={`/d/${d.id}/cases`}>{d.label}</Link></li>)}
+            {datasets.map((d) => <li key={d.id}><Link href={switchTargets(d.id)[app]}>{d.label}</Link></li>)}
           </ul>
         </details>
       ) : null}
