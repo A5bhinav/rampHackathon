@@ -1024,10 +1024,13 @@ are reproduced here.
     documents) takes Q119 to Q122. The next free numbers are spec 0053 and Q123.
   - **Renumbered on landing (Nov 10; main then went up to spec 0077 and Q116, the branches up to
     spec 0082, on `sami/company-name-match`, and Q138):** the lab's 0033 is spec 0083; spec 0017's Q56,
-    Q57 and Q58 are Q139, Q140 and Q141; spec 0083's Q60, Q61 and Q65 are Q142, Q143 and Q144; spec
+    Q57 and Q58 are Q150, Q140 and Q141; spec 0083's Q60, Q61 and Q65 are Q142, Q143 and Q144; spec
     0046's Q87 to Q91 are Q145 to Q149. Spec 0083's Q62 to Q64 and spec 0048's Q101 to Q105 collided
     with nothing and stay. `evals/tests/test_numbering.py` fails if a lab spec or question number is
     used by another spec.
+  - **Q56 moved again (Nov 10):** spec 0082 (PR #118) added its own Q139 after the lab's PR 2 had
+    used Q139 for spec 0017's Q56, so the lab's moved to Q150, the next number nothing else used
+    (outside the lab, nothing went past Q139).
 
 ## F. How other services verify a bank change (Nov 9)
 
