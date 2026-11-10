@@ -24,7 +24,7 @@ A bank-change email will open a Dialback case on its own (design: `docs/superpow
 | Acceptance item | Test |
 |---|---|
 | 1 | `packages/contracts/scripts/validate.py` (inline `listMail` example), `pnpm check:api`, `pnpm typecheck` |
-| 2, 3 | `supabase/tests/011_email_door.sql`, `scripts/db/test_migrate.py` |
+| 2, 3 | `supabase/tests/016_email_door.sql`, `scripts/db/test_migrate.py` |
 
 ## Out of scope
 

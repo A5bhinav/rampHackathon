@@ -1,4 +1,4 @@
--- 011: stored inbound emails and the per-dataset email door switch (spec 0084).
+-- 016: stored inbound emails and the per-dataset email door switch (spec 0084).
 begin;
 \i supabase/tests/_helpers.sql
 
