@@ -5,6 +5,7 @@ import os
 from dataclasses import dataclass, field
 from urllib.parse import urlsplit
 
+from .email_door.signature import MIN_KEY_BYTES, decode_secret
 from .flags import EmailMode, RampMode, ResolverMode, read_flag
 
 
@@ -117,6 +118,13 @@ class Settings:
             for name in ("RESEND_API_KEY", "RESEND_WEBHOOK_SECRET"):
                 if not env.get(name, "").strip():
                     raise ConfigurationError(f"{name} is required when DIALBACK_EMAIL=resend")
+            try:
+                key = decode_secret(env["RESEND_WEBHOOK_SECRET"].strip())
+            except ValueError:
+                key = b""
+            if len(key) < MIN_KEY_BYTES:
+                raise ConfigurationError(
+                    f"RESEND_WEBHOOK_SECRET must be Resend's signing secret (whsec_ and base64 of at least {MIN_KEY_BYTES} bytes)")
         base = env.get("RAMP_BASE_URL")
         if not base:
             raise ConfigurationError("RAMP_BASE_URL is required (the mock's URL, or Ramp's sandbox API)")

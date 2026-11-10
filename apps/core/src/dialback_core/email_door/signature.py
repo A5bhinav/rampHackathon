@@ -13,6 +13,17 @@ import hmac
 from collections.abc import Mapping
 
 
+MIN_KEY_BYTES = 16
+
+
+def decode_secret(secret: str) -> bytes:
+    """The HMAC key inside a `whsec_...` secret. Raises ValueError for anything that is not base64."""
+    try:
+        return base64.b64decode(secret.removeprefix("whsec_"), validate=True)
+    except (ValueError, binascii.Error) as exc:
+        raise ValueError("not a base64 signing secret") from exc
+
+
 def verify(secret: str, headers: Mapping[str, str], raw: bytes, now: int, tolerance: int = 300) -> bool:
     """True only for a fresh, correctly signed delivery. Every malformed input is a refusal."""
     lowered = {k.lower(): v for k, v in headers.items()}
@@ -21,15 +32,17 @@ def verify(secret: str, headers: Mapping[str, str], raw: bytes, now: int, tolera
         return False
     try:
         ts = int(stamp)
-        key = base64.b64decode(secret.removeprefix("whsec_"), validate=True)
-    except (ValueError, binascii.Error):
+        key = decode_secret(secret)
+    except ValueError:
+        return False
+    if not key:  # an empty key would let anyone forge a delivery
         return False
     if abs(now - ts) > tolerance:
         return False
-    expected = base64.b64encode(hmac.new(key, f"{msg_id}.{stamp}.".encode() + raw, hashlib.sha256).digest()).decode()
+    expected = base64.b64encode(hmac.new(key, f"{msg_id}.{stamp}.".encode() + raw, hashlib.sha256).digest())
     ok = False
     for item in given.split():
         version, _, sig = item.partition(",")
-        if version == "v1" and hmac.compare_digest(expected, sig):
+        if version == "v1" and hmac.compare_digest(expected, sig.encode("utf-8", errors="replace")):
             ok = True  # no early exit: keep the time independent of which item matched
     return ok
