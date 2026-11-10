@@ -27,12 +27,30 @@ context_row = row.flatmap(lambda r: st.sampled_from([r | {"thread": "req"}, r | 
 many = settings(max_examples=150, deadline=None)
 
 
+# The strategies above almost never give today's rule a pick (the review found none in 1000
+# derandomized draws), and spec 0079's guard acts only on a pick. These worlds do: two to four
+# provable numbers, none a near miss of another, plus change-context rows on them. Four, so a
+# change to how many backups are called (rank[1:3]) can't hide (the review's item 3).
+PROVABLE = ["+14155550142", "+16455550177", "+13035550101", "+19715550124"]
+clean = st.fixed_dictionaries({
+    "channel": st.sampled_from(["email", "contract", "vendor_portal", "listing", "paper_mail"]),
+    "days_before": st.integers(60, 1500), "visibility": st.just("visible"),
+    "role": st.sampled_from(["ar", "main", "billing"]), "party": st.just("vendor")})
+provable_number = st.tuples(st.sampled_from(PROVABLE), st.lists(clean, min_size=2, max_size=3)).map(
+    lambda t: [r | {"e164": t[0]} for r in t[1]])
+on_a_provable = st.tuples(context_row, st.sampled_from(PROVABLE + PROVABLE + NUMBERS[1:2])).map(lambda t: t[0] | {"e164": t[1]})
+guarded_rows = st.tuples(st.lists(provable_number, min_size=2, max_size=4, unique_by=lambda rs: rs[0]["e164"]),
+                         st.lists(on_a_provable, min_size=1, max_size=4),
+                         st.lists(row, max_size=2)).map(lambda t: [r for rs in t[0] for r in rs] + t[1] + t[2])
+any_rows = st.one_of(st.tuples(rows, st.lists(context_row, max_size=5)).map(lambda t: t[0] + t[1]), guarded_rows)
+
+
 def eligible(out: dict) -> set[str]:
     return {c["e164"] for c in out["candidates"] if c["eligible"]}
 
 
-@many
-@given(rows)
+@settings(max_examples=300, deadline=None)
+@given(any_rows)       # `rows` alone gives today's rule no pick, so the pick branches below need any_rows
 def test_the_result_is_always_a_valid_selection(rs):
     out = run(world(rs))
     assert list(Draft202012Validator(SCHEMA).iter_errors(out)) == []
@@ -234,22 +252,6 @@ def prefix_holds(rule, w: dict) -> bool:
     return new == old[:len(new)]
 
 
-# The strategies above almost never give today's rule a pick (0 of 3000 derandomized draws, Nov 10),
-# and the guard acts only on a pick. These worlds do: two or three provable numbers that are not near
-# misses of each other, plus change-context rows on them. At 1000 derandomized draws, today's rule
-# picks in 450 of them; the new rule withholds 41 and cuts the backups in 2.
-PROVABLE = ["+14155550142", "+16455550177", "+13035550101"]
-clean = st.fixed_dictionaries({
-    "channel": st.sampled_from(["email", "contract", "vendor_portal", "listing", "paper_mail"]),
-    "days_before": st.integers(60, 1500), "visibility": st.just("visible"),
-    "role": st.sampled_from(["ar", "main", "billing"]), "party": st.just("vendor")})
-provable_number = st.tuples(st.sampled_from(PROVABLE), st.lists(clean, min_size=2, max_size=3)).map(
-    lambda t: [r | {"e164": t[0]} for r in t[1]])
-on_a_provable = st.tuples(context_row, st.sampled_from(PROVABLE + PROVABLE + NUMBERS[1:2])).map(lambda t: t[0] | {"e164": t[1]})
-guarded_rows = st.tuples(st.lists(provable_number, min_size=2, max_size=3), st.lists(on_a_provable, min_size=1, max_size=4),
-                         st.lists(row, max_size=2)).map(lambda t: [r for rs in t[0] for r in rs] + t[1] + t[2])
-any_rows = st.one_of(st.tuples(rows, st.lists(context_row, max_size=5)).map(lambda t: t[0] + t[1]), guarded_rows)
-
 
 @settings(max_examples=400, deadline=None)
 @given(any_rows)
@@ -257,6 +259,23 @@ def test_new_rule_is_a_prefix_of_frozen_v1(rs):
     w = world(rs)
     assert prefix_holds(run, w)
     assert list(Draft202012Validator(SCHEMA).iter_errors(run(w))) == []
+
+
+@settings(max_examples=300, deadline=None)
+@given(any_rows)
+def test_the_flag_off_is_the_frozen_copy(rs):
+    # Decision 7: DIALBACK_CONTEXT_GUARD=off gives today's rule exactly, byte for byte, on any world.
+    import os
+    w = world(rs)
+    before = os.environ.get("DIALBACK_CONTEXT_GUARD")
+    os.environ["DIALBACK_CONTEXT_GUARD"] = "off"
+    try:
+        assert run(w) == frozen(w)
+    finally:
+        if before is None:
+            os.environ.pop("DIALBACK_CONTEXT_GUARD")
+        else:
+            os.environ["DIALBACK_CONTEXT_GUARD"] = before
 
 
 def skips_the_comparison(w: dict) -> dict:
