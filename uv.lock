@@ -313,6 +313,15 @@ dev = [
 name = "dialback-evals"
 version = "0.0.0"
 source = { editable = "evals" }
+dependencies = [
+    { name = "dialback-core" },
+    { name = "dialback-decision" },
+    { name = "dialback-ledger" },
+    { name = "dialback-policy" },
+    { name = "dialback-voice" },
+    { name = "jsonschema" },
+    { name = "pyyaml" },
+]
 
 [package.dev-dependencies]
 dev = [
@@ -321,6 +330,15 @@ dev = [
 ]
 
 [package.metadata]
+requires-dist = [
+    { name = "dialback-core", editable = "apps/core" },
+    { name = "dialback-decision", editable = "packages/decision" },
+    { name = "dialback-ledger", editable = "packages/ledger" },
+    { name = "dialback-policy", editable = "packages/policy" },
+    { name = "dialback-voice", editable = "apps/voice" },
+    { name = "jsonschema", specifier = ">=4" },
+    { name = "pyyaml", specifier = ">=6" },
+]
 
 [package.metadata.requires-dev]
 dev = [

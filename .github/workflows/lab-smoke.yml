@@ -1,0 +1,41 @@
+name: lab-smoke
+
+# The attack lab's voice slice (spec 0017). Runs on changes to the agent, the policy, the decision
+# engine, or the lab itself: a change that weakens the agent fails the build (AGENTS.md "done means").
+# Deterministic (the production ScriptedAgent, scripted callers), so it needs no API key and no spend.
+# The live-model gate and the full-pipeline run land later.
+on:
+  pull_request:
+    paths:
+      - "apps/voice/**"
+      - "packages/policy/**"
+      - "packages/decision/**"
+      - "apps/core/src/dialback_core/company.py"   # the lab reuses production's company check
+      - "apps/core/src/dialback_core/answers.py"   # and the digits it reads from a call report
+      - "apps/core/src/dialback_core/calls.py"     # the report's arrival step (spec 0048, A1)
+      - "apps/core/src/dialback_core/call_facts.py"   # the facts the worker builds, which the lab chains
+      - "apps/core/src/dialback_core/worker.py"    # and the worker that calls it
+      - "apps/core/src/dialback_core/ports.py"     # ChangeFacts, the change-context result the lab builds
+      - "evals/**"
+      - "pyproject.toml"
+      - "uv.lock"
+      - ".github/workflows/lab-smoke.yml"
+  push:
+    branches: [main]
+
+jobs:
+  lab-smoke:
+    name: attack lab, voice slice (text mode)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Install the Python workspace
+        run: uv sync --all-packages --locked
+      - name: Lab tests
+        run: cd evals && uv run pytest -q -m "not selection_gate and not report_gate"   # the gates run in lab-fuzz and lab-reports
+      - name: Lab run (scripted callers, no spend)
+        run: uv run lab run --split voice --max-usd 0
+      - name: Rule-removal sweep (every decision rule seen, or listed in evals/UNREACHABLE.md)
+        if: always()
+        run: uv run lab sweep
