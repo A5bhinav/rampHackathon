@@ -159,6 +159,35 @@ def test_both_kinds_are_required_and_counted():
     assert ev.count(out, failed)["numbers_by_kind"] == {"ordinary": 15, "hard": 15}
 
 
+def test_labeled_set_errors_never_print_contents_or_numbers(tmp_path):
+    # Review G20: a malformed set's errors printed numbers and, through the parser's message, text.
+    secret = "Remit questions to Dana Whitfield"
+    main = truth(1, "+12065550118", "main", "vendor", explicit_role=True)
+    unreadable = doc("x-1", "ordinary", [secret, "Main: (206) 555-0118"], [main])
+    unreadable["document"]["pages"][0]["width"] = f"{secret} 206-555-0186"
+    cases = {
+        "a label on a number code doesn't find": dev_set(doc("x-0", "ordinary", [secret, "Main: (206) 555-0118"],
+                                                             [main, truth(0, "+12065550186", "unknown", "bank")])),
+        "a page that can't be read": dev_set(unreadable),
+        "a line that isn't a line": dev_set(doc("x-2", "ordinary", [secret, "Main: (206) 555-0118"],
+                                                [main, truth(f"{secret} 206-555-0186", "+12065550186", "unknown", "bank")])),
+        "an unlabeled number": dev_set(doc("x-3", "ordinary", [secret, "Bank 206-555-0186"], [])),
+        "a repeated number": dev_set(doc("x-4", "ordinary", [secret, "Main: (206) 555-0118"], [main, main])),
+    }
+    for case, labeled in cases.items():
+        path = tmp_path / "dev.json"
+        path.write_text(json.dumps(labeled))
+        with pytest.raises(ev.LabeledSetError) as refused:
+            ev.load(path, "dev")
+        message = f"{refused.value} {refused.value.__cause__!r}"
+        for leak in (secret, "Dana", "555-01", "55501", "+1206"):
+            assert leak not in message, (case, leak)
+    path.write_text('{"split": "dev", "documents": [' + secret)                            # not JSON at all
+    with pytest.raises(ev.LabeledSetError, match="malformed") as refused:
+        ev.load(path, "dev")
+    assert secret not in str(refused.value)
+
+
 def test_read_matches_what_ingest_stores():
     # The eval labels each number the way ingestion does; if they drift apart, the eval measures
     # something else.

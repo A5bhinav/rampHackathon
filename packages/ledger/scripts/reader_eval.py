@@ -195,15 +195,23 @@ def check_runs(split: str, runs: int) -> None:
 # The labeled set -----------------------------------------------------------------------------------
 
 def check(labeled: dict, split: str) -> None:
-    """Refuse a labeled set that can't be scored as spec 0049 says."""
+    """Refuse a labeled set that can't be scored as spec 0049 says. Errors name a document by its id
+    and a line by its index, never document contents or a phone number (review G20)."""
     if labeled.get("split") != split:
-        raise LabeledSetError(f"the file is the {labeled.get('split')!r} split, not {split!r}")
+        other = labeled.get("split") if labeled.get("split") in SIZES else "another"
+        raise LabeledSetError(f"the file is the {other} split, not {split}")
     docs = labeled.get("documents")
     if not isinstance(docs, list):
         raise LabeledSetError("the labeled set has no list of documents")
     seen: set = set()
-    for entry in docs:
+    for i, entry in enumerate(docs):
         doc_id = entry["document"]["id"]
+        if not isinstance(doc_id, str):
+            raise LabeledSetError(f"document {i} has no string id")
+        numbers = entry["numbers"]
+        if not isinstance(numbers, list) or not all(
+                isinstance(n, dict) and type(n.get("line")) is int and isinstance(n.get("e164"), str) for n in numbers):
+            raise LabeledSetError(f"{doc_id}: a label's line or number is malformed")
         if doc_id in seen:
             raise LabeledSetError(f"{doc_id}: the document is listed twice")
         seen.add(doc_id)
@@ -219,7 +227,7 @@ def check(labeled: dict, split: str) -> None:
             raise LabeledSetError(f"{doc_id}: line {unlabeled[0][0]} holds a visible phone number with no label")
         for n in entry["numbers"]:
             if (n["line"], n["e164"]) not in found:
-                raise LabeledSetError(f"{doc_id}: line {n['line']} holds no visible candidate {n['e164']}")
+                raise LabeledSetError(f"{doc_id}: line {n['line']} holds no visible candidate for its number")
             if n["role"] not in ROLES or n["party"] not in PARTIES or not isinstance(n["explicit_role"], bool) \
                     or not isinstance(n["us"], bool):
                 raise LabeledSetError(f"{doc_id}: line {n['line']} has a label off spec 0049's lists")
@@ -252,8 +260,9 @@ def load(path: Path, split: str, *, sha_file: Path | None = None) -> tuple[dict,
     try:
         labeled = json.loads(raw)
         check(labeled, split)
-    except (ValueError, KeyError, TypeError, AttributeError) as exc:
-        raise LabeledSetError(f"the labeled set is malformed ({type(exc).__name__}: {exc})") from exc
+    except (ValueError, KeyError, TypeError, AttributeError, RecursionError) as exc:
+        # The type only: a parser's message can quote the file's contents (review G20).
+        raise LabeledSetError(f"the labeled set is malformed ({type(exc).__name__})") from None
     return labeled, sha
 
 
