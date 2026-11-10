@@ -342,6 +342,8 @@ These are not reachable today, but each is frozen as a regression.
 - **Status:** confirmed (read).
 - **What happens:** while I12 fails (about 18% of worlds), `lab fuzz` and the property test stop at
   the first failure. Until `select()` is fixed, the search cannot report any other new defect.
+- **Spec:** 0046 on `sami/guided-search` (draft): a search that runs its whole budget and keeps the
+  first world for every label.
 
 ### B4. Frozen-case history was overwritten
 
@@ -397,6 +399,19 @@ These are not reachable today, but each is frozen as a regression.
 - `test_generated_corpus.py` builds a real-looking number in pieces for a negative test, on purpose
   (it proves `freeze` refuses one). The reviewer checklist forbids real-looking numbers in code,
   so expect it to be flagged.
+
+### B9. The direct checks catch regressions, not design mistakes
+
+- **Status:** confirmed (read). The oracle's docstring and spec 0033 (decision 2) both say so.
+- **What it means:**
+  - Where no document id is shared, I1 to I7 and I9 follow `select()`'s own reading of the spec
+    exactly. If that reading is wrong, the check is wrong with it.
+  - So they catch a branch that is deleted or broken later, not a hole in the design. The design
+    holes found so far (A1, the shared-id defect) came from the metamorphic checks.
+  - Both kinds of check borrow the ledger's lookalike classifier, so a bug in it is invisible to
+    both.
+- **Spec:** 0046 steers its search by the metamorphic checks for this reason, and keeps the direct
+  checks as the regression net.
 
 ## C. The voice lab (spec 0017)
 
@@ -552,8 +567,12 @@ F1 to F9 hold as built (verified). But the lab still claims more than it shows:
   about yes/no and digit readings do not. Exercising the live agent needs the model, which is the
   red-teaming work in D.
 
-## D. Red teaming (not started)
+## D. Red teaming
 
+- **Started (Nov 9):** Sami chose number selection as the first target. Spec 0046
+  (`sami/guided-search`, draft) is a guided search on `select()` with no model: it scores each
+  world by how much a must-not-help attacker move helped, steers toward higher scores, and fixes
+  the measurement that decides whether the steering stays. The model-driven targets below remain.
 - **Targets:** the two model-driven parts.
   - **The live voice agent** (`apps/voice/src/dialback_voice/claude_agent.py`): a model playing the
     person who answers.
@@ -579,9 +598,11 @@ F1 to F9 hold as built (verified). But the lab still claims more than it shows:
     `0029-voice-call-lookup-and-store.md`, Q65 in `0034-live-call-blockers.md`. A4 above cites
     "spec 0033, Q65", meaning the lab's.
   - Main uses up to Q68. PR #91 takes Q69 to Q75, the `sami/onboarding-anchors` branch takes
-    Q76 and Q77, spec 0043 (`sami/keypad-only-digits`) takes Q78 to Q82, and spec 0044
-    (`sami/line-risk`) takes Q83 to Q86, so the next free number is Q87. Renumber before this
-    branch merges.
+    Q76 and Q77, spec 0043 (`sami/keypad-only-digits`) takes Q78 to Q82, spec 0044
+    (`sami/line-risk`) takes Q83 to Q86, and spec 0046 (`sami/guided-search`) takes Q87 to Q91,
+    so the next free number is Q92. Renumber before this branch merges.
+  - Spec 0045 is on `sami/shared-vendor-profile-spec` and 0046 on `sami/guided-search`, so the
+    next free spec number is 0047.
 
 ## F. How other services verify a bank change (Nov 9)
 
