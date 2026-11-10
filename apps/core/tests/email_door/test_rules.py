@@ -5,6 +5,7 @@ import hashlib
 import hmac
 import re
 import time
+import unicodedata
 
 import pytest
 from dialback_core.bank import aba_valid
@@ -180,6 +181,23 @@ def test_accounts_need_a_label_and_four_to_seventeen_digits():
     assert find_accounts("Account: \uff10\uff10\uff10\uff11\uff12\uff13\uff14\uff15\uff14\uff18\uff12\uff11") == [ACCOUNT]
 
 
+def test_redact_is_fast_on_a_long_email():
+    # Many found accounts, and many runs that repeat none of them: each run is checked against every account.
+    text = "".join(f"Account: {7783110000 + i}. Wire {5000000000 + i} or {6000000000 + i}.\n" for i in range(8300))
+    assert len(text) > 431_000
+    start = time.perf_counter()
+    rules.redact(text)
+    assert time.perf_counter() - start < 1.0
+
+
+def test_every_text_function_reads_only_the_first_50000_characters():
+    pad = "x" * 50_000
+    assert rules.MAX_CHARS == 50_000
+    assert find_accounts(pad + " Account: 000123454821") == [] and find_routing(pad + " ABA 026009593") == []
+    assert redact(pad + " Account: 000123454821") == pad and rules.redact_for_model(pad + " 1234") == pad
+    assert not flag("", pad + " We have changed our bank.").flagged
+
+
 def test_a_last_four_reference_is_not_an_account():
     assert find_accounts("the account ending 8888 is closed; new account 000088889999") == ["000088889999"]
     assert find_accounts("Acct last four: 4821") == []
@@ -277,6 +295,49 @@ def test_a_phone_extension_of_five_digits_or_more_is_masked():
     assert redact("Call 212-555-0199 ext. 4821") == "Call 212-555-0199 ext. 4821"
 
 
+@pytest.mark.parametrize(("text", "phone"), [
+    ("Tel +44 (0)20 7946 0958 ext 000123454821", "+442079460958"),
+    ("Call 011 44 20 7946 0958 ext. 000123454821", "+442079460958"),
+    ("Call 212-555-0199 x000123454821", "+12125550199"),
+    ("Call 212-555-0199 #000123454821", "+12125550199"),
+])
+def test_an_extension_is_masked_in_any_form(text, phone):
+    out = redact(text)
+    assert surviving_account_digits(out) == set() and phone in parse_phone(out)
+
+
+def test_an_extension_is_never_a_routing_number():
+    text = "Call 212-555-0199 ext. 123454821"                                         # nine digits, valid ABA checksum
+    out = redact(text)
+    assert "123454821" not in out and find_routing(text) == [] and parse_phone(out) == ["+12125550199"]
+
+
+@pytest.mark.parametrize("text", [
+    "Please wire the payment to the account below:\n7783110245\nEvergreen Bank",
+    "Our new account is below\n7783110245",
+    "Our new account is below\r\n7783110245",
+    "Our new account is below\r7783110245",
+    "Our new account is below\u20287783110245",
+    "Please wire the payment to the account below:\n\n(778) 311-0245",
+])
+def test_a_number_alone_on_a_line_takes_the_words_of_the_line_before(text):
+    assert surviving_account_digits(redact(text), "7783110245") == set()
+
+
+def test_a_phone_alone_on_a_line_after_a_phone_word_stays():
+    assert parse_phone(redact("Please wire the payment, and if anything is unclear call me on\n212-555-0199")) == ["+12125550199"]
+
+
+@pytest.mark.parametrize(("text", "phone"), [
+    ("Accounts Payable: 212-555-0199", "+12125550199"),
+    ("Jane Doe | Accounts Receivable | Acme Corp | 617-555-0143", "+16175550143"),
+    ("Account manager: Dana 212-555-0199", "+12125550199"),
+    ("Remittance desk Ph: 617-555-0143", "+16175550143"),
+])
+def test_signature_lines_keep_their_phones(text, phone):
+    assert redact(text) == text and parse_phone(text) == [phone]
+
+
 def test_a_loosely_labeled_account_is_not_a_routing_number():
     text = "Our new acct at Evergreen: 026009593"                                      # P9
     assert find_routing(text) == [] and "026009593" not in redact(text)
@@ -303,9 +364,21 @@ def test_the_model_sees_no_run_of_five_digits(text):
     assert [m.group(0) for m in DIGIT_RUN.finditer(out) if sum(c.isdigit() for c in m.group(0)) >= 5] == []
 
 
-def test_redact_for_model_passes_also_mask_through():
-    assert rules.redact_for_model("Re: 1234", also_mask=["0001234"]) == "Re: 1234"
-    assert rules.redact_for_model("Re: 7783110245", also_mask=["7783110245"]) == "Re: ******0245"
+@pytest.mark.parametrize("text", [
+    "Account: 000123454821",
+    "0001  --  2345  --  4821",                                                     # gaps longer than masking.py groups
+    "7783|1102|45",
+    "778\u00b7311\u00b70245",                                                         # middle dots
+    "".join(d + "\ufe0f\u20e3" for d in "7783110245"),                              # keycaps
+    "\u2077\u2077\u2078\u00b3\u00b9\u00b9\u2070\u00b2\u2074\u2075",                          # superscripts
+    "\uff17\uff17\uff18\uff13\uff11\uff11\uff10\uff12\uff14\uff15",                          # fullwidth
+    "\u0667\u0667\u0668\u0663\u0661\u0661\u0660\u0662\u0664\u0665",                          # Arabic-Indic
+    "Call 212-555-0199 or wire 026009593.",
+])
+def test_the_model_copy_has_no_digit_at_all(text):
+    out = rules.redact_for_model(text)
+    assert not any(c.isdecimal() or c.isdigit() for c in out)
+    assert not any(c.isdecimal() for c in unicodedata.normalize("NFKC", out))
 
 
 # Fingerprint ---------------------------------------------------------------------------------------

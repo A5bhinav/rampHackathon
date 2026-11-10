@@ -17,7 +17,7 @@ from dialback_ledger.candidates import find_phones
 from dialback_ledger.text import Line
 
 from ..bank import aba_valid
-from .masking import DIGIT_RUN, SEPARATOR, mask_digit_runs, mask_run
+from .masking import DIGIT_RUN, SEPARATOR, mask_run
 
 # Flagging ------------------------------------------------------------------------------------------
 #
@@ -34,7 +34,9 @@ from .masking import DIGIT_RUN, SEPARATOR, mask_digit_runs, mask_run
 # before "remains the same". Spec 0086 lists every version of this rule and its numbers.
 
 WINDOW = 8
-FLAG_READS = 50_000  # flag() reads at most this many characters, subject first, so its time stays bounded
+# Every email-text function here reads at most this many characters (flag: subject first, then text), so
+# its time stays bounded. Text past it is not read: padding an email can push a request past it.
+MAX_CHARS = 50_000
 
 
 def _terms(*alternatives: str) -> re.Pattern[str]:
@@ -119,9 +121,9 @@ class Flag:
 
 def flag(subject: str, text: str) -> Flag:
     """Whether the email asks to change where a vendor's payments go, with the word pairs that say so.
-    Reads the first FLAG_READS characters of the subject and then the text."""
-    subject = (subject or "")[:FLAG_READS]
-    text = (text or "")[:FLAG_READS - len(subject)]
+    Reads the first MAX_CHARS characters of the subject and then the text."""
+    subject = (subject or "")[:MAX_CHARS]
+    text = (text or "")[:MAX_CHARS - len(subject)]
     reasons: dict[str, None] = {}
     verbs: list[str] = []
     dests: list[str] = []
@@ -276,11 +278,13 @@ def _sentence_reasons(tokens: list[str]) -> tuple[list[str], list[str], list[str
 # reference to the last four, not an account. A run is digits grouped by masking.py's separators, so
 # "0001 2345 4821", "0001-2345-4821" and a number split over lines are each one run.
 #
-# Redaction is the ADR-8 barrier for the ledger and the model. Beyond the labeled accounts it treats
-# as an account (so masks, and never reports as a routing number): any digits that repeat a found
-# account, however grouped; a run whose nearest label on its line is an account label ("Our new acct at
+# Redaction keeps ADR-8 for the ledger's copy of the text. Beyond the labeled accounts it treats as an
+# account (so masks, and never reports as a routing number): any digits that repeat a found account,
+# however grouped; a run whose nearest label on its line is an account label ("Our new acct at
 # Evergreen: 026009593"); and a phone-shaped number on a line that has a payment word and no phone word
-# ("wire to 7783110245"). A phone extension of 5 or more digits is masked like any other run.
+# ("wire to 7783110245"). A line of digits and punctuation only takes the words of the line before it.
+# A phone extension is masked like any other run and is never a routing number. The model's copy has
+# no digits at all (redact_for_model).
 
 _NOT_AN_ACCOUNT = (r"(?!\s+(?:manager|managers|statements?|payable|receivable|team|contacts?|reps?|representative|executive"
                    r"|settings|password|login|portal|balance|summary|history|activity)\b)")
@@ -291,32 +295,38 @@ _ACCOUNT = re.compile(
 LABEL_REACH = 40
 _ACCOUNT_LABEL = rf"(?<![a-z0-9])(?:accounts?|accts?|a/c)(?![a-z0-9]){_NOT_AN_ACCOUNT}"
 _ROUTING_LABEL = r"(?<![a-z0-9])(?:routing|aba|rtn|transit|swift|iban|sort code)(?![a-z0-9])"
-_PHONE_WORD = r"(?<![a-z0-9])(?:call[a-z]*|phones?|telephone|tel|mobile|cell|fax|contact[a-z]*|reach|text|ext)(?![a-z0-9])"
-_PAYMENT_WORD = re.compile(r"(?<![a-z0-9])(?:accounts?|accts?|routing|aba|wires?|wired|wiring|ach|remit[a-z]*|pay[a-z]*"
-                           r"|bank[a-z]*|iban|deposits?|beneficiar[a-z]*)(?![a-z0-9])", re.IGNORECASE)
+_PHONE_WORD = r"(?<![a-z0-9])(?:call[a-z]*|phones?|telephone|tel|ph|mobile|cell|fax|contact[a-z]*|reach|text|ext)(?![a-z0-9])"
+# Not "accounts payable", "accounts receivable", "account manager" or "payable": a signature line keeps its phone.
+_PAYMENT_WORD = re.compile(
+    r"(?<![a-z0-9])(?:accounts?(?!\s+(?:payable|receivable|managers?)(?![a-z0-9]))|accts?|routing|aba|wires?|wired|wiring|ach"
+    r"|remit[a-z]*|pay(?!able(?![a-z0-9]))[a-z]*|bank[a-z]*|iban|deposits?|beneficiar[a-z]*)(?![a-z0-9])", re.IGNORECASE)
 _PHONE_LINE = re.compile(_PHONE_WORD, re.IGNORECASE)
 _NEAREST_LABEL = re.compile(rf"(?P<account>{_ACCOUNT_LABEL})|(?P<routing>{_ROUTING_LABEL})|(?P<phone>{_PHONE_WORD})",
                             re.IGNORECASE)
+_LINE_BREAK = re.compile("[\n\r\x0b\x0c\x1c-\x1e\x85\u2028\u2029]")   # what str.splitlines splits on
+_EXTENSION_MARK = re.compile(r"[ \t]*(?:ext(?:ension)?\.?|x|#|,)[ \t]*(?=\d)", re.IGNORECASE)
 
 
 def find_routing(text: str) -> list[str]:
-    """Every routing number in `text` (nine digits, valid ABA checksum, not taken for an account), in
-    order, once each."""
+    """Every routing number in the first MAX_CHARS of `text` (nine digits, valid ABA checksum, not taken
+    for an account or a phone extension), in order, once each."""
+    text = text[:MAX_CHARS]
     return _unique(_ascii(text[s:e]) for s, e, kind in _pieces(text) if kind == "routing")
 
 
 def find_accounts(text: str) -> list[str]:
-    """Every labeled account number in `text`, digits only, in order, once each. The only function that
-    returns a full account number: use it in memory and drop it (ADR-8)."""
-    return _unique(digits for _, _, digits in _accounts(text))
+    """Every labeled account number in the first MAX_CHARS of `text`, digits only, in order, once each.
+    The only function that returns a full account number: use it in memory and drop it (ADR-8)."""
+    return _unique(digits for _, _, digits in _accounts(text[:MAX_CHARS]))
 
 
 def redact(text: str, also_mask: Iterable[str] = ()) -> str:
-    """The ledger's copy of `text`: every account number (see above) and every other run of 5 or more
-    digits masked to its last four, separators kept. Phone numbers and routing numbers stay, so the
-    ledger can still read them; its stub reader stores a phone's whole line, so nothing else on that
-    line may stay whole. `also_mask` holds accounts found in another field (the body's, when redacting
-    the subject), masked wherever their digits appear."""
+    """The ledger's copy of the first MAX_CHARS of `text`: every account number (see above) and every
+    other run of 5 or more digits masked to its last four, separators kept. Phone numbers and routing
+    numbers stay, so the ledger can still read them; its stub reader stores a phone's whole line, so
+    nothing else on that line may stay whole. `also_mask` holds accounts found in another field (the
+    body's, when redacting the subject), masked wherever their digits appear."""
+    text = text[:MAX_CHARS]
     out = list(text)
     for s, e, kind in _pieces(text, also_mask):
         if kind in ("account", "other"):
@@ -324,10 +334,11 @@ def redact(text: str, also_mask: Iterable[str] = ()) -> str:
     return "".join(out)
 
 
-def redact_for_model(text: str, also_mask: Iterable[str] = ()) -> str:
-    """The model's copy of `text`: `redact`, then every run of 5 or more digits masked, phones and
-    routing numbers included. The model needs none of them."""
-    return mask_digit_runs(redact(text, also_mask))
+def redact_for_model(text: str) -> str:
+    """The model's copy of the first MAX_CHARS of `text`: NFKC-normalized (so fullwidth digits, keycaps'
+    digits and superscripts become plain digits), then every digit replaced by `#`. The model needs no
+    digits, and masking them format by format is an arms race."""
+    return "".join("#" if c.isdigit() else c for c in unicodedata.normalize("NFKC", text[:MAX_CHARS]))
 
 
 def requested_fingerprint(key: bytes, routing: str, account: str) -> str:
@@ -344,48 +355,75 @@ def _accounts(text: str) -> list[tuple[int, int, str]]:
     return out
 
 
-def _phones(text: str) -> list[tuple[int, int]]:
-    """The phone numbers the ledger needs, found the way it finds them: line by line, with parse_phone's
-    matcher. A phone-shaped number on a line with a payment word and no phone word is left out (it is
-    taken for an account), and a span stops before an extension, which is masked like other digits."""
-    out, offset = [], 0
+def _phones(text: str) -> tuple[list[tuple[int, int]], list[tuple[int, int]]]:
+    """(the phone numbers the ledger needs, their extensions), found the way the ledger finds phones:
+    line by line, with parse_phone's matcher. A phone-shaped number on a line with a payment word and no
+    phone word is left out (it is taken for an account); a line of digits and punctuation only takes
+    the words of the last line before it that has letters. A phone stops before its extension; when
+    the number and its digits cannot be lined up and there are extra digits, the phone is left out."""
+    phones, extensions, offset = [], [], 0
+    payment = phone_word = False
     for i, line in enumerate(text.splitlines(keepends=True)):
-        if not (_PAYMENT_WORD.search(line) and not _PHONE_LINE.search(line)):
-            out += [(offset + c.start, offset + _without_extension(line, c)) for c in find_phones([Line(line, "visible", 0, i)])]
+        if any(c.isalpha() for c in line):
+            payment, phone_word = bool(_PAYMENT_WORD.search(line)), bool(_PHONE_LINE.search(line))
+        if payment and not phone_word:
+            offset += len(line)
+            continue
+        for c in find_phones([Line(line, "visible", 0, i)]):
+            end = _phone_end(line, c)
+            if end is None:
+                extensions.append((offset + c.start, offset + c.end))
+                continue
+            phones.append((offset + c.start, offset + end))
+            extensions.append((offset + end, offset + c.end))
+            mark = _EXTENSION_MARK.match(line, c.end)
+            run = mark and DIGIT_RUN.match(line, mark.end())
+            if run:
+                extensions.append((offset + run.start(), offset + run.end()))
         offset += len(line)
-    return out
+    return phones, extensions
 
 
-def _without_extension(line: str, candidate) -> int:
-    """Where the phone number itself ends in `line`: before any extension digits after it."""
+def _phone_end(line: str, candidate) -> int | None:
+    """Where the phone number itself ends in `line`, before any extension: its E.164 digits (or their
+    national part) lined up within the matched digits, after any prefix such as "011" or "(0)". None
+    when they cannot be lined up and the match has more digits than the number."""
     digits = _ascii(line[candidate.start:candidate.end])
     e164 = candidate.e164.lstrip("+")
-    for skip in range(4):   # the matched digits may start with the country code, or without it
-        if digits.startswith(e164[skip:]):
-            keep, end = len(e164) - skip, candidate.start
+    for skip in range(4):   # the country code may be written, partly written or left out
+        at = digits.find(e164[skip:], 0, len(e164) + 4)
+        if at >= 0:
+            keep, end = at + len(e164) - skip, candidate.start
             while keep:
                 keep -= line[end].isdecimal()
                 end += 1
             return end
-    return candidate.end
+    return None if len(digits) > len(e164) else candidate.end
 
 
 def _pieces(text: str, also_mask: Iterable[str] = ()) -> list[tuple[int, int, str]]:
     """The digits of `text` as (start, end, kind) pieces: each labeled `account`, then every digit run
     with those accounts and the ledger's phone numbers cut out of it. A remaining piece is an `account`
-    when it repeats a found account or its nearest label is an account label, else a `routing` number,
-    else `other`."""
+    when it repeats a found account or its nearest label is an account label, else `other` when it is
+    a phone extension, else a `routing` number, else `other`."""
     accounts = _accounts(text)
     secrets = {d for _, _, d in accounts} | {_ascii(a) for a in also_mask}
     secrets = {d for d in secrets if len(d) >= 5}   # four digits are the last four ADR-8 keeps anyway
+    lengths = sorted({len(d) for d in secrets})
 
     def repeats_an_account(span: str) -> bool:
+        """Whether `span`'s digits hold a found account: each window of each account length is looked up
+        in a set, so the cost is the span's length times the number of distinct lengths."""
         digits = _ascii(span)
-        return any(secret in digits for secret in secrets)
+        return any(digits[i:i + n] in secrets for n in lengths for i in range(len(digits) - n + 1))
 
+    phones, extensions = _phones(text)
     taken = bytearray(len(text))
-    for s, e in [(s, e) for s, e, _ in accounts] + [(s, e) for s, e in _phones(text) if not repeats_an_account(text[s:e])]:
+    for s, e in [(s, e) for s, e, _ in accounts] + [(s, e) for s, e in phones if not repeats_an_account(text[s:e])]:
         taken[s:e] = b"\x01" * (e - s)
+    extension = bytearray(len(text))
+    for s, e in extensions:
+        extension[s:e] = b"\x01" * (e - s)
     out = [(s, e, "account") for s, e, _ in accounts]
     for m in DIGIT_RUN.finditer(text):
         k = m.start()
@@ -402,6 +440,8 @@ def _pieces(text: str, also_mask: Iterable[str] = ()) -> list[tuple[int, int, st
             piece = text[s:e]
             if repeats_an_account(piece) or _labeled_as_account(text, s):
                 kind = "account"
+            elif extension[s]:
+                kind = "other"
             elif len(piece) == 9 and piece.isdecimal() and aba_valid(_ascii(piece)):
                 kind = "routing"
             else:
@@ -413,8 +453,9 @@ def _pieces(text: str, also_mask: Iterable[str] = ()) -> list[tuple[int, int, st
 def _labeled_as_account(text: str, start: int) -> bool:
     """Whether the nearest label before `start`, on its line and within LABEL_REACH characters, is an
     account label (not a routing label or a phone word)."""
-    line_start = text.rfind("\n", max(0, start - LABEL_REACH), start) + 1
-    labels = list(_NEAREST_LABEL.finditer(text, max(line_start, start - LABEL_REACH), start))
+    window = max(0, start - LABEL_REACH)
+    breaks = list(_LINE_BREAK.finditer(text, window, start))
+    labels = list(_NEAREST_LABEL.finditer(text, breaks[-1].end() if breaks else window, start))
     return bool(labels) and labels[-1].lastgroup == "account"
 
 
