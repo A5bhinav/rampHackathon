@@ -2,7 +2,8 @@ import "server-only";
 import { redirect } from "next/navigation";
 import { sessionToken } from "./session";
 import type {
-  ActionResult, Alert, ApiError, CaseDetail, CaseState, CaseSummary, ChainStatus, Dataset, EvidenceLog, Me, SelectionView, VendorRisk,
+  ActionResult, Alert, ApiError, BankChangeResult, CaseDetail, CaseState, CaseSummary, ChainStatus, Dataset, EvidenceLog, Me,
+  SelectionView, VendorAccounts, VendorRisk,
 } from "./api-types";
 
 // The only way the dashboard talks to the core: server-side, with the signed-in user's
@@ -50,6 +51,12 @@ export const core = {
   selection: (caseId: string) => call<SelectionView>(`/api/cases/${caseId}/selection`),
   release: (caseId: string, body: { expected_version: number; action: "approve" | "reject"; reason: string }) =>
     call<ActionResult>(`/api/cases/${caseId}/release`, { method: "POST", body: JSON.stringify(body) }),
+  /** The demo's Ramp (mock) portal (spec 0077): each vendor's current account, and whether this person can change one. */
+  vendorAccounts: (datasetId: string) => call<VendorAccounts>(`/api/datasets/${datasetId}/vendor-accounts`),
+  /** A clerk's bank change, sent by the core to the Ramp mock as their linked Ramp user. The account number goes
+   *  straight through; the answer carries only routing and last four. */
+  bankChange: (datasetId: string, vendorId: string, body: { routing_number: string; account_number: string }) =>
+    call<BankChangeResult>(`/api/datasets/${datasetId}/vendors/${vendorId}/bank-change`, { method: "POST", body: JSON.stringify(body) }),
   review: (caseId: string, body: { expected_version: number; action: "clear" | "block"; reason: string }) =>
     call<ActionResult>(`/api/cases/${caseId}/review`, { method: "POST", body: JSON.stringify(body) }),
 };
