@@ -17,7 +17,7 @@ schemas' own `$id`s (https://dialback.dev/schemas/...) map to schemas/. Nothing 
 import json
 import sys
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
 import yaml
 from jsonschema import Draft202012Validator
@@ -42,7 +42,7 @@ def retrieve(uri: str) -> Resource:
         parsed = urlparse(uri)
         if parsed.scheme != "file":
             raise LookupError(f"refusing to fetch {uri}: only local contracts resolve")
-        path = Path(parsed.path)
+        path = Path(unquote(parsed.path))  # as_uri() escapes "+", spaces...; undo it
     return Resource.from_contents(load(path), default_specification=DRAFT202012)
 
 
