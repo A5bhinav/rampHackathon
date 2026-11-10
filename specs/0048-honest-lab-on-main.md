@@ -68,6 +68,12 @@ sample is drawn with pinned draws (C1).
    The callback number is allowed only in the fixed lines that say it: the disclosure, the voicemail
    line (`script.py:61`) and the consent-refused line (`script.py:67`). The fixed wording "last four
    digits" is a single number word, so it is below the threshold.
+
+   **The agent says nothing of its own** (added Nov 10). Production agents return no text: code
+   owns every spoken line. So a gate fails any call where the agent's reply carries text. This
+   catches what no word list can, such as an agent agreeing in words to call another number ("sure,
+   I'll use the number you gave me"). If an agent that speaks is ever built, this gate has to be
+   revisited.
 3. **Declared facts are labelled.**
    - A scenario whose verdict rests on a fact production never computes that way lists it under
      `declared`. Today that's a07 (`line_risk`), a04 (`dialed_number_is_pick: false`), a06
@@ -172,7 +178,8 @@ This tests the step after the call, the way the fuzz lab tests `select()`. No ca
      - A strict reference matcher must pass F3, to show the phrase bank's truth labels are sound.
 5. **Proving each check can fail.** Each check is first shown failing on a deliberately broken
    double:
-   - **F1:** a `decide()` whose V07 accepts `unsure`.
+   - **F1:** a `decide()` whose V07 accepts `unsure` and whose NR09 is turned off. NR09 refuses any
+     unsure answer first, so the V07 change alone changes nothing (corrected Nov 10).
    - **F2:** one double per move, each letting that move's less certain value through. For example,
      a `decide()` that skips the digit rules when the digits are `dont_know`.
    - **F3:** a company check that accepts any answer containing the vendor's name. Production may
@@ -211,7 +218,10 @@ This tests the step after the call, the way the fuzz lab tests `select()`. No ca
    0), with one test per change.
 3. **The coverage floor.**
    - `context_label_on_provable` counts a label on the pick only.
-   - The eligible-number floor leaves out the planted real number.
+   - The eligible-number floor leaves out the planted real number, and keeps its 50% bar. Counted
+     that way it was 27% (B11), so the generator changes until it reaches 50%. If it can't without
+     distorting the worlds, the build stops and reports. The bar is never lowered to fit (decided
+     Nov 10).
    - A test shows the first-cut generator fails the coverage check, as 0033's acceptance says.
 4. **B7's minors.**
    - `lab run` works without the dev-only `hypothesis`.
@@ -278,7 +288,8 @@ This tests the step after the call, the way the fuzz lab tests `select()`. No ca
   - a removed vendor-name rule;
   - an agent naming a bank and an amount without digits.
 
-  Every honest scenario, voicemail and consent refused included, still passes.
+  The broken new-number pattern is caught by the gate that fails any agent text. Every honest
+  scenario, voicemail and consent refused included, still passes.
 - [ ] Every scenario that rests on an uncomputed fact declares it. The loader refuses one that
   doesn't, and the scorecard reports declared scenarios on their own.
 - [ ] The oracle imports nothing from `dialback_core`.
