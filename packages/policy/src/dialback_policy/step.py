@@ -342,7 +342,7 @@ def _callee_said(state: State, event: CalleeSaid) -> Step:
 def _keypad(state: State, event: Keypad) -> Step:
     if state.phase is not Phase.LAST4 or state.consent != "yes":
         if state.check_in_pending:  # after a check-in, a key elsewhere shows the caller is there (spec 0051, D5)
-            return _presence(state, "[keypad]", event.at)
+            return _presence(state, "[keys]", event.at)   # never "[keypad]", which marks a digits entry
         return Step(state)  # keys pressed outside the digits question mean nothing
     # The digits never enter the transcript. An entry is activity, and after a check-in it is the answer.
     state = replace(_add(state, "callee", "[keypad]"), silences=0, check_in_pending=False)
@@ -361,7 +361,7 @@ def _keypad_reset(state: State, event: KeypadReset) -> Step:
     check-in; elsewhere it shows the caller is there (spec 0051, D5)."""
     if state.phase is not Phase.LAST4 or state.consent != "yes":
         if state.check_in_pending:
-            return _presence(state, "[keypad reset]", event.at)
+            return _presence(state, "[keys reset]", event.at)
         return Step(state)
     state = replace(_add(state, "callee", "[keypad reset]"), silences=0, check_in_pending=False)
     if _over_turn_cap(state):
@@ -369,18 +369,27 @@ def _keypad_reset(state: State, event: KeypadReset) -> Step:
     return _speak(state, START_OVER, Phase.LAST4)
 
 
+def asking_digits(state: State) -> bool:
+    """True while the open question is the digits question itself, not the callback-time question
+    asked during it. The check-in's line and ending follow this, and so do the relay's quiet timings
+    (spec 0051)."""
+    return state.phase is Phase.LAST4 and _open_question(state)[1] is Phase.LAST4
+
+
 def _silence(state: State) -> Step:
     """The transport's quiet clock ran out (spec 0051, D4 and D6). The first time, the call checks in,
     asking no question. With no reply to that, or on the fourth quiet spell in the call whatever came
     between, the call ends closed: at the digits question it finishes with every other answer and no
-    digits (NR06), as a second unclear does there (spec 0043, Q79); anywhere else it ends `failed`."""
+    digits (NR06), as a second unclear does there (spec 0043, Q79); anywhere else, the callback-time
+    question included, it ends `failed`."""
     script = state.ctx.script
+    digits = asking_digits(state)
     state = replace(state, silences=state.silences + 1, quiet_spells=state.quiet_spells + 1)
     if state.silences >= MAX_SILENCES or state.quiet_spells > MAX_CHECK_INS:
-        if state.phase is Phase.LAST4:
+        if digits:
             return _end(state, "answers_recorded", "silence:last4", script.goodbye())
         return _end(state, "failed", "silence", script.goodbye())
-    line = TAKE_YOUR_TIME if state.phase is Phase.LAST4 else STILL_THERE
+    line = TAKE_YOUR_TIME if digits else STILL_THERE
     return _speak(replace(state, check_in_pending=True), line, None)
 
 
@@ -389,12 +398,15 @@ def _presence(state: State, text: str, at: dt.datetime) -> Step:
     D5). It is kept in the call's transcript, marked, but it is never recorded, never sent to the
     model and never citable by a tool call (R9); code's own pressure flag still reads it, which can
     only add a review. The open question is asked again in code's wording, and that does not use up
-    the one more try (spec 0043, D5): presence is not an unclear answer."""
+    the one more try (spec 0043, D5): presence is not an unclear answer. Digits said at the digits
+    question get spec 0043's keypad line instead of "Thanks." (D4)."""
     state = replace(_add(state, "callee", text, presence=True), silences=0, check_in_pending=False)
     if _over_turn_cap(state):
         return _end(state, "failed", "turn_cap", state.ctx.script.goodbye())
     if state.consent == "yes":
         state = _flag_pressure(state, at)
+    if asking_digits(state) and any(len(run) >= SPOKEN_DIGITS for run in digit_runs(text)):
+        return _speak(state, f"{REASK} {KEYPAD_ONLY}", Phase.LAST4)
     line, asked = _open_question(state)
     return _speak(state, f"{THANKS} {line}", asked)
 
