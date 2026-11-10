@@ -137,7 +137,9 @@ def received(email_id: str, **changes) -> ReceivedEmail:
             "text": "Please update our account.", "html_text": "", "headers": {},
             "authentication": {"spf": "pass", "dkim": "pass", "dmarc": "pass"}, "raw_sha256": "ab" * 32,
             "has_attachments": False}
-    return ReceivedEmail(**(base | changes))
+    email = base | changes
+    email["headers"] = {"from": email["sender"]} | email["headers"]   # the raw From header, as Resend keeps it
+    return ReceivedEmail(**email)
 
 
 class FakeResend:

@@ -23,6 +23,7 @@ from dialback_core.email_door import door
 from dialback_core.email_door.classifier import ClassifierFailed, Verdict
 from dialback_core.email_door.inbox import process_inbound_emails
 from dialback_core.email_door.masking import mask_digit_runs
+from dialback_core.email_door.reply import send_reply
 from dialback_core.email_door.resend import ReceivedEmail
 from dialback_core.email_door.rules import flag_email, requested_fingerprint
 from dialback_core.flags import EmailMode, ResolverMode
@@ -99,7 +100,9 @@ async def arrive(w, email_id: str | None = None, notice_message_id: str | None =
                  **changes) -> dict:
     """One email through the signed route; the worker runs until idle. Returns the email's row.
     `notice_sender` is the From the notice carries (the row stores it); the default is the tests' usual one."""
-    email_id = await deliver(w, email_id, **({"sender": notice_sender} if notice_sender else {}), message_id=notice_message_id)
+    # The notice carries the From of the email, as in production (the row stores it; the reply counts by it).
+    notice_sender = notice_sender or changes.get("sender") or "Sam Judge <sam.judge@gmail.example>"
+    email_id = await deliver(w, email_id, sender=notice_sender, message_id=notice_message_id)
     w.worker.resend.emails[email_id] = judge(email_id, **changes)
     await w.worker.drain(w.demo_id)
     return await one(w.pool, "select * from app.inbound_emails where dataset_id = %s and resend_email_id = %s", w.demo_id, email_id)
@@ -614,7 +617,7 @@ async def test_a_flagged_email_gets_the_fixed_reply_to_its_from_address(door_wor
     [sent] = door_world.worker.resend.sent
     assert sent["to"] == "sam.judge@gmail.example"
     assert sent["sender"] == "Dialback <bank-changes@dialback.example>"
-    assert sent["subject"] == "Re: Cobalt Freight: new bank details"
+    assert sent["subject"] == "Re: your message about payment details"
     assert sent["in_reply_to"] == row["message_id"]
     assert sent["idempotency_key"] == f"reply-{row['resend_email_id']}"
     assert sent["text"].splitlines()[-1] == "https://dialback.example/bank-changes"
@@ -624,7 +627,7 @@ async def test_a_flagged_email_gets_the_fixed_reply_to_its_from_address(door_wor
 async def test_the_reply_is_the_same_whatever_happened_to_the_email(door_world):
     replying(door_world)
     opened = await arrive(door_world)
-    stopped = await arrive(door_world, notice_sender="Pat <pat@other.example>", sender="Pat <pat@other.example>", text="Please move to our new bank. Routing 026009593.")
+    stopped = await arrive(door_world, sender="Pat <pat@other.example>", text="Please move to our new bank. Routing 026009593.")
     assert (opened["outcome"], stopped["outcome"]) == ("case_opened", "no_account_number")
     assert (opened["reply"], stopped["reply"]) == ("sent", "sent")
     first, second = door_world.worker.resend.sent
@@ -661,8 +664,8 @@ async def test_an_unauthenticated_flagged_email_gets_no_reply(door_world):
 
 async def test_a_second_email_from_the_same_sender_is_rate_limited(door_world):
     replying(door_world)
-    first = await arrive(door_world, notice_sender="Dana <AR@vendor.example>")
-    second = await arrive(door_world, notice_sender="Someone Else <ar@vendor.example>")   # the same address, another display name
+    first = await arrive(door_world)
+    second = await arrive(door_world, sender="Someone Else <SAM.JUDGE@gmail.example>")   # the same address, another display name
     assert (first["reply"], second["reply"]) == ("sent", "rate_limited")
     assert len(door_world.worker.resend.sent) == 1
 
@@ -697,11 +700,12 @@ async def test_a_send_error_records_failed_and_keeps_the_case(door_world, caplog
     assert "boom" not in caplog.text and "gmail.example" not in caplog.text and "RuntimeError" in caplog.text
 
 
-async def test_a_crlf_subject_cannot_add_headers_to_the_reply(door_world):
+async def test_the_reply_never_echoes_the_subject(door_world):
     replying(door_world)
-    await arrive(door_world, subject="Cobalt Freight bank\r\nBcc: victim@elsewhere.example")
+    await arrive(door_world, subject="Cobalt Freight bank\r\nBcc: victim@elsewhere.example 000123454821")
     [sent] = door_world.worker.resend.sent
-    assert "\r" not in sent["subject"] and "\n" not in sent["subject"]
+    assert sent["subject"] == "Re: your message about payment details"
+    assert "Bcc" not in sent["text"] and "000123454821" not in sent["text"]
 
 
 async def test_an_unparseable_from_is_suppressed(door_world):
@@ -709,3 +713,70 @@ async def test_an_unparseable_from_is_suppressed(door_world):
     row = await arrive(door_world, sender="no address here")
     assert row["outcome"] == "case_opened" and row["reply"] == "suppressed"
     assert door_world.worker.resend.sent == []
+
+
+async def test_without_a_link_the_reply_is_not_configured(door_world):
+    replying(door_world, bank_changes_url=None)
+    row = await arrive(door_world)
+    assert row["outcome"] == "case_opened" and row["reply"] == "not_configured"
+    assert door_world.worker.resend.sent == []
+
+
+async def test_a_production_shaped_email_with_two_from_mailboxes_gets_no_reply(door_world):
+    replying(door_world)
+    row = await arrive(door_world, sender="sam.judge@gmail.example",
+                       headers={"from": "Sam <sam.judge@gmail.example>, Victim <victim@elsewhere.example>"})
+    assert row["outcome"] == "case_opened" and row["reply"] == "suppressed"
+    assert door_world.worker.resend.sent == []
+
+
+@pytest.mark.parametrize("message_id,expected", [
+    ("<ok@gmail.example>", "<ok@gmail.example>"), ("no brackets@x", None), ("<has space@x>", None),
+    ("<" + "a" * 250 + ">", None), ("<caf\u00e9@x>", None), ("<a@x>\r\nBcc: v@e.example", None)])
+async def test_in_reply_to_is_sent_only_for_a_well_formed_message_id(door_world, message_id, expected):
+    replying(door_world)
+    await arrive(door_world, message_id=message_id)
+    assert door_world.worker.resend.sent[0]["in_reply_to"] == expected
+
+
+async def test_a_second_decision_on_a_sent_row_changes_nothing(door_world):
+    replying(door_world)
+    row = await arrive(door_world)
+    email = door_world.worker.resend.emails[row["resend_email_id"]]
+    await send_reply(door_world.pool, door_world.worker.settings, door_world.worker.resend, door_world.demo_id, email)
+    assert await reply_of(door_world, row) == "sent" and len(door_world.worker.resend.sent) == 1
+
+
+async def test_a_database_error_while_deciding_does_not_raise_or_undo_the_case(door_world, monkeypatch, caplog):
+    replying(door_world)
+
+    def broken(pool):
+        raise ConnectionError("db down sam.judge@gmail.example")
+    monkeypatch.setattr("dialback_core.email_door.reply.system_tx", broken)
+    with caplog.at_level(logging.DEBUG):
+        row = await arrive(door_world)
+    assert row["outcome"] == "case_opened" and row["reply"] == "not_flagged"
+    assert door_world.worker.resend.sent == [] and len(await cases(door_world)) == 1
+    assert "gmail.example" not in caplog.text and "ConnectionError" in caplog.text
+
+
+@pytest.mark.parametrize("minutes_ago,expected", [(61, "sent"), (59, "rate_limited")])
+async def test_the_hourly_cap_counts_the_last_sixty_minutes(door_world, minutes_ago, expected):
+    replying(door_world)
+    async with system_tx(door_world.pool) as conn:
+        for i in range(20):
+            await conn.execute(
+                """insert into app.inbound_emails (dataset_id, resend_email_id, sender, received_at, has_attachments, outcome, flagged, reply)
+                   values (%s, %s, %s, app.now(%s) - make_interval(mins => %s), false, 'case_opened', true, 'sent')""",
+                (door_world.demo_id, f"win{i}", f"p{i}@elsewhere.example", door_world.demo_id, minutes_ago))
+    assert (await arrive(door_world))["reply"] == expected
+
+
+async def test_an_unreadable_stored_sender_counts_toward_the_sender_limit(door_world):
+    replying(door_world)
+    async with system_tx(door_world.pool) as conn:
+        await conn.execute(
+            """insert into app.inbound_emails (dataset_id, resend_email_id, sender, received_at, has_attachments, outcome, flagged, reply)
+               values (%s, 'garbled', 'no address at all', app.now(%s), false, 'case_opened', true, 'sent')""",
+            (door_world.demo_id, door_world.demo_id))
+    assert (await arrive(door_world))["reply"] == "rate_limited"

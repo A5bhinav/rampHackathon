@@ -1,17 +1,29 @@
 """The fixed reply and its suppression rules (spec 0088; design section 8). Pure decisions and wording."""
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pytest
-from dialback_core.email_door.reply import REPLY_TEXT, ReplyDecision, compose_reply, decide_reply
+from dialback_core.email_door.reply import (
+    REPLY_TEXT,
+    ReplyDecision,
+    compose_reply,
+    decide_reply,
+    is_authenticated,
+    reply_address,
+)
 from flows import received
 
 INBOX = "inbox@dialback.example"
 URL = "https://dialback.example/bank-changes"
 
 
+REPLY_FROM = "Dialback <bank-changes@dialback.example>"
+
+
 def decide(email=None, *, configured=True, inbox=INBOX, per_sender=0, per_hour=0, **changes) -> ReplyDecision:
     return decide_reply(email or received("e1", **changes), inbox_address=inbox, configured=configured,
-                        sent_to_sender_24h=per_sender, sent_last_hour=per_hour)
+                        sent_to_sender_24h=per_sender, sent_last_hour=per_hour, reply_from=REPLY_FROM)
 
 
 def test_a_clean_authenticated_email_is_sent():
@@ -39,6 +51,38 @@ def test_auto_submitted_no_and_other_precedence_are_fine():
     "MAILER-DAEMON@vendor.example", "mailer-daemon@mx.vendor.example", "", "not an address", "a@b.example\r\nBcc: x@y.example"])
 def test_inbox_noreply_and_unparseable_senders_are_suppressed(sender):
     assert decide(sender=sender) == ReplyDecision(False, "suppressed")
+
+
+@pytest.mark.parametrize("sender", ["x@dialback.example", "Anyone <hr@DIALBACK.example>", "bank-changes@dialback.example"])
+def test_the_inbox_domain_and_our_own_from_address_are_never_replied_to(sender):
+    assert decide(sender=sender) == ReplyDecision(False, "suppressed")
+
+
+def test_the_raw_from_with_two_mailboxes_is_suppressed():
+    """Production shape: Resend's `sender` is the bare first address, the raw header holds two mailboxes."""
+    email = received("e1", sender="ar@vendor.example", headers={"from": "AR <ar@vendor.example>, Victim <victim@elsewhere.example>"})
+    assert decide(email) == ReplyDecision(False, "suppressed")
+
+
+def test_a_raw_from_naming_another_address_than_sender_is_suppressed():
+    email = received("e1", sender="ar@vendor.example", headers={"from": "Dana <someone.else@vendor.example>"})
+    assert decide(email) == ReplyDecision(False, "suppressed")
+
+
+def test_a_missing_raw_from_is_suppressed():
+    email = received("e1", sender="ar@vendor.example")
+    assert decide(replace(email, headers={})) == ReplyDecision(False, "suppressed")
+
+
+def test_a_matching_bare_sender_and_raw_from_is_sent():
+    email = received("e1", sender="ar@vendor.example", headers={"from": "Dana <AR@Vendor.example>"})
+    assert decide(email) == ReplyDecision(True, "sent")
+    assert reply_address(email) == "ar@vendor.example"
+
+
+def test_dkim_and_dmarc_are_compared_trimmed_and_lowercase():
+    assert decide(authentication={"spf": "fail", "dkim": " PASS ", "dmarc": "fail"}).send is True
+    assert is_authenticated({"dmarc": "gray"}) is False and is_authenticated(None) is False
 
 
 def test_suppression_beats_unauthenticated():
@@ -76,36 +120,15 @@ APPROVED = ("We never change payment details because of an email. Every change i
 
 
 def test_reply_text_is_the_approved_wording():
-    _subject, text = compose_reply(received("e1"), "Cobalt Freight", URL)
+    _subject, text = compose_reply("Cobalt Freight", URL)
     assert text == APPROVED + "\n\n" + URL
     assert text.splitlines()[-1] == URL
     assert "{" not in text
     assert REPLY_TEXT.format(company="Cobalt Freight", url=URL) == text
 
 
-def test_reply_text_holds_nothing_from_the_email():
-    _, text = compose_reply(received("e1", sender="Dana <ar@vendor.example>", text="Account 000123454821", subject="Secret subject"),
-                            "Cobalt Freight", URL)
-    for part in ("Dana", "vendor.example", "000123454821", "Secret subject"):
-        assert part not in text
-
-
-@pytest.mark.parametrize("original,expected", [
-    ("New bank details", "Re: New bank details"), ("Re: New bank details", "Re: New bank details"),
-    ("RE: hi", "RE: hi"), ("", "Re: (no subject)"),
-    ("a\r\nBcc: x@y.example", "Re: a Bcc: x@y.example"), ("nul\x00byte", "Re: nulbyte"),
-    ("Account 000123454821", "Re: Account ********4821")])
-def test_the_subject_is_cleaned(original, expected):
-    assert compose_reply(received("e1", subject=original), "Co", URL)[0] == expected
-
-
-def test_the_subject_is_capped_at_200_characters():
-    subject, _ = compose_reply(received("e1", subject="x" * 500), "Co", URL)
-    assert subject == "Re: " + "x" * 200
-
-
-def test_without_a_url_the_text_ends_after_the_wording():
-    assert compose_reply(received("e1"), "Co", "")[1].endswith("someone sent you.")
+def test_the_subject_is_fixed_and_never_the_senders():
+    assert compose_reply("Co", URL)[0] == "Re: your message about payment details"
 
 
 @pytest.mark.anyio
@@ -126,3 +149,4 @@ async def test_the_client_sends_an_idempotency_key_and_threads_the_reply():
     assert (sent, method, path) == ("out_1", "POST", "/emails")
     assert headers["idempotency-key"] == "reply-em_1" and headers["authorization"] == "Bearer re_key"
     assert body["to"] == ["b@vendor.example"] and body["headers"]["In-Reply-To"] == "<m@b>"
+    assert body["headers"]["Auto-Submitted"] == "auto-replied"

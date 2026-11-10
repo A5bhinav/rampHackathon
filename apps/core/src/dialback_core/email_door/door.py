@@ -42,7 +42,7 @@ from ..events import apply_event
 from ..settings import Settings
 from .masking import mask_digit_runs, strip_nul
 from .match import VendorRef, match_vendor
-from .reply import send_reply
+from .reply import is_authenticated, send_reply
 from .resend import ReceivedEmail, ResendPort
 from .rules import (
     MAX_CHARS,
@@ -280,8 +280,7 @@ def _header_flags(email: ReceivedEmail) -> list[str]:
     sender = parseaddr(strip_nul(email.sender))[1].lower()
     if any(parseaddr(strip_nul(r))[1].lower() != sender for r in email.reply_to):
         flags.append("reply_to_differs")
-    auth = email.authentication or {}
-    if "pass" not in {str(auth.get(k) or "").strip().lower() for k in ("dmarc", "dkim")}:
+    if not is_authenticated(email.authentication):
         flags.append("sender_unauthenticated")
     return flags
 

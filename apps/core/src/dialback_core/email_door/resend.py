@@ -25,7 +25,7 @@ SKIPPED_TAGS = frozenset({"script", "style", "title"})
 class ReceivedEmail:
     email_id: str
     message_id: str
-    sender: str                       # the From header
+    sender: str                       # Resend's top-level `from` (the bare address); the raw header is headers["from"]
     reply_to: tuple[str, ...]
     to: tuple[str, ...]
     subject: str
@@ -140,8 +140,10 @@ class ResendClient:
     async def send(self, *, sender: str, to: str, subject: str, text: str, in_reply_to: str | None,
                    idempotency_key: str) -> str:
         """Send one email. Resend drops a second send with the same Idempotency-Key, so a retry never sends twice."""
-        payload: dict[str, Any] = {"from": sender, "to": [to], "subject": subject, "text": text}
+        # Every mail we send is an automatic reply (RFC 3834), so other robots do not answer it.
+        headers = {"Auto-Submitted": "auto-replied"}
         if in_reply_to:
-            payload["headers"] = {"In-Reply-To": in_reply_to, "References": in_reply_to}
+            headers |= {"In-Reply-To": in_reply_to, "References": in_reply_to}
+        payload: dict[str, Any] = {"from": sender, "to": [to], "subject": subject, "text": text, "headers": headers}
         body = await self._call("POST", "/emails", extra_headers={"Idempotency-Key": idempotency_key}, json=payload)
         return str(body.get("id") or "")
