@@ -790,7 +790,7 @@ F1 to F9 hold as built (verified). But the lab still claims more than it shows:
   NR21), 22 listed as unreachable.
 - **The reachable domain was wider than production:** before fix 4, 881 of 2,000 "reachable"
   reports broke production's recording rules.
-- **Three calls for Sami:**
+- **Three calls, accepted by Sami on Nov 10** (written into spec 0048, review fix 8):
   - The third planted bug (reading only the first company answer) shows only on reports production
     never sends, so it is reported but not gated.
   - The F1 list names five company conditions, not A10's three: the near-variants are real defects
