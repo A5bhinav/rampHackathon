@@ -6,6 +6,7 @@ vendor_name: Initech Parts
 caller:
   consent: 'yes'
   company: Initech Parts
+  company_is: vendor              # spec 0048, A4: the vendor's own name
   department: Accounts payable
   name: Dana Price
   role: accounts receivable

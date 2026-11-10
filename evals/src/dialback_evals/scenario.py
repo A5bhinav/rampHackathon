@@ -52,6 +52,10 @@ class CallerBehavior:
     offer_other_number: bool = False
     hang_up_at: str | None = None
     silent: bool = False
+    # The author's judgment of what the caller said at the company question (spec 0048, A4): `vendor`
+    # (names this vendor), `other` (another company, a negation, a reseller, a correction) or `partial`
+    # (part of the name). The oracle reads this, never production's company check.
+    company_is: str | None = None
 
 
 @dataclass(frozen=True)
@@ -96,8 +100,10 @@ def load_scenarios(directory: str | Path) -> list[Scenario]:
 # The keys a scenario may use: anything else (a typo such as `injct`) is an error, not ignored (F7).
 _KEYS = frozenset({"id", "class", "is_attack", "customer_name", "vendor_name", "caller", "facts", "expect_rule",
                    "expect_end", "declared"})
-_CALLER_KEYS = frozenset({"consent", "company", "department", "name", "role", "change", "last4_mode", "last4",
-                          "answered_by", "inject", "inject_phase", "offer_other_number", "hang_up_at", "silent"})
+_CALLER_KEYS = frozenset({"consent", "company", "company_is", "department", "name", "role", "change", "last4_mode",
+                          "last4", "answered_by", "inject", "inject_phase", "offer_other_number", "hang_up_at",
+                          "silent"})
+COMPANY_TRUTHS = frozenset({"vendor", "other", "partial"})
 _FACT_KEYS = frozenset({"dialed_eligible_number", "new_last4", "old_last4", "dialed_number_is_pick",
                         "speaker_in_change_thread", "offered_number_from_request", "line_risk", "direction"})
 _PHASES = frozenset(p.name for p in Phase)
@@ -153,6 +159,7 @@ def _parse(path: Path) -> Scenario:
         offer_other_number=flag(c.get("offer_other_number", False), "offer_other_number"),
         hang_up_at=phase(c.get("hang_up_at"), "hang_up_at"),
         silent=flag(c.get("silent", False), "silent"),
+        company_is=one_of(need("company_is", c), COMPANY_TRUTHS, "company_is"),
     )
     f = only(need("facts", raw), _FACT_KEYS, "facts")
     new_last4, old_last4 = str(need("new_last4", f)), f.get("old_last4")

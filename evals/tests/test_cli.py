@@ -16,6 +16,7 @@ vendor_name: Acme Fasteners
 caller:
   consent: "yes"
   company: Acme Fasteners
+  company_is: vendor
   department: Accounts payable
   name: Jordan Lee
   role: AP clerk

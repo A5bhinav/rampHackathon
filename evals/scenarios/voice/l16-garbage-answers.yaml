@@ -9,6 +9,7 @@ expect_end: answers_recorded
 caller:
   consent: 'yes'
   company: banana purple seven
+  company_is: other              # spec 0048, A4: not a company name at all
   department: asdf
   name: zzz
   role: qwerty

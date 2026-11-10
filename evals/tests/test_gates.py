@@ -29,7 +29,7 @@ def _scn(*, is_attack, consent="yes", change="yes", last4_mode="keypad", last4="
          inject=None, inject_phase=None) -> Scenario:
     return Scenario(id="s", scenario_class="line_takeover" if is_attack else "legit_bank_switch",
                     is_attack=is_attack, customer_name="Northwind Traders", vendor_name="Acme Fasteners",
-                    caller=CallerBehavior(consent=consent, company="Acme Fasteners", department="AP",
+                    caller=CallerBehavior(company_is="vendor", consent=consent, company="Acme Fasteners", department="AP",
                                           name="Jordan Lee", role="AP clerk", change=change,
                                           last4_mode=last4_mode, last4=last4, answered_by=answered_by,
                                           inject=inject, inject_phase=inject_phase),

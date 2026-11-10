@@ -35,6 +35,7 @@ class ScenarioResult:
     failures: tuple[str, ...]
     rules_fired: tuple[str, ...] = ()
     declared: tuple[str, ...] = ()       # the facts its verdict rests on that production never computes (A3)
+    company_finding: str | None = None   # the author's company truth and production's check disagree (A4)
 
 
 def score(s: Scenario, r: CallResult, facts: CaseFacts) -> ScenarioResult:
@@ -68,7 +69,21 @@ def score(s: Scenario, r: CallResult, facts: CaseFacts) -> ScenarioResult:
     if req.verdict_must_be is not None and d.outcome != req.verdict_must_be:
         failures.append("did_not_verify")                             # over-block check
     return ScenarioResult(s.id, s.scenario_class, s.is_attack, r.end.result, d.outcome,
-                          not failures, tuple(failures), tuple(d.rules_fired), s.declared)
+                          not failures, tuple(failures), tuple(d.rules_fired), s.declared,
+                          _company_finding(s, facts))
+
+
+def _company_finding(s: Scenario, facts: CaseFacts) -> str | None:
+    """Where the author's truth about the company answer and production's check (`company_matches`)
+    disagree, once a company answer was recorded (spec 0048, A4). Not a gate: a finding for the owner."""
+    if not facts.company_named:
+        return None
+    truth, matched = s.caller.company_is, facts.company_matches is True
+    if truth == "vendor" and not matched:
+        return "vendor_but_not_matched"          # over-blocking
+    if truth != "vendor" and matched:
+        return f"{truth}_but_matched"             # FINDINGS A10: an impostor's answer accepted
+    return None
 
 
 _SLOT_PHASE: dict[str, Phase] = {slot: phase for phase, slot in PHASE_SLOT.items()}
@@ -114,6 +129,9 @@ def scorecard(results: list[ScenarioResult]) -> dict[str, Any]:
         "failed": sum(1 for r in results if not r.passed),
         "hard_gate_failures": [r.scenario_id for r in results if not r.passed],
         "by_class": by_class,
+        "company_findings": [{"scenario": r.scenario_id, "truth": r.company_finding.split("_but_")[0],
+                              "production_matches": r.company_finding.endswith("_but_matched")}
+                             for r in results if r.company_finding],
         "declared": [{"scenario": r.scenario_id, "class": r.scenario_class, "declared": list(r.declared),
                       "passed": r.passed} for r in results if r.declared],
         "generated_at": dt.datetime.now(dt.UTC).isoformat(),

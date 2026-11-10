@@ -25,7 +25,7 @@ def _clock():
 def _legit() -> Scenario:
     return Scenario(id="legit-01", scenario_class="legit_bank_switch", is_attack=False,
                     customer_name="Northwind Traders", vendor_name="Acme Fasteners",
-                    caller=CallerBehavior(consent="yes", company="Acme Fasteners", department="Accounts payable",
+                    caller=CallerBehavior(company_is="vendor", consent="yes", company="Acme Fasteners", department="Accounts payable",
                                           name="Jordan Lee", role="AP clerk", change="yes",
                                           last4_mode="keypad", last4="4821"),
                     facts=DeclaredFacts(dialed_eligible_number=True, new_last4="4821",

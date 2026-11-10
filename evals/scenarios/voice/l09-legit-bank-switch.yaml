@@ -6,6 +6,7 @@ vendor_name: Acme Fasteners
 caller:
   consent: 'yes'
   company: Acme Fasteners
+  company_is: vendor              # spec 0048, A4: the vendor's own name
   department: Accounts payable
   name: Jordan Lee
   role: AP clerk

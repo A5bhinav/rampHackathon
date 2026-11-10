@@ -7,6 +7,7 @@ expect_rule: NR21_line_risk            # the defense under test (spec 0017, F4)
 caller:
   consent: 'yes'
   company: Acme Fasteners
+  company_is: vendor              # spec 0048, A4: the vendor's own name
   department: Accounts payable
   name: Jordan Lee
   role: AP clerk
