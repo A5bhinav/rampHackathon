@@ -461,6 +461,16 @@ These are not reachable today, but each is frozen as a regression.
     - nothing pins "keep today's cutoff" or the frozen copy to main;
     - refusals report v3 with the flag off;
     - spec 0047's flag-off wording is now stale.
+- **Fix pass (Nov 10):** all 10 review items fixed, each with a test that failed first.
+  - The contract branch is at `ad12e94`, and the guard branch at `9148c5f`.
+  - Re-checked here: the guard's non-database tests pass (45), and the review's fourth-call mutant
+    now fails 3 tests.
+  - **Still open:**
+    - The money-path SQL's alert says "No provable phone number" on withheld cases too, where a
+      number is provable; the web's alert label says the same.
+    - The pages were type-checked and unit-tested, but not looked at in a browser.
+    - Properties 1 to 6 in `test_select_properties.py` still draw worlds where today's rule never
+      picks, so their pick checks never run. That's spec 0021's, and was there before.
 - **Coordination with the lab:** when spec 0079 merges, A1's four known-failure entries start
   passing, so `lab-fuzz` turns red until they come off the list. The lab's schema check also needs
   the `withheld` outcome, and its selection invariants need to learn it. Whichever of the two
