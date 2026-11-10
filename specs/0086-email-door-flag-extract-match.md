@@ -116,3 +116,5 @@ Results (to fill in after the runs):
 | Model | Set | Change requests flagged | Ordinary flagged | Failures | cr-36 | Bar | Cost |
 |---|---|---|---|---|---|---|---|
 | | | | | | | | |
+
+Notes on the numbers (Task 6c, fix round 1). The Opus run uses the server-side fallback `"default"`, so an email the model refuses may be answered by another model; the result is for "Opus with its fallbacks", not Opus alone. The reported cost is a lower bound: it counts the tokens of the replies received, not retries or timed-out attempts. The result files in `apps/core/tests/email_door/eval_results/` (counts and file names only, with a `failed` map of file to failure reason) are committed as the record, and a result file is never overwritten.

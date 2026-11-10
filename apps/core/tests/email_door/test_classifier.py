@@ -548,3 +548,26 @@ def test_a_failed_call_adds_no_usage():
     with pytest.raises(ClassifierFailed):
         model.classify("S", "T")
     assert (model.input_tokens, model.output_tokens, model.calls) == (0, 0, 0)
+
+
+def plain_message(text: str | None, stop: str = "end_turn"):
+    from anthropic.types import Message
+
+    content = [{"type": "text", "text": text}] if text is not None else []
+    return Message.model_validate({
+        "id": "msg_01", "type": "message", "role": "assistant", "model": "claude-haiku-5-5", "content": content,
+        "stop_reason": stop, "stop_sequence": None, "usage": {"input_tokens": 7, "output_tokens": 3}})
+
+
+def test_haiku_reads_a_plain_message():
+    got = AnthropicClassifier(FakeBothEndpoints(plain_message(reply(True, "q"))), model="claude-haiku-5-5").classify("S", "T")
+    assert got == Verdict(True, "q")
+
+
+@pytest.mark.parametrize("stop, reason", [("refusal", "refusal"), ("max_tokens", "max_tokens")])
+def test_haiku_refusal_and_max_tokens_are_typed_failures_and_still_count_usage(stop, reason):
+    model = AnthropicClassifier(FakeBothEndpoints(plain_message(None, stop)), model="claude-haiku-5-5")
+    with pytest.raises(ClassifierFailed) as err:
+        model.classify("S", "T")
+    assert err.value.reason == reason
+    assert (model.input_tokens, model.output_tokens, model.calls) == (7, 3, 1)

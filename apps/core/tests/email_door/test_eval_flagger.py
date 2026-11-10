@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
+import threading
+from datetime import UTC, datetime
 from pathlib import Path
 
 import eval_flagger
@@ -86,12 +89,13 @@ def test_counting_by_label_and_by_who_flagged(fixtures):
 
 def test_a_failure_counts_as_not_flagged_and_is_tallied_by_reason(fixtures):
     r = evaluate(fixtures)
-    assert r["failures"] == {"timeout": 1}
+    assert r["failures"] == {"timeout": 1} and r["failed"] == {"ord-03.json": "timeout"}
     assert "ord-03.json" not in r["false_flags"]
     # a failure on a change request is a miss
     write(fixtures / "x", {"cr-01.json": email("change_request", BOOM)})
     r = eval_flagger.evaluate_set("tuning", eval_flagger.load_set(fixtures / "x"), FakeModel(), model="m", workers=2)
     assert r["missed"] == ["cr-01.json"] and r["failures"] == {"timeout": 1}
+    assert r["failed"] == {"cr-01.json": "timeout"}   # told apart from an ordinary email that failed
 
 
 def test_only_subject_text_and_label_are_loaded(fixtures):
@@ -125,13 +129,18 @@ def test_the_heldout2_bar_with_and_without_cr_36(tmp_path, cr36_flagged, ordinar
     r = evaluate(tmp_path, "heldout2")
     assert r["cr_36"] == {"flagged": cr36_flagged}
     assert "cr-36.json" not in r["missed"]
+    assert (r["change_requests_total"], r["ordinary_total"]) == (2, 5)   # cr-36 is not counted among them
     assert r["bar_without_cr_36"] == ("PASS" if without else "FAIL")
     assert r["bar_with_cr_36"] == ("PASS" if with_ else "FAIL")
 
 
-def run_main(fixtures, tmp_path, *args):
-    return eval_flagger.main(list(args), fixtures=fixtures, out_dir=tmp_path / "out", make_classifier=lambda m: FakeModel(),
-                             today="2026-11-10")
+EXPECTED = {"tuning": (3, 3), "dev": (1, 1), "heldout2": (3, 5)}
+T0 = datetime(2026, 11, 10, 12, 30, 5, tzinfo=UTC)
+
+
+def run_main(fixtures, tmp_path, *args, now=T0, model_factory=FakeModel):
+    return eval_flagger.main(list(args), fixtures=fixtures, out_dir=tmp_path / "out",
+                             make_classifier=lambda m: model_factory(), now=now, expected=EXPECTED)
 
 
 def test_heldout2_needs_the_confirm_flag_and_is_never_read_without_it(tmp_path, capsys):
@@ -154,14 +163,14 @@ def test_heldout2_runs_when_confirmed_and_sealed(tmp_path, capsys):
     assert run_main(tmp_path, tmp_path, "--sets", "heldout2", "--confirm-heldout2") == 0
     out = capsys.readouterr().out
     assert "PASS" in out and "cr-36.json" in out
-    assert (tmp_path / "out" / "2026-11-10-claude-haiku-5-5-heldout2.json").exists()
+    assert (tmp_path / "out" / "2026-11-10T123005Z-claude-haiku-5-5-heldout2.json").exists()
 
 
 def test_the_results_file_and_the_table_hold_counts_and_file_names_only(fixtures, tmp_path, capsys):
     assert run_main(fixtures, tmp_path, "--sets", "tuning", "dev") == 0
     out = capsys.readouterr()
     written = sorted((tmp_path / "out").glob("*.json"))
-    assert [p.name for p in written] == ["2026-11-10-claude-haiku-5-5-dev.json", "2026-11-10-claude-haiku-5-5-tuning.json"]
+    assert [p.name for p in written] == ["2026-11-10T123005Z-claude-haiku-5-5-dev.json", "2026-11-10T123005Z-claude-haiku-5-5-tuning.json"]
     data = json.loads(written[1].read_text())
     assert data["missed"] == ["cr-03.json"] and data["model"] == "claude-haiku-5-5"
     blob = out.out + out.err + "".join(p.read_text() for p in written)
@@ -172,5 +181,129 @@ def test_the_results_file_and_the_table_hold_counts_and_file_names_only(fixtures
 
 def test_a_missing_key_stops_before_any_call(monkeypatch, fixtures, tmp_path, capsys):
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-    assert eval_flagger.main(["--sets", "tuning"], fixtures=fixtures, out_dir=tmp_path / "out") == 2
+    assert eval_flagger.main(["--sets", "tuning"], fixtures=fixtures, out_dir=tmp_path / "out", expected=EXPECTED) == 2
     assert "ANTHROPIC_API_KEY" in capsys.readouterr().err
+
+
+# Fix round 1 -------------------------------------------------------------------------------------------
+
+def test_an_unexpected_error_is_tallied_by_type_and_counts_as_not_flagged(fixtures):
+    class Broken(FakeModel):
+        def classify(self, subject, text):
+            raise RuntimeError("EMAILTEXT leaked into an error")
+
+    r = evaluate(fixtures, model_factory=Broken)
+    assert r["failures"] == {"unexpected:RuntimeError": 5}   # the five emails the rule leaves to the model
+    assert set(r["failed"].values()) == {"unexpected:RuntimeError"}
+    assert r["change_requests_flagged"] == 1 and r["ordinary_flagged"] == 0
+    assert "EMAILTEXT" not in json.dumps(r)
+
+
+def test_every_email_is_counted_exactly_once(tmp_path):
+    heldout2(tmp_path, cr36_flagged=True, ordinary_flagged=1)
+    r = evaluate(tmp_path, "heldout2")
+    assert r["change_requests_total"] + r["ordinary_total"] + 1 == r["emails"] == 8
+
+
+def test_quiet_sdk_logs_survives_loggers_created_meanwhile():
+    from dialback_core.email_door.classifier import quiet_sdk_logs
+
+    stop, errors = threading.Event(), []
+
+    def create():
+        i = 0
+        while not stop.is_set() and i < 1_000:
+            logging.getLogger(f"anthropic.stress{i}")
+            i += 1
+
+    maker = threading.Thread(target=create)
+    maker.start()
+    try:
+        for _ in range(20):
+            try:
+                quiet_sdk_logs()
+            except RuntimeError as exc:
+                errors.append(exc)
+    finally:
+        stop.set()
+        maker.join()
+    assert not errors
+
+
+def test_a_result_file_is_never_overwritten(fixtures, tmp_path, capsys):
+    assert run_main(fixtures, tmp_path, "--sets", "tuning") == 0
+    (first,) = (tmp_path / "out").glob("*.json")
+    before = first.read_text()
+    assert run_main(fixtures, tmp_path, "--sets", "tuning") == 2   # same second, same name
+    assert "exists" in capsys.readouterr().err and first.read_text() == before
+    later = datetime(2026, 11, 10, 12, 30, 6, tzinfo=UTC)
+    assert run_main(fixtures, tmp_path, "--sets", "tuning", now=later) == 0
+    assert len(list((tmp_path / "out").glob("*.json"))) == 2
+
+
+def test_sets_are_deduplicated(fixtures, tmp_path):
+    assert run_main(fixtures, tmp_path, "--sets", "tuning", "tuning", "dev", "tuning") == 0
+    assert len(list((tmp_path / "out").glob("*.json"))) == 2
+
+
+def test_heldout2_runs_once_per_model(tmp_path, capsys):
+    heldout2(tmp_path, cr36_flagged=True, ordinary_flagged=0)
+    assert run_main(tmp_path, tmp_path, "--sets", "heldout2", "--confirm-heldout2") == 0
+    later = datetime(2026, 11, 11, tzinfo=UTC)
+    assert run_main(tmp_path, tmp_path, "--sets", "heldout2", "--confirm-heldout2", now=later) == 2
+    assert "already" in capsys.readouterr().err
+    assert run_main(tmp_path, tmp_path, "--sets", "heldout2", "--confirm-heldout2", "--model", "claude-opus-5-5", now=later) == 0
+
+
+def test_the_composition_is_checked_before_any_call(fixtures, tmp_path, capsys):
+    calls = []
+
+    class Spy(FakeModel):
+        def classify(self, subject, text):
+            calls.append(1)
+            return super().classify(subject, text)
+
+    assert eval_flagger.main(["--sets", "tuning"], fixtures=fixtures, out_dir=tmp_path / "out", now=T0,
+                             make_classifier=lambda m: Spy(), expected={"tuning": (30, 62)}) == 2
+    assert "tuning" in capsys.readouterr().err and calls == []
+
+
+def test_an_unknown_label_is_an_error(tmp_path):
+    write(tmp_path / "s", {"a.json": email("maybe", PLAIN)})
+    with pytest.raises(eval_flagger.EvalError):
+        eval_flagger.load_set(tmp_path / "s")
+
+
+def test_heldout2_composition_is_forty_change_requests_with_cr_36_and_seventy_ordinary():
+    assert eval_flagger.EXPECTED == {"tuning": (30, 62), "dev": (35, 65), "heldout2": (40, 70)}
+
+
+def test_nul_bytes_are_stripped_as_production_does(tmp_path):
+    write(tmp_path / "s", {"a.json": email("ordinary", "Hi\u0000 there")})
+    assert eval_flagger.load_set(tmp_path / "s")["a.json"]["text"] == "Hi there"
+
+
+def test_the_hash_is_of_the_bytes_that_are_run(tmp_path):
+    heldout2(tmp_path, cr36_flagged=True, ordinary_flagged=0)
+    emails, digest = eval_flagger.read_set(tmp_path / "heldout2")
+    files = sorted((tmp_path / "heldout2").glob("*.json"))
+    assert digest == hashlib.sha256(b"".join(p.read_bytes() for p in files)).hexdigest() and len(emails) == 8
+
+
+def test_only_the_two_named_models_are_allowed(fixtures, tmp_path):
+    with pytest.raises(SystemExit):
+        run_main(fixtures, tmp_path, "--model", "claude-other")
+
+
+@pytest.mark.parametrize("mode, ok", [("", True), ("metadata", True), ("full", False), ("content", False)])
+def test_span_content_capture_refuses_the_run(monkeypatch, fixtures, tmp_path, capsys, mode, ok):
+    monkeypatch.setenv("ANTHROPIC_OPEN_TELEMETRY_TRACES_CONTENT_MODE", mode)
+    assert run_main(fixtures, tmp_path, "--sets", "tuning") == (0 if ok else 2)
+    if not ok:
+        assert "TELEMETRY" in capsys.readouterr().err
+
+
+def test_the_table_shows_failures_by_file_and_model_call_latency(fixtures, tmp_path, capsys):
+    run_main(fixtures, tmp_path, "--sets", "tuning")
+    out = capsys.readouterr().out
+    assert "ord-03.json" in out and "timeout" in out and "model-call latency" in out

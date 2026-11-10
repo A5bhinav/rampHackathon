@@ -28,12 +28,16 @@ from dialback_core.email_door.classifier import (
     ClassifierFailed,
     anthropic_client,
 )
+from dialback_core.email_door.masking import strip_nul
 from dialback_core.email_door.rules import flag_email
 
 FIXTURES = Path(__file__).parent / "fixtures"
 OUT_DIR = Path(__file__).parent / "eval_results"
 SETS = {"tuning": "tuning", "dev": "heldout", "heldout2": "heldout2"}   # set name -> fixture directory
 DEFAULT_MODEL = "claude-haiku-5-5"
+MODELS = ("claude-haiku-5-5", "claude-opus-5-5")
+EXPECTED = {"tuning": (30, 62), "dev": (35, 65), "heldout2": (40, 70)}   # (change requests incl. cr-36, ordinary)
+TELEMETRY_VAR = "ANTHROPIC_OPEN_TELEMETRY_TRACES_CONTENT_MODE"
 WORKERS = 4
 MAX_ORDINARY_FLAGGED = 3
 CR_36 = "cr-36.json"   # reported separately on heldout2
@@ -44,21 +48,33 @@ class EvalError(Exception):
     """A refusal to run; the message holds no email text."""
 
 
-def load_set(directory: Path) -> dict[str, dict]:
-    """Each fixture's subject, text and label, and nothing else (never the note or the vendor)."""
-    out = {}
+def read_set(directory: Path) -> tuple[dict[str, dict], str]:
+    """Each fixture's subject, text and label, and nothing else (never the note or the vendor), with NUL
+    bytes stripped as production does, plus the sha256 of the bytes read (the sealed-set check hashes
+    exactly what is run)."""
+    out, blob = {}, b""
     for path in sorted(directory.glob("*.json")):
-        raw = json.loads(path.read_text())
-        out[path.name] = {"subject": raw["subject"], "text": raw["text"], "label": raw["label"]}
-    return out
+        data = path.read_bytes()
+        blob += data
+        raw = json.loads(data)
+        if raw["label"] not in ("change_request", "ordinary"):
+            raise EvalError(f"{path.name} has a label that is neither change_request nor ordinary")
+        out[path.name] = {"subject": strip_nul(raw["subject"]), "text": strip_nul(raw["text"]), "label": raw["label"]}
+    return out, hashlib.sha256(blob).hexdigest()
 
 
-def verify_sealed(directory: Path, sha_file: Path) -> None:
-    """The same check as test_flag_bar.py: sha256 of the sorted files' bytes, joined, equals the sealed hash."""
-    files = sorted(directory.glob("*.json"))
-    sealed = sha_file.read_text().split()[0]
-    if hashlib.sha256(b"".join(p.read_bytes() for p in files)).hexdigest() != sealed:
-        raise EvalError(f"the {directory.name} hash does not match {sha_file.name}; refusing to run")
+def load_set(directory: Path) -> dict[str, dict]:
+    return read_set(directory)[0]
+
+
+def check_composition(name: str, emails: dict[str, dict], expected: tuple[int, int]) -> None:
+    labels = [e["label"] for e in emails.values()]
+    got = (labels.count("change_request"), labels.count("ordinary"))
+    if got != expected or sum(got) != len(emails):
+        raise EvalError(f"the {name} set holds {got[0]} change requests and {got[1]} ordinary emails, "
+                        f"not the expected {expected[0]} and {expected[1]}")
+    if name == "heldout2" and (CR_36 not in emails or emails[CR_36]["label"] != "change_request"):
+        raise EvalError(f"{CR_36} is not among the heldout2 change requests")
 
 
 def cost_usd(model: str, input_tokens: int, output_tokens: int) -> float | None:
@@ -95,21 +111,23 @@ class TimedClassifier:
 def evaluate_set(name: str, emails: dict[str, dict], classifier: ChangeClassifier, *, model: str,
                  workers: int = WORKERS) -> dict:
     timed = TimedClassifier(classifier)
-    failures: dict[str, int] = {}
-    lock = threading.Lock()
 
     def one(item: tuple[str, dict]) -> tuple[str, bool, str]:
         file, e = item
         try:
             decision = flag_email(e["subject"], e["text"], "", timed)
         except ClassifierFailed as exc:   # counted as not flagged
-            with lock:
-                failures[exc.reason] = failures.get(exc.reason, 0) + 1
-            return file, False, "none"
+            return file, False, exc.reason
+        except Exception as exc:   # noqa: BLE001  one bad email must not lose the set; the type name only
+            return file, False, f"unexpected:{type(exc).__name__}"
         return file, decision.flagged, decision.by
 
     with ThreadPoolExecutor(max_workers=workers) as pool:
         outcomes = {file: (flagged, by) for file, flagged, by in pool.map(one, sorted(emails.items()))}
+    failed = {f: by for f, (flagged, by) in outcomes.items() if not flagged and by not in ("none", "rule", "model")}
+    failures: dict[str, int] = {}
+    for reason in failed.values():
+        failures[reason] = failures.get(reason, 0) + 1
 
     def is_cr(f: str) -> bool:
         return emails[f]["label"] == "change_request"
@@ -118,6 +136,7 @@ def evaluate_set(name: str, emails: dict[str, dict], classifier: ChangeClassifie
     separate = {CR_36} if name == "heldout2" and CR_36 in emails else set()
     crs = [f for f in sorted(emails) if is_cr(f) and f not in separate]
     ords = [f for f in sorted(emails) if not is_cr(f)]
+    assert len(crs) + len(ords) + len(separate) == len(emails)
     flagged = lambda f: outcomes[f][0] 
     by = lambda f, who: outcomes[f] == (True, who) 
     in_tokens, out_tokens = getattr(classifier, "input_tokens", 0), getattr(classifier, "output_tokens", 0)
@@ -127,7 +146,7 @@ def evaluate_set(name: str, emails: dict[str, dict], classifier: ChangeClassifie
         "change_requests_by_rule": sum(by(f, "rule") for f in crs), "change_requests_by_model": sum(by(f, "model") for f in crs),
         "ordinary_total": len(ords), "ordinary_flagged": sum(map(flagged, ords)),
         "ordinary_by_rule": sum(by(f, "rule") for f in ords), "ordinary_by_model": sum(by(f, "model") for f in ords),
-        "failures": dict(sorted(failures.items())),
+        "failures": dict(sorted(failures.items())), "failed": dict(sorted(failed.items())),
         "missed": [f for f in crs if not flagged(f)], "false_flags": [f for f in ords if flagged(f)],
         "calls": getattr(classifier, "calls", 0), "input_tokens": in_tokens, "output_tokens": out_tokens,
         "cost_usd": cost_usd(model, in_tokens, out_tokens),
@@ -153,10 +172,11 @@ def table(r: dict) -> str:
         (f"ordinary flagged        {r['ordinary_flagged']}/{r['ordinary_total']} "
          f"(rule {r['ordinary_by_rule']}, model {r['ordinary_by_model']})"),
         f"failures (counted as not flagged): {r['failures'] or 'none'}",
+        f"failed by file: {r['failed'] or 'none'}",
         f"missed: {r['missed'] or 'none'}",
         f"falsely flagged: {r['false_flags'] or 'none'}",
         (f"tokens in/out {r['input_tokens']}/{r['output_tokens']} over {r['calls']} calls, cost {cost}, "
-         f"latency p50 {lat(r['latency_p50_s'])} p95 {lat(r['latency_p95_s'])}"),
+         f"model-call latency p50 {lat(r['latency_p50_s'])} p95 {lat(r['latency_p95_s'])}"),
     ]
     if "cr_36" in r:
         lines += [f"{CR_36} (separate): {'flagged' if r['cr_36']['flagged'] else 'NOT flagged'}",
@@ -174,34 +194,52 @@ def build_classifier(model: str) -> AnthropicClassifier:
 
 
 def main(argv: list[str] | None = None, *, fixtures: Path = FIXTURES, out_dir: Path = OUT_DIR,
-         make_classifier=build_classifier, today: str | None = None) -> int:
+         make_classifier=build_classifier, now: datetime | None = None, expected: dict | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    parser.add_argument("--model", default=DEFAULT_MODEL)
+    parser.add_argument("--model", choices=MODELS, default=DEFAULT_MODEL)
     parser.add_argument("--sets", nargs="+", choices=sorted(SETS), default=["tuning", "dev"])
     parser.add_argument("--confirm-heldout2", action="store_true")
     args = parser.parse_args(argv)
+    sets = list(dict.fromkeys(args.sets))
+    expected = expected or EXPECTED
+    now = now or datetime.now(UTC)
+    safe_model = "".join(c if c.isalnum() or c in ".-" else "_" for c in args.model)
     try:
-        if "heldout2" in args.sets:
-            if not args.confirm_heldout2:
-                raise EvalError("heldout2 is sealed and runs once: pass --confirm-heldout2 to run it")
-            verify_sealed(fixtures / "heldout2", fixtures / "heldout2.sha256")
+        if os.environ.get(TELEMETRY_VAR, "") not in ("", "metadata"):
+            raise EvalError(f"{TELEMETRY_VAR} would put email text in trace spans; unset it (or use metadata)")
+        loaded = {}
+        for name in sets:
+            if name == "heldout2":
+                if not args.confirm_heldout2:
+                    raise EvalError("heldout2 is sealed and runs once: pass --confirm-heldout2 to run it")
+                if list(out_dir.glob(f"*-{safe_model}-heldout2.json")):
+                    raise EvalError(f"a heldout2 result for {args.model} already exists in {out_dir.name}; it runs once")
+            emails, digest = read_set(fixtures / SETS[name])
+            if name == "heldout2" and digest != (fixtures / "heldout2.sha256").read_text().split()[0]:
+                raise EvalError("the heldout2 hash does not match heldout2.sha256; refusing to run")
+            check_composition(name, emails, expected[name])
+            loaded[name] = emails
         classifier = make_classifier(args.model)
     except EvalError as exc:
         print(str(exc), file=sys.stderr)
         return 2
-    date = today or datetime.now(UTC).strftime("%Y-%m-%d")
-    safe_model = "".join(c if c.isalnum() or c in ".-" else "_" for c in args.model)
+    stamp = now.astimezone(UTC).strftime("%Y-%m-%dT%H%M%SZ")
     out_dir.mkdir(parents=True, exist_ok=True)
-    for name in args.sets:
-        # Fresh counters per set: totals are per classifier instance, so take the difference.
+    for name in sets:
+        # Totals are per classifier instance, so each set's usage is the difference.
         before = (getattr(classifier, "input_tokens", 0), getattr(classifier, "output_tokens", 0), getattr(classifier, "calls", 0))
-        result = evaluate_set(name, load_set(fixtures / SETS[name]), classifier, model=args.model)
+        result = evaluate_set(name, loaded[name], classifier, model=args.model)
         result["input_tokens"] -= before[0]
         result["output_tokens"] -= before[1]
         result["calls"] -= before[2]
         result["cost_usd"] = cost_usd(args.model, result["input_tokens"], result["output_tokens"])
-        (out_dir / f"{date}-{safe_model}-{name}.json").write_text(json.dumps(result, indent=2) + "\n")
-        print(table(result))
+        print(table(result))   # shown first, so a paid result is never lost to a file error
+        try:
+            with open(out_dir / f"{stamp}-{safe_model}-{name}.json", "x") as f:   # never overwrite
+                f.write(json.dumps(result, indent=2) + "\n")
+        except FileExistsError:
+            print(f"the result file for {name} exists; not overwriting it", file=sys.stderr)
+            return 2
     return 0
 
 

@@ -71,7 +71,7 @@ SDK_LOGGERS = ("anthropic", "httpx2", "httpcore2")   # the SDK's and its HTTP li
 def quiet_sdk_logs() -> None:
     """Set the SDK's loggers and its HTTP library's, children included, to WARNING, so debug logging
     (ANTHROPIC_LOG=debug, say) can't print a request body, which holds the email's text."""
-    names = {n for n in logging.root.manager.loggerDict if n.split(".")[0] in SDK_LOGGERS}
+    names = {n for n in list(logging.root.manager.loggerDict) if n.split(".")[0] in SDK_LOGGERS}
     for name in {*SDK_LOGGERS, *names}:
         logging.getLogger(name).setLevel(logging.WARNING)
 
@@ -115,7 +115,7 @@ _STOPS = {"end_turn", "max_tokens", "stop_sequence", "tool_use", "pause_turn", "
 _CATEGORIES = {"cyber", "bio", "frontier_llm", "reasoning_extraction", "general_harms"}
 
 
-@dataclass
+@dataclass(eq=False)
 class AnthropicClassifier:
     """ChangeClassifier over the Messages API (beta, for the server-side refusal fallbacks), through the
     official SDK: no tools, no sampling parameters, structured output in SCHEMA's shape. A model with no
