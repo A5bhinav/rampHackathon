@@ -219,6 +219,34 @@ def test_lab_frontier_prints_its_grid(tmp_path, capsys):
     assert "P" in "".join(c for cells in rows.values() for c in cells)      # the grid shows where the pick moves
 
 
+# Spec 0048, part B: lab reports.
+
+def test_lab_reports_fails_on_a_reachable_violation_and_freezes_it(tmp_path, monkeypatch, capsys):
+    from dialback_evals import reports
+    out = tmp_path / "reports-generated"
+    real = reports.run_checks
+    monkeypatch.setattr(reports, "run_checks", lambda **kw: real(**kw, decide=reports.doubles.v07_accepts_unsure_nr09_off))
+    assert main(["reports", "--examples", "60", "--seed", "0", "--out", str(out)]) == 1
+    assert reports.load_all(out) and "reachable F1:" in capsys.readouterr().out
+
+
+def test_lab_reports_passes_when_nothing_is_found(tmp_path, monkeypatch):
+    from dialback_evals import reports
+    monkeypatch.setattr(reports, "check_f1", lambda cases, decide=None: reports.Found())
+    monkeypatch.setattr(reports, "check_f2", lambda cases, decide=None, moves=(): reports.Found())
+    monkeypatch.setattr(reports, "check_f3", lambda cases, matcher=None: reports.Found())
+    assert main(["reports", "--examples", "20", "--seed", "0", "--out", str(tmp_path / "r")]) == 0
+
+
+def test_lab_sweep_starts_without_hypothesis():
+    # Spec 0048, B7: lab sweep (like lab run) starts without the dev-only hypothesis package; it imports it
+    # only when it draws the generated reports.
+    done = _without_hypothesis(["sweep", "--help"])
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert "--unreachable" in done.stdout
+
+
+
 # Spec 0048, D3: each command holds itself to its job's strict known-failures list.
 
 def _list(tmp_path, job, entries):
