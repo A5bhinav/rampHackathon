@@ -42,6 +42,8 @@ REAL = "+14155550142"
 NUM = "+13035550169"
 real_rule = importlib.import_module("dialback_ledger.select")   # the module: the package re-exports select()
 SEED0_BUDGET = 60   # enough worlds at seed 0 for today's rule to show two labels (I12 and I11)
+# "Today's rule" in tests 5 and 6 is the pinned select.py (e3d57b5), so they keep their meaning once
+# select.py is fixed and stops failing those labels.
 
 
 def _pinned():
@@ -208,8 +210,9 @@ def test_gain_new_skips_moves_with_open_labels(tmp_path):
 # ---- 5: the archive keeps going -------------------------------------------------------------------
 
 def test_archive_keeps_going_after_a_failure():
+    today = _pinned()
     for kind in KINDS:
-        arc = search(kind, budget=SEED0_BUDGET, seed=0)
+        arc = search(kind, budget=SEED0_BUDGET, seed=0, rule=today)
         assert arc.calls == SEED0_BUDGET, kind                       # the whole budget ran
         assert len(arc.worlds) == len(set(arc.digests)) <= SEED0_BUDGET
         seen = {label for labels in arc.labels for label in labels}
@@ -251,19 +254,20 @@ def _single_removals(world):
 
 
 def test_frozen_world_is_one_minimal(tmp_path):
+    today = _pinned()
     result = archive_fuzz("archive", examples=SEED0_BUDGET, seed=0, out_dir=tmp_path / "cg",
-                          near_misses=tmp_path / "out" / "near-misses.json")
+                          near_misses=tmp_path / "out" / "near-misses.json", rule=today)
     assert len(result.frozen) >= 2 and len(load_all(tmp_path / "cg")) == len(result.frozen)
     for label, case in result.frozen.items():
         world = load_world(tmp_path / "cg" / case)
-        assert label in all_violations(world), case
+        assert label in all_violations(world, rule=today), case
         found = result.archive.first[label].world
         if found.kwargs["request"] is not None:                   # the request and its document are kept
             request = world.kwargs["request"]
             assert request == found.kwargs["request"]
             assert any(d.id == request.document_id for d in world.kwargs["documents"])
         for what, smaller in _single_removals(world):
-            assert label not in all_violations(smaller), (case, what)
+            assert label not in all_violations(smaller, rule=today), (case, what)
 
 
 # ---- 7: a crash is a finding ----------------------------------------------------------------------
