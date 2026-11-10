@@ -17,11 +17,18 @@ This spec is the test only. Making the mock and the core pass it is the next spe
 
 ## Contract touched
 
-`packages/contracts/openapi/ramp-developer-api.json`: Ramp's Developer API document, byte for
-byte. Source `https://docs.ramp.com/openapi/developer-api.json`, fetched 2026-11-10T09:09Z,
-SHA-256 `29571a47002f5d08d5c7686a31551bb9b66a6c40f06b66597b3f1f5b26d35808`, OpenAPI 3.0.2, 189
-paths. Never edited by hand: to refresh it, download it again and update the hash here and in the
-test. `validate.py` checks only `openapi/*.yaml`, so it skips this file.
+`packages/contracts/openapi/ramp-developer-api.json`: Ramp's Developer API document. Source
+`https://docs.ramp.com/openapi/developer-api.json`, fetched 2026-11-10T09:09Z, OpenAPI 3.0.2, 189
+paths, upstream SHA-256 `29571a47002f5d08d5c7686a31551bb9b66a6c40f06b66597b3f1f5b26d35808`.
+
+One change from upstream, made by the command below and nothing else: Ramp's document carries
+four example access tokens (`ramp_business_tok_...`, in the `example` of `TokenRequestBody`,
+`TokenResponse` and `TokenRevokeRequestBody`). They are documentation values, but a secret
+scanner that knows Ramp's token format could block the push or raise an alert, so each becomes
+`ramp_business_tok_EXAMPLE`. Committed SHA-256
+`64321b18337bf39d10d86d1fa9903c24f48268cd8ea0d2bc2b6a04a602d458da`. To refresh: download, run the
+command, update both hashes here and the committed one in the test. `validate.py` checks only
+`openapi/*.yaml`, so it skips this file.
 
 ## Decisions
 
@@ -47,7 +54,7 @@ test. `validate.py` checks only `openapi/*.yaml`, so it skips this file.
 
 ## Acceptance
 
-- [ ] The committed document's SHA-256 is the one above.
+- [ ] The committed document's SHA-256 is the one above, and it holds no token-shaped string.
 - [ ] The checker passes the Ramp-shaped body and reports each of the seven planted problems (D3).
 - [ ] Every `/developer/v1` route the mock serves has a check (D2).
 - [ ] One check for each route: `GET /vendors`, `GET /vendors/{vendor_id}`, `GET
@@ -88,6 +95,9 @@ test. `validate.py` checks only `openapi/*.yaml`, so it skips this file.
 ## Commands
 
 ```bash
+# refresh Ramp's document (then update the hashes)
+curl -sSL -o /tmp/ramp.json https://docs.ramp.com/openapi/developer-api.json
+python3 -c 'import re,sys; d=open(sys.argv[1],"rb").read(); open(sys.argv[2],"wb").write(re.sub(rb"ramp_business_tok_[A-Za-z0-9]+", b"ramp_business_tok_EXAMPLE", d))' /tmp/ramp.json packages/contracts/openapi/ramp-developer-api.json
 cd apps/ramp-mock && uv run pytest -q tests/test_matches_ramp.py
 uv run --with jsonschema --with rfc8785 --with pyyaml --with openapi-spec-validator python packages/contracts/scripts/validate.py
 ```
