@@ -24,6 +24,7 @@ from psycopg import AsyncConnection, errors
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from .auth import Principal, current_user
+from .bank import aba_valid
 from .db import person_tx
 from .events import NotAllowed, TransitionRefused, VersionConflict, apply_event, person
 from .flags import RampMode
@@ -445,18 +446,9 @@ async def review(case_id: UUID, body: ReviewRequest, request: Request, user: Use
 
 
 # A clerk's bank change from the dashboard (spec 0077) ----------------------------------------------
-ROUTING = re.compile(r"^[0-9]{9}$")
 ACCOUNT = re.compile(r"^[0-9]{4,17}$")
 CHANGE_EVERY_SECONDS = 60  # one change a minute per dataset: a shared demo account can't set off a run of calls
 _last_sent: dict[UUID, float] = {}  # dataset -> when this process last sent a change (the core is one container)
-
-
-def aba_valid(routing: str) -> bool:
-    """The ABA routing-number checksum: 3, 7, 1 weights over the nine digits, a multiple of 10."""
-    if not ROUTING.match(routing):
-        return False
-    d = [int(c) for c in routing]
-    return sum(w * x for w, x in zip([3, 7, 1] * 3, d)) % 10 == 0
 
 
 async def change_access(conn: AsyncConnection, settings: Any, dataset: dict[str, Any]) -> tuple[str | None, str | None]:
