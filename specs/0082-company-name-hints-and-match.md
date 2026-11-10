@@ -118,6 +118,28 @@ say (Part B), and keeps the clear-mismatch signal.
 7. **`False` and `None` are as today.** Anything not `True` under D6 keeps today's result: `False`
    when the answer has readable words, and `None` when it has none. The several-answers rule is
    unchanged (any `False` gives `False`; otherwise any `None` gives `None`; otherwise `True`).
+
+   **7a. Refusal words override a match** (amendment, Sami, Nov 10). An answer that says the person
+   is not with the vendor, or only works with it, is `False` (NR03) even when the vendor's name is in
+   it. It keeps the "clearly a different company" signal the Goal wants, at almost no cost to honest
+   answers.
+   - **The words,** read as whole words the way the guard reads text: `not`, `isn` (from "isn't"),
+     `aren`, `wasn`, `weren`, `never`, `former`, `formerly`, `until`, `reseller`, `resellers`,
+     `resell`, `resells`, `distribute`, `distributes`, `distributor`, `behalf`.
+   - **The phrases,** as runs of whole words: "used to" and "I mean".
+   - **Never these:** bare "no" and "sorry". Honest answers start with them ("No problem, this is
+     Acme", "Sorry, Acme Fasteners").
+   - **A word in the vendor's own name doesn't count** ("Never Summer Industries" answering "Never
+     Summer").
+   - **What it catches:** "Not Acme, this is Globex", "This isn't Acme", "We're a reseller for
+     Acme", "We distribute for Acme", "I used to work at Acme", "I was at Acme until last year",
+     "Acme, sorry, I mean Globex".
+   - **What it doesn't:** a correction with no such word ("Acme? No, Globex"), and another company
+     whose name contains the vendor's ("Acme Fasteners Supply Co"). Both stay accepted costs (D9).
+   - **Its cost:** an honest answer that happens to use one of these words goes to review ("Not
+     sure, I think this is Acme"). That is the safe direction (R7).
+   - **The list is exploratory.** It was chosen after reading the lab's phrase bank (spec 0048), so
+     its effect there proves nothing. D10's measurement is what confirms it.
 8. **No fuzzy matching.** A one-letter slip rule was drafted and dropped after the builder check:
    - On sentences it accepts "help" for "Yelp", "this" for "Thin Air", and "Bell" for "Dell".
    - Phonetic codes disagree with each other: Soundex gives "acme" and "acne" the same code,
@@ -127,9 +149,9 @@ say (Part B), and keeps the clear-mismatch signal.
 9. **Accepted costs.**
    - A different company that shares a distinctive first word passes ("Acme Bolts" for "Acme
      Fasteners").
-   - A negated or corrected short name passes ("Not Acme, this is Globex"). Today the same already
-     happens with the full name ("Not Acme Fasteners, this is Globex"). The lab has measured this
-     class of answer: `evals/FINDINGS.md` A8 and A10 on `sami/attack-lab-generative`.
+   - A correction with no refusal word passes ("Acme? No, Globex"), as it does today with the full
+     name. Negations, resellers and past connections no longer pass (D7a). The lab has measured
+     these classes of answer: `evals/FINDINGS.md` A8 and A10 on `sami/attack-lab-generative`.
    - Conflicting companies across answers are not flagged, because NR18 leaves companies to NR03
      and both answers match.
    - The digits must still match in every case.
@@ -138,10 +160,14 @@ say (Part B), and keeps the clear-mismatch signal.
     Part B, report both numbers:
     - over-blocking, the share of answers that name the vendor but are not `True` (18.3%, 533 of
       2,920, in A10);
-    - other-company acceptance, the answers naming someone else that come out `True`.
+    - other-company acceptance, the answers naming someone else that come out `True`;
+    - for D7a, the answers each refusal word turns to `False`, per phrase class.
 
     The expectation is that over-blocking falls and other-company acceptance rises. That is the
     accepted cost in D9. Neither number gates the merge; both go to Abhi with Q137.
+    - **When D7a lands,** the lab's known-failures entries for negation, reseller and past
+      connection should start passing and must come off (spec 0048, D3). Correction and "contains
+      the vendor's name" stay listed.
 
 ### Considered and rejected
 
@@ -208,6 +234,12 @@ the vendor unless stated:
   is in `vendor_variants`.
 - [ ] B7. The matcher stays pure and total. Empty, suffix-only and non-ASCII names, and empty
   answers, never raise.
+- [ ] B8. Refusal words override a match (D7a).
+  - Each "what it catches" example in D7a is `False`.
+  - Honest answers stay `True`: "No problem, this is Acme", "Sorry, Acme Fasteners", "Yes, Acme",
+    and "Never Summer" for "Never Summer Industries".
+  - "Acme? No, Globex" stays `True` (an accepted cost), and "Not sure, I think this is Acme" is
+    `False` (the safe cost). Both are pinned.
 
 ## Tests (written first)
 
@@ -219,6 +251,7 @@ the vendor unless stated:
 | A5 | `apps/voice/tests/test_twiml.py::test_the_route_hints_the_calls_vendor_names_and_never_speaks_them` |
 | A6 | the existing `packages/policy` and `apps/voice` suites, unedited |
 | B1 to B7 | `apps/core/tests/test_company.py` (new, pure, no database) |
+| B8 | `apps/core/tests/test_company.py::test_b8_refusal_words_override_a_match`, `::test_b8_honest_answers_and_pinned_costs` |
 | B5 | the existing `apps/core/tests/test_worker.py` company tests, unedited (they need Postgres) |
 
 ## Landing
@@ -231,7 +264,8 @@ merges second rebases and keeps both attributes.
 
 - Line-takeover detection (`line_risk`, NR21) and turning on strict mode (S01). Those are the real
   answers to a fraudster on the line (Goal); the gap is noted here, not fixed.
-- Negations and corrections in the company answer (D9; lab A8, A10).
+- Corrections with no refusal word, and other companies whose name contains the vendor's (D9; lab
+  A8, A10). Negations, resellers and past connections are handled by D7a.
 - Who fills `trade_names`.
 - Changing the company question's wording, or the decision rules.
 
