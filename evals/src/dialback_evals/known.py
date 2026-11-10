@@ -13,6 +13,11 @@ without hiding anything new:
   that entry is fixed;
 - an entry is added only with its finding written in FINDINGS, and removed only when the job says it now
   passes.
+
+Spec 0052, decision 6 (Q120): `lab-docs` keys its entries by pattern, not by case: the check, the phrasing
+and the placement, each naming its finding. Such an entry is held exactly like a case, under the case name
+`<check>/<phrasing>/<placement>` with the check as its one label: a listed pattern must still fail, and a
+failing pattern the list lacks turns the job red.
 """
 from __future__ import annotations
 
@@ -22,7 +27,9 @@ import re
 from collections.abc import Iterable, Mapping
 from pathlib import Path
 
-JOBS = ("lab-smoke", "lab-fuzz", "lab-reports")
+JOBS = ("lab-smoke", "lab-fuzz", "lab-reports", "lab-docs")
+PATTERN_JOBS = frozenset({"lab-docs"})                  # entries keyed by pattern (spec 0052, decision 6)
+PATTERN_FIELDS = ("check", "phrasing", "placement")
 _HEADING = re.compile(r"(?m)^### ([A-Z][0-9]+)\.")
 
 
@@ -56,12 +63,23 @@ def load(path: Path) -> dict[str, tuple[Entry, ...]]:
             raise ValueError(f"known-failures: unknown job {job!r}; one of {', '.join(JOBS)}")
         parsed = []
         for e in entries:
+            if job in PATTERN_JOBS:
+                missing = [k for k in (*PATTERN_FIELDS, "finding", "owner") if not e.get(k)]
+                if missing:
+                    raise ValueError(f"known-failures: {job} entry {e!r} has no {', '.join(missing)}")
+                parsed.append(Entry(pattern(*(e[k] for k in PATTERN_FIELDS)), (e["check"],), e["finding"], e["owner"]))
+                continue
             missing = [k for k in ("case", "labels", "finding", "owner") if not e.get(k)]
             if missing:
                 raise ValueError(f"known-failures: {job} entry {e.get('case')!r} has no {', '.join(missing)}")
             parsed.append(Entry(e["case"], tuple(e["labels"]), e["finding"], e["owner"]))
         jobs[job] = tuple(parsed)
     return jobs
+
+
+def pattern(check: str, phrasing: str, placement: str) -> str:
+    """A pattern's case name, as `lab docs` reports it (docgen.pattern_key)."""
+    return f"{check}/{phrasing}/{placement}"
 
 
 def for_job(path: Path | None, job: str) -> tuple[Entry, ...] | None:

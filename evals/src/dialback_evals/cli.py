@@ -9,6 +9,10 @@ and needs no key. `--max-usd` is accepted for forward compatibility; the scripte
 `--out`, then checks `--examples` reports per domain at `--seed`, freezing the first report for each new
 label; it exits non-zero on a frozen report that still fails or any reachable-domain violation.
 
+`lab docs` (spec 0052) re-runs the frozen document cases under `--out`, then checks `--examples` generated
+documents (and one world for every ten) at `--seed` through real ingestion with the stub reader, freezes a
+shrunk case for each new failing pattern, and holds the failing patterns to lab-docs' known-failures list.
+
 `lab fuzz` re-runs every frozen finding under `--out`, then searches `--examples` generated worlds at
 `--seed`, freezing the first shrunk violation there; it exits non-zero on any frozen case that still
 fails or any new finding. `lab frontier` and `lab overblock` write the two measurement tables and exit
@@ -100,6 +104,11 @@ def main(argv: list[str] | None = None) -> int:
     rp.add_argument("--seed", type=int, default=0)
     rp.add_argument("--out", default=str(_REPO / "evals" / "reports-generated"))
     rp.add_argument("--known-failures", default="auto", help=_KNOWN_HELP)
+    dc = sub.add_parser("docs", help="re-run frozen document findings, then check generated documents (spec 0052)")
+    dc.add_argument("--examples", type=int, default=1000)
+    dc.add_argument("--seed", type=int, default=0)
+    dc.add_argument("--out", default=str(_REPO / "evals" / "docs-generated"))
+    dc.add_argument("--known-failures", default="auto", help=_KNOWN_HELP)
     freeze = sub.add_parser("freeze", help="record each scenario's hash and required outcome (expected.lock.json)")
     freeze.add_argument("--split", default="voice")
     freeze.add_argument("--scenarios-root", default=str(_REPO / "evals" / "scenarios"))
@@ -126,6 +135,9 @@ def main(argv: list[str] | None = None) -> int:
         return _overblock(Path(args.out))
     if args.command == "sweep":
         return _sweep(Path(args.scenarios_root) / args.split, args.examples, args.seed, Path(args.unreachable))
+    if args.command == "docs":
+        return _docs(args.examples, args.seed, Path(args.out),
+                     _known(args.known_failures, Path(args.out), _REPO / "evals" / "docs-generated"))
     if args.command == "reports":
         return _reports(args.examples, args.seed, Path(args.out),
                         _known(args.known_failures, Path(args.out), _REPO / "evals" / "reports-generated"))
@@ -229,6 +241,39 @@ def _reports(examples: int, seed: int, out_dir: Path, known_failures: Path | Non
           f"label(s) (seed {seed}, {examples} reports per domain)")
     held = _held("lab-reports", known_failures, dict(done.frozen_failing), done.reachable_hits)
     return (1 if done.frozen_failing or done.gated else 0) if held is None else held
+
+
+def _docs(examples: int, seed: int, out_dir: Path, known_failures: Path | None = None) -> int:
+    """Spec 0052: re-run every frozen document case, then check the fixed sample of generated documents
+    and worlds against the stub reader (no network), freeze a shrunk case for each failing pattern no frozen
+    case shows yet, and hold the failing patterns to lab-docs' known-failures list (decision 6)."""
+    from collections import Counter
+
+    from dialback_ledger.reader import StubReader
+
+    from . import docgen
+    reader = StubReader()
+    frozen = docgen.rerun_frozen(out_dir, reader=reader)
+    drifted = [name for name, _, drift in frozen if drift]
+    for name in drifted:
+        print(f"lab docs: frozen case {name} no longer renders to its frozen documents: it no longer means what it meant")
+    for name, patterns, _ in frozen:
+        if patterns:
+            print(f"lab docs: frozen case {name} still fails: {', '.join(patterns)}")
+    found = docgen.run(examples=examples, seed=seed, reader=reader)
+    new = docgen.freeze_new(found, out_dir, {p for _, patterns, _ in frozen for p in patterns}, reader=reader)
+    counts = Counter(v.pattern for v in found.violations)
+    for pattern, count in sorted(counts.items()):
+        print(f"lab docs: {pattern}: {count} violation(s)")
+    for name, pattern in new:
+        print(f"lab docs: {pattern} frozen as {name} under {out_dir}")
+    failing = {p: [p.split("/", 1)[0]] for p in {*counts, *(p for _, ps, _ in frozen for p in ps)}}
+    print(f"lab docs: {len(failing)} failing pattern(s), {len(frozen)} frozen case(s) re-run, {len(new)} new "
+          f"(seed {seed}, {examples} documents, stub reader)")
+    held = _held("lab-docs", known_failures, failing, [])
+    if drifted:
+        return 1
+    return (1 if failing else 0) if held is None else held
 
 
 def _write(path: Path, body: dict) -> None:

@@ -755,3 +755,141 @@ def check_world(plan: WorldPlan, *, reader, rule=None) -> list[Violation]:
                 out.append(Violation("G7", n.phrasing, n.placement, plan.id, first.e164,
                                      f"{G7_FIRST}: {first.e164} first seen in {first.document_id}"))
     return out
+
+
+# --- A run: the fixed sample, shrinking, frozen cases, the report (decision 7) -----------------------
+
+@dataclasses.dataclass
+class Run:
+    examples: int
+    seed: int
+    result: Result                       # G1 to G6 over the documents, with the tally
+    world_violations: list[Violation]    # G7 over the worlds
+    plans: dict[str, Plan]               # every plan in the sample, by id
+
+    @property
+    def violations(self) -> list[Violation]:
+        return [*self.result.violations, *self.world_violations]
+
+
+def run(*, examples: int, seed: int, reader, rule=None) -> Run:
+    """Check every plan in the seed's fixed sample: `examples` documents with G1 to G6, and
+    `world_count(examples)` worlds with G7. Nothing stops at the first failure (FINDINGS B3)."""
+    docs = draw_docs(examples=examples, seed=seed)
+    worlds = draw_worlds(count=world_count(examples), seed=seed)
+    result = check_docs(docs, reader=reader)
+    found = [v for w in worlds for v in check_world(w, reader=reader, rule=rule)]
+    result.tally.worlds, result.tally.worlds_planted = len(worlds), sum(w.planted for w in worlds)
+    return Run(examples, seed, result, found, {p.id: p for p in [*docs, *worlds]})
+
+
+def patterns_of(plan: Plan, *, reader, rule=None, checks: Iterable[str] | None = None) -> set[str]:
+    if isinstance(plan, WorldPlan):
+        return {v.pattern for v in check_world(plan, reader=reader, rule=rule)}
+    return {v.pattern for v in check_doc(plan, reader=reader, checks=DOC_CHECKS if checks is None else checks).violations}
+
+
+def _without(numbers: tuple[NumberPlan, ...], gone: NumberPlan) -> tuple[NumberPlan, ...]:
+    """The numbers without `gone`; a partner left alone on its shared line gets a line of its own."""
+    out = []
+    for group in _groups(numbers):
+        if gone in group:
+            out += [dataclasses.replace(n, shares_line=False) for n in group if n != gone]
+        else:
+            out += group
+    return tuple(out)
+
+
+def _simpler_doc(plan: DocPlan):
+    """Every one-step simplification of a document plan: remove a number or a filler line (in the quote
+    too), or simplify a phrasing (to the first one making the same claim) or a format (to the first)."""
+    for n in plan.numbers:
+        yield dataclasses.replace(plan, numbers=_without(plan.numbers, n))
+    for i in range(len(plan.filler)):
+        yield dataclasses.replace(plan, filler=plan.filler[:i] + plan.filler[i + 1:])
+    q = plan.quote
+    if q is not None:
+        for n in q.numbers:
+            yield dataclasses.replace(plan, quote=dataclasses.replace(q, numbers=_without(q.numbers, n)))
+        for i in range(len(q.filler)):
+            yield dataclasses.replace(plan, quote=dataclasses.replace(q, filler=q.filler[:i] + q.filler[i + 1:]))
+        if not q.numbers and not q.filler:      # an empty quote is only its header line
+            yield dataclasses.replace(plan, quote=None)
+    for author, n in numbers_with_authors(plan):
+        form_ok = (lambda k: PHRASINGS[k].form == "label") if n.shares_line else \
+            (lambda k, n=n: PHRASINGS[k].form in PLACEMENT_FORMS[n.placement])
+        first = next(k for k in PHRASINGS if claim(k, author) == (n.role, n.party) and form_ok(k))
+        if first != n.phrasing:
+            yield _replace_number(plan, n, dataclasses.replace(n, phrasing=first))
+        if n.format != next(iter(FORMATS)):
+            yield _replace_number(plan, n, dataclasses.replace(n, format=next(iter(FORMATS))))
+
+
+def simpler(plan: Plan):
+    """Every one-step simplification of a plan. A world can also lose a document (never its request)."""
+    if isinstance(plan, DocPlan):
+        yield from _simpler_doc(plan)
+        return
+    for d in plan.documents:
+        if d.id != plan.request:
+            yield dataclasses.replace(plan, documents=tuple(x for x in plan.documents if x is not d))
+    for k, d in enumerate(plan.documents):
+        for smaller in _simpler_doc(d):
+            yield dataclasses.replace(plan, documents=plan.documents[:k] + (smaller,) + plan.documents[k + 1:])
+
+
+def shrink(plan: Plan, pattern: str, *, reader, rule=None) -> Plan:
+    """Shrink a plan that shows `pattern` until every one-step simplification loses it (1-minimal)."""
+    check = pattern.split("/", 1)[0]
+    checks = None if check == "G7" else (check,)
+
+    def still(p: Plan) -> bool:
+        return pattern in patterns_of(p, reader=reader, rule=rule, checks=checks)
+
+    if not still(plan):
+        raise ValueError(f"{plan.id} does not show {pattern}")
+    while True:
+        for smaller in simpler(plan):
+            if still(smaller):
+                plan = smaller
+                break
+        else:
+            return plan
+
+
+def case_name(pattern: str, plan: Plan) -> str:
+    """A frozen case's name: its pattern, and a digest of its plan, so re-finding it lands on the same case."""
+    import hashlib
+    digest = hashlib.sha256(json.dumps(plan_to_json(plan), sort_keys=True).encode()).hexdigest()[:8]
+    return f"{pattern.lower().replace('/', '-').replace('_', '-')}-{digest}"
+
+
+def rerun_frozen(out_dir: Path, *, reader, rule=None) -> list[tuple[str, list[str], bool]]:
+    """Every frozen case under `out_dir`: its name, the patterns it shows now, and whether its plan no
+    longer renders to its frozen documents (then it no longer means what it meant)."""
+    out = []
+    for case in sorted(Path(out_dir).glob(f"*/{FILE}")):
+        plan, documents, _ = load_case(case.parent)
+        out.append((case.parent.name, sorted(patterns_of(plan, reader=reader, rule=rule)),
+                    _normal(rendered(plan)) != documents))
+    return out
+
+
+def freeze_new(found: Run, out_dir: Path, shown: set[str], *, reader, rule=None) -> list[tuple[str, str]]:
+    """Shrink and freeze the first plan of every failing pattern no frozen case shows yet."""
+    first: dict[str, str] = {}
+    for v in found.violations:
+        first.setdefault(v.pattern, v.plan)
+    frozen, shown = [], set(shown)
+    for pattern, plan_id in sorted(first.items()):
+        if pattern in shown:
+            continue
+        small = shrink(found.plans[plan_id], pattern, reader=reader, rule=rule)
+        patterns = sorted(patterns_of(small, reader=reader, rule=rule))
+        name = case_name(pattern, small)
+        freeze_case(small, name, out_dir, patterns=patterns,
+                    why=f"{pattern}: shrunk from {plan_id}, found by lab docs at seed {found.seed} in {found.examples} "
+                        "documents")
+        shown |= set(patterns)
+        frozen.append((name, pattern))
+    return frozen

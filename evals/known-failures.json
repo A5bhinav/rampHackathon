@@ -22,5 +22,6 @@
     {"case": "reports-f1-company-reseller-7a3b073e", "labels": ["F1:company=reseller", "F3_company_accepted_reseller"], "finding": "A10", "owner": "Abhi"},
     {"case": "reports-f1-company-other-containing-vendor-806bec8b", "labels": ["F1:company=other_containing_vendor", "F3_company_accepted_other_containing_vendor"], "finding": "A8", "owner": "Abhi"},
     {"case": "reports-f1-company-past-connection-aefe6e7d", "labels": ["F1:company=past_connection", "F3_company_accepted_past_connection"], "finding": "A10", "owner": "Abhi"}
-  ]
+  ],
+  "lab-docs": []
 }

@@ -299,3 +299,56 @@ def test_g7_fails_today_and_passes_context_blind(_today_rule):
         quiet = docgen.world_of(docgen.without_context_numbers(world), reader=StubReader())
         out = docgen.run_rule(quiet)
         assert any(c["e164"] == world.real and c["eligible"] for c in out["candidates"]), world.id
+
+
+# --- Known failures by pattern (decision 6) ----------------------------------------------------------
+
+SMALL = 40   # a small run for the known-failures tests; the gate runs 1000
+
+
+def _lab_docs(tmp_path, entries: list[dict], capsys) -> tuple[int, str]:
+    from dialback_evals.cli import main
+    listed = tmp_path / "known.json"
+    listed.write_text(json.dumps({"lab-docs": entries}))
+    code = main(["docs", "--examples", str(SMALL), "--seed", str(SEED), "--out", str(tmp_path / "frozen"),
+                 "--known-failures", str(listed)])
+    return code, capsys.readouterr().out
+
+
+def _failing_now() -> list[str]:
+    run = docgen.run(examples=SMALL, seed=SEED, reader=StubReader())
+    return sorted({v.pattern for v in run.violations})
+
+
+def _entry(pattern: str, finding: str = "A19") -> dict:
+    check, phrasing, placement = pattern.split("/")
+    return {"check": check, "phrasing": phrasing, "placement": placement, "finding": finding, "owner": "Inesh"}
+
+
+def test_unlisted_pattern_turns_red(tmp_path, capsys):
+    failing = _failing_now()
+    assert len(failing) >= 2                              # the stub fails some patterns even in a small run
+    code, out = _lab_docs(tmp_path, [_entry(p) for p in failing], capsys)
+    assert code == 0, out                                 # every failure listed, every listed one failing
+    left_out = failing[0]
+    code, out = _lab_docs(tmp_path, [_entry(p) for p in failing[1:]], capsys)
+    assert code == 1 and f"{left_out} fails with {left_out.split('/')[0]}, which the known-failures list" in out, out
+
+
+def test_listed_pattern_that_passes_turns_red(tmp_path, capsys):
+    failing = _failing_now()
+    passing = "G3/main/table_row"                         # the stub never labels a table row's number
+    assert passing not in failing
+    code, out = _lab_docs(tmp_path, [_entry(p) for p in [*failing, passing]], capsys)
+    assert code == 1 and f"{passing} is on the known-failures list" in out and "no longer fails" in out, out
+
+
+def test_a_pattern_entry_needs_every_field(tmp_path):
+    from dialback_evals import known
+    good = _entry("G3/main/label_number")
+    path = tmp_path / "known.json"
+    path.write_text(json.dumps({"lab-docs": [good]}))
+    assert known.load(path)["lab-docs"] == (known.Entry("G3/main/label_number", ("G3",), "A19", "Inesh"),)
+    path.write_text(json.dumps({"lab-docs": [{k: v for k, v in good.items() if k != "placement"}]}))
+    with pytest.raises(ValueError, match="placement"):
+        known.load(path)
