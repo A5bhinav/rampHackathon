@@ -17,9 +17,10 @@ export function BankChangeForm({ datasetId, vendorId }: { datasetId: string; ven
       <label htmlFor="account_number">Account number</label>
       <input id="account_number" name="account_number" type="text" inputMode="numeric" autoComplete="off" required
              maxLength={17} pattern="[0-9]{4,17}" placeholder="4 to 17 digits" />
+      <p className="muted sub">This is the Ramp mock: use a made-up account number.</p>
       {state.error ? (
         <div className="callout callout-warn" role="alert">
-          <div className="callout-body"><p className="callout-title">Nothing was changed</p><p>{state.error}</p></div>
+          <div className="callout-body"><p>{state.error}</p></div>
         </div>
       ) : null}
       <div className="actions">

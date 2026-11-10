@@ -6,7 +6,7 @@ import { BankChangeForm } from "@/components/bank-change-form";
 import { CaseRail } from "@/components/flow";
 import { CoreError, core } from "@/lib/core";
 import { canWatchCall } from "@/lib/live-call";
-import { formatAccount, pickedUp, watchFor } from "@/lib/ramp-portal";
+import { formatAccount, latestCase, parseMark, pickedUp, watchFor } from "@/lib/ramp-portal";
 import { REFRESH_STATES, stations } from "@/lib/stations";
 
 // One vendor's payment details in Ramp (mock) (spec 0077). After a save, the page watches: it
@@ -14,18 +14,21 @@ import { REFRESH_STATES, stations } from "@/lib/stations";
 // follows that case's seven stations as code works through them.
 export default async function RampVendor({ params, searchParams }: {
   params: Promise<{ datasetId: string; vendorId: string }>;
-  searchParams: Promise<{ sent?: string }>;
+  searchParams: Promise<{ sent?: string; base?: string }>;
 }) {
-  const [{ datasetId, vendorId }, { sent }] = await Promise.all([params, searchParams]);
+  const [{ datasetId, vendorId }, { sent, base }] = await Promise.all([params, searchParams]);
   const data = await core.vendorAccounts(datasetId).catch((e) => {
     if (e instanceof CoreError && e.status === 404) notFound();
     throw e;
   });
   const vendor = data.vendors.find((v) => v.vendor_id === vendorId);
   if (!vendor) notFound();
-  const detail = vendor.open_case_id ? await core.case(vendor.open_case_id).catch(() => null) : null;
-  const sentAt = sent ?? null;
-  const watch = watchFor(sentAt, detail ? { picked: sentAt ? pickedUp(detail.timeline, sentAt) : false } : null);
+  // Compare the vendor's newest case (any state) with the one recorded when the change was sent.
+  const mark = parseMark(base);
+  const latest = mark === undefined ? null : latestCase(await core.allCases(datasetId), vendorId);
+  const picked = mark !== undefined && pickedUp(latest, mark);
+  const detail = picked && latest ? await core.case(latest.id).catch(() => null) : null;
+  const watch = mark === undefined ? "idle" : watchFor(sent, picked && detail !== null, Date.now());
   const steps = detail ? stations(detail.timeline, detail.case.state, detail.decision?.outcome ?? null) : null;
   const caseHref = detail ? `/d/${datasetId}/cases/${detail.case.id}` : null;
   const working = watch === "detecting" || (watch === "opened" && detail !== null && REFRESH_STATES.has(detail.case.state));
@@ -42,7 +45,7 @@ export default async function RampVendor({ params, searchParams }: {
         <section className="card ramp-watch" aria-live="polite" aria-labelledby="watch-h">
           <div className="card-head">
             <span className="section-marker">Dialback</span>
-            <h2 id="watch-h">{watch === "opened" ? "Dialback caught the change" : "Saved in Ramp (mock). Waiting for Dialback to detect it…"}</h2>
+            <h2 id="watch-h">{watch === "opened" ? "Dialback caught the change" : watch === "no_case" ? "Saved in Ramp (mock). No case yet." : "Saved in Ramp (mock). Waiting for Dialback to detect it…"}</h2>
             {detail && watch === "opened" ? <span className="card-meta"><StateBadge state={detail.case.state} /></span> : null}
           </div>
           <div className="card-body">
@@ -55,7 +58,8 @@ export default async function RampVendor({ params, searchParams }: {
                   <Link className="button-link" href={`${caseHref}/flow`}>Flow mode</Link>
                 </p>
               </>
-            ) : <p className="muted sub">Ramp sends Dialback a signed webhook; this page refreshes until the case opens.</p>}
+            ) : watch === "detecting" ? <p className="muted sub">Ramp sends Dialback a signed webhook; this page refreshes until the case opens.</p>
+              : <p className="muted sub"><Link href={`/d/${datasetId}/cases`}>Open the inbox</Link></p>}
           </div>
         </section>
       ) : null}

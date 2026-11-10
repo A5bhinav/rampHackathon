@@ -52,11 +52,11 @@ export const core = {
   release: (caseId: string, body: { expected_version: number; action: "approve" | "reject"; reason: string }) =>
     call<ActionResult>(`/api/cases/${caseId}/release`, { method: "POST", body: JSON.stringify(body) }),
   /** The demo's Ramp (mock) portal (spec 0077): each vendor's current account, and whether this person can change one. */
-  vendorAccounts: (datasetId: string) => call<VendorAccounts>(`/api/datasets/${datasetId}/vendor-accounts`),
+  vendorAccounts: (datasetId: string) => call<VendorAccounts>(`/api/datasets/${encodeURIComponent(datasetId)}/vendor-accounts`),
   /** A clerk's bank change, sent by the core to the Ramp mock as their linked Ramp user. The account number goes
    *  straight through; the answer carries only routing and last four. */
   bankChange: (datasetId: string, vendorId: string, body: { routing_number: string; account_number: string }) =>
-    call<BankChangeResult>(`/api/datasets/${datasetId}/vendors/${vendorId}/bank-change`, { method: "POST", body: JSON.stringify(body) }),
+    call<BankChangeResult>(`/api/datasets/${encodeURIComponent(datasetId)}/vendors/${encodeURIComponent(vendorId)}/bank-change`, { method: "POST", body: JSON.stringify(body) }),
   review: (caseId: string, body: { expected_version: number; action: "clear" | "block"; reason: string }) =>
     call<ActionResult>(`/api/cases/${caseId}/review`, { method: "POST", body: JSON.stringify(body) }),
 };
