@@ -54,16 +54,16 @@ command, update both hashes here and the committed one in the test. `validate.py
 
 ## Acceptance
 
-- [ ] The committed document's SHA-256 is the one above, and it holds no token-shaped string.
-- [ ] The checker passes the Ramp-shaped body and reports each of the seven planted problems (D3).
-- [ ] Every `/developer/v1` route the mock serves has a check (D2).
-- [ ] One check for each route: `GET /vendors`, `GET /vendors/{vendor_id}`, `GET
+- [x] The committed document's SHA-256 is the one above, and it holds no token-shaped string.
+- [x] The checker passes the Ramp-shaped body and reports each of the seven planted problems (D3).
+- [x] Every `/developer/v1` route the mock serves has a check (D2).
+- [x] One check for each route: `GET /vendors`, `GET /vendors/{vendor_id}`, `GET
       /vendors/{vendor_id}/accounts`, `GET /vendors/{vendor_id}/contacts`, `POST
       /vendors/{vendor_id}/hold`, `POST /vendors/{vendor_id}/release`, `GET /bills`, `PATCH
       /bills/{bill_id}`, `GET /audit-logs/events`. Each lists every problem it finds, not the first.
-- [ ] Fail closed: a route or status the checker can't find in Ramp's document, or a body that isn't
+- [x] Fail closed: a route or status the checker can't find in Ramp's document, or a body that isn't
       JSON where Ramp documents JSON, is a failure, never a skip.
-- [ ] Expected today: route checks fail, and their output is the drift list for the next spec.
+- [x] Expected today: route checks fail, and their output is the drift list for the next spec.
 
 ## Tests (written first)
 
@@ -72,6 +72,7 @@ command, update both hashes here and the committed one in the test. `validate.py
 | 1 | `apps/ramp-mock/tests/test_matches_ramp.py::test_the_committed_document_is_unchanged` |
 | 2 | `apps/ramp-mock/tests/test_matches_ramp.py::test_checker_*` |
 | 3 | `apps/ramp-mock/tests/test_matches_ramp.py::test_every_ramp_route_the_mock_serves_is_checked` |
+| 4 (D1.2 reads the mock) | `apps/ramp-mock/tests/test_matches_ramp.py::test_mock_inputs_reads_what_the_mock_accepts` |
 | 4, 5, 6 | `apps/ramp-mock/tests/test_matches_ramp.py::test_route_matches_ramp[...]` |
 
 ## Out of scope
