@@ -9,6 +9,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import re
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -16,7 +17,9 @@ import anthropic
 import httpx2
 import rfc8785
 
+from .candidates import find_phones
 from .reader import ReaderFailed
+from .text import Line
 
 MODEL = "claude-haiku-5-5"   # pinned here and nowhere else
 EFFORT = "low"               # no `thinking` setting: Haiku 5.5 thinks adaptively, within max_tokens
@@ -92,6 +95,24 @@ def anthropic_client(api_key: str, http_client: httpx2.Client | None = None) -> 
 
 def user_turn(text: str) -> str:
     return USER_BEFORE + text + USER_AFTER
+
+
+_LONG_RUN = re.compile(r"\d{7,}")
+
+
+def for_the_model(visible_text: str) -> tuple[str, int]:
+    """The text the model is sent, and how many phone candidates it holds. Every run of 7 or more
+    digits that isn't inside a phone candidate (an account or routing number, say) is replaced with
+    PLACEHOLDER, in the text sent only (spec 0049, decision 5, Q110). Grounding checks quotes against
+    the original lines, so a quote that holds a placeholder is dropped. Candidates are found line by
+    line, exactly as ingestion finds them."""
+    out, count = [], 0
+    for i, text in enumerate(visible_text.split("\n")):
+        spans = [(c.start, c.end) for c in find_phones([Line(text, "visible", 0, i)])]
+        count += len(spans)
+        out.append(_LONG_RUN.sub(lambda m: m.group(0) if any(s <= m.start() and m.end() <= e for s, e in spans)
+                                 else PLACEHOLDER, text))
+    return "\n".join(out), count
 
 
 def llm_version(*, model: str = MODEL, system: str = SYSTEM_PROMPT, user: tuple[str, str] = (USER_BEFORE, USER_AFTER),
@@ -181,8 +202,12 @@ class LlmReader:
         return self.model.version
 
     def label(self, visible_text: str) -> list[dict]:
+        text, candidates = for_the_model(visible_text)
+        if candidates == 0:      # nothing to label, so the text never leaves
+            log.info("llm reader: no visible phone number, no call")
+            return []
         try:
-            reply = self.model.label(visible_text)
+            reply = self.model.label(text)
             if not matches_schema(reply.data):
                 raise ReaderFailed("schema", detail="the reply doesn't match the schema", request_id=reply.request_id)
         except ReaderFailed as exc:

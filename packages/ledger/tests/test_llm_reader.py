@@ -12,6 +12,7 @@ import re
 import anthropic
 import httpx2
 import pytest
+from dialback_ledger import demo
 from dialback_ledger.custody import custody_for
 from dialback_ledger.flags import ReaderMode, reader_mode
 from dialback_ledger.ingest import ingest, ingest_all
@@ -224,6 +225,75 @@ def test_never_falls_back_to_the_stub(monkeypatch):
     with pytest.raises(ReaderUnavailable):
         ingest_all([BAD], extractor_version="test", reader=reader_for(reader_mode()))
     assert seen == []
+
+
+# What reaches the model ---------------------------------------------------------------------------
+
+def test_long_digit_runs_never_reach_the_model():
+    calls = []
+    doc = page(span("Remit to account 000123456789, routing 021000021"),
+               span("Invoice 12345678-A, PO 9876543, ref 123456"),
+               span("Call 2065550117 or (206) 555-0142"),
+               span("Old line 2065550124", color="#ffffff"))                 # hidden: never sent at all
+    ingest_all([doc], extractor_version="test", reader=llm_reader(like_the_stub, calls))
+    (request,) = calls
+    assert re.findall(r"\d{7,}", request.content.decode()) == ["2065550117"]   # the one left is a phone candidate
+    assert sent_text(request) == ("Remit to account [digits removed], routing [digits removed]\n"
+                                  "Invoice [digits removed]-A, PO [digits removed], ref 123456\n"
+                                  "Call 2065550117 or (206) 555-0142")
+
+
+def test_a_quote_with_a_placeholder_is_dropped():
+    doc = page(span("Acct 123456789 AR (206) 555-0142"), span("Ref 7654321, main 206-555-0117"))
+
+    def model(request):
+        first = sent_text(request).split("\n")[0]          # the line as the model saw it, placeholder and all
+        return answer({"labels": [{"quote": first, "role": "ar", "party": "vendor"},
+                                  {"quote": "main 206-555-0117", "role": "main", "party": "vendor"}]})
+    result = ingest_all([doc], extractor_version="test", reader=llm_reader(model))
+    got = {o["value_normalized"]: (o["role"], o["party"]) for o in result.observations}
+    assert got == {"+12065550142": ("unknown", "unknown"), "+12065550117": ("main", "vendor")}
+    assert [(raw["quote"], why) for _, raw, why in result.dropped] == [
+        ("Acct [digits removed] AR (206) 555-0142", "the quote isn't in the visible text at a candidate")]
+
+
+def test_a_document_without_a_visible_number_makes_no_call():
+    calls = []
+    doc = page(span("Thanks for your business."), span("Acct 123456789"), span("206-555-0124", color="#ffffff"))
+    result = ingest_all([doc], extractor_version="test", reader=llm_reader(like_the_stub, calls))
+    assert calls == []                                      # nothing to label, so the text never leaves
+    assert [(o["value_normalized"], o["visibility"]) for o in result.observations] == [("+12065550124", "white")]
+
+
+TEAM = "+12025550100"   # fictional here; on the day, the operator types the team phone
+
+
+def test_team_numbers_never_reach_the_model():
+    seed = demo.load_seed()["vendors"]["acme"]
+    fictional = seed["phones"]["ar"]
+    calls = []
+    reader = llm_reader(like_the_stub, calls)
+    result = demo.labeled(seed["documents"], reader, (fictional, TEAM))
+    sent = "\n".join(r.content.decode() for r in calls)
+    assert calls and any(f in sent for f in demo._formats(fictional))   # the reader saw the fictional line
+    for f in [*demo._formats(TEAM), TEAM, TEAM[2:]]:
+        assert f not in sent, f
+    stored = {o["value_normalized"] for o in result.observations}
+    assert TEAM in stored and fictional not in stored                    # the team phone is in the stored rows
+    assert not any(f in (o["quote"] or "") for o in result.observations for f in demo._formats(fictional))
+    assert {o["extractor_version"] for o in result.observations} == {reader.version}
+
+
+def test_swapping_the_rows_matches_swapping_the_text():
+    # Before spec 0049 the demo swapped the team phone into the documents' text before ingesting them.
+    # Swapping it into the rows afterward must store exactly the same rows.
+    for ref, v in demo.load_seed()["vendors"].items():
+        swap = (v["phones"]["ar"], TEAM)
+        before = ingest_all([demo._with_phone(d, swap) for d in v["documents"]], extractor_version="stub",
+                            reader=StubReader())
+        after = demo.labeled(v["documents"], StubReader(), swap)
+        assert (after.documents, after.observations) == (before.documents, before.observations), ref
+        assert any(o["value_normalized"] == TEAM for o in after.observations), ref
 
 
 # Logs --------------------------------------------------------------------------------------------
