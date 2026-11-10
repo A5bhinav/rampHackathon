@@ -140,6 +140,43 @@ say (Part B), and keeps the clear-mismatch signal.
      sure, I think this is Acme"). That is the safe direction (R7).
    - **The list is exploratory.** It was chosen after reading the lab's phrase bank (spec 0048), so
      its effect there proves nothing. D10's measurement is what confirms it.
+
+   **7b. The decision (Sami, Nov 10): the company answer no longer has to match** (amendment). D7a
+   stands as written. Where D7, D8, B2 to B5, "Contract touched", "Considered and rejected" or "Out
+   of scope" say otherwise, this wins.
+   1. **The company answer is no longer required to verify.** `V05_company_matches` is retired: it
+      leaves `rules.VERIFIED`, and `V05_company_matches` and `V05_company_matches_unmet` keep their
+      sentences in `engine.RETIRED`, so old decisions still render. A short ("Acme"), garbled
+      ("acne") or missing answer does not block.
+   2. **`NR03_wrong_company` keeps its id and its predicate** (`company_matches is False`), but now
+      fires only for an answer with a refusal word or phrase (D7a). Its sentence becomes "The
+      company answer says the person is not with this vendor, or only works with it."
+      `SLOT_RULES["company_named"]` becomes `("NR03_wrong_company",)`.
+   3. **The matcher** (`company.py`): an answer with readable words that neither matches nor holds a
+      refusal word is `None`, not `False`. `every_name_matches` keeps its rule (any `False` gives
+      `False`; otherwise any `None` gives `None`; otherwise `True`).
+   4. **`ENGINE_VERSION` becomes `decision-1.1.0`.** A decision recorded by `decision-1.0.0` shows
+      its checklist as "not checked", with a note. Known limit: an old decision that recorded NR03
+      renders with the new sentence.
+
+   | Answer | `company_matches` | Engine |
+   |---|---|---|
+   | names the vendor, with no refusal word | `True` | nothing fires |
+   | holds a refusal word or phrase ("Not Acme, this is Globex", "We're a reseller for Acme") | `False` | NR03, needs review |
+   | anything else: another company ("This is Globex"), a garbled name ("acne"), nonsense, no readable words, no answer | `None` | nothing fires |
+
+   - **"This is Globex" passes.** Code can't tell another company's name from a garbled vendor
+     name. The person who releases sees the answer on the call record.
+   - **Why.** The Goal shows the answer gives no protection against a fraudster on the line, who
+     knows the vendor's name. Requiring it only sent honest calls to review ("acne" on the first
+     real call). The one signal worth keeping, a person saying they are not with the vendor, stays
+     as NR03.
+   - **What it gives up.** A clearly different company named with no refusal word, on a call that
+     otherwise passes, is no longer flagged; only the releaser sees it. Conflicting companies across
+     answers are not flagged either (D9).
+   - **The rule table changes, the contract doesn't.** `company_matches` stays `bool | None`, and
+     `rules_fired` is still a list of ids.
+   - **Q137 is answered:** decided: demote, with NR03 kept for refusal words; Sami, Nov 10.
 8. **No fuzzy matching.** A one-letter slip rule was drafted and dropped after the builder check:
    - On sentences it accepts "help" for "Yelp", "this" for "Thin Air", and "Bell" for "Dell".
    - Phonetic codes disagree with each other: Soundex gives "acme" and "acne" the same code,
@@ -173,6 +210,8 @@ say (Part B), and keeps the clear-mismatch signal.
 
 - **Demote the check entirely.** It loses the "clearly different company, right digits" signal,
   which costs nothing to keep.
+  - D7b demotes it after all, keeping NR03 for refusal words; the plain "different company"
+    signal is given up.
 - **One-letter slips, and phonetic matching.** See D8.
 - **The first word alone, whatever it is** (the first draft). On sentences it accepts "Hi, this is
   Globex" for "Thin Air" and "the main line at Globex" for "Main Street Supply". The guard's
@@ -182,6 +221,9 @@ say (Part B), and keeps the clear-mismatch signal.
 ## Contract touched
 
 None. `company_matches` stays `bool | None`, and the decision rules don't change.
+
+D7b changes the decision rules (V05 retired, NR03's sentence, `decision-1.1.0`), but no contract:
+`company_matches` stays `bool | None`.
 
 ## Acceptance
 
@@ -210,7 +252,7 @@ the vendor unless stated:
   - Today's matches still match: "Acme Fasteners" and "Fasteners, Acme" are `True`.
   - For "Brightline Office Supply Inc", "Brightline Office" is `True`.
 - [ ] B2. Clearly different companies stay `False`, including near-sounding and common-word cases.
-  These come from the builder check:
+  These come from the builder check. (D7b: none of them is a match, and each is now `None`; see B9.)
 
   | Said | Vendor |
   |---|---|
@@ -222,14 +264,17 @@ the vendor unless stated:
   | "Bell Canada" | Dell Inc |
   | "We're a plumbing firm, Globex" | A & B Supply |
 
-- [ ] B3. No fuzzy matching (D8): "acne" and "This is acne" are `False`.
+- [ ] B3. No fuzzy matching (D8): "acne" and "This is acne" are `False`. (D7b: not a match, and now
+  `None`; see B9.)
 - [ ] B4. A common first word alone doesn't match: "First" is `False` for "First Solar Inc", and
-  "Main" is `False` for "Main Street Supply LLC".
+  "Main" is `False` for "Main Street Supply LLC". (D7b: not a match, and now `None`; see B9.)
 - [ ] B5. Unchanged:
   - "LLC" alone and no answers give `None`.
   - Any `False` among several answers gives `False`.
   - A vendor with no usable name gives today's result.
   - The existing tests in `apps/core/tests/test_worker.py` pass unedited.
+  - (D7b: a vendor with no usable name now gives `None` for an answer with readable words, and the
+    company tests in `test_worker.py` change as B9 says.)
 - [ ] B6. The matcher reads names as the guard does: for each B1 example, the variant that matches
   is in `vendor_variants`.
 - [ ] B7. The matcher stays pure and total. Empty, suffix-only and non-ASCII names, and empty
@@ -240,6 +285,23 @@ the vendor unless stated:
     and "Never Summer" for "Never Summer Industries".
   - "Acme? No, Globex" stays `True` (an accepted cost), and "Not sure, I think this is Acme" is
     `False` (the safe cost). Both are pinned.
+- [ ] B9. A plain mismatch is unknown (D7b), and only a refusal is `False`.
+  - `None`: every row of B2's table, B3's "acne" and "This is acne", B4's "First" and "Main", D6's
+    whole-word cases, and B5's "no usable name" rows that have readable words.
+  - "This is Globex" and nonsense are `None` for "Acme Fasteners LLC".
+  - B8's refusals stay `False`, and `every_name_matches(["This is Globex", "Not Acme, this is
+    Globex"])` is `False`.
+  - End to end (Postgres): an extra answer "Globex Corporation" doesn't fire NR03, and the call
+    decides exactly as it does without that answer. "Not Acme Fasteners, this is Globex" fires NR03.
+- [ ] B10. The engine (D7b).
+  - `V05_company_matches` is not in `rules.VERIFIED`, and neither it nor `V05_company_matches_unmet`
+    is a current id. Both render from `engine.RETIRED` with their old sentences.
+  - NR03's sentence is D7b's, its `FIRES` case (`company_matches=False`) still fires it alone, and
+    `SLOT_RULES["company_named"]` is `("NR03_wrong_company",)`.
+  - `ENGINE_VERSION` is `decision-1.1.0`.
+  - The clean call (`GOOD`) verifies with `company_matches=None` and with `True`.
+  - A worked example, another company named with no refusal word (`company_matches` null) and
+    everything else clean, is verified.
 
 ## Tests (written first)
 
@@ -252,7 +314,9 @@ the vendor unless stated:
 | A6 | the existing `packages/policy` and `apps/voice` suites, unedited |
 | B1 to B7 | `apps/core/tests/test_company.py` (new, pure, no database) |
 | B8 | `apps/core/tests/test_company.py::test_b8_refusal_words_override_a_match`, `::test_b8_honest_answers_and_pinned_costs` |
-| B5 | the existing `apps/core/tests/test_worker.py` company tests, unedited (they need Postgres) |
+| B5 | the existing `apps/core/tests/test_worker.py` company tests, unedited (they need Postgres); D7b edits them (B9) |
+| B9 | `apps/core/tests/test_company.py::test_b9_another_company_or_nonsense_is_unknown`, `::test_b9_a_refusal_in_any_answer_is_false`, and the B2 to B6 and D6 tests' `None` rows; `apps/core/tests/test_call_facts.py::test_the_company_matches_a_trade_name`; `apps/core/tests/test_worker.py::test_another_company_named_decides_as_the_call_would_without_it`, `::test_a_refusal_in_the_company_answer_goes_to_review` (Postgres) |
+| B10 | `packages/decision/tests/test_rules.py::test_the_company_answer_is_not_required_to_verify`, `::test_v05_is_retired_and_its_ids_still_render`, `::test_nr03_has_its_new_sentence_and_is_the_company_answers_only_rule`; `test_engine.py` (the version); `tests/examples/22-another-company-named.json` |
 
 ## Landing
 
@@ -267,7 +331,8 @@ merges second rebases and keeps both attributes.
 - Corrections with no refusal word, and other companies whose name contains the vendor's (D9; lab
   A8, A10). Negations, resellers and past connections are handled by D7a.
 - Who fills `trade_names`.
-- Changing the company question's wording, or the decision rules.
+- Changing the company question's wording, or the decision rules. (D7b changes the rules: V05 and
+  NR03.)
 
 ## Open questions
 
@@ -278,6 +343,7 @@ merges second rebases and keeps both attributes.
     before Sep 12, 2025.
 - **Q137 (Abhi):** accept Part B (D5 to D10), including its accepted costs (D9), with the
   measurement in D10 if it is run?
+  - **Answered (D7b):** decided: demote, with NR03 kept for refusal words; Sami, Nov 10.
 - **Q138 (Abhi, Sami):** should hints and the matcher use the vendor's name as it was before the
   change (a snapshot on the case), rather than Ramp's current record? A clerk can edit both in the
   same session.
