@@ -39,7 +39,7 @@ None.
 
 ## Acceptance
 
-- [ ] 1. A vendor synced before with no account that now has an active one opens a case: one change row with `old_account_id` null, the case `open`, the hold queued; a re-sync joins it.
+- [ ] 1. A vendor synced before with no account that now has an active one opens a case: one change row with `old_account_id` null, the case `open`, the hold queued; a re-sync adds nothing.
 - [ ] 2. That case walks the normal path: the hold goes on, R1 holds its bills, a call is placed, code decides. Digits matching the new account verify; any others do not (there is no old account to match).
 - [ ] 3. The case detail shows no previous account, the timeline reads as for any change, and the chain verifies.
 - [ ] 4. The audit log names the changer as today; no match means an unknown changer (ADR-10).
@@ -56,7 +56,7 @@ None.
 | 1 | `apps/core/tests/test_detection.py::test_a_known_vendor_with_no_account_gets_its_first_account_and_a_case` |
 | 2 | `apps/core/tests/test_worker.py::test_a_first_account_case_walks_the_money_path` (match and mismatch) |
 | 3 | `apps/core/tests/test_api.py::test_a_first_account_change_shows_no_previous_account` |
-| 4 | `test_detection.py::test_a_first_account_from_an_unknown_changer_needs_two_approvers` |
+| 4 | `test_detection.py::test_a_first_account_with_no_known_author_has_an_unknown_changer` |
 | 5 | `test_detection.py::test_first_sight_of_a_vendor_with_an_account_is_still_a_baseline`, `test_initial_import_is_a_baseline_not_a_change` (existing) |
 | 6 | `test_detection.py::test_a_webhook_and_a_poll_racing_at_first_sight_make_no_change` |
 | 7 | `test_detection.py::test_a_bank_change_webhook_opens_one_case_and_queues_the_hold` (existing) |
