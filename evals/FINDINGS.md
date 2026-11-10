@@ -107,9 +107,29 @@ Specs: 0017 (voice slice lab), 0083 (generative selection pressure; 0033 before 
     all pick the planted number.
   - **Why:** the change context is drawn by thread, subject, sender domain and time, and the sender
     chooses all four. Any label outside it vetoes as history.
-  - **An idea to measure, not yet tried:** a label younger than `min_age_days` (90) may cancel a
-    call but not move it, by spec 0079's compare-and-withhold applied to young labels anywhere
-    instead of to the change context. Moving a call would then cost what planting a number costs.
+- **Replacements for "one label vetoes a number", measured Nov 10** (plan `measure_w_plan.md`,
+  written before the run; exploratory, one seed, fixture dates).
+  - **The idea:** a label against a number counts as a veto only if it meets the same bar as trust:
+    at least 2 source types, outside the change context, the earliest at least 90 days before the
+    cutoff. Anything less is a weak label.
+  - **W (weak labels are ignored):** stops the redirect and the block. A1's three frozen cases,
+    the separate email the day before, and the same in the thread all call the real number. An
+    attacker's day-before label with no plant, and an honest request that mentions the number, also
+    call it (today's rule and spec 0079 call nobody). Honest over-block rows calling nobody: 13 of
+    61 (today 29). **Cost:** when the attacker's number already outranks the real one (planted
+    before the real number's evidence, K01's hard case), a single honest warning no longer stops
+    it. It picks the planted number where today's rule doesn't in 49 of 2000 generated draws (38
+    distinct; 30 unpinned) and in 3 of the 4 A6 worlds, all for that reason. Without the warning,
+    today's rule picks the planted number in those worlds too.
+  - **WC (weak labels can only cancel):** never picks a number today's rule wouldn't (0 in every
+    set), and stops every redirect, but one email still blocks the call: the attacker's day-before
+    label and the honest mention both call nobody. Calls nobody in 964 of 2000 (today 816).
+  - **WG (W plus spec 0079's guard):** W's results, and it also fixes A3's old thread copy. Over-block
+    planted rows picking the planted number: 8 (today 28, 0079 20, W and WC 12).
+  - No rule changed a corpus outcome or demo pick. By the pre-registered bars, W and WG fail K1, and
+    WC fails the disruption bar. No rule passes all of them: a single honest warning about a planted
+    number and a single attacker label on the real number look the same, so a rule either lets one
+    fresh label cancel the call or doesn't.
 - **Open question:** whether such documents reach `select()` depends on how ingestion attaches
   documents to a vendor (`ledger.documents.vendor_id`), which nobody has traced.
 
