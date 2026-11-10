@@ -313,3 +313,40 @@ def test_no_demo_dataset_is_made_against_the_sandbox():
     from dialback_core.main import _new_dataset
     with pytest.raises(SystemExit, match="sandbox"):
         asyncio.run(_new_dataset(core_settings(ramp_mode=RampMode.SANDBOX), "demo", "Demo", None))
+
+
+# `demo prepare` (spec 0077): one command that gets the demo ready for a clerk's change in the
+# dashboard: reset (linking the clerk), then the Trust Ledger, then the change-request email, in the
+# order the selection rule needs (it trusts only what was recorded before the case opened).
+TEAM = "+12025550100"  # fictional; the hosted run passes the voice allowlist's number on the command line
+
+
+async def test_prepare_resets_then_loads_the_ledger_then_the_request_so_a_number_is_provable(demo):
+    from dialback_core.demo import prepare
+    from dialback_ledger.risk import risk_list
+    from psycopg.rows import dict_row
+    r = await prepare(demo.env, load_seed(SEED), {"clerk": demo.emails["clerk"]}, phones={"acme": TEAM}, requests=["acme"],
+                      today=TODAY)
+    assert r.reset.linked == {"clerk": demo.users["clerk"]}
+    assert r.ledger["vendors"]["acme"]["phone"] == "team" and r.requests == {"acme": True}
+    async with await psycopg.AsyncConnection.connect(demo.env.owner_url, row_factory=dict_row) as conn:
+        risk = {v["legal_name"]: v for v in await risk_list(conn, r.reset.dataset.id)}
+        requests = await (await conn.execute("select count(*) as n from ledger.change_requests where dataset_id = %s",
+                                             (r.reset.dataset.id,))).fetchone()
+    assert risk["Acme Fasteners LLC"]["provable_number"] == TEAM, "the team phone is the number the rule can prove"
+    assert requests["n"] == 1
+    assert await demo_case(demo, r.reset.dataset.id) is None, "no change yet: the clerk makes it in the dashboard"
+
+
+async def test_prepare_checks_everything_before_it_resets(demo):
+    from dialback_core.demo import prepare
+    before = await fresh(demo)
+    for kwargs, why in (({"phones": {"acme": "not-a-phone"}, "requests": ["acme"]}, "phone"),
+                        ({"phones": {"nobody": TEAM}, "requests": ["acme"]}, "nobody"),
+                        ({"phones": {"acme": TEAM}, "requests": ["nobody"]}, "nobody")):
+        with pytest.raises(DemoError, match=why):
+            await prepare(demo.env, load_seed(SEED), {"clerk": demo.emails["clerk"]}, today=TODAY, **kwargs)
+    with pytest.raises(DemoError, match="--link clerk"):
+        await prepare(demo.env, load_seed(SEED), {}, phones={"acme": TEAM}, requests=["acme"], today=TODAY)
+    current = await one(demo.pool, "select id from app.datasets where kind = 'demo' and retired_at is null order by created_at desc limit 1")
+    assert current["id"] == before.dataset.id, "a refused prepare leaves the current demo as it was"
