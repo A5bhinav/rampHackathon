@@ -25,6 +25,22 @@ class ReaderUnavailable(Exception):
     """The configured reader can't start (llm mode without its key). Nothing is labeled or stored."""
 
 
+class ReaderFailed(Exception):
+    """One document couldn't be labeled: an API error, a timeout, a refusal, a `max_tokens` stop, or a
+    reply off the schema (`reason` says which). Fail closed: the document isn't stored, and no other
+    reader is tried. The message holds the reason, the document and the API's request id; never
+    document text or model output."""
+
+    def __init__(self, reason: str, *, detail: str | None = None, request_id: str | None = None,
+                 document_id: str | None = None):
+        self.reason, self.detail, self.request_id, self.document_id = reason, detail, request_id, document_id
+        what = reason + (f", {detail}" if detail else "") + (f", request {request_id}" if request_id else "")
+        super().__init__((f"document {document_id}: " if document_id else "") + f"the reader failed ({what})")
+
+    def for_document(self, document_id: str) -> ReaderFailed:
+        return ReaderFailed(self.reason, detail=self.detail, request_id=self.request_id, document_id=document_id)
+
+
 def _role(label_words: list[str]) -> str:
     if "fax" in label_words:
         return "fax"
