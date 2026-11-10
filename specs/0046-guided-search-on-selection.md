@@ -239,3 +239,30 @@ uv run lab fuzz --search guided --examples 1000 --seed 0 --out evals/corpus-gene
 uv run lab redteam-bench --seeds 0-9
 uv run lab redteam-bench --seeds 1000-1009 --held-out
 ```
+
+## Result (Nov 10): closed without the held-out run
+
+Sami closed this spec on Nov 10, without running the held-out seeds.
+
+- **Why.** A fresh review (FINDINGS D) found that the pass bar could almost never be met with
+  these planted breaks:
+  - archive found all 6 `helps` breaks on 9 of 10 dev seeds;
+  - the `helps` breaks fall in three pairs found on the same worlds, so there are really 3;
+  - D01 and D03 can never be found.
+
+  A held-out run could barely come out in steering's favor, so it would tell us nothing.
+- **Kept: the search that keeps going** (`--search archive`), adopted under decision 5 as the fix
+  for FINDINGS B3. At seed 0 it found I1, I4 and I5 violations on today's rule that today's search
+  never reaches.
+- **Parked: the guided searches** (`guided`, `guided-new`) and the bench. They stay in the code,
+  unproven and out of CI. Testing steering again would be a new spec, with harder breaks, a
+  time-to-find metric, the review's harness fixes and fresh seeds. It is worth doing only once the
+  plain search starts missing things.
+- **Exploratory result** (dev seeds 0 to 9 only): for these planted breaks, a random search that
+  keeps going finds every break the checks can see within about 800 worlds.
+- **Known harness defects,** left unfixed while the bench is parked (FINDINGS D):
+  - steering starts around world 15, not 200;
+  - the budget counts test cases, not distinct worlds;
+  - `guided-new` reads an unpinned frozen corpus;
+  - a held-out run records no provenance;
+  - `test_bench_runs_the_pinned_rule` cannot fail.
