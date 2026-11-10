@@ -6,6 +6,8 @@ dependencies = [
   "dialback-policy",
   "dialback-voice",
   "dialback-decision",
+  "dialback-ledger",
+  "jsonschema>=4",
   "dialback-core",
   "pyyaml>=6",
 ]
@@ -15,6 +17,11 @@ lab = "dialback_evals.cli:main"
 
 [dependency-groups]
 dev = ["pytest>=8", "hypothesis>=6"]
+
+[tool.pytest.ini_options]
+markers = [
+  "selection_gate: the spec 0083 gate on the number-selection rule; lab-fuzz carries it in CI, lab-smoke deselects it",
+]
 
 [build-system]
 requires = ["hatchling"]

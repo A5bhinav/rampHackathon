@@ -1,0 +1,131 @@
+{
+  "label": "planted-number-picked-after-bare-mention-in-request",
+  "labels": [
+    "M_incontext_label_moved_pick"
+  ],
+  "why": "Reachable today, built by the ledger's real ingest_all (stub reader) and rebuilt by test_ingested_case_is_still_what_real_ingestion_produces. The vendor's real number +14155550142 is in a contract and a listing 200 days before the request; a planted provable number +16455550177 is in a contract and a listing 150 days before. The change request's own body says 'Please stop using our old number (415) 555-0142.', which the reader cannot place, so ingestion records party unknown; the rule refuses the real number (not_vendor_party) and calls the planted one. I12's removal half catches it. Frozen Nov 9 after review 2 (B1) found no generated world or frozen case put a label in the request email.",
+  "case_id": "00000000-0000-0000-0000-000000000001",
+  "dataset_id": "00000000-0000-0000-0000-000000000002",
+  "vendor_id": "00000000-0000-0000-0000-000000000003",
+  "vendor_domains": [
+    "acme.example"
+  ],
+  "requested_cutoff": "2026-10-01T16:00:00+00:00",
+  "case_opened_at": "2026-10-01T17:00:00+00:00",
+  "request": {
+    "document_id": "req",
+    "received_at": "2026-10-01T16:00:00+00:00",
+    "thread_id": "req",
+    "subject": "Updated banking details",
+    "sender": "ap@acme.example"
+  },
+  "settings": {
+    "min_source_types": 2,
+    "min_age_days": 90,
+    "near_miss_distance": 1,
+    "same_subject_window_days": 30,
+    "established_days": 365
+  },
+  "poison": [
+    "+16455550177"
+  ],
+  "documents": [
+    {
+      "id": "c1",
+      "channel": "contract",
+      "received_at": "2026-03-15T16:00:00+00:00",
+      "sender": null,
+      "thread_id": null,
+      "subject": null,
+      "recorded_at": "2026-03-15T16:00:00+00:00"
+    },
+    {
+      "id": "l1",
+      "channel": "listing",
+      "received_at": "2026-03-15T16:00:00+00:00",
+      "sender": null,
+      "thread_id": null,
+      "subject": null,
+      "recorded_at": "2026-03-15T16:00:00+00:00"
+    },
+    {
+      "id": "c2",
+      "channel": "contract",
+      "received_at": "2026-05-04T16:00:00+00:00",
+      "sender": null,
+      "thread_id": null,
+      "subject": null,
+      "recorded_at": "2026-05-04T16:00:00+00:00"
+    },
+    {
+      "id": "l2",
+      "channel": "listing",
+      "received_at": "2026-05-04T16:00:00+00:00",
+      "sender": null,
+      "thread_id": null,
+      "subject": null,
+      "recorded_at": "2026-05-04T16:00:00+00:00"
+    },
+    {
+      "id": "req",
+      "channel": "email",
+      "received_at": "2026-10-01T16:00:00+00:00",
+      "sender": "ap@acme.example",
+      "thread_id": "req",
+      "subject": "Updated banking details",
+      "recorded_at": "2026-10-01T16:00:00+00:00"
+    }
+  ],
+  "sightings": [
+    {
+      "e164": "+14155550142",
+      "document_id": "c1",
+      "channel": "contract",
+      "received_at": "2026-03-15T16:00:00+00:00",
+      "visibility": "visible",
+      "role": "ar",
+      "party": "vendor",
+      "recorded_at": "2026-03-15T16:00:00+00:00"
+    },
+    {
+      "e164": "+14155550142",
+      "document_id": "l1",
+      "channel": "listing",
+      "received_at": "2026-03-15T16:00:00+00:00",
+      "visibility": "visible",
+      "role": "ar",
+      "party": "vendor",
+      "recorded_at": "2026-03-15T16:00:00+00:00"
+    },
+    {
+      "e164": "+16455550177",
+      "document_id": "c2",
+      "channel": "contract",
+      "received_at": "2026-05-04T16:00:00+00:00",
+      "visibility": "visible",
+      "role": "ar",
+      "party": "vendor",
+      "recorded_at": "2026-05-04T16:00:00+00:00"
+    },
+    {
+      "e164": "+16455550177",
+      "document_id": "l2",
+      "channel": "listing",
+      "received_at": "2026-05-04T16:00:00+00:00",
+      "visibility": "visible",
+      "role": "ar",
+      "party": "vendor",
+      "recorded_at": "2026-05-04T16:00:00+00:00"
+    },
+    {
+      "e164": "+14155550142",
+      "document_id": "req",
+      "channel": "email",
+      "received_at": "2026-10-01T16:00:00+00:00",
+      "visibility": "visible",
+      "role": "unknown",
+      "party": "unknown",
+      "recorded_at": "2026-10-01T16:00:00+00:00"
+    }
+  ]
+}

@@ -75,6 +75,30 @@ def test_lab_run_records_the_frozen_scenario_hashes(tmp_path):
     assert len(line["scenario_hash"]) == 64
 
 
+# Spec 0083, Task 5: lab fuzz. The fuzz tests check the command's
+# contract (exit codes, frozen cases re-run, the seed passed through) with the search and the re-run
+# substituted; the rule's own status is carried by the two selection_gate tests and the lab-fuzz job.
+
+def test_lab_fuzz_exits_zero_when_nothing_is_found(tmp_path, monkeypatch):
+    monkeypatch.setattr("dialback_evals.gencorpus.rerun", lambda d: [])
+    monkeypatch.setattr("dialback_evals.gencorpus.fuzz", lambda **k: [])
+    assert main(["fuzz", "--examples", "10", "--seed", "0", "--out", str(tmp_path)]) == 0
+
+
+def test_lab_fuzz_fails_on_a_violation(tmp_path, monkeypatch):
+    monkeypatch.setattr("dialback_evals.gencorpus.rerun", lambda d: [])
+    monkeypatch.setattr("dialback_evals.gencorpus.fuzz", lambda **k: ["I7_poison_pick_below_bar"])
+    assert main(["fuzz", "--examples", "10", "--seed", "0", "--out", str(tmp_path)]) == 1
+
+
+def test_lab_fuzz_fails_on_a_frozen_finding_and_passes_the_seed_through(tmp_path, monkeypatch):
+    seen = {}
+    monkeypatch.setattr("dialback_evals.gencorpus.rerun", lambda d: [("near-miss-x", ["M_shared_id_helped"])])
+    monkeypatch.setattr("dialback_evals.gencorpus.fuzz", lambda **k: seen.update(k) or [])
+    assert main(["fuzz", "--examples", "7", "--seed", "3", "--out", str(tmp_path)]) == 1
+    assert seen["examples"] == 7 and seen["seed"] == 3 and str(seen["out_dir"]) == str(tmp_path)
+
+
 # Review fix F7: a run that would test nothing, or spend money, is refused.
 
 def test_lab_run_with_no_scenarios_exits_nonzero(tmp_path):
@@ -171,3 +195,17 @@ def test_lab_run_holds_the_known_failures_list(tmp_path):
     assert main([*args, "--known-failures", _list(tmp_path, "lab-smoke", [])]) == 1   # unlisted
     orphan = {**held, "finding": "A99"}                                  # no such finding in FINDINGS.md
     assert main([*args, "--known-failures", _list(tmp_path, "lab-smoke", [orphan])]) == 1
+
+
+def test_lab_fuzz_counts_a_known_hit_and_does_not_freeze_it(tmp_path, monkeypatch, capsys):
+    from dialback_evals.gencorpus import load_all
+    monkeypatch.setattr("dialback_evals.gencorpus.all_violations", lambda w: ["M_shared_id_helped"])
+    entry = {"case": "elsewhere", "labels": ["M_shared_id_helped"], "finding": "A5", "owner": "Inesh"}
+    out = tmp_path / "corpus"
+    listed = _list(tmp_path, "lab-fuzz", [entry])
+    monkeypatch.setattr("dialback_evals.gencorpus.rerun", lambda d: [("elsewhere", ["M_shared_id_helped"])])
+    assert main(["fuzz", "--examples", "5", "--seed", "0", "--out", str(out), "--known-failures", listed]) == 0
+    assert load_all(out) == [] and "1 search hit(s) showed only listed labels" in capsys.readouterr().out
+    monkeypatch.setattr("dialback_evals.gencorpus.all_violations", lambda w: ["I5_too_young_eligible"])
+    assert main(["fuzz", "--examples", "5", "--seed", "0", "--out", str(out), "--known-failures", listed]) == 1
+    assert len(load_all(out)) == 1                                      # an unlisted hit is frozen, and red

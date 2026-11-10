@@ -33,6 +33,6 @@ jobs:
       - name: Install the Python workspace
         run: uv sync --all-packages --locked
       - name: Lab tests
-        run: cd evals && uv run pytest -q
+        run: cd evals && uv run pytest -q -m "not selection_gate"   # the gate runs in lab-fuzz
       - name: Lab run (scripted callers, no spend)
         run: uv run lab run --split voice --max-usd 0
