@@ -1,14 +1,17 @@
 """The flagging bar on the labeled emails (spec 0086). The rule alone did not meet the held-out bar, and
 Sami's decision 11 made the email door's flagger the rule OR a quarantined model, judged on a fresh
 held-out set. Here: the rule still meets the bar on the tuning half it was built on, and keeps a floor
-on the old held-out half, which is now development data (its hash is still checked)."""
+on the old held-out half, which is now development data (its hash is still checked). Both go through the
+combined flagger, flag_email, with no classifier configured: the rule alone, as DIALBACK_EMAIL_CLASSIFIER=rule
+runs it. The combined flagger with the model is judged on the fresh held-out set by Task 6c's evaluation."""
 from __future__ import annotations
 
 import hashlib
 import json
 from pathlib import Path
 
-from dialback_core.email_door.rules import flag
+from dialback_core.email_door.classifier import ChangeClassifier
+from dialback_core.email_door.rules import flag_email
 
 FIXTURES = Path(__file__).parent / "fixtures"
 MAX_ORDINARY_FLAGGED = 3  # an absolute count, set before any tuning; never loosen it
@@ -19,10 +22,11 @@ def load(half: str) -> dict[str, dict]:
     return {p.name: json.loads(p.read_text()) for p in sorted((FIXTURES / half).glob("*.json"))}
 
 
-def score(emails: dict[str, dict], change_requests: int, ordinary: int) -> tuple[list[str], list[str], str]:
+def score(emails: dict[str, dict], change_requests: int, ordinary: int,
+          classifier: ChangeClassifier | None = None) -> tuple[list[str], list[str], str]:
     labels = [e["label"] for e in emails.values()]
     assert (labels.count("change_request"), labels.count("ordinary"), len(labels)) == (change_requests, ordinary, change_requests + ordinary)
-    flagged = {name: flag(e["subject"], e["text"]).flagged for name, e in emails.items()}
+    flagged = {name: flag_email(e["subject"], e["text"], "", classifier).flagged for name, e in emails.items()}
     missed = sorted(n for n, e in emails.items() if e["label"] == "change_request" and not flagged[n])
     false_flags = sorted(n for n, e in emails.items() if e["label"] == "ordinary" and flagged[n])
     summary = (f"change requests flagged {change_requests - len(missed)}/{change_requests} (missed: {missed}); "

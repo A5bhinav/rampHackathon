@@ -108,6 +108,7 @@ falls back to the safe path.
 | `DIALBACK_RESOLVER` | `stub`, `ledger` | `stub` |
 | `DIALBACK_LAB_ATTACKER` | `scripted`, `llm` | `scripted` |
 | `DIALBACK_EMAIL` | `off`, `resend` | `off` |
+| `DIALBACK_EMAIL_CLASSIFIER` | `rule`, `rule+model` | `rule` |
 
 ## Key dates
 

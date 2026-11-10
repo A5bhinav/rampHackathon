@@ -26,6 +26,11 @@ class EmailMode(StrEnum):
     RESEND = "resend"
 
 
+class ClassifierMode(StrEnum):
+    RULE = "rule"                  # safe: the word rule alone flags an email; no email text leaves Dialback
+    RULE_AND_MODEL = "rule+model"  # the rule OR a quarantined model (spec 0086, Sami's decision 11)
+
+
 def read_flag[E: StrEnum](name: str, kind: type[E], safe: E, environ: dict[str, str] | None = None) -> E:
     raw = (environ if environ is not None else os.environ).get(name)
     if raw is None:

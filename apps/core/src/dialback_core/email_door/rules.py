@@ -13,6 +13,7 @@ import unicodedata
 from bisect import bisect_left, bisect_right
 from collections.abc import Iterable
 from dataclasses import dataclass
+from typing import TYPE_CHECKING, Literal
 
 import phonenumbers
 from dialback_ledger.candidates import find_phones
@@ -20,6 +21,9 @@ from dialback_ledger.text import Line
 
 from ..bank import aba_valid
 from .masking import DIGIT_RUN, SEPARATOR
+
+if TYPE_CHECKING:
+    from .classifier import ChangeClassifier
 
 # Flagging ------------------------------------------------------------------------------------------
 #
@@ -138,6 +142,39 @@ def flag(subject: str, text: str) -> Flag:
     if verbs and dests and not reasons:
         reasons[f"email: '{verbs[0]}' and '{dests[0]}' in different sentences"] = None
     return Flag(bool(reasons), tuple(reasons))
+
+
+@dataclass(frozen=True)
+class FlagDecision:
+    flagged: bool
+    by: Literal["rule", "model", "none"]
+    quote: str | None   # the model's quote when the model flagged, else None
+
+
+def flag_email(subject: str, text: str, html_text: str, classifier: ChangeClassifier | None) -> FlagDecision:
+    """Whether the email asks to change where a vendor's payments go: the rule OR a quarantined model
+    (Sami's decision 11). The rule reads the subject with the text part, and with the HTML part's text;
+    when it flags, the model is not asked. Otherwise a configured classifier gets redact_for_model's
+    copies only (no digits) of the subject and of model_text(text, html_text). The model can add a flag,
+    never remove the rule's. A ClassifierFailed propagates, so the inbox retries the email (R7)."""
+    if flag(subject, text).flagged or (html_text != text and flag(subject, html_text).flagged):
+        return FlagDecision(True, "rule", None)
+    if classifier is None:
+        return FlagDecision(False, "none", None)
+    verdict = classifier.classify(redact_for_model(subject or ""), redact_for_model(model_text(text, html_text)))
+    if verdict.change_request:
+        return FlagDecision(True, "model", verdict.quote)
+    return FlagDecision(False, "none", None)
+
+
+def model_text(text: str, html_text: str) -> str:
+    """The email's text for the model, before redaction: the text part, then a blank line and the HTML
+    part's text when that is non-empty and differs from the text part once whitespace is collapsed (a
+    request can sit in the part one mail reader shows and another hides)."""
+    text, html_text = text or "", html_text or ""
+    if html_text.strip() and " ".join(html_text.split()) != " ".join(text.split()):
+        return text + "\n\n" + html_text
+    return text
 
 
 def _sentences(text: str) -> list[list[str]]:

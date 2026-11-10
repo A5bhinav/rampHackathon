@@ -99,6 +99,8 @@ The `ramp-mock` URL uses Railway's reference variables (`${{service.VARIABLE}}`)
 | `DIALBACK_EMAIL` | no | `off` (default) or `resend`. With `resend` the core answers `POST /webhooks/email`; without it the route is a 404. |
 | `RESEND_API_KEY` | with `resend` | Resend's API key. Missing with `DIALBACK_EMAIL=resend`: the core refuses to start. |
 | `RESEND_WEBHOOK_SECRET` | with `resend` | The webhook's signing secret from Resend (`whsec_...`). Missing with `resend`: the core refuses to start. |
+| `DIALBACK_EMAIL_CLASSIFIER` | no | `rule` (default: the word rule alone flags an email, and no email text leaves Dialback) or `rule+model` (the rule OR a quarantined model, pinned in `apps/core/src/dialback_core/email_door/classifier.py`, which sees the subject and text with every digit replaced by `#`). Any other value is `rule`. |
+| `ANTHROPIC_API_KEY` | with `rule+model` | The email classifier's key. Missing with `DIALBACK_EMAIL_CLASSIFIER=rule+model`: the core refuses to start. |
 | `DIALBACK_INBOX_ADDRESS` | no | The address vendors write to (shown on the public page) |
 | `DIALBACK_REPLY_FROM` | no | The sender of replies. Unset: replies are not configured and none is sent. |
 | `DIALBACK_BANK_CHANGES_URL` | no | The public page vendors are pointed to |

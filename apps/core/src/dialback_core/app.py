@@ -16,9 +16,10 @@ from .auth import TokenVerifier, verifier_from_settings
 from .calls import router as calls_router
 from .db import open_pool
 from .detection import Keys
+from .email_door.classifier import AnthropicClassifier, ChangeClassifier, anthropic_client
 from .email_door.resend import ResendClient
 from .email_door.route import router as email_router
-from .flags import EmailMode
+from .flags import ClassifierMode, EmailMode
 from .ports import (
     CallPlacer,
     ChangeContext,
@@ -28,9 +29,19 @@ from .ports import (
     VoiceServiceClient,
 )
 from .ramp import RampConnector
-from .settings import Settings
+from .settings import ConfigurationError, Settings
 from .webhooks import router as webhooks_router
 from .worker import Worker
+
+
+def email_classifier(settings: Settings) -> ChangeClassifier | None:
+    """The email door's model (spec 0086, Task 6b), only with DIALBACK_EMAIL_CLASSIFIER=rule+model. Otherwise
+    None: the rule alone flags, and no email text leaves Dialback."""
+    if settings.email_classifier is not ClassifierMode.RULE_AND_MODEL:
+        return None
+    if not settings.anthropic_api_key:   # Settings.from_env refuses this too
+        raise ConfigurationError("ANTHROPIC_API_KEY is required when DIALBACK_EMAIL_CLASSIFIER=rule+model")
+    return AnthropicClassifier(anthropic_client(settings.anthropic_api_key))
 
 
 def create_app(settings: Settings, pool: AsyncConnectionPool | None = None, connector: RampConnector | None = None,
@@ -43,15 +54,17 @@ def create_app(settings: Settings, pool: AsyncConnectionPool | None = None, conn
             app.state.pool = await open_pool(settings.database_url)
         if connector is None:
             app.state.connector = RampConnector(settings, http)
-        stop, task = asyncio.Event(), None
+        stop, task, classifier = asyncio.Event(), None, None
         if settings.run_worker:
+            classifier = email_classifier(settings)
             worker = Worker(app.state.pool, settings, app.state.connector,
                             resolver or LedgerResolver(settings.resolver_mode),
                             caller or (VoiceServiceClient(settings.voice_base_url, settings.internal_api_token, http)
                                        if settings.voice_base_url else NoVoiceService()),
                             change_context=change_context,
                             resend=ResendClient(settings.resend_api_key, http)
-                            if settings.email_mode is EmailMode.RESEND and settings.resend_api_key else None)
+                            if settings.email_mode is EmailMode.RESEND and settings.resend_api_key else None,
+                            classifier=classifier)
             task = asyncio.create_task(worker.run_forever(stop))
         try:
             yield
@@ -59,6 +72,8 @@ def create_app(settings: Settings, pool: AsyncConnectionPool | None = None, conn
             stop.set()
             if task:
                 await task
+            if isinstance(classifier, AnthropicClassifier):
+                classifier.client.close()
             await http.aclose()
             if pool is None:
                 await app.state.pool.close()

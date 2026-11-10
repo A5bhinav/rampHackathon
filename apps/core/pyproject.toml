@@ -14,6 +14,8 @@ dependencies = [
   "dialback-decision",
   "dialback-ledger",
   "dialback-policy",  # the call's fixed text, shown on the case page (spec 0035)
+  "anthropic>=2.7.0",  # the email door's quarantined classifier, DIALBACK_EMAIL_CLASSIFIER=rule+model (spec 0086)
+  "phonenumbers>=8.13",  # the email door formats the ledger's phone lines itself (rules.py)
 ]
 
 [project.scripts]

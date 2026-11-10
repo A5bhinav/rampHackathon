@@ -33,6 +33,7 @@ from .calling_window import CallingWindow
 from .company import every_name_matches
 from .db import dataset_now, system_tx
 from .detection import Keys, process_inbound_webhooks
+from .email_door.classifier import ChangeClassifier
 from .email_door.inbox import process_inbound_emails
 from .email_door.resend import ResendPort
 from .events import TransitionRefused, apply_event
@@ -123,9 +124,11 @@ select type, body_jcs::jsonb -> 'body' as body
 class Worker:
     def __init__(self, pool: AsyncConnectionPool, settings: Settings, connector: RampConnector, resolver: NumberResolver,
                  caller: CallPlacer, name: str | None = None, sleep=asyncio.sleep,
-                 change_context: ChangeContext | None = None, resend: ResendPort | None = None) -> None:
+                 change_context: ChangeContext | None = None, resend: ResendPort | None = None,
+                 classifier: ChangeClassifier | None = None) -> None:
         self.pool, self.settings, self.connector = pool, settings, connector
         self.resend = resend
+        self.classifier = classifier   # the email door's model, with DIALBACK_EMAIL_CLASSIFIER=rule+model only
         self.resolver, self.caller, self.name, self._sleep = resolver, caller, name or unique_worker_name(), sleep
         self.change_context = change_context or LedgerChangeContext()
         self.keys = Keys(settings.fingerprint_key, settings.fingerprint_key_version)

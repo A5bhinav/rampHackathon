@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from urllib.parse import urlsplit
 
 from .email_door.signature import MIN_KEY_BYTES, decode_secret
-from .flags import EmailMode, RampMode, ResolverMode, read_flag
+from .flags import ClassifierMode, EmailMode, RampMode, ResolverMode, read_flag
 
 
 class ConfigurationError(RuntimeError):
@@ -103,6 +103,10 @@ class Settings:
     reply_from: str | None = None             # unset: replies are not configured
     bank_changes_url: str | None = None
     company_name: str = "the company you're writing to"
+    # The email door's flagger (spec 0086, Task 6b). With `rule+model`, the Anthropic key is required; it is
+    # kept only in that mode, and never shown in the settings' repr.
+    email_classifier: ClassifierMode = ClassifierMode.RULE
+    anthropic_api_key: str | None = field(default=None, repr=False)
     extra: dict[str, str] = field(default_factory=dict)
 
     @classmethod
@@ -125,6 +129,12 @@ class Settings:
             if len(key) < MIN_KEY_BYTES:
                 raise ConfigurationError(
                     f"RESEND_WEBHOOK_SECRET must be Resend's signing secret (base64, optionally prefixed whsec_, of at least {MIN_KEY_BYTES} bytes)")
+        email_classifier = read_flag("DIALBACK_EMAIL_CLASSIFIER", ClassifierMode, ClassifierMode.RULE, env)
+        anthropic_api_key = None
+        if email_classifier is ClassifierMode.RULE_AND_MODEL:
+            anthropic_api_key = env.get("ANTHROPIC_API_KEY", "").strip()
+            if not anthropic_api_key:
+                raise ConfigurationError("ANTHROPIC_API_KEY is required when DIALBACK_EMAIL_CLASSIFIER=rule+model")
         base = env.get("RAMP_BASE_URL")
         if not base:
             raise ConfigurationError("RAMP_BASE_URL is required (the mock's URL, or Ramp's sandbox API)")
@@ -159,6 +169,8 @@ class Settings:
             reply_from=(env.get("DIALBACK_REPLY_FROM") or "").strip() or None,
             bank_changes_url=(env.get("DIALBACK_BANK_CHANGES_URL") or "").strip() or None,
             company_name=(env.get("DIALBACK_COMPANY_NAME") or "").strip() or "the company you're writing to",
+            email_classifier=email_classifier,
+            anthropic_api_key=anthropic_api_key,
             supabase_url=supabase_url,
             jwt_secret=_jwt_secret(env, supabase_url),
         )
