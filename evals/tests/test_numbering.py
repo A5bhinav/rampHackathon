@@ -15,6 +15,7 @@ SPECS = Path(__file__).resolve().parents[2] / "specs"
 # Each lab spec on main, with the questions it defines. A later landing PR adds its spec here.
 LAB = {
     "0017-attack-lab-voice-slice.md": {139, 140, 141},
+    "0083-generative-selection-pressure.md": {142, 143, 62, 63, 64, 144},
 }
 
 _DEFINES = re.compile(r"^\s*(?:[-*]|\d+\.)\s+(?:\*\*)?Q(\d+)\b", re.MULTILINE)

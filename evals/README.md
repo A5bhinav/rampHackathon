@@ -13,12 +13,14 @@ nothing.
 ```bash
 uv run lab run --split voice                  # the voice scenarios, scripted callers, no spend
 uv run lab freeze --split voice               # re-freeze scenario hashes and required outcomes
-cd evals && uv run pytest -q                  # the lab's own tests
+uv run lab fuzz --examples 2000 --seed 0 --out evals/corpus-generated   # selection: frozen cases, then a search
+cd evals && uv run pytest -q -m "not selection_gate"   # the checks that must stay green
 ```
 
 `lab run` writes `results.jsonl` and `scorecard.json`, and exits non-zero when a hard gate
 fails, which is what CI checks (`lab-smoke` on PRs that touch the agent, the call flow, the
-decision engine or the lab). `voice` is the only split today; the dev and held-out sets, and
+decision engine or the lab). `lab fuzz` exits non-zero on a frozen case that still fails or a
+new finding (`lab-fuzz`). `voice` is the only split today; the dev and held-out sets, and
 `lab-full`, come later.
 
 ## Scenarios

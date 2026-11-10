@@ -1,11 +1,13 @@
-"""The lab CLI (spec 0017, Task 6).
+"""The lab CLI (spec 0017, Task 6; spec 0083, Task 5).
 
 `lab run --split voice` loads the scenarios, runs each through the real call and the real decision,
 writes `results.jsonl` and `scorecard.json`, prints a one-line summary, and exits non-zero when any
 hard gate fails. Deterministic (the production ScriptedAgent, scripted callers), so CI is reproducible
 and needs no key. `--max-usd` is accepted for forward compatibility; the scripted slice never spends.
-`lab freeze` records each scenario's hash and required outcome, so an expectation moves only with a
-deliberate re-freeze."""
+
+`lab fuzz` re-runs every frozen finding under `--out`, then searches `--examples` generated worlds at
+`--seed`, freezing the first shrunk violation there; it exits non-zero on any frozen case that still
+fails or any new finding."""
 from __future__ import annotations
 
 import argparse
@@ -22,6 +24,9 @@ from .oracle import required
 from .runner import facts_for, run_scenario
 from .scenario import Scenario, expected_hash, load_scenarios
 from .scorers import ScenarioResult, score, scorecard
+
+# The fuzz lab's modules import the dev-only hypothesis package, so the commands that need them import
+# them when they run: `lab run` starts without it (spec 0048, C4; FINDINGS B7, M2).
 
 _REPO = Path(__file__).resolve().parents[3]   # evals/src/dialback_evals/cli.py -> the repo root
 KNOWN_FAILURES = _REPO / "evals" / "known-failures.json"
@@ -61,6 +66,11 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--out", default=str(_REPO / "evals" / "out"))
     run.add_argument("--max-usd", type=float, default=0.0)
     run.add_argument("--known-failures", default="auto", help=_KNOWN_HELP)
+    fz = sub.add_parser("fuzz", help="re-run frozen findings, then search generated worlds (spec 0083)")
+    fz.add_argument("--examples", type=int, default=2000)
+    fz.add_argument("--seed", type=int, default=0)
+    fz.add_argument("--out", default="evals/corpus-generated")
+    fz.add_argument("--known-failures", default="auto", help=_KNOWN_HELP)
     freeze = sub.add_parser("freeze", help="record each scenario's hash and required outcome (expected.lock.json)")
     freeze.add_argument("--split", default="voice")
     freeze.add_argument("--scenarios-root", default=str(_REPO / "evals" / "scenarios"))
@@ -76,7 +86,33 @@ def main(argv: list[str] | None = None) -> int:
         scenarios_dir = Path(args.scenarios_root) / args.split
         return _run(scenarios_dir, Path(args.out), _known(args.known_failures, scenarios_dir, _REPO / "evals" /
                                                           "scenarios" / "voice"))
+    if args.command == "fuzz":
+        return _fuzz(args.examples, args.seed, Path(args.out),
+                     _known(args.known_failures, Path(args.out), _REPO / "evals" / "corpus-generated"))
     return 2
+
+
+def _fuzz(examples: int, seed: int, out_dir: Path, known_failures: Path | None = None) -> int:
+    from . import known
+    from .gencorpus import fuzz, load_all, rerun
+    before = {label for label, _ in load_all(out_dir)}
+    failing = rerun(out_dir)
+    for label, found in failing:
+        print(f"lab fuzz: frozen case {label} still fails: {', '.join(found)}")
+    entries = known.for_job(known_failures, "lab-fuzz")
+    listed = {label for e in entries or () for label in e.labels}
+    # A hit whose labels are all listed is counted, not frozen: frozen, it would fail as an unlisted case.
+    new = fuzz(examples=examples, seed=seed, out_dir=out_dir,
+               keep=lambda labels: entries is None or not set(labels) <= listed)
+    fresh = sorted({label for label, _ in load_all(out_dir)} - before) if new else []
+    if new and fresh:
+        print(f"lab fuzz: new finding ({', '.join(new)}) frozen as {', '.join(fresh)} under {out_dir}")
+    elif new:
+        print(f"lab fuzz: the search re-found an already-frozen case ({', '.join(new)})")
+    print(f"lab fuzz: {len(failing)} frozen case(s) failing, {len(fresh)} new finding(s) "
+          f"(seed {seed}, {examples} examples)")
+    held = _held("lab-fuzz", known_failures, dict(failing), [new] if new else [])
+    return (1 if failing or new else 0) if held is None else held
 
 
 def _run(scenarios_dir: Path, out_dir: Path, known_failures: Path | None = None) -> int:
