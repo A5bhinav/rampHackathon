@@ -177,6 +177,15 @@ These are not reachable today, but each is frozen as a regression.
 - **Spec 0082** (`sami/company-name-match`, draft, Nov 10) goes the other way on purpose: it accepts
   short names ("Acme") and speech hints, and lists negated short names as an accepted cost. Its D10
   measures over-blocking and other-company acceptance with spec 0048's fuzzer.
+- **Spec 0082 amendment D7a, refusal words** (`sami/company-refusal-words`, stacked on 0082's
+  matcher, Nov 10). On the lab's phrase bank, against main (exploratory: the word list was chosen
+  after reading the bank):
+  - negations 48 to 0, resellers 36 to 0, past connections 24 to 0, corrections 24 to 12 (the "I
+    mean" ones);
+  - unchanged costs of 0082 itself: other companies containing the vendor's name 36 of 36 still
+    accepted, a different company sharing the vendor's first word ("Acme Fastening Co") 3 of 36,
+    and short partial names ("Acme") 36 of 36, which 0082 accepts on purpose;
+  - typos still 0 of 12 (no fuzzy matching).
 
 ### A11. The scripted agent's yes/no reading disagrees with the policy's
 
