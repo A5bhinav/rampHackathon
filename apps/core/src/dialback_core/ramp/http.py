@@ -95,7 +95,8 @@ class RampHttpAdapter:
         bearer = self._token if isinstance(self._token, str) else await self._token.token()
         return {"Authorization": f"Bearer {bearer}", "Accept": "application/json"}
 
-    async def _request(self, method: str, url: str, **kwargs: Any) -> dict[str, Any]:
+    async def _request(self, method: str, url: str, *, empty_ok: bool = False, **kwargs: Any) -> dict[str, Any]:
+        """`empty_ok`: a 202 or 204 with no body is an answer (Ramp's hold and release, spec 0097)."""
         if url.startswith("/"):
             url = self.base_url + url
         elif urlsplit(url).netloc != self._host:
@@ -125,6 +126,8 @@ class RampHttpAdapter:
                 raise RampNotFound(f"{method} {url}: not found")
             if code >= 400:
                 raise RampError(f"{method} {url}: HTTP {code}", status=code, retryable=code == 429 or code >= 500)
+            if empty_ok and not response.content:
+                return {}
             return response.json()
         raise AssertionError("unreachable")
 

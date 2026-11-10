@@ -249,10 +249,11 @@ async def test_routing_sends_a_sandbox_dataset_to_the_sandbox_with_the_login(poo
     d = await sandbox_dataset(pool)
     async with ramp.client() as http:
         await connector(core_settings(ramp_sandbox=SANDBOX), http, pool).for_dataset(d.id).get_vendor("v1")
-    token, api = ramp.requests
+    # Spec 0097 adds a third request after these two: the vendor's hold, from Ramp's audit log.
+    token, api = ramp.requests[:2]
     assert str(token.url) == "https://sandbox.ramp.test/developer/v1/token"
     assert str(api.url) == "https://sandbox.ramp.test/developer/v1/vendors/v1"
-    assert api.headers["Authorization"] == "Bearer test-token-1"
+    assert all(r.headers["Authorization"] == "Bearer test-token-1" for r in ramp.requests[1:])
 
 
 @pytest.mark.anyio

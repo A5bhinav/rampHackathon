@@ -26,6 +26,7 @@ from ..settings import ConfigurationError, Settings
 from .http import RampHttpAdapter, Sleep, TokenBucket
 from .login import RampLogin
 from .port import RampAccount, RampAuditEvent, RampBill, RampError, RampHold, RampPort, RampVendor
+from .sandbox import RampSandboxAdapter
 
 
 def mock_token(secret: bytes, dataset_id: UUID) -> str:
@@ -81,8 +82,8 @@ class RampConnector:
             else:
                 if self._login is None or self._settings.ramp_sandbox is None:
                     raise RampError(f"dataset {dataset_id} is on Ramp's sandbox, and this server has no sandbox credentials")
-                adapter = RampHttpAdapter(self._settings.ramp_sandbox.base_url, self._login, self._http, self._limiter,
-                                          sleep=self._sleep)
+                adapter = RampSandboxAdapter(self._settings.ramp_sandbox.base_url, self._login, self._http, self._limiter,
+                                             sleep=self._sleep)
             self._adapters[dataset_id] = adapter
         return adapter
 

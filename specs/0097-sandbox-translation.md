@@ -28,7 +28,7 @@ None.
   |---|---|
   | vendor | `id`, `name`; `status` is `ACTIVE` or `INACTIVE` from `is_active`; `updated_at` |
   | bank account | `id`; `last4` from `account_number_last_four`, which must be four digits or the call fails (never invented); `is_active` when `status` is `active`; `routing_number` empty, because Ramp never returns it; `bank_name`, `account_type`, `created_at` empty |
-  | bill | `id`; `vendor_id` from `vendor.id`; `payment_date` the date part of `payment.payment_date`; `paid` when `status` is `PAID` or `paid_at` is set; `is_on_hold` (D3) |
+  | bill | `id`; `vendor_id` from `vendor.id`; `payment_date` the date part of `payment.payment_date`; `paid` only when `status` is `PAID` (not on `paid_at` alone: the read-back skips paid bills, so a bill must never look paid early); `is_on_hold` (D3) |
   | audit event | `id`; `actor_id`; `occurred_at` from `event_time`; `target_id` from `primary_reference.id`; `payload` from `event_details`; `event_type` (D4) |
   | hold | Ramp answers 202 or 204 with no body, so the hold has no Ramp id (`""`) |
 
@@ -48,15 +48,15 @@ None.
 
 ## Acceptance
 
-- [ ] Each of the eight calls sends Ramp's documented path, method, parameters and body.
-- [ ] Each answer becomes the core's object exactly as in D2, D3 and D4, from Ramp-shaped data.
-- [ ] An account without four last digits, and an event name with no Ramp equivalent, raise a
+- [x] Each of the eight calls sends Ramp's documented path, method, parameters and body.
+- [x] Each answer becomes the core's object exactly as in D2, D3 and D4, from Ramp-shaped data.
+- [x] An account without four last digits, and an event name with no Ramp equivalent, raise a
       `RampError` that isn't retried.
-- [ ] A sandbox dataset reaches the sandbox through this adapter; a mock dataset through the
+- [x] A sandbox dataset reaches the sandbox through this adapter; a mock dataset through the
       unchanged mock adapter.
-- [ ] Importing a sandbox dataset's vendors stores them and their accounts, with an empty routing
+- [x] Importing a sandbox dataset's vendors stores them and their accounts, with an empty routing
       number and Ramp's last four.
-- [ ] Everything else is unchanged: the core and SQL suites and the smoke run pass.
+- [x] Everything else is unchanged: the core and SQL suites and the smoke run pass.
 
 ## Tests (written first)
 
