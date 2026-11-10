@@ -16,10 +16,11 @@ from dialback_core.email_door import route
 from dialback_core.email_door.signature import verify
 from dialback_core.flags import EmailMode
 from dialback_core.settings import ConfigurationError, Settings
+from flows import RESEND_SECRET, svix_headers
 
 pytestmark = pytest.mark.anyio
 
-SECRET = "whsec_" + base64.b64encode(b"resend-test-signing-key-0123456789").decode()
+SECRET = RESEND_SECRET
 MSG_ID, TS = "msg_2Lh9KRb0pzN3LePmFinf1Vsl8Nh", 1_731_200_000
 ACCOUNT = "000123454821"  # a full account number that must never be stored (ADR-8)
 
@@ -35,9 +36,7 @@ BODY = notice()
 
 
 def sign(raw: bytes = BODY, msg_id: str = MSG_ID, ts: int = TS, secret: str = SECRET) -> dict[str, str]:
-    key = base64.b64decode(secret.removeprefix("whsec_"))
-    mac = hmac.new(key, f"{msg_id}.{ts}.".encode() + raw, hashlib.sha256).digest()
-    return {"svix-id": msg_id, "svix-timestamp": str(ts), "svix-signature": "v1," + base64.b64encode(mac).decode()}
+    return svix_headers(raw, msg_id, ts, secret)
 
 
 def test_verify_accepts_svixs_own_example():

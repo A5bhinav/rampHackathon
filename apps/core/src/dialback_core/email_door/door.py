@@ -2,22 +2,26 @@
 
 In order: the door must be on (the current demo dataset, with door vendors); the email is flagged
 (the rule, or the quarantined model, in a thread); it is matched to a vendor and its bank details are
-read (pure code, also for an unflagged email: one from a door vendor naming an account other than the
-one on file is a silent change, and counts as flagged). Then, ledger first, it is filed as the
-vendor's change request and committed, so the selection rule sees it (R2); and in a second
-transaction the requested account and the change are written and `change_detected` opens or joins
-the case. Ramp is never written. Every stop is an outcome on the email's row, and only a row still
-`pending` is ever changed, so an email is acted on once.
+read, each mail part on its own (pure code, also for an unflagged email: one from a door vendor that
+names bank details but not the account on file is a silent change, and counts as flagged). Then,
+ledger first, it is filed as the vendor's change request and committed, so the selection rule sees it
+(R2); and in a second transaction, under the vendor's lock, the requested account and the change are
+written and `change_detected` opens or joins the case. Ramp is never written. Every stop is an outcome
+on the email's row, and only a row still `pending` is ever changed, so an email is acted on once.
 
 ADR-8: the full account number lives only in `handle_email`'s memory, long enough to fingerprint it.
-It is written nowhere and logged nowhere; an error from the ledger write on is recorded by its type
-name only, with no case (R7). The email's text is data, never instructions (R9).
+It is written nowhere and logged nowhere. An email whose Message-ID, thread ID or sender domain holds
+one of its accounts fails before anything is filed, and those stored headers are scrubbed. An error
+from the ledger write on is recorded by its type name only, with no case (R7). The email's text is
+data, never instructions (R9).
 """
 from __future__ import annotations
 
 import asyncio
 import datetime as dt
+import json
 import logging
+import unicodedata
 from dataclasses import dataclass, replace
 from email.utils import parseaddr
 from typing import TYPE_CHECKING
@@ -37,7 +41,7 @@ from ..settings import Settings
 from .masking import mask_digit_runs, strip_nul
 from .match import VendorRef, match_vendor
 from .resend import ReceivedEmail, ResendPort
-from .rules import find_accounts, find_routing, flag_email, ledger_text, requested_fingerprint
+from .rules import account_spans, find_accounts, flag_email, ledger_text, requested_fingerprint, routing_spans
 
 if TYPE_CHECKING:
     from .classifier import ChangeClassifier
@@ -46,7 +50,10 @@ log = logging.getLogger(__name__)
 
 EXTRACTOR = "email-door-v1"
 PAGE_LINES = 51   # a span at y = 72 + 14 * i stays on the 792-point page for i < 51; later lines start a new page
+PAIR_REACH = 200  # an account's routing number is the nearest one before it, within this many characters
 REUSED_MESSAGE_ID = "this Message-ID already made a change for another account or vendor"
+PLANTED_ACCOUNT = "an account number in the email is also in its Message-ID, thread ID or sender domain; those were scrubbed"
+SCRUBBED = "scrubbed"
 
 
 def thread_id_of(email: ReceivedEmail) -> str | None:
@@ -84,6 +91,38 @@ def ledger_document(email: ReceivedEmail, ledger_lines: str, masked_subject: str
     }
 
 
+# Bank details, per mail part ------------------------------------------------------------------------
+
+@dataclass(frozen=True)
+class _Found:
+    part: int     # 0: the text part, 1: the HTML part's text
+    start: int
+    end: int
+    digits: str   # for an account, the full number: memory only (ADR-8)
+
+
+def _bank_details(*parts: str) -> tuple[list[_Found], list[_Found]]:
+    """(routing numbers, accounts) of each part, read on its own (each up to rules.MAX_CHARS), in order."""
+    routings = [_Found(i, s, e, d) for i, part in enumerate(parts) for s, e, d in routing_spans(part)]
+    accounts = [_Found(i, s, e, d) for i, part in enumerate(parts) for s, e, d in account_spans(part)]
+    return routings, accounts
+
+
+def _routing_for(account: _Found, routings: list[_Found], on_file_routing: str | None) -> str:
+    """The account's routing number: the nearest one before it in its part within PAIR_REACH characters,
+    else the first that is not on file, else the first. `routings` is not empty."""
+    near = [r for r in routings if r.part == account.part and r.end <= account.start <= r.end + PAIR_REACH]
+    if near:
+        return near[-1].digits   # in text order, so the last is the nearest
+    return next((r.digits for r in routings if r.digits != on_file_routing), routings[0].digits)
+
+
+def _digits(value: str | None) -> str:
+    return "".join(str(unicodedata.decimal(c)) for c in strip_nul(value or "") if c.isdecimal())
+
+
+# The email's row ----------------------------------------------------------------------------------
+
 @dataclass(frozen=True)
 class _Facts:
     """What the door decided about one email: the outcome and what its inbound_emails row records."""
@@ -96,18 +135,20 @@ class _Facts:
     last4: str | None = None
     red_flags: tuple[str, ...] = ()
     error: str | None = None
+    scrubbed: bool = False   # the Message-ID, thread ID and sender domain are stored as SCRUBBED
 
 
 async def _record(conn: AsyncConnection, dataset_id: UUID, email: ReceivedEmail, facts: _Facts) -> str:
     """Write the outcome to the email's row if it is still pending; otherwise report what is there."""
+    headers = ((SCRUBBED, SCRUBBED, SCRUBBED) if facts.scrubbed else
+               (thread_id_of(email), strip_nul(sender_domain(email.sender) or "") or None, strip_nul(email.message_id) or None))
     done = await conn.execute(
         """update app.inbound_emails set raw_sha256 = %s, has_attachments = %s, subject = %s, thread_id = %s,
                   sender_domain = %s, message_id = coalesce(%s, message_id), outcome = %s, flagged = %s, vendor_id = %s,
                   case_id = %s, change_event_id = %s, routing_number = %s, last4 = %s, red_flags = %s, error = %s,
                   processed_at = %s
             where dataset_id = %s and resend_email_id = %s and outcome = 'pending'""",
-        (email.raw_sha256, email.has_attachments, mask_digit_runs(strip_nul(email.subject)), thread_id_of(email),
-         strip_nul(sender_domain(email.sender) or "") or None, strip_nul(email.message_id) or None, facts.outcome,
+        (email.raw_sha256, email.has_attachments, mask_digit_runs(strip_nul(email.subject)), *headers, facts.outcome,
          facts.flagged, facts.vendor_id, facts.case_id, facts.change_event_id, facts.routing_number, facts.last4,
          list(facts.red_flags), facts.error, await dataset_now(conn, dataset_id), dataset_id, email.email_id))
     if done.rowcount == 1:
@@ -128,6 +169,46 @@ async def _finish(pool: AsyncConnectionPool, dataset_id: UUID, email: ReceivedEm
     async with system_tx(pool) as conn:
         return await _record(conn, dataset_id, email, facts)
 
+
+def _without_message_id(raw_body: str, email_id: str) -> str | None:
+    """The stored notice without data.message_id, when it is this email's notice and has one; else None."""
+    try:
+        payload = json.loads(raw_body)
+    except ValueError:
+        return None
+    data = payload.get("data") if isinstance(payload, dict) else None
+    if not (isinstance(data, dict) and data.get("email_id") == email_id and "message_id" in data):
+        return None
+    del data["message_id"]
+    return json.dumps(payload)
+
+
+async def _scrub_notices(conn: AsyncConnection, dataset_id: UUID, email_id: str) -> None:
+    """Drop data.message_id from this email's stored Resend notices (the route kept it as sent). A notice
+    the inbox has claimed is locked and skipped here, never waited on: the inbox holds that lock while it
+    waits for handle_email, and scrubs its own notice with scrub_claimed_notice."""
+    rows = await (await conn.execute(
+        "select id, raw_body from app.inbound_webhooks where source = 'resend' and dataset_id = %s and strpos(raw_body, %s) > 0 "
+        "for update skip locked", (dataset_id, email_id))).fetchall()
+    for row in rows:
+        scrubbed = _without_message_id(row["raw_body"], email_id)
+        if scrubbed is not None:
+            await conn.execute("update app.inbound_webhooks set raw_body = %s where id = %s", (scrubbed, row["id"]))
+
+
+async def scrub_claimed_notice(conn: AsyncConnection, delivery_id: int, dataset_id: UUID, email_id: str) -> None:
+    """On the inbox's claim connection: when this email's row was scrubbed, drop data.message_id from the
+    claimed delivery's stored notice too (a duplicate notice that arrives later included)."""
+    row = await (await conn.execute(
+        """select w.raw_body from app.inbound_webhooks w
+             join app.inbound_emails e on e.dataset_id = w.dataset_id and e.resend_email_id = %s and e.message_id = %s
+            where w.id = %s and w.dataset_id = %s""", (email_id, SCRUBBED, delivery_id, dataset_id))).fetchone()
+    scrubbed = _without_message_id(row["raw_body"], email_id) if row else None
+    if scrubbed is not None:
+        await conn.execute("update app.inbound_webhooks set raw_body = %s where id = %s", (scrubbed, delivery_id))
+
+
+# Reading the database -----------------------------------------------------------------------------
 
 async def _vendor_refs(conn: AsyncConnection, dataset_id: UUID) -> list[VendorRef]:
     rows = await (await conn.execute(
@@ -163,25 +244,24 @@ async def _unknown_phone(conn: AsyncConnection, dataset_id: UUID, vendor_id: UUI
     return bool(phones - known)
 
 
-async def _same_email(conn: AsyncConnection, dataset_id: UUID, vendor_id: UUID, source_event_id: str,
-                      fingerprint: str, key_version: int) -> tuple[str, UUID | None] | None:
-    """A change this Message-ID already made: ("repeat_request", its case) when it was for this vendor and
-    account, ("failed", None) when it was for another; None when it made none."""
-    row = await (await conn.execute(
+async def _repeat(conn: AsyncConnection, dataset_id: UUID, vendor_id: UUID, source_event_id: str, fingerprint: str,
+                  key_version: int) -> tuple[str, UUID | None, str | None] | None:
+    """(outcome, case, error) when this request must write nothing; None when it is new.
+
+    The same Message-ID already made a change: `repeat_request` with its case when that change was for this
+    vendor and account, else `failed` (two requests can't share a Message-ID). Otherwise, the vendor's
+    unfinished case has an email change for this account: `repeat_request` with that case."""
+    same = await (await conn.execute(
         """select ce.vendor_id, b.account_fingerprint, b.fingerprint_key_version, r.case_id
              from app.bank_change_events ce
              join app.bank_accounts b on b.id = ce.new_account_id
              left join app.case_event_receipts r on r.idempotency_key = ce.id::text || ':detected'
             where ce.dataset_id = %s and ce.source_event_id = %s""", (dataset_id, source_event_id))).fetchone()
-    if row is None:
-        return None
-    same = (row["vendor_id"], row["account_fingerprint"], row["fingerprint_key_version"]) == (vendor_id, fingerprint, key_version)
-    return ("repeat_request", row["case_id"]) if same else ("failed", None)
-
-
-async def _repeat_case(conn: AsyncConnection, dataset_id: UUID, vendor_id: UUID, fingerprint: str, key_version: int) -> UUID | None:
-    """The vendor's unfinished case, when one of its email changes asked for this account."""
-    row = await (await conn.execute(
+    if same is not None:
+        if (same["vendor_id"], same["account_fingerprint"], same["fingerprint_key_version"]) == (vendor_id, fingerprint, key_version):
+            return "repeat_request", same["case_id"], None
+        return "failed", None, REUSED_MESSAGE_ID
+    case = await (await conn.execute(
         """select c.id from app.cases c
             where c.dataset_id = %s and c.vendor_id = %s and c.state <> 'released'
               and exists (select 1 from app.case_event_receipts r
@@ -190,8 +270,10 @@ async def _repeat_case(conn: AsyncConnection, dataset_id: UUID, vendor_id: UUID,
                            where r.case_id = c.id and r.event_type = 'change_detected' and ce.detected_via = 'email'
                              and b.account_fingerprint = %s and b.fingerprint_key_version = %s)""",
         (dataset_id, vendor_id, fingerprint, key_version))).fetchone()
-    return row["id"] if row else None
+    return ("repeat_request", case["id"], None) if case else None
 
+
+# The door ---------------------------------------------------------------------------------------
 
 async def handle_email(pool: AsyncConnectionPool, settings: Settings, keys: Keys, resend: ResendPort, dataset_id: UUID,
                        delivery_id: int, email: ReceivedEmail, classifier: ChangeClassifier | None = None) -> str:
@@ -201,7 +283,7 @@ async def handle_email(pool: AsyncConnectionPool, settings: Settings, keys: Keys
     subject, text, html = strip_nul(email.subject), strip_nul(email.text), strip_nul(email.html_text)
     async with system_tx(pool) as conn:
         state = await (await conn.execute(
-            """select e.outcome, e.received_at, d.email_door_vendors as door,
+            """select e.outcome, e.received_at, e.message_id, d.email_door_vendors as door,
                       d.kind = 'demo' and d.retired_at is null as current_demo
                  from app.inbound_emails e join app.datasets d on d.id = e.dataset_id
                 where e.dataset_id = %s and e.resend_email_id = %s""", (dataset_id, email.email_id))).fetchone()
@@ -214,107 +296,119 @@ async def handle_email(pool: AsyncConnectionPool, settings: Settings, keys: Keys
         return await _finish(pool, dataset_id, email, _Facts("door_off"))
 
     # 1. Flag, in a thread: the model's SDK client is synchronous and the worker shares the app's event loop.
-    # Then match and extract, which are pure: an unflagged email from a door vendor can still be a silent change.
+    # Then match and read the bank details, which is pure: an unflagged email can still be a silent change.
     decision = await asyncio.to_thread(flag_email, subject, text, html, classifier)
-    body = text + "\n" + html
     async with system_tx(pool) as conn:
-        match = match_vendor(email.sender, subject, body, await _vendor_refs(conn, dataset_id))
+        match = match_vendor(email.sender, subject, text + "\n" + html, await _vendor_refs(conn, dataset_id))
         current = None if match.vendor_id is None else await (await conn.execute(
             "select id, routing_number, account_last4 from app.bank_accounts where vendor_id = %s and is_current "
             "order by first_seen_at desc, created_at desc limit 1", (match.vendor_id,))).fetchone()
-    routings, accounts = find_routing(body), find_accounts(body)
-    routing = routings[0] if routings else None
-    account = max(accounts, key=len) if accounts else None   # the first longest: a last-four shape can come first
-    last4 = account[-4:] if account else None
-    on_file = current is not None and (routing, last4) == (current["routing_number"], current["account_last4"])
+    on_file = (current["routing_number"], current["account_last4"]) if current else None
+    routings, accounts = _bank_details(text, html)
+    pairs = {(_routing_for(a, routings, on_file and on_file[0]), a.digits[-4:]) for a in accounts} if routings else set()
     flagged_by = decision.by if decision.flagged else None
-    if flagged_by is None and match.vendor_id in door and routing and account and not on_file:
-        flagged_by = "on_file_mismatch"
+    if flagged_by is None and match.vendor_id in door and routings and accounts and on_file not in pairs:
+        flagged_by = "on_file_mismatch"   # an email naming bank details, but not the account on file
+
+    # 2. ADR-8: an account planted where the door keeps headers as they are fails the email, scrubbed.
+    secrets = list(dict.fromkeys([a.digits for a in accounts] + find_accounts(subject)))
+    stored = [_digits(v) for v in (state["message_id"], email.message_id, email.headers.get("message-id"),
+                                   thread_id_of(email), sender_domain(email.sender))]
+    if any(len(a) >= 5 and a in d for a in secrets for d in stored):
+        log.warning("email door: inbound email %s has an account number in its headers; failed and scrubbed", email.email_id)
+        async with system_tx(pool) as conn:
+            await _scrub_notices(conn, dataset_id, email.email_id)
+            return await _record(conn, dataset_id, email, _Facts(
+                "failed", flagged=flagged_by is not None, error=PLANTED_ACCOUNT, scrubbed=True))
     if flagged_by is None:
         return await _finish(pool, dataset_id, email, _Facts("not_flagged"))
 
-    # 2. Red flags, and the ledger's copy: rebuilt phone lines only, with every account found masked.
-    masked_subject = mask_digit_runs(subject)
-    secrets = accounts + find_accounts(subject)
-    document = ledger_document(email, ledger_text(text, also_mask=secrets) + "\n" + ledger_text(html, also_mask=secrets),
-                               masked_subject, state["received_at"], thread_id_of(email))
+    # 3. The requested account: the longest whose last four is not the account on file's, with its routing
+    # number. Red flags, and the ledger's copy: rebuilt phone lines only, every account found masked, and
+    # the HTML part only when it says something the text part doesn't.
+    requested = max((a for a in accounts if on_file is None or a.digits[-4:] != on_file[1]), key=lambda a: len(a.digits),
+                    default=None)
+    shown = requested or (accounts[0] if accounts else None)
+    routing = _routing_for(shown, routings, on_file and on_file[0]) if shown and routings else \
+        (routings[0].digits if routings else None)
+    lines = ledger_text(text, also_mask=secrets)
+    if " ".join(html.split()) != " ".join(text.split()):
+        lines += "\n" + ledger_text(html, also_mask=secrets)
+    document = ledger_document(email, lines, mask_digit_runs(subject), state["received_at"], thread_id_of(email))
     red_flags = [*match.red_flags, *_header_flags(email)]
     if match.vendor_id is not None:
         phones = {p for page in document["pages"] for span in page["spans"] for p in parse_phone(span["text"])}
         async with system_tx(pool) as conn:
             if await _unknown_phone(conn, dataset_id, match.vendor_id, phones):
                 red_flags.append("unknown_phone")
-    facts = _Facts("", flagged=True, vendor_id=match.vendor_id, routing_number=routing, last4=last4, red_flags=tuple(red_flags))
+    facts = _Facts("", flagged=True, vendor_id=match.vendor_id, routing_number=routing,
+                   last4=shown.digits[-4:] if shown else None, red_flags=tuple(red_flags))
     log.info("email door: inbound email %s flagged by %s, vendor match %s", email.email_id, flagged_by, match.how)
 
-    # 3. Enough information? (design section 6)
+    # 4. Enough information? (design section 6)
     stop = ("no_vendor" if match.how == "none" else "several_vendors" if match.how == "several"
-            else "not_demo_vendor" if match.vendor_id not in door else "no_routing_number" if routing is None
-            else "no_account_number" if account is None else "same_as_on_file" if on_file else None)
+            else "not_demo_vendor" if match.vendor_id not in door else "no_routing_number" if not routings
+            else "no_account_number" if not accounts else "same_as_on_file" if requested is None else None)
     if stop is not None:
         return await _finish(pool, dataset_id, email, replace(facts, outcome=stop))
     vendor_id = match.vendor_id
-    fingerprint = requested_fingerprint(keys.fingerprint_key, routing, account)   # ADR-8: nothing below uses the full number
+    fingerprint = requested_fingerprint(keys.fingerprint_key, routing, requested.digits)   # ADR-8: nothing below uses the full number
     source_event_id = f"email:{_message_key(email)}"
 
-    # 4. The same email again, or the same account while the vendor's case is unfinished: nothing written.
+    # 5. The same email again, or the same account while the vendor's case is unfinished: nothing written.
+    # Checked here so a repeat files nothing in the ledger, and again under the vendor's lock below.
     async with system_tx(pool) as conn:
-        same = await _same_email(conn, dataset_id, vendor_id, source_event_id, fingerprint, keys.fingerprint_key_version)
-        repeat = None if same else await _repeat_case(conn, dataset_id, vendor_id, fingerprint, keys.fingerprint_key_version)
-        if same:
-            return await _record(conn, dataset_id, email, replace(
-                facts, outcome=same[0], case_id=same[1], error=REUSED_MESSAGE_ID if same[0] == "failed" else None))
+        repeat = await _repeat(conn, dataset_id, vendor_id, source_event_id, fingerprint, keys.fingerprint_key_version)
         if repeat:
-            return await _record(conn, dataset_id, email, replace(facts, outcome="repeat_request", case_id=repeat))
+            return await _record(conn, dataset_id, email, replace(facts, outcome=repeat[0], case_id=repeat[1], error=repeat[2]))
 
-    # 5. Ledger first, committed: the rule only uses a change request recorded before the case opened. Then
+    # 6. Ledger first, committed: the rule only uses a change request recorded before the case opened. Then
     # the case. From here any error is `failed` with no case (R7), recorded by its type name only.
     try:
         async with system_tx(pool) as conn:
             await write_ingest(conn, dataset_id=dataset_id, vendor_id=vendor_id,
                                result=ingest_all([document], extractor_version=EXTRACTOR))
             await mark_change_request(conn, dataset_id=dataset_id, vendor_id=vendor_id, document_id=document["id"])
-        async with system_tx(pool) as conn:
-            outcome = await _settled(conn, dataset_id, email, lock=True)   # held to the end: one worker opens the case
-            if outcome != "pending":
-                return outcome
-            return await _open_case(conn, dataset_id, email, facts, keys, fingerprint, source_event_id,
-                                    current["id"] if current else None, thread_id_of(email))
+        return await _case_transaction(pool, dataset_id, email, facts, keys, fingerprint, source_event_id,
+                                       current["id"] if current else None)
     except Exception as exc:  # noqa: BLE001  fail closed (R7); the message can hold the email's values (ADR-8)
         log.warning("email door: opening a case for inbound email %s failed: %s", email.email_id, type(exc).__name__)
         return await _finish(pool, dataset_id, email, replace(facts, outcome="failed", error=type(exc).__name__))
 
 
-async def _open_case(conn: AsyncConnection, dataset_id: UUID, email: ReceivedEmail, facts: _Facts, keys: Keys,
-                     fingerprint: str, source_event_id: str, old_account_id: UUID | None, thread_id: str | None) -> str:
-    """Write the requested account and the change, open or join the case, and record the outcome, in the
-    caller's transaction. The requested account is never `is_current` and has no Ramp id, so neither the
-    Ramp sync nor the clerk portal ever takes it for the account on file."""
-    now = await dataset_now(conn, dataset_id)
-    account_id = (await (await conn.execute(
-        """insert into app.bank_accounts (dataset_id, vendor_id, ramp_account_id, routing_number, account_last4,
-                  account_fingerprint, fingerprint_key_version, first_seen_at, last_seen_at, is_current)
-           values (%s, %s, null, %s, %s, %s, %s, %s, %s, false)
-           on conflict (dataset_id, vendor_id, account_fingerprint, fingerprint_key_version) do update
-             set last_seen_at = excluded.last_seen_at
-           returning id""",
-        (dataset_id, facts.vendor_id, facts.routing_number, facts.last4, fingerprint, keys.fingerprint_key_version, now, now),
-    )).fetchone())["id"]
-    inserted = await (await conn.execute(
-        """insert into app.bank_change_events (dataset_id, vendor_id, old_account_id, new_account_id, detected_via,
-                  source_event_id, changed_by, change_thread_id, detected_at)
-           values (%s, %s, %s, %s, 'email', %s, null, %s, %s)
-           on conflict (dataset_id, source_event_id) do nothing returning id""",
-        (dataset_id, facts.vendor_id, old_account_id, account_id, source_event_id, thread_id, now))).fetchone()
-    if inserted is None:   # another delivery of this Message-ID made the change since the check above
-        outcome, case_id = await _same_email(conn, dataset_id, facts.vendor_id, source_event_id, fingerprint,
-                                             keys.fingerprint_key_version) or ("failed", None)
-        return await _record(conn, dataset_id, email, replace(
-            facts, outcome=outcome, case_id=case_id, error=REUSED_MESSAGE_ID if outcome == "failed" else None))
-    change_id = inserted["id"]
-    result = await apply_event(conn, None, "change_detected", f"{change_id}:detected", {
-        "change_event_id": str(change_id), "policy_version": POLICY_VERSION,
-        "detected_via": "email", "source_event_id": source_event_id,
-    })
-    outcome = "case_opened" if result.from_state is None else "joined_case"
-    return await _record(conn, dataset_id, email, replace(facts, outcome=outcome, case_id=result.case_id, change_event_id=change_id))
+async def _case_transaction(pool: AsyncConnectionPool, dataset_id: UUID, email: ReceivedEmail, facts: _Facts, keys: Keys,
+                            fingerprint: str, source_event_id: str, old_account_id: UUID | None) -> str:
+    """One transaction: lock the email's row (one worker acts on it) and the vendor's (the lock
+    apply_case_event takes, so requests for one vendor take turns), check for a repeat again, then write
+    the requested account and the change and open or join the case. The requested account is never
+    `is_current` and has no Ramp id, so neither the Ramp sync nor the clerk portal takes it for the
+    account on file."""
+    async with system_tx(pool) as conn:
+        outcome = await _settled(conn, dataset_id, email, lock=True)
+        if outcome != "pending":
+            return outcome
+        await conn.execute("select 1 from app.vendors where id = %s for update", (facts.vendor_id,))
+        repeat = await _repeat(conn, dataset_id, facts.vendor_id, source_event_id, fingerprint, keys.fingerprint_key_version)
+        if repeat:
+            return await _record(conn, dataset_id, email, replace(facts, outcome=repeat[0], case_id=repeat[1], error=repeat[2]))
+        now = await dataset_now(conn, dataset_id)
+        account_id = (await (await conn.execute(
+            """insert into app.bank_accounts (dataset_id, vendor_id, ramp_account_id, routing_number, account_last4,
+                      account_fingerprint, fingerprint_key_version, first_seen_at, last_seen_at, is_current)
+               values (%s, %s, null, %s, %s, %s, %s, %s, %s, false)
+               on conflict (dataset_id, vendor_id, account_fingerprint, fingerprint_key_version) do update
+                 set last_seen_at = excluded.last_seen_at
+               returning id""",
+            (dataset_id, facts.vendor_id, facts.routing_number, facts.last4, fingerprint, keys.fingerprint_key_version, now, now),
+        )).fetchone())["id"]
+        change_id = (await (await conn.execute(
+            """insert into app.bank_change_events (dataset_id, vendor_id, old_account_id, new_account_id, detected_via,
+                      source_event_id, changed_by, change_thread_id, detected_at)
+               values (%s, %s, %s, %s, 'email', %s, null, %s, %s) returning id""",
+            (dataset_id, facts.vendor_id, old_account_id, account_id, source_event_id, thread_id_of(email), now))).fetchone())["id"]
+        result = await apply_event(conn, None, "change_detected", f"{change_id}:detected", {
+            "change_event_id": str(change_id), "policy_version": POLICY_VERSION,
+            "detected_via": "email", "source_event_id": source_event_id,
+        })
+        outcome = "case_opened" if result.from_state is None else "joined_case"
+        return await _record(conn, dataset_id, email, replace(facts, outcome=outcome, case_id=result.case_id, change_event_id=change_id))

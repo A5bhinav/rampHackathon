@@ -12,23 +12,14 @@ from dialback_core.email_door import inbox
 from dialback_core.email_door.door import handle_email
 from dialback_core.email_door.masking import mask_digit_runs
 from dialback_core.email_door.resend import ResendClient, ResendError, html_to_text
-from flows import FakeResend, assert_nowhere, received
-from test_email_route import _now, post, sign
+from flows import FakeResend, assert_nowhere, deliver, received
+from test_email_route import post
 
 pytest_plugins = ["test_email_route"]  # registers its `demo` fixture here
 pytestmark = pytest.mark.anyio
 
 BODY_MARKER = "BODYMARKER-7f3"
 ACCOUNT = "000123454821"
-
-
-async def deliver(w, email_id: str | None = None, sender: str = "Dana <ar@vendor.example>", kind: str = "email.received") -> str:
-    email_id = email_id or f"em_{uuid.uuid4().hex}"
-    raw = json.dumps({"type": kind, "created_at": "2026-11-10T00:00:00Z",
-                      "data": {"email_id": email_id, "from": sender, "to": ["inbox@x.example"], "message_id": f"<{email_id}@v.example>"}}).encode()
-    r = await w.core.post("/webhooks/email", content=raw, headers=sign(raw, msg_id=f"msg_{uuid.uuid4().hex}", ts=_now()))
-    assert r.status_code == 200, r.text
-    return email_id
 
 
 async def rows(w) -> list[dict]:

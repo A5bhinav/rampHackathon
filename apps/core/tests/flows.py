@@ -1,6 +1,13 @@
 """Shared steps for core tests: drive a case through the money path the way the services do."""
 from __future__ import annotations
 
+import base64
+import hashlib
+import hmac
+import json
+import time
+import uuid
+
 from conftest import CONTACT_POINT, INTERNAL_TOKEN
 from dialback_core.db import person_tx, system_tx
 from dialback_core.email_door.resend import ReceivedEmail, ResendError
@@ -99,6 +106,29 @@ async def assert_nowhere(pool, caplog, needle: str) -> None:
             hit = await (await conn.execute(
                 f'select count(*) as n from "{t["table_schema"]}"."{t["table_name"]}" x where x::text like %s', (f"%{needle}%",))).fetchone()
             assert hit["n"] == 0, f"{t['table_schema']}.{t['table_name']} holds {needle!r}"
+
+
+RESEND_SECRET = "whsec_" + base64.b64encode(b"resend-test-signing-key-0123456789").decode()
+
+
+def svix_headers(raw: bytes, msg_id: str, ts: int, secret: str = RESEND_SECRET) -> dict[str, str]:
+    """The headers Resend (through Svix) signs a notice with."""
+    key = base64.b64decode(secret.removeprefix("whsec_"))
+    mac = hmac.new(key, f"{msg_id}.{ts}.".encode() + raw, hashlib.sha256).digest()
+    return {"svix-id": msg_id, "svix-timestamp": str(ts), "svix-signature": "v1," + base64.b64encode(mac).decode()}
+
+
+async def deliver(w, email_id: str | None = None, sender: str = "Dana <ar@vendor.example>", kind: str = "email.received",
+                  message_id: str | None = None) -> str:
+    """One signed Resend notice through POST /webhooks/email (the core's settings must use RESEND_SECRET).
+    Returns the email id."""
+    email_id = email_id or f"em_{uuid.uuid4().hex}"
+    raw = json.dumps({"type": kind, "created_at": "2026-11-10T00:00:00Z",
+                      "data": {"email_id": email_id, "from": sender, "to": ["inbox@x.example"],
+                               "message_id": message_id or f"<{email_id}@v.example>"}}).encode()
+    r = await w.core.post("/webhooks/email", content=raw, headers=svix_headers(raw, f"msg_{uuid.uuid4().hex}", int(time.time())))
+    assert r.status_code == 200, r.text
+    return email_id
 
 
 def received(email_id: str, **changes) -> ReceivedEmail:

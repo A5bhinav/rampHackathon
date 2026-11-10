@@ -21,7 +21,7 @@ from psycopg_pool import AsyncConnectionPool
 from ..db import dataset_now, system_tx
 from ..detection import Keys
 from ..settings import Settings
-from .door import handle_email
+from .door import handle_email, scrub_claimed_notice
 from .masking import mask_digit_runs, strip_nul
 from .resend import ResendError, ResendPort
 
@@ -142,6 +142,8 @@ async def process_inbound_emails(pool: AsyncConnectionPool, settings: Settings, 
                             await conn.execute("update app.inbound_webhooks set error = %s where id = %s", (reason, row["id"]))
                             continue
                         error = f"failed: {reason}" if result == "failed" else "duplicate: this email was already recorded"
+                if state is not None:  # ADR-8: an email whose headers held its account number is scrubbed (door.py)
+                    await scrub_claimed_notice(conn, row["id"], row["dataset_id"], email_id)
             await conn.execute(
                 "update app.inbound_webhooks set processed_at = app.now(dataset_id), error = %s where id = %s", (error, row["id"]))
             handled += 1

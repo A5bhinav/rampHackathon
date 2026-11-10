@@ -370,6 +370,18 @@ def find_accounts(text: str) -> list[str]:
     return _unique(digits for _, _, digits in _accounts(text[:MAX_CHARS]))
 
 
+def routing_spans(text: str) -> list[tuple[int, int, str]]:
+    """(start, end, digits) of each routing number find_routing finds, in text order, repeats included."""
+    text = text[:MAX_CHARS]
+    return sorted((s, e, _ascii(text[s:e])) for s, e, kind in _pieces(text)[0] if kind == "routing")
+
+
+def account_spans(text: str) -> list[tuple[int, int, str]]:
+    """(start, end, digits) of each account find_accounts finds, in text order, repeats included. Holds full
+    account numbers: use in memory and drop (ADR-8)."""
+    return _accounts(text[:MAX_CHARS])
+
+
 def ledger_text(text: str, also_mask: Iterable[str] = ()) -> str:
     """The ledger's document for the first MAX_CHARS of `text`, built from rebuilt lines only: one line
     per phone number kept (see above), holding the words of the phone's original line before it (letters,

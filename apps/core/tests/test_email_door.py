@@ -8,6 +8,7 @@ live email is the request. The door is on for Cobalt only, and the real ledger r
 from __future__ import annotations
 
 import datetime as dt
+import json
 import logging
 import uuid
 from pathlib import Path
@@ -16,17 +17,15 @@ import psycopg
 import pytest
 from conftest import core_settings, make_world
 from dialback_core.db import system_tx
-from dialback_core.demo import DemoEnv, load_seed, prepare
+from dialback_core.demo import DemoEnv, change, load_seed, prepare
 from dialback_core.email_door import door
 from dialback_core.email_door.classifier import ClassifierFailed, Verdict
 from dialback_core.email_door.masking import mask_digit_runs
 from dialback_core.email_door.resend import ReceivedEmail
-from dialback_core.email_door.rules import flag_email
+from dialback_core.email_door.rules import flag_email, requested_fingerprint
 from dialback_core.flags import EmailMode, ResolverMode
 from dialback_core.ports import LedgerResolver
-from flows import FakeResend, assert_nowhere, one, received
-from test_email_inbox import deliver
-from test_email_route import SECRET
+from flows import RESEND_SECRET, FakeResend, assert_nowhere, deliver, one, received
 
 pytestmark = pytest.mark.anyio
 
@@ -73,7 +72,7 @@ class FakeClassifier:
 async def door_world(pool, database_url, monkeypatch):
     monkeypatch.setenv("DATABASE_URL", database_url)   # the ledger's select_number connects with it
     settings = core_settings(core_public_url="http://core", email_mode=EmailMode.RESEND, resend_api_key="re_test",
-                             resend_webhook_secret=SECRET)
+                             resend_webhook_secret=RESEND_SECRET)
     w = await make_world(pool, settings=settings)
     clerk = f"clerk.{uuid.uuid4().hex[:8]}@judges.example"
     async with await psycopg.AsyncConnection.connect(database_url, autocommit=True) as owner:
@@ -82,7 +81,7 @@ async def door_world(pool, database_url, monkeypatch):
         await owner.execute("insert into auth.users (id, email) values (%s, %s)", (w.users["clerk"], clerk))
     env = DemoEnv(pool=pool, settings=settings, mock=w.mock, connector=w.connector, owner_url=database_url)
     r = await prepare(env, load_seed(SEED), {"clerk": clerk}, phones={"cobalt": TEAM}, requests=[], today=TODAY)
-    w.demo_id, w.demo_refs = r.reset.dataset.id, r.reset.refs
+    w.env, w.demo_id, w.demo_refs = env, r.reset.dataset.id, r.reset.refs
     async with system_tx(pool) as conn:
         rows = await (await conn.execute("select id, ramp_vendor_id from app.vendors where dataset_id = %s", (w.demo_id,))).fetchall()
         w.vendor = {ref: next(v["id"] for v in rows if v["ramp_vendor_id"] == w.demo_refs[ref]) for ref in ("acme", "cobalt")}
@@ -94,9 +93,9 @@ async def door_world(pool, database_url, monkeypatch):
     await w.mock.aclose()
 
 
-async def arrive(w, email_id: str | None = None, **changes) -> dict:
+async def arrive(w, email_id: str | None = None, notice_message_id: str | None = None, **changes) -> dict:
     """One email through the signed route; the worker runs until idle. Returns the email's row."""
-    email_id = await deliver(w, email_id)
+    email_id = await deliver(w, email_id, message_id=notice_message_id)
     w.worker.resend.emails[email_id] = judge(email_id, **changes)
     await w.worker.drain(w.demo_id)
     return await one(w.pool, "select * from app.inbound_emails where dataset_id = %s and resend_email_id = %s", w.demo_id, email_id)
@@ -307,8 +306,101 @@ async def test_the_full_account_number_is_nowhere(door_world, caplog):
     assert (row["outcome"], row["last4"]) == ("case_opened", "4821")
     (case,) = await cases(w)
     assert case["state"] == "calling"
+
+    # The same account planted where the door would store it as is: the Message-ID and References (the stored
+    # notice too), and the sender's domain. Each email fails before any ledger or case write, and the row and
+    # the stored notice are scrubbed.
+    planted = f"<{ACCOUNT}@x.example>"
+    in_headers = await arrive(w, notice_message_id=planted, message_id=planted,
+                              headers={"message-id": planted, "references": f"{planted} <other@x.example>"})
+    in_domain = await arrive(w, sender=f"Sam Judge <sam@{ACCOUNT}.example>")
+    for planted_row in (in_headers, in_domain):
+        assert (planted_row["outcome"], planted_row["error"], planted_row["case_id"]) == ("failed", door.PLANTED_ACCOUNT, None)
+        assert (planted_row["message_id"], planted_row["thread_id"], planted_row["sender_domain"]) == ("scrubbed",) * 3
+    notice = await one(w.pool, "select raw_body from app.inbound_webhooks w join app.inbound_emails e on e.delivery_id = w.id "
+                               "where e.id = %s", in_headers["id"])
+    assert "message_id" not in json.loads(notice["raw_body"])["data"]
+    (case,) = await cases(w)
+    assert case["version"] == 1 and await count(w, "ledger.change_requests where dataset_id = %s") == 1
     for needle in (ACCOUNT, grouped, ACCOUNT.lstrip("0")):
         await assert_nowhere(w.pool, caplog, needle)
+
+
+async def test_an_account_labeled_only_in_the_html_part_is_masked_past_the_text_cap(door_world, caplog):
+    """Each part is read on its own: a text part padded past the 50,000-character cap can't hide the HTML
+    part's account, which must still keep its phone-shaped copy in the text part out of the ledger."""
+    caplog.set_level(logging.DEBUG)
+    w = door_world
+    filler = "Thank you for your business. " * 1800   # about 52,000 characters
+    row = await arrive(w, text=JUDGE_TEXT + "Questions: call 778-311-0246\n" + filler, html_text="Our other account 7783110246")
+    assert (row["outcome"], row["last4"]) == ("case_opened", "4821")
+    await assert_nowhere(w.pool, caplog, "7783110246")   # its own number: assert_nowhere reads every dataset
+
+
+async def test_a_change_from_the_old_account_to_a_new_one_asks_for_the_new_one(door_world):
+    w = door_world
+    text = (f"We are changing banks. Please move our payments from our old account (Routing {ON_FILE[0]}, Account {ON_FILE[1]}) "
+            f"to our new account: Routing {ROUTING}, Account {ACCOUNT}.\n")
+    row = await arrive(w, sender=FROM_COBALT, subject="Cobalt Freight bank details", text=text)
+    assert (row["outcome"], row["routing_number"], row["last4"]) == ("case_opened", ROUTING, "4821")
+    change_row = await one(w.pool, "select b.routing_number, b.account_last4 from app.bank_change_events ce "
+                                   "join app.bank_accounts b on b.id = ce.new_account_id where ce.id = %s", row["change_event_id"])
+    assert (change_row["routing_number"], change_row["account_last4"]) == (ROUTING, "4821")
+
+
+async def test_an_unflagged_invoice_listing_the_account_on_file_and_another_is_not_a_change(door_world):
+    w = door_world
+    text = ("Invoice CF-88200 from Cobalt Freight LLC\nAmount due: $9,150.00 by November 30.\n"
+            f"Wire: Routing {ROUTING} Account {ACCOUNT}\nACH: Routing {ON_FILE[0]} Account {ON_FILE[1]}\n"
+            "Thank you for your business.\n")
+    assert not flag_email("Invoice CF-88200", text, "", None).flagged, "the rule alone does not flag it"
+    row = await arrive(w, sender=FROM_COBALT, subject="Invoice CF-88200", text=text)
+    assert (row["outcome"], row["flagged"]) == ("not_flagged", False)
+    await assert_no_case(w)
+
+
+async def test_html_only_mail_files_each_phone_once(door_world):
+    """Resend gives the HTML part's text as the text part when there is no text part: one copy in the ledger."""
+    w = door_world
+    row = await arrive(w, html_text=JUDGE_TEXT.replace(" ", "  "))   # the same text once whitespace is collapsed
+    assert row["outcome"] == "case_opened"
+    seen = await one(w.pool, "select count(*) as n from ledger.observations o join ledger.change_requests r on r.document_id = o.document_id "
+                             "where r.dataset_id = %s and o.value_normalized = %s", w.demo_id, EMAIL_PHONE)
+    assert seen["n"] == 1
+
+
+async def test_a_repeat_found_inside_the_case_transaction_writes_nothing(door_world):
+    """Two requests for one account can both pass the early repeat check. The case transaction checks again
+    under the vendor's lock, so the second one writes nothing."""
+    w = door_world
+    first = await arrive(w)
+    email = judge("em_race", message_id="<race@gmail.example>")
+    async with system_tx(w.pool) as conn:
+        await conn.execute("insert into app.inbound_emails (dataset_id, resend_email_id, sender, received_at, has_attachments) "
+                           "values (%s, %s, 'Sam Judge', now(), false)", (w.demo_id, email.email_id))
+    old = await one(w.pool, "select id from app.bank_accounts where vendor_id = %s and is_current", w.vendor["cobalt"])
+    facts = door._Facts("", flagged=True, vendor_id=w.vendor["cobalt"], routing_number=ROUTING, last4="4821")
+    keys = w.worker.keys
+    outcome = await door._case_transaction(w.pool, w.demo_id, email, facts, keys,
+                                           requested_fingerprint(keys.fingerprint_key, ROUTING, ACCOUNT),
+                                           "email:<race@gmail.example>", old["id"])
+    assert outcome == "repeat_request"
+    row = await one(w.pool, "select outcome, case_id, change_event_id from app.inbound_emails where resend_email_id = %s", "em_race")
+    assert (row["outcome"], row["case_id"], row["change_event_id"]) == ("repeat_request", first["case_id"], None)
+    (case,) = await cases(w)
+    assert case["version"] == 1 and await count(w, "app.bank_change_events where dataset_id = %s") == 1
+
+
+async def test_an_email_joins_a_case_opened_by_a_ramp_change(door_world):
+    w = door_world
+    await change(w.env, load_seed(SEED), "cobalt")   # the clerk's change in Ramp, and its webhook
+    await w.worker.drain(w.demo_id)
+    (case,) = await cases(w)
+    assert (case["detected_via"], case["version"]) == ("webhook", 1)
+    row = await arrive(w)
+    assert (row["outcome"], row["case_id"]) == ("joined_case", case["id"])
+    (after,) = await cases(w)
+    assert (after["version"], after["change_event_id"], after["detected_via"]) == (2, row["change_event_id"], "email")
 
 
 async def test_an_account_named_in_the_subject_never_reaches_the_ledger_as_a_phone(door_world, caplog):
