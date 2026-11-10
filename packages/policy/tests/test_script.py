@@ -2,7 +2,18 @@
 import re
 
 from dialback_policy.guard import GuardContext, check
-from dialback_policy.script import FALLBACK_LINE, ORDER, PHASE_SLOT, QUESTIONS, STILL_THERE, Phase, Script
+from dialback_policy.script import (
+    FALLBACK_LINE,
+    KEYPAD_ONLY,
+    ORDER,
+    PHASE_SLOT,
+    QUESTIONS,
+    REASK,
+    START_OVER,
+    STILL_THERE,
+    Phase,
+    Script,
+)
 
 SCRIPT = Script(customer_name="Fictional Co", callback_number="+1 415 555 0100")
 
@@ -55,8 +66,10 @@ def test_every_fixed_line_passes_the_guard() -> None:
     ctx = GuardContext(vendor_names=("Acme Fasteners LLC",), callback_number=SCRIPT.callback_number,
                        customer_name=SCRIPT.customer_name)
     lines = [SCRIPT.disclosure(), SCRIPT.consent_question(), SCRIPT.voicemail(), SCRIPT.close(),
-             SCRIPT.consent_refused(), SCRIPT.callback_close(), SCRIPT.goodbye(), FALLBACK_LINE, STILL_THERE]
+             SCRIPT.consent_refused(), SCRIPT.callback_close(), SCRIPT.goodbye(), FALLBACK_LINE, STILL_THERE,
+             REASK, START_OVER, KEYPAD_ONLY]                      # spec 0043's lines too (R4)
     lines += [QUESTIONS[p].wording(SCRIPT) for p in ORDER]
+    lines += [f"{REASK} {line}" for line in (KEYPAD_ONLY, *[QUESTIONS[p].wording(SCRIPT) for p in ORDER])]
     for line in lines:
         assert check(line, ctx).ok, line
 

@@ -3,18 +3,21 @@ from __future__ import annotations
 
 import datetime as dt
 
-from dialback_policy.script import FALLBACK_LINE, REASK, STILL_THERE, Phase, Script
+import pytest
+from dialback_policy.script import FALLBACK_LINE, QUESTIONS, REASK, STILL_THERE, Phase, Script
 from dialback_policy.step import (
     MAX_CALLEE_TURNS,
     MAX_SILENCES,
     REDIAL_AFTER,
     AgentFailed,
     AgentReplied,
+    AgentUnclear,
     CallContext,
     CalleeSaid,
     Connected,
     Hangup,
     Keypad,
+    KeypadReset,
     Silence,
     TimedOut,
     answers_object,
@@ -64,6 +67,16 @@ class Call:
     def agent(self, *calls: ToolCall, text: str | None = None):
         return self.send(AgentReplied(at=self._at(), text=text, tool_calls=tuple(calls)))
 
+    def unclear(self):
+        return self.send(AgentUnclear(at=self._at()))
+
+    def reset(self) -> int:
+        self.send(KeypadReset(at=self._at()))
+        return self.last_callee_turn()
+
+    def slots(self) -> list[str]:
+        return [a["slot"] for a in self.state.answers]
+
 
 def rec(slot: str, value, turn: int) -> ToolCall:
     return ToolCall(id=f"tc_{slot}_{turn}", name="record_answer", args={"slot": slot, "value": value, "turn_id": turn})
@@ -73,8 +86,17 @@ def tool(name: str, **args) -> ToolCall:
     return ToolCall(id=f"tc_{name}", name=name, args=args)
 
 
-def to_last4(c: Call) -> None:
-    """A clean call up to the last-four question."""
+# Spec 0043's fixed lines, as the spec words them (D1, D3, D4).
+KEYPAD_QUESTION = ("For the account you'd like to be paid into, please use your phone's keypad to enter the last "
+                   "four digits, then press the pound key. To start over, press the star key.")
+START_OVER_LINE = "Okay, let's start over. Please enter the last four digits, then press the pound key."
+KEYPAD_ONLY_LINE = "Please don't say the digits. Enter them on your phone's keypad, then press the pound key."
+BEFORE_DIGITS = ["recording_consent", "company_named", "department", "speaker_name", "speaker_role",
+                 "change_requested"]
+
+
+def to_change(c: Call) -> None:
+    """A clean call up to the question about the change."""
     c.connect()
     t = c.callee("Yes, that's fine.")
     c.agent(rec("recording_consent", "yes", t), text="Great. Which company have I reached?")
@@ -87,6 +109,11 @@ def to_last4(c: Call) -> None:
     t = c.callee("I'm the AR manager")
     c.agent(rec("speaker_role", "AR manager", t),
             text="Did your company recently ask Fictional Co to change how you get paid?")
+
+
+def to_last4(c: Call) -> None:
+    """A clean call up to the last-four question."""
+    to_change(c)
     t = c.callee("Yes, we did, last week.")
     c.agent(rec("change_requested", "yes", t), text="What are the last four digits of the new account?")
 
@@ -118,8 +145,7 @@ def test_callee_words_go_to_the_agent_as_quoted_data() -> None:
 def test_a_clean_call_records_every_answer_and_ends_answers_recorded() -> None:
     c = Call()
     to_last4(c)
-    t = c.callee("It ends in 4821.")
-    c.agent(rec("account_last4", "4821", t), text="Thanks!")
+    c.keys("4821")                                        # the last four come only from the keypad (spec 0043, D1)
     assert c.end.result == "answers_recorded" and c.said[-1] == SCRIPT.close()
     slots = [a["slot"] for a in answers_object(c.state)["answers"]]
     assert slots == ["recording_consent", "company_named", "department", "speaker_name", "speaker_role",
@@ -322,11 +348,13 @@ def test_grounding_a_yes_must_answer_its_own_question() -> None:
 
 
 def test_grounding_text_and_digits_must_appear_in_the_cited_turn() -> None:
+    # Digits are never taken from speech now (spec 0043, D1): an agent that records spoken digits
+    # breaks policy and nothing is kept, whether or not the digits appear in the turn it cites.
     c = Call()
     to_last4(c)
-    t = c.callee("It's 4821.")
+    t = c.callee("Hold on.")
     c.agent(rec("account_last4", "4822", t))
-    assert checks(c.state)["answers_grounded"] is False
+    assert "account_last4" not in c.slots() and c.state.violations == 1
     c2 = Call()
     c2.connect()
     t = c2.callee("Yes.")
@@ -484,13 +512,23 @@ def test_odd_tool_input_never_raises() -> None:  # C1
 
 
 def test_bad_keypad_input_cannot_go_on_forever() -> None:  # C2
+    # A bad entry is unclear: asked once more, then the call finishes without digits (spec 0043, D5).
     c = Call()
     to_last4(c)
     for _ in range(MAX_CALLEE_TURNS):
         c.keys("123456789")
         if c.end:
             break
-    assert c.end.result == "failed"
+    assert c.end.result == "answers_recorded" and "account_last4" not in c.slots()
+    assert sum(t.speaker == "callee" and t.text == "[keypad]" for t in c.state.turns) == 2
+    # Starting over never uses up the one more try, so the turn cap is what bounds it (D3).
+    c = Call()
+    to_last4(c)
+    for _ in range(MAX_CALLEE_TURNS + 1):
+        c.reset()
+        if c.end:
+            break
+    assert c.end.result == "failed" and c.end.reason == "turn_cap"
 
 
 def test_pressure_in_the_consent_turn_is_still_flagged() -> None:  # M1
@@ -524,10 +562,11 @@ def test_checks_report_a_new_number_even_if_a_line_slipped_through() -> None:  #
 
 
 def test_a_violation_after_the_last_answer_closes_the_call() -> None:  # M4
+    # The last answer the agent can record is a refusal of the digits (spec 0043, D1).
     c = Call()
     to_last4(c)
-    t = c.callee("4821")
-    c.agent(rec("account_last4", "4821", t), tool("approve_payment", case="x"))
+    t = c.callee("I'd rather not say.")
+    c.agent(rec("account_last4", "refused", t), tool("approve_payment", case="x"))
     assert c.end.result == "answers_recorded" and c.said[-1] == SCRIPT.close()
 
 
@@ -561,3 +600,221 @@ def test_a_malformed_tool_call_never_records_a_yes() -> None:  # acceptance item
     c.agent(bad)
     c.agent(bad)
     assert c.end.result == "failed" and len(c.state.answers) == before
+
+
+# --- spec 0043: keypad-only last four, and one more try on an unclear answer ---------------
+
+def test_digits_question_is_fixed_wording() -> None:  # D1
+    assert QUESTIONS[Phase.LAST4].wording(SCRIPT) == KEYPAD_QUESTION
+    c = Call()
+    to_last4(c)                                       # the agent offered its own words for the question
+    assert c.said[-1] == KEYPAD_QUESTION and c.state.turns[-1].asked == Phase.LAST4
+
+
+@pytest.mark.parametrize("spoken", ["4821", "four eight two one", "Forty eight twenty one.",
+                                    "Zero zero zero one, those are the last four."])
+def test_spoken_digits_are_not_recorded_and_reasked(spoken: str) -> None:  # D1, D4, D5
+    c = Call()
+    to_last4(c)
+    c.callee(spoken)
+    assert c.request is None                          # step decides before it asks the agent
+    assert c.said[-1] == f"{REASK} {KEYPAD_ONLY_LINE}" and c.state.turns[-1].asked == Phase.LAST4
+    assert c.slots() == BEFORE_DIGITS and c.end is None
+    c.callee(spoken)                                  # a second spoken entry: the call finishes with no digits
+    assert c.request is None
+    assert c.end.result == "answers_recorded" and c.slots() == BEFORE_DIGITS  # NR06, every other answer kept
+    assert c.said[-1] == SCRIPT.goodbye()
+
+
+def test_a_refusal_at_the_digits_question_is_recorded() -> None:  # D4
+    c = Call()
+    to_last4(c)
+    t = c.callee("I'd rather not say.")
+    assert c.request is not None and c.request.phase == Phase.LAST4   # no digits: the agent reads it
+    c.agent(rec("account_last4", "refused", t))
+    assert c.end.result == "answers_recorded"
+    assert answers_object(c.state)["answers"][-1]["value"] == "refused"
+    assert checks(c.state)["answers_grounded"] is True
+
+
+def test_a_short_number_in_speech_goes_to_the_agent_and_gets_the_plain_reask() -> None:  # D4
+    c = Call()
+    to_last4(c)
+    c.callee("Oh, one moment")                        # digit_runs reads "01": under the threshold
+    assert c.request is not None and c.request.phase == Phase.LAST4
+    c.unclear()
+    assert c.said[-1] == f"{REASK} {KEYPAD_QUESTION}"
+    assert c.slots() == BEFORE_DIGITS and c.end is None
+
+
+def test_the_agent_can_never_record_spoken_digits() -> None:  # D1
+    c = Call()
+    to_last4(c)
+    t = c.callee("Let me see.")
+    c.agent(rec("account_last4", "4821", t))          # a model that tries anyway breaks policy
+    assert "account_last4" not in c.slots() and c.state.violations == 1
+    assert c.said[-1] == f"{REASK} {KEYPAD_QUESTION}"
+
+
+def test_unclear_is_asked_once_more() -> None:  # D5
+    # Consent: "Hello?" is asked again, and a following "Yes." continues the call.
+    c = Call()
+    c.connect()
+    c.callee("Hello?")
+    c.unclear()
+    assert c.said[-1] == f"{REASK} {SCRIPT.consent_question()}" and c.end is None and c.state.answers == ()
+    t = c.callee("Yes.")
+    c.agent(rec("recording_consent", "yes", t))
+    assert c.state.consent == "yes" and c.state.phase == Phase.COMPANY
+    assert checks(c.state)["answers_grounded"] is True   # the re-ask is the consent question
+    # The change question works the same way.
+    c = Call()
+    to_change(c)
+    c.callee("Sorry, what was that?")
+    c.unclear()
+    assert c.said[-1] == f"{REASK} {QUESTIONS[Phase.CHANGE].wording(SCRIPT)}" and c.end is None
+    t = c.callee("Yes, we did.")
+    c.agent(rec("change_requested", "yes", t))
+    assert c.state.phase == Phase.LAST4 and checks(c.state)["answers_grounded"] is True
+    # The digits question: an entry that is not four digits.
+    c = Call()
+    to_last4(c)
+    c.keys("48")
+    assert c.said[-1] == f"{REASK} {KEYPAD_QUESTION}" and c.slots() == BEFORE_DIGITS
+    t = c.keys("4821")
+    assert c.end.result == "answers_recorded"
+    assert answers_object(c.state)["answers"][-1] == {
+        "slot": "account_last4", "value": "4821", "turn_id": t, "tool_call_id": f"dtmf_{t}",
+        "captured_at": c.state.answers[-1]["captured_at"], "capture_method": "keypad"}
+
+
+@pytest.mark.parametrize("entry", ["", "4", "482", "48215", "1234567890123456"])
+def test_only_exactly_four_keys_are_recorded(entry: str) -> None:  # D3
+    c = Call()
+    to_last4(c)
+    c.keys(entry)
+    assert c.said[-1] == f"{REASK} {KEYPAD_QUESTION}" and c.slots() == BEFORE_DIGITS
+    assert c.state.turns[-2].text == "[keypad]"       # the entry itself never enters the transcript
+
+
+def test_second_unclear_ends_without_the_answer() -> None:  # D5
+    # Consent: the call ends failed, nothing recorded, no retry time (the core waits its default).
+    c = Call()
+    c.connect()
+    for _ in range(2):
+        c.callee("Hello?")
+        c.unclear()
+    assert (c.end.result, c.end.reason, c.end.retry_at) == ("failed", "unclear:consent", None)
+    assert c.state.answers == () and c.said[-1] == SCRIPT.goodbye()
+    # The change question: the same, and the answers so far stay as they were.
+    c = Call()
+    to_change(c)
+    for _ in range(2):
+        c.callee("Sorry?")
+        c.unclear()
+    assert (c.end.result, c.end.reason, c.end.retry_at) == ("failed", "unclear:change", None)
+    assert c.slots() == BEFORE_DIGITS[:-1]
+    # The digits question: the call finishes with no digits and every other answer (NR06), whichever
+    # kind of unclear comes second.
+    for second in ("keys", "speech", "agent"):
+        c = Call()
+        to_last4(c)
+        c.keys("48")
+        if second == "keys":
+            c.keys("48215")
+        elif second == "speech":
+            c.callee("It's 4821.")
+        else:
+            c.callee("Hmm, hang on.")
+            c.unclear()
+        assert c.end.result == "answers_recorded", second
+        assert c.slots() == BEFORE_DIGITS, second
+
+
+def test_unclear_keeps_its_own_budget() -> None:  # D5
+    # A violation, then an unclear, then a silence, then an unclear: each counter is separate, and
+    # a silence does not give back the one more try.
+    c = Call()
+    c.connect()
+    c.callee("Sure.")
+    c.agent(tool("approve_payment", case="x"))
+    assert c.state.violations == 1 and c.said[-1] == f"{REASK} {SCRIPT.consent_question()}"
+    c.callee("Hello?")
+    c.unclear()
+    assert c.end is None and c.state.violations == 1 and c.said[-1] == f"{REASK} {SCRIPT.consent_question()}"
+    c.send(Silence(at=T0))
+    assert c.said[-1] == STILL_THERE and c.state.silences == 1
+    c.callee("Hello?")
+    c.unclear()
+    assert c.end.reason == "unclear:consent" and c.state.violations == 1 and c.state.answers == ()
+
+
+def test_start_over_does_not_use_the_one_more_try() -> None:  # D3
+    c = Call()
+    to_last4(c)
+    before = c.state.answers
+    t = c.reset()
+    assert c.said[-1] == START_OVER_LINE and c.state.turns[-1].asked == Phase.LAST4
+    assert c.state.answers == before and not any(ch.isdigit() for ch in c.state.turns[t].text)
+    c.keys("48")                                      # the first bad entry still gets its one more try
+    assert c.said[-1] == f"{REASK} {KEYPAD_QUESTION}" and c.end is None
+    c.reset()
+    assert c.said[-1] == START_OVER_LINE and c.end is None
+    c.keys("4821")
+    assert c.end.result == "answers_recorded" and c.state.answers[-1]["value"] == "4821"
+
+
+def test_keys_outside_the_digits_question_still_mean_nothing() -> None:  # D3
+    c = Call()
+    c.connect()
+    before = (c.state, list(c.said))
+    c.reset()
+    c.keys("4821")
+    assert (c.state, c.said) == before                # before consent: nothing said, nothing kept
+    c = Call()
+    to_change(c)
+    before = (c.state, list(c.said))
+    c.reset()
+    c.keys("4821")
+    assert (c.state, c.said) == before                # at another question: the same
+
+
+def test_an_unclear_at_a_free_text_question_fails_closed() -> None:  # R7: no agent says it there
+    c = Call()
+    c.connect()
+    t = c.callee("Yes.")
+    c.agent(rec("recording_consent", "yes", t))
+    c.callee("Mm.")
+    c.unclear()
+    assert (c.end.result, c.end.reason) == ("failed", "unclear:company")
+
+
+def test_numbered_company_is_kept_as_said() -> None:  # D8: only the model's copy is redacted
+    c = Call()
+    c.connect()
+    t = c.callee("Yes.")
+    c.agent(rec("recording_consent", "yes", t))
+    t = c.callee("84 Lumber")
+    assert c.request is not None and c.request.transcript[-1] == (t, "callee", "84 Lumber")
+    c.agent(rec("company_named", "84 Lumber", t))
+    assert c.state.answers[-1]["value"] == "84 Lumber" and c.state.turns[t].text == "84 Lumber"
+    assert checks(c.state)["answers_grounded"] is True
+
+
+def test_read_yes_no_reads_like_grounding() -> None:  # D9
+    from dialback_policy.step import read_yes_no
+
+    cases = [("Sure, no problem.", True, "yes"), ("We did.", True, "yes"), ("Hello?", True, "unclear"),
+             ("Yes, that's fine.", False, "yes"), ("No, I'd rather not.", False, "no"),
+             ("I'm not sure.", True, "unsure"), ("I'm not sure.", False, "unclear"),
+             ("Absolutely not.", False, "no"), ("No worries, go ahead.", False, "yes"), ("", False, "unclear")]
+    for text, allow_unsure, expected in cases:
+        assert read_yes_no(text, allow_unsure=allow_unsure) == expected, text
+    # Whatever it reads is grounded at the question it answers, so the double never records a guess.
+    for text, _, expected in cases:
+        if expected in ("yes", "no", "unsure"):
+            c = Call()
+            to_change(c)
+            t = c.callee(text)
+            c.agent(rec("change_requested", expected, t))
+            assert c.state.grounded[-1] is True, text
