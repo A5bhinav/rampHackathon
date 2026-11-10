@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import random
 import re
 import time
 import unicodedata
@@ -19,7 +20,9 @@ from dialback_core.email_door.rules import (
     redact,
     requested_fingerprint,
 )
-from dialback_ledger.candidates import parse_phone
+from dialback_ledger.candidates import find_phones, parse_phone
+from dialback_ledger.reader import StubReader
+from dialback_ledger.text import Line
 
 ACCOUNT = "000123454821"
 
@@ -35,6 +38,29 @@ def surviving_account_digits(redacted: str, account: str = ACCOUNT) -> set[str]:
         digits = re.sub(r"\D", "", m.group(0))
         found |= {digits[i:i + 5] for i in range(len(digits) - 4)} & five_digit_pieces_of(account)
     return found
+
+
+def numeric_runs_outside_the_phones(quote: str) -> list[str]:
+    """Every run of 5 or more numeric characters (str.isnumeric, so CJK numerals count; up to 5 separator
+    characters between them) in `quote` that lies outside the phone numbers the ledger's matcher reads there."""
+    chars = list(quote)
+    for c in find_phones([Line(quote, "visible", 0, 0)]):
+        chars[c.start:c.end] = " " * (c.end - c.start)
+    runs, run, gap = [], "", 0
+    for ch in chars + ["\n"]:
+        if ch.isnumeric():
+            run, gap = run + ch, 0
+        elif run and gap < 5 and not ch.isalnum() and ch != "*":
+            gap += 1
+        else:
+            if len(run) >= 5:
+                runs.append(run)
+            run, gap = "", 0
+    return runs
+
+
+def stored_by_the_ledger(text: str) -> list[str]:
+    return [label["quote"] for label in StubReader().label(redact(text))]
 
 
 # Flagging ------------------------------------------------------------------------------------------
@@ -289,7 +315,7 @@ def test_a_phone_on_a_line_with_a_phone_word_or_no_payment_word_stays():
     assert parse_phone(redact("Questions about the wire? Call 212-555-0199.")) == ["+12125550199"]
 
 
-def test_a_phone_extension_of_five_digits_or_more_is_masked():
+def test_a_phone_extension_is_masked_whatever_its_length():
     out = redact("Call 212-555-0199 ext. 000123454821")
     assert surviving_account_digits(out) == set() and parse_phone(out) == ["+12125550199"]
     assert redact("Call 212-555-0199 ext. 4821") == "Call 212-555-0199 ext. ****"     # a phone line keeps only its phone
@@ -359,6 +385,68 @@ def test_a_phone_line_keeps_no_digit_but_its_phone(text):
     out = redact(text)
     assert parse_phone(out) == ["+12125550199"] and "212-555-0199" in out
     assert not any(c.isdigit() for c in out.replace("212-555-0199", "", 1))
+
+
+# The ledger's final check: redact() decides "phone line" on its input, the ledger on redact()'s output,
+# and masking can turn a line that was not a phone line into one (212(555)0199(77777) is not a phone,
+# 212(555)0199(*7777) is). So redact() ends by reading its output the way the ledger does.
+
+@pytest.mark.parametrize(("text", "account"), [
+    ("Ref 212(555)0199(77777) Our new account: 7783|1102|45", "7783110245"),
+    ("Ph 212(555)0199(77777), acct 778·311·0245", "7783110245"),
+])
+def test_the_ledger_stores_no_line_that_masking_turned_into_a_phone_line(text, account):
+    out = redact(text)
+    assert parse_phone(text) == []                        # not a phone line on the way in
+    assert parse_phone(out) == []                         # and not one on the way out
+    assert not any(c.isnumeric() for c in out)            # a phone the ledger reads and redact did not keep: whole line masked
+    assert surviving_account_digits(out, account) == set()
+    assert all(numeric_runs_outside_the_phones(quote) == [] for quote in stored_by_the_ledger(text))
+
+
+def test_cjk_numerals_are_masked_on_a_phone_line():
+    text = "Call 212-555-0199 or 七七八三一一〇二四五"
+    out = redact(text)
+    assert out == "Call 212-555-0199 or **********"
+    assert stored_by_the_ledger(text) == [out]
+    # On a line without a phone they are not decimal digits, so nothing masks them, and the stub stores nothing.
+    assert stored_by_the_ledger("Account: 七七八三一一〇二四五") == []
+
+
+def test_a_phone_with_an_unspaced_extension_is_lost_to_the_ledger():
+    # Known minor loss, recorded in spec 0086: the extension is masked, and "0199x****" no longer reads as a phone.
+    out = redact("Call 212-555-0199x4821 now")
+    assert out == "Call 212-555-0199x**** now" and parse_phone(out) == []
+    assert parse_phone(redact("Call 212-555-0199 x4821 now")) == ["+12125550199"]
+
+
+PHONES = ["212-555-0199", "(617) 555-0143", "+44 20 7946 0958", "617.555.0143", "2125550199"]
+ODD_ACCOUNTS = ["7783|1102|45", "778·311·0245", "0001  --  2345  --  4821", "2299 1004 77",
+                "七七八三一一〇二四五", "000123454821", "77777"]
+GLUE = ["(", ")", "-", ".", "/", " ", "", "x", ", "]
+LINE_WORDS = ["Ref", "Ph", "Call", "Our new account:", "acct", "Wire to", "Tel", "Account number", ""]
+
+
+def test_stored_quotes_hold_no_numeric_run_but_their_phone():
+    # A few hundred generated lines: phones glued to digit runs with ( ) - . / x and odd-format accounts.
+    # Whatever the ledger stores, the only run of 5 or more numeric characters in it is the stored phone.
+    rng = random.Random(86)
+    leaks = []
+    for _ in range(400):
+        parts = []
+        for _ in range(rng.randint(2, 4)):
+            kind = rng.random()
+            if kind < 0.4:
+                parts.append(rng.choice(PHONES))
+            elif kind < 0.7:
+                parts.append("".join(rng.choice("0123456789") for _ in range(rng.randint(5, 12))))
+            else:
+                parts.append(rng.choice(ODD_ACCOUNTS))
+        line = rng.choice(LINE_WORDS) + " " + "".join(p + rng.choice(GLUE) for p in parts)
+        for quote in stored_by_the_ledger(line):
+            if numeric_runs_outside_the_phones(quote):
+                leaks.append((line, quote))
+    assert leaks == []
 
 
 def test_a_loosely_labeled_account_is_not_a_routing_number():

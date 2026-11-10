@@ -283,8 +283,11 @@ def _sentence_reasons(tokens: list[str]) -> tuple[list[str], list[str], list[str
 # however grouped; a run whose nearest label on its line is an account label ("Our new acct at
 # Evergreen: 026009593"); and a phone-shaped number on a line that has a payment word and no phone word
 # ("wire to 7783110245"). A line of digits and punctuation only takes the words of the line before it.
-# A phone extension is masked like any other run and is never a routing number. The model's copy has
-# no digits at all (redact_for_model).
+# A phone extension is masked like any other run and is never a routing number. The ledger's stub reader
+# stores the whole of any line on which it finds exactly one phone, so a line that holds a phone keeps
+# no numeric character outside the phones kept, and redact() ends by reading its own output the way the
+# ledger does (_ledger_check): masking can make a phone readable where there was none. The model's copy
+# has no digits at all (redact_for_model).
 
 _NOT_AN_ACCOUNT = (r"(?!\s+(?:manager|managers|statements?|payable|receivable|team|contacts?|reps?|representative|executive"
                    r"|settings|password|login|portal|balance|summary|history|activity)\b)")
@@ -327,11 +330,13 @@ def redact(text: str, also_mask: Iterable[str] = ()) -> str:
     numbers stay, so the ledger can still read them; its stub reader stores a phone's whole line, so
     nothing else on that line may stay whole. `also_mask` holds accounts found in another field (the
     body's, when redacting the subject), masked wherever their digits appear. The ledger stores text
-    only from lines that hold a phone number, so on those lines every digit outside the phones kept is
-    masked, whatever its format."""
+    only from lines that hold a phone number, so on those lines every numeric character outside the
+    phones kept is masked, whatever its format; and the result is read once more the way the ledger
+    reads it (_ledger_check), so a line where the ledger would find a phone that was not kept loses
+    every numeric character."""
     text = text[:MAX_CHARS]
     pieces, kept, phone_lines = _pieces(text, also_mask)
-    out = list(text)
+    out = list(text)   # masking replaces characters one for one, so offsets and line breaks are the input's
     for s, e, kind in pieces:
         if kind in ("account", "other"):
             out[s:e] = mask_run(text[s:e])
@@ -339,10 +344,39 @@ def redact(text: str, also_mask: Iterable[str] = ()) -> str:
     for s, e in kept:
         keep[s:e] = b"\x01" * (e - s)
     for s, e in phone_lines:
-        for k in range(s, e):
-            if not keep[k] and out[k].isdigit():
-                out[k] = "*"
+        _mask_numerics(out, s, e, keep)
+    _ledger_check(out, text, set(kept), keep)
     return "".join(out)
+
+
+def _ledger_check(out: list[str], text: str, kept: set[tuple[int, int]], keep: bytearray) -> None:
+    """The last step of redact(): read the masked text the way the ledger's stub reader will, line by
+    line with parse_phone's matcher, since masking can turn a line that held no phone into one that does
+    ("212(555)0199(77777)" is not a phone; "212(555)0199(*7777)" is, and the stub stores its whole
+    line). A line where the matcher finds only phones redact kept loses every other numeric character
+    (str.isnumeric, so CJK numerals too). A line where it finds a phone redact did not keep loses every
+    numeric character, kept phones included (fail safe: the ledger reads nothing from it). A line this
+    changes is read again until nothing changes, which cannot create a phone: a line with no decimal
+    digit never matches, and the fully masked line has none."""
+    offset = 0
+    for line in text.splitlines(keepends=True):
+        s, e = offset, offset + len(line)
+        offset = e
+        while True:
+            found = {(s + c.start, s + c.end) for c in find_phones([Line("".join(out[s:e]), "visible", 0, 0)])}
+            if not found or not _mask_numerics(out, s, e, keep if found <= kept else None):
+                break
+
+
+def _mask_numerics(out: list[str], start: int, end: int, keep: bytearray | None) -> bool:
+    """Mask every numeric character of out[start:end] not marked in `keep` (all of them when `keep` is
+    None). Whether anything changed."""
+    changed = False
+    for k in range(start, end):
+        if out[k].isnumeric() and not (keep is not None and keep[k]):
+            out[k] = "*"
+            changed = True
+    return changed
 
 
 def redact_for_model(text: str) -> str:
