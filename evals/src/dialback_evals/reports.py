@@ -289,7 +289,36 @@ def unconfirmed(case: ReportCase) -> list[str]:
                       ("earlier_concern", "earlier_concern")):
         if case.truth[key]:
             missing.append(name)
+    # Spec 0048 review fix 2: every verify condition, not only some.
+    missing += [f"flag={flag}" for flag in sorted(set(case.values("flag")))]                    # V12
+    if case.values("offered_number"):
+        missing.append("offered_number")                                                   # V12
+    names, roles = case.values("speaker_name"), [r for r in case.values("speaker_role") if r.strip()]
+    if not names:
+        missing.append("name=missing")                                                     # V06
+    elif len(set(names)) > 1:
+        missing.append("speaker=two_names")                                                # V09: one person
+    if not roles:
+        missing.append("role=missing")                                                     # V06
+    elif len(set(roles)) > 1:
+        missing.append("role=two_values")
+    if not _in_order(case):
+        missing.append("order=out_of_order")                                               # V04, V10
     return missing
+
+
+_ORDER = ("recording_consent", "company_named", "department", "speaker_name", "speaker_role", "change_requested",
+          "account_last4")
+
+
+def _in_order(case: ReportCase) -> bool:
+    """The questions' answers come in the script's order, each in a turn after the last, consent first: the
+    first turn of each slot strictly rises along the order, and nothing is recorded at or before consent."""
+    firsts = [min(a["turn_id"] for a in case.answers if a["slot"] == slot) for slot in _ORDER if case.values(slot)]
+    if any(b <= a for a, b in zip(firsts, firsts[1:], strict=False)):
+        return False
+    consent = [a["turn_id"] for a in case.answers if a["slot"] == "recording_consent"]
+    return not consent or all(a["turn_id"] > min(consent) for a in case.answers if a["slot"] != "recording_consent")
 
 
 def honest_full(case: ReportCase) -> bool:

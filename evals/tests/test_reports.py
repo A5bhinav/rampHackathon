@@ -185,3 +185,54 @@ def test_planted_call_facts_bugs_turn_lab_reports_red(bug, tmp_path, monkeypatch
     code = main(["reports", "--examples", "2000", "--seed", "0", "--out", str(out),
                  "--known-failures", str(ROOT / "evals" / "known-failures.json")])
     assert code == (1 if bug else 0)
+
+
+
+# ---- spec 0048 review fix 2: F1 covers every verify condition --------------------------------------------
+
+def _answer(slot, value, turn):
+    return {"slot": slot, "value": value, "turn_id": turn, "tool_call_id": f"x{turn}_{slot}",
+            "captured_at": "2026-11-01T17:30:00Z", "capture_method": "speech"}
+
+
+def _retimed(case, slot, turn):
+    return reports.with_case(case, answers=tuple({**a, "turn_id": turn} if a["slot"] == slot else a
+                                                 for a in case.answers))
+
+
+@pytest.mark.parametrize(("change", "condition"), [
+    (lambda c: reports.with_case(c, answers=(*c.answers, _answer("flag", "pressure_to_approve", 13))),
+     "flag=pressure_to_approve"),
+    (lambda c: reports.with_case(c, answers=(*c.answers, _answer("offered_number", "(312) 555-0142", 13))),
+     "offered_number"),
+    (lambda c: reports.with_case(c, answers=tuple(a for a in c.answers if a["slot"] != "speaker_name")), "name=missing"),
+    (lambda c: reports.with_case(c, answers=tuple(a for a in c.answers if a["slot"] != "speaker_role")), "role=missing"),
+    (lambda c: reports.with_case(c, answers=(*c.answers, _answer("speaker_name", "Sam Ortiz", 15))), "speaker=two_names"),
+    (lambda c: reports.with_case(c, answers=(*c.answers, _answer("speaker_role", "Controller", 15))), "role=two_values"),
+    (lambda c: _retimed(c, "change_requested", 6), "order=out_of_order"),         # the change before the name
+    (lambda c: _retimed(c, "recording_consent", 4), "order=out_of_order"),        # consent after the company
+])
+def test_f1_covers_every_verify_condition(change, condition):
+    assert reports.unconfirmed(change(reports.honest())) == [condition]
+
+
+def test_a_planted_flag_dropping_bug_turns_lab_reports_red(tmp_path, monkeypatch):
+    # The review's fifth finding: a call_facts that drops every flag answer verified 30 more reachable reports
+    # and F1 did not see it. Flags are reachable only as code's pressure flag (review fix 4), so the bug shows
+    # on those.
+    import shutil
+
+    import dialback_core.call_facts as core_facts
+    from dialback_evals.cli import main
+    real = core_facts.call_facts
+
+    def no_flags(report, case, generation, context):
+        if report.get("answers"):
+            kept = [a for a in report["answers"]["answers"] if a["slot"] != "flag"]
+            report = {**report, "answers": {**report["answers"], "answers": kept}}
+        return real(report, case, generation, context)
+    out = tmp_path / "reports-generated"
+    shutil.copytree(ROOT / "evals" / "reports-generated", out)
+    monkeypatch.setattr(core_facts, "call_facts", no_flags)
+    assert main(["reports", "--examples", "2000", "--seed", "0", "--out", str(out),
+                 "--known-failures", str(ROOT / "evals" / "known-failures.json")]) == 1
