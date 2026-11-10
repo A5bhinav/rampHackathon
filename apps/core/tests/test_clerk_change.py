@@ -118,6 +118,8 @@ async def test_the_full_account_number_is_never_stored_returned_or_logged(demo, 
     {"routing_number": ROUTING, "account_number": "123"},           # too short
     {"routing_number": ROUTING, "account_number": "12345678901234567890"},  # too long
     {"routing_number": ROUTING, "account_number": "1234-5678"},     # not digits
+    {"routing_number": ROUTING + "\n", "account_number": ACCOUNT},  # a trailing newline
+    {"routing_number": ROUTING, "account_number": ACCOUNT + "\n"},
 ])
 async def test_a_malformed_number_is_refused_without_echoing_it(demo, body):
     before = await mock_accounts(demo)

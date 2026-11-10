@@ -9,13 +9,15 @@ import hashlib
 import hmac
 import re
 import unicodedata
+from bisect import bisect_left, bisect_right
+from collections.abc import Iterable
 from dataclasses import dataclass
 
 from dialback_ledger.candidates import find_phones
 from dialback_ledger.text import Line
 
 from ..bank import aba_valid
-from .masking import DIGIT_RUN, SEPARATOR, mask_run
+from .masking import DIGIT_RUN, SEPARATOR, mask_digit_runs, mask_run
 
 # Flagging ------------------------------------------------------------------------------------------
 #
@@ -32,6 +34,7 @@ from .masking import DIGIT_RUN, SEPARATOR, mask_run
 # before "remains the same". Spec 0086 lists every version of this rule and its numbers.
 
 WINDOW = 8
+FLAG_READS = 50_000  # flag() reads at most this many characters, subject first, so its time stays bounded
 
 
 def _terms(*alternatives: str) -> re.Pattern[str]:
@@ -77,8 +80,9 @@ _CORRECTION = _terms(r"wrong", r"incorrect", r"typo", r"outdated", r"out of date
 # Revision 1 (after the held-out run of version 5).
 # A core change verb anywhere in the email pairs with a destination word anywhere in it: the change is
 # often announced in one sentence and the details given in the next ("our bank has changed. Bank: ...").
+# Matched against a whole term with fullmatch, so the time phrase "moving forward" is not the verb "move".
 _CORE_VERB = re.compile(r"(?:chang|updat|switch|replac|mov|redirect|modif|migrat|transition|amend|alter|revis"
-                        r"|transferr|relocat|rerout|merg|acquir|opened)")
+                        r"|transferr|relocat|rerout|merg|acquir|opened)[a-z]*")
 _CARRIES_ITS_NEGATION = {"anymore", "any more", "any longer", "no longer"}   # "we don't use that account anymore"
 # A change adjective on a generic noun ("new details", "updated instructions").
 _GENERIC = _terms(r"details?", r"instructions?", r"information", r"info", r"particulars")
@@ -114,20 +118,21 @@ class Flag:
 
 
 def flag(subject: str, text: str) -> Flag:
-    """Whether the email asks to change where a vendor's payments go, with the word pairs that say so."""
-    reasons: list[str] = []
+    """Whether the email asks to change where a vendor's payments go, with the word pairs that say so.
+    Reads the first FLAG_READS characters of the subject and then the text."""
+    subject = (subject or "")[:FLAG_READS]
+    text = (text or "")[:FLAG_READS - len(subject)]
+    reasons: dict[str, None] = {}
     verbs: list[str] = []
     dests: list[str] = []
     for where, part in (("subject", subject), ("body", text)):
-        for sentence in _sentences(part or ""):
+        for sentence in _sentences(part):
             sentence_reasons, sentence_verbs, sentence_dests = _sentence_reasons(sentence)
-            for reason in sentence_reasons:
-                if f"{where}: {reason}" not in reasons:
-                    reasons.append(f"{where}: {reason}")
+            reasons |= dict.fromkeys(f"{where}: {reason}" for reason in sentence_reasons)
             verbs += sentence_verbs
             dests += sentence_dests
     if verbs and dests and not reasons:
-        reasons.append(f"email: '{verbs[0]}' and '{dests[0]}' in different sentences")
+        reasons[f"email: '{verbs[0]}' and '{dests[0]}' in different sentences"] = None
     return Flag(bool(reasons), tuple(reasons))
 
 
@@ -138,14 +143,31 @@ def _sentences(text: str) -> list[list[str]]:
     return [tokens for part in _SENTENCE_END.split(text) if (tokens := _TOKEN.findall(part))]
 
 
-def _hits(pattern: re.Pattern[str], tokens: list[str]) -> list[tuple[int, int, str]]:
-    """(first token, last token, words) for each match of `pattern` in the sentence."""
-    joined = " ".join(tokens)
-    out = []
-    for m in pattern.finditer(joined):
-        first = joined.count(" ", 0, m.start())
-        out.append((first, first + m.group(0).count(" "), m.group(0)))
-    return out
+class _Sentence:
+    """A sentence's tokens, joined by single spaces, with each token's offset in the joined text, so a
+    match maps to its tokens by binary search instead of by counting spaces from the start."""
+
+    def __init__(self, tokens: list[str]) -> None:
+        self.tokens = tokens
+        self.joined = " ".join(tokens)
+        self.starts: list[int] = []
+        offset = 0
+        for t in tokens:
+            self.starts.append(offset)
+            offset += len(t) + 1
+
+    def hits(self, pattern: re.Pattern[str]) -> list[tuple[int, int, str]]:
+        """(first token, last token, words) for each match of `pattern`, in order."""
+        out = []
+        for m in pattern.finditer(self.joined):
+            first = bisect_right(self.starts, m.start()) - 1
+            out.append((first, first + m.group(0).count(" "), m.group(0)))
+        return out
+
+
+def _near(hits: list[tuple[int, int, str]], firsts: list[int], low: int, high: int) -> list[tuple[int, int, str]]:
+    """The hits whose first token is between `low` and `high`, in order (`firsts` is sorted)."""
+    return hits[bisect_left(firsts, low):bisect_right(firsts, high)]
 
 
 def _before(tokens: list[str], i: int, n: int) -> list[str]:
@@ -184,7 +206,7 @@ def _not_a_request(tokens: list[str], i: int, j: int) -> bool:
     word = " ".join(tokens[i:j + 1])
     if word not in _CARRIES_ITS_NEGATION and _negated(tokens, i, 4) or _after(tokens, j, 1) == ["requests"]:
         return True
-    if not _CORE_VERB.match(word):
+    if not _CORE_VERB.fullmatch(word):
         return False
     before = _before(tokens, i, WINDOW)
     clause = " ".join(reversed(before))
@@ -206,31 +228,43 @@ def _readers_own(tokens: list[str], i: int) -> bool:
 
 
 def _sentence_reasons(tokens: list[str]) -> tuple[list[str], list[str], list[str]]:
-    """(reasons in this sentence, core change verbs that ask for something, destination words)."""
-    if _hits(_AWARENESS, tokens):
+    """(reasons in this sentence, core change verbs that ask for something, destination words).
+    Each pairing looks only at the hits whose first token falls in its window, found by binary search,
+    so a long sentence costs about its length, not its length squared."""
+    sentence = _Sentence(tokens)
+    if sentence.hits(_AWARENESS):
         return [], [], []
-    dests = [d for d in _hits(_DEST, tokens) if not _readers_own(tokens, d[0]) and not _SAME & set(_after(tokens, d[1], 3))]
-    verbs = [v for v in _hits(_CHANGE_VERB, tokens) if not _not_a_request(tokens, v[0], v[1])]
-    core = [w for a, _, w in verbs if _CORE_VERB.match(w) and (a == 0 or tokens[a - 1] not in _NOUN_BEFORE)]
+    dests = [d for d in sentence.hits(_DEST) if not _readers_own(tokens, d[0]) and not _SAME & set(_after(tokens, d[1], 3))]
+    verbs = [v for v in sentence.hits(_CHANGE_VERB) if not _not_a_request(tokens, v[0], v[1])]
+    core = [w for a, _, w in verbs if _CORE_VERB.fullmatch(w) and (a == 0 or tokens[a - 1] not in _NOUN_BEFORE)]
+    adjectives = [h for h in sentence.hits(_CHANGE_ADJECTIVE) if not _negated(tokens, h[0], 1)]
+    generic = sentence.hits(_GENERIC)
+    payments = sentence.hits(_PAYMENT)
     out = []
-    for a, b, word in _hits(_CHANGE_ADJECTIVE, tokens):
-        if not _negated(tokens, a, 1):
-            out += [f"'{word} {g}'" for c, e, g in _hits(_GENERIC, tokens) if 0 < c - b <= 2]
-    for a, b, word in _hits(_FROM_NOW, tokens):
-        out += [f"'{word}' near '{p}'" for c, e, p in _hits(_PAYMENT, tokens) if max(0, c - b, a - e) <= WINDOW]
+    generic_firsts = [h[0] for h in generic]
+    for a, b, word in adjectives:
+        out += [f"'{word} {g}'" for c, e, g in _near(generic, generic_firsts, b + 1, b + 2)]
+    payment_firsts, payment_span = [h[0] for h in payments], max((e - c for c, e, _ in payments), default=0)
+    for a, b, word in sentence.hits(_FROM_NOW):
+        out += [f"'{word}' near '{p}'" for c, e, p in _near(payments, payment_firsts, a - WINDOW - payment_span, b + WINDOW)
+                if max(0, c - b, a - e) <= WINDOW]
     if not dests:
         return out, core, []
     nouns = [d for d in dests if d[2] not in ("remittance", "remittances")]
+    dest_firsts = [d[0] for d in dests]
+    noun_firsts = [d[0] for d in nouns]
+    span = max(e - c for c, e, _ in dests)   # a hit's last token is at most `span` after its first
     for a, b, word in verbs:
-        out += [f"'{word}' near '{d}'" for c, e, d in dests if max(0, c - b, a - e) <= WINDOW]
-    for a, b, word in _hits(_CHANGE_ADJECTIVE, tokens):
-        if _negated(tokens, a, 1):
-            continue
-        out += [f"'{word} {d}'" for c, e, d in nouns if 0 < c - b <= 3 and not _CLAUSE_BREAK & set(tokens[b + 1:c])]
-    for a, b, word in _hits(_CORRECTION, tokens):
-        out += [f"'{d}' then '{word}'" for c, e, d in nouns if 0 < a - e <= WINDOW]
-    for a, b, word in _hits(_STOPPED, tokens):
-        out += [f"'{d}' then '{word}'" for c, e, d in nouns if 0 < a - e <= WINDOW and "acc" in d]
+        out += [f"'{word}' near '{d}'" for c, e, d in _near(dests, dest_firsts, a - WINDOW - span, b + WINDOW)
+                if max(0, c - b, a - e) <= WINDOW]
+    for a, b, word in adjectives:
+        out += [f"'{word} {d}'" for c, e, d in _near(nouns, noun_firsts, b + 1, b + 3)
+                if not _CLAUSE_BREAK & set(tokens[b + 1:c])]
+    for a, b, word in sentence.hits(_CORRECTION):
+        out += [f"'{d}' then '{word}'" for c, e, d in _near(nouns, noun_firsts, a - WINDOW - span, a - 1) if 0 < a - e <= WINDOW]
+    for a, b, word in sentence.hits(_STOPPED):
+        out += [f"'{d}' then '{word}'" for c, e, d in _near(nouns, noun_firsts, a - WINDOW - span, a - 1)
+                if 0 < a - e <= WINDOW and "acc" in d]
     return out, core, [d for _, _, d in dests]
 
 
@@ -238,21 +272,36 @@ def _sentence_reasons(tokens: list[str]) -> tuple[list[str], list[str], list[str
 #
 # A routing number is a run of exactly nine digits with a valid ABA checksum. An account number is the
 # first run of 4 to 17 digits that starts within 40 characters after an account label, with only label
-# words between ("Account number:", "Acct #", "our account is", "account ending"). A run is digits
-# grouped by masking.py's separators, so "0001 2345 4821", "0001-2345-4821" and a number split over
-# lines are each one run.
+# words between ("Account number:", "Acct #", "our account is"). "The account ending 8888" is a
+# reference to the last four, not an account. A run is digits grouped by masking.py's separators, so
+# "0001 2345 4821", "0001-2345-4821" and a number split over lines are each one run.
+#
+# Redaction is the ADR-8 barrier for the ledger and the model. Beyond the labeled accounts it treats
+# as an account (so masks, and never reports as a routing number): any digits that repeat a found
+# account, however grouped; a run whose nearest label on its line is an account label ("Our new acct at
+# Evergreen: 026009593"); and a phone-shaped number on a line that has a payment word and no phone word
+# ("wire to 7783110245"). A phone extension of 5 or more digits is masked like any other run.
 
 _NOT_AN_ACCOUNT = (r"(?!\s+(?:manager|managers|statements?|payable|receivable|team|contacts?|reps?|representative|executive"
                    r"|settings|password|login|portal|balance|summary|history|activity)\b)")
-_LABEL_WORD = r"(?:number|num|nbr|no|is|ending|ends|in|our|the|new|checking|savings|operating|will|be|now)\b"
+_LABEL_WORD = r"(?:number|num|nbr|no|is|in|our|the|new|checking|savings|operating|will|be|now)\b"
 _ACCOUNT = re.compile(
     rf"(?<![a-z0-9])(?:accounts?|accts?|a/c)\b{_NOT_AN_ACCOUNT}(?P<gap>(?:{SEPARATOR}|[:#()=]|{_LABEL_WORD})*)"
     rf"(?P<run>{DIGIT_RUN.pattern})", re.IGNORECASE)
 LABEL_REACH = 40
+_ACCOUNT_LABEL = rf"(?<![a-z0-9])(?:accounts?|accts?|a/c)(?![a-z0-9]){_NOT_AN_ACCOUNT}"
+_ROUTING_LABEL = r"(?<![a-z0-9])(?:routing|aba|rtn|transit|swift|iban|sort code)(?![a-z0-9])"
+_PHONE_WORD = r"(?<![a-z0-9])(?:call[a-z]*|phones?|telephone|tel|mobile|cell|fax|contact[a-z]*|reach|text|ext)(?![a-z0-9])"
+_PAYMENT_WORD = re.compile(r"(?<![a-z0-9])(?:accounts?|accts?|routing|aba|wires?|wired|wiring|ach|remit[a-z]*|pay[a-z]*"
+                           r"|bank[a-z]*|iban|deposits?|beneficiar[a-z]*)(?![a-z0-9])", re.IGNORECASE)
+_PHONE_LINE = re.compile(_PHONE_WORD, re.IGNORECASE)
+_NEAREST_LABEL = re.compile(rf"(?P<account>{_ACCOUNT_LABEL})|(?P<routing>{_ROUTING_LABEL})|(?P<phone>{_PHONE_WORD})",
+                            re.IGNORECASE)
 
 
 def find_routing(text: str) -> list[str]:
-    """Every routing number in `text` (nine digits, valid ABA checksum), in order, once each."""
+    """Every routing number in `text` (nine digits, valid ABA checksum, not taken for an account), in
+    order, once each."""
     return _unique(_ascii(text[s:e]) for s, e, kind in _pieces(text) if kind == "routing")
 
 
@@ -262,15 +311,23 @@ def find_accounts(text: str) -> list[str]:
     return _unique(digits for _, _, digits in _accounts(text))
 
 
-def redact(text: str) -> str:
-    """`text` with every labeled account number, and every other run of 5 or more digits, masked to its
-    last four (separators kept). Phone numbers and routing numbers stay, so the ledger can still read
-    them: its stub reader stores a phone's whole line, so nothing else on that line may stay whole."""
+def redact(text: str, also_mask: Iterable[str] = ()) -> str:
+    """The ledger's copy of `text`: every account number (see above) and every other run of 5 or more
+    digits masked to its last four, separators kept. Phone numbers and routing numbers stay, so the
+    ledger can still read them; its stub reader stores a phone's whole line, so nothing else on that
+    line may stay whole. `also_mask` holds accounts found in another field (the body's, when redacting
+    the subject), masked wherever their digits appear."""
     out = list(text)
-    for s, e, kind in _pieces(text):
+    for s, e, kind in _pieces(text, also_mask):
         if kind in ("account", "other"):
             out[s:e] = mask_run(text[s:e])
     return "".join(out)
+
+
+def redact_for_model(text: str, also_mask: Iterable[str] = ()) -> str:
+    """The model's copy of `text`: `redact`, then every run of 5 or more digits masked, phones and
+    routing numbers included. The model needs none of them."""
+    return mask_digit_runs(redact(text, also_mask))
 
 
 def requested_fingerprint(key: bytes, routing: str, account: str) -> str:
@@ -288,21 +345,47 @@ def _accounts(text: str) -> list[tuple[int, int, str]]:
 
 
 def _phones(text: str) -> list[tuple[int, int]]:
-    """Phone spans, found the way the ledger finds them: line by line, with parse_phone's matcher."""
+    """The phone numbers the ledger needs, found the way it finds them: line by line, with parse_phone's
+    matcher. A phone-shaped number on a line with a payment word and no phone word is left out (it is
+    taken for an account), and a span stops before an extension, which is masked like other digits."""
     out, offset = [], 0
     for i, line in enumerate(text.splitlines(keepends=True)):
-        out += [(offset + c.start, offset + c.end) for c in find_phones([Line(line, "visible", 0, i)])]
+        if not (_PAYMENT_WORD.search(line) and not _PHONE_LINE.search(line)):
+            out += [(offset + c.start, offset + _without_extension(line, c)) for c in find_phones([Line(line, "visible", 0, i)])]
         offset += len(line)
     return out
 
 
-def _pieces(text: str) -> list[tuple[int, int, str]]:
+def _without_extension(line: str, candidate) -> int:
+    """Where the phone number itself ends in `line`: before any extension digits after it."""
+    digits = _ascii(line[candidate.start:candidate.end])
+    e164 = candidate.e164.lstrip("+")
+    for skip in range(4):   # the matched digits may start with the country code, or without it
+        if digits.startswith(e164[skip:]):
+            keep, end = len(e164) - skip, candidate.start
+            while keep:
+                keep -= line[end].isdecimal()
+                end += 1
+            return end
+    return candidate.end
+
+
+def _pieces(text: str, also_mask: Iterable[str] = ()) -> list[tuple[int, int, str]]:
     """The digits of `text` as (start, end, kind) pieces: each labeled `account`, then every digit run
-    with the accounts and phone numbers cut out of it, each remaining piece a `routing` number or `other`."""
+    with those accounts and the ledger's phone numbers cut out of it. A remaining piece is an `account`
+    when it repeats a found account or its nearest label is an account label, else a `routing` number,
+    else `other`."""
     accounts = _accounts(text)
-    taken = [False] * len(text)
-    for s, e in [(s, e) for s, e, _ in accounts] + _phones(text):
-        taken[s:e] = [True] * (e - s)
+    secrets = {d for _, _, d in accounts} | {_ascii(a) for a in also_mask}
+    secrets = {d for d in secrets if len(d) >= 5}   # four digits are the last four ADR-8 keeps anyway
+
+    def repeats_an_account(span: str) -> bool:
+        digits = _ascii(span)
+        return any(secret in digits for secret in secrets)
+
+    taken = bytearray(len(text))
+    for s, e in [(s, e) for s, e, _ in accounts] + [(s, e) for s, e in _phones(text) if not repeats_an_account(text[s:e])]:
+        taken[s:e] = b"\x01" * (e - s)
     out = [(s, e, "account") for s, e, _ in accounts]
     for m in DIGIT_RUN.finditer(text):
         k = m.start()
@@ -317,8 +400,22 @@ def _pieces(text: str) -> list[tuple[int, int, str]]:
             while not text[e - 1].isdecimal():
                 e -= 1
             piece = text[s:e]
-            out.append((s, e, "routing" if len(piece) == 9 and piece.isdecimal() and aba_valid(_ascii(piece)) else "other"))
+            if repeats_an_account(piece) or _labeled_as_account(text, s):
+                kind = "account"
+            elif len(piece) == 9 and piece.isdecimal() and aba_valid(_ascii(piece)):
+                kind = "routing"
+            else:
+                kind = "other"
+            out.append((s, e, kind))
     return out
+
+
+def _labeled_as_account(text: str, start: int) -> bool:
+    """Whether the nearest label before `start`, on its line and within LABEL_REACH characters, is an
+    account label (not a routing label or a phone word)."""
+    line_start = text.rfind("\n", max(0, start - LABEL_REACH), start) + 1
+    labels = list(_NEAREST_LABEL.finditer(text, max(line_start, start - LABEL_REACH), start))
+    return bool(labels) and labels[-1].lastgroup == "account"
 
 
 def _ascii(run: str) -> str:

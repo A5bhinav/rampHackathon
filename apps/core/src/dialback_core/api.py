@@ -446,7 +446,7 @@ async def review(case_id: UUID, body: ReviewRequest, request: Request, user: Use
 
 
 # A clerk's bank change from the dashboard (spec 0077) ----------------------------------------------
-ACCOUNT = re.compile(r"^[0-9]{4,17}$")
+ACCOUNT = re.compile(r"[0-9]{4,17}")  # used with fullmatch: "$" would accept a trailing newline
 CHANGE_EVERY_SECONDS = 60  # one change a minute per dataset: a shared demo account can't set off a run of calls
 _last_sent: dict[UUID, float] = {}  # dataset -> when this process last sent a change (the core is one container)
 
@@ -505,7 +505,7 @@ async def change_bank_account(dataset_id: UUID, vendor_id: UUID, body: BankChang
     never stored, logged or returned (ADR-8); a refusal sends nothing to Ramp."""
     if not aba_valid(body.routing_number):
         return problem(422, "invalid_request", "The routing number must be nine digits with a valid checksum.")
-    if not ACCOUNT.match(body.account_number):
+    if not ACCOUNT.fullmatch(body.account_number):
         return problem(422, "invalid_request", "The account number must be 4 to 17 digits.")
     settings = request.app.state.settings
     async with person_tx(request.app.state.pool, user.user_id, user.claims) as conn:

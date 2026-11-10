@@ -4,10 +4,12 @@ from __future__ import annotations
 import hashlib
 import hmac
 import re
+import time
 
 import pytest
 from dialback_core.bank import aba_valid
-from dialback_core.email_door.masking import mask_digit_runs
+from dialback_core.email_door import rules
+from dialback_core.email_door.masking import DIGIT_RUN, mask_digit_runs
 from dialback_core.email_door.rules import (
     Flag,
     find_accounts,
@@ -36,7 +38,7 @@ def surviving_account_digits(redacted: str, account: str = ACCOUNT) -> set[str]:
 
 # Flagging ------------------------------------------------------------------------------------------
 
-def test_flag_needs_change_words_near_payment_words():
+def test_flag_pairs_a_change_word_with_a_payment_destination_in_a_sentence_or_a_core_verb_in_the_email():
     assert flag("Banking update", "Hi, see below.").flagged
     assert flag("Re: Invoice 1638", "We have moved our banking. Please pay the account ending 4821.").flagged
     assert flag("", "Our account number changed when our bank merged.").flagged
@@ -93,9 +95,24 @@ def test_a_correction_to_the_details_is_a_change():
     (False, "Shipment update", "We changed the routing of your shipment through Memphis."),
     (False, "Invoice 5521", "Remit to New York Community Bank, routing 021000021, account 1234567."),
     (False, "Holiday", "Our bank will be closed on Monday; payments will post Tuesday."),
+    # "Moving forward" is a time phrase, not the verb "move" (fixed after the stop, found by code reading).
+    (False, "", "Moving forward, send invoices to ap@x.example.\n\nRemit to: First Meridian Bank, routing 026009593"),
 ])
 def test_flag_examples(flagged, subject, text):
     assert flag(subject, text).flagged is flagged
+
+
+def test_flag_is_fast_on_a_long_unpunctuated_email():
+    text = ("we changed the bank account and the new routing details for remittance going forward " * 3000)[:200_000]
+    start = time.perf_counter()
+    flag("Banking update", text)
+    assert time.perf_counter() - start < 1.0
+
+
+def test_flag_reads_only_the_first_50000_characters():
+    assert flag("", "We have changed our bank.").flagged
+    assert not flag("", "x " * 25_000 + "We have changed our bank.").flagged
+    assert not flag("y" * 50_000, "We have changed our bank.").flagged
 
 
 def test_quoted_paragraphs_split_like_plain_ones():
@@ -127,6 +144,10 @@ def test_forwarded_request_is_flagged():
 
 # Routing numbers -----------------------------------------------------------------------------------
 
+def test_aba_valid_refuses_a_trailing_newline():
+    assert not aba_valid("026009593\n")
+
+
 def test_routing_needs_the_aba_checksum():
     assert aba_valid("026009593") and not aba_valid("026009594")
     assert find_routing("New routing 026009593, thanks") == ["026009593"]
@@ -155,8 +176,13 @@ def test_accounts_need_a_label_and_four_to_seventeen_digits():
     assert find_accounts("Account: 123456789012345678") == []
     assert find_accounts("For account questions, call 212-555-0199.") == []
     assert find_accounts("Call your account manager at 212-555-0199.") == []
-    assert find_accounts("Pay the account ending 4821.") == ["4821"]
+    assert find_accounts("Pay the account ending 4821.") == []          # a last-four reference is not an account
     assert find_accounts("Account: \uff10\uff10\uff10\uff11\uff12\uff13\uff14\uff15\uff14\uff18\uff12\uff11") == [ACCOUNT]
+
+
+def test_a_last_four_reference_is_not_an_account():
+    assert find_accounts("the account ending 8888 is closed; new account 000088889999") == ["000088889999"]
+    assert find_accounts("Acct last four: 4821") == []
 
 
 # Redaction -----------------------------------------------------------------------------------------
@@ -209,6 +235,77 @@ def test_redact_masks_at_least_what_masking_masks():
     # Every digit that mask_digit_runs hides stays hidden, except phones and routing numbers.
     text = "Inv 2291 for 18,450.00. Wire 5530 7781 02 or 44100-99231 by Friday."
     assert redact(text) == mask_digit_runs(text)
+
+
+@pytest.mark.parametrize(("text", "account"), [
+    ("Account: 7783110245.\nTo confirm, wire to 7783110245 today.", "7783110245"),
+    ("Account: 7783110245.\nTo confirm, it is 7783110245.", "7783110245"),       # no payment word on line 2
+    ("Account: 778 311 0245\nTo confirm, it is (778) 311-0245.", "7783110245"),  # grouped differently
+    ("Account: 026009593\nTo confirm, it is 026009593.", "026009593"),           # nine digits, valid ABA checksum
+])
+def test_a_found_account_is_masked_wherever_it_repeats(text, account):
+    out = rules.redact(text)
+    assert surviving_account_digits(out, account) == set()
+    assert find_routing(text) == [] and parse_phone(out) == []
+
+
+def test_redact_masks_accounts_found_in_another_field():
+    # Task 8 passes the body's accounts when it redacts the subject.
+    assert rules.redact("Re: wire to 7783110245", also_mask=["7783110245"]) == "Re: wire to ******0245"
+    assert rules.redact("Re: 778-311-0245 is ours", also_mask=["7783110245"]) == "Re: ***-***-0245 is ours"
+
+
+@pytest.mark.parametrize(("text", "account"), [
+    ("Please wire to 7783110245 at Evergreen Bank.", "7783110245"),             # P1
+    ("Account at Chase: 2299100477", "2299100477"),                             # P2
+    ("Send the ACH to 12125550199 tomorrow.", "12125550199"),                   # P5
+])
+def test_a_phone_shaped_number_on_a_payment_line_is_masked(text, account):
+    out = redact(text)
+    assert surviving_account_digits(out, account) == set() and parse_phone(out) == []
+
+
+def test_a_phone_on_a_line_with_a_phone_word_or_no_payment_word_stays():
+    assert redact("Call 212-555-0199") == "Call 212-555-0199"
+    assert redact("Our office: 212-555-0199") == "Our office: 212-555-0199"
+    assert parse_phone(redact("Questions about the wire? Call 212-555-0199.")) == ["+12125550199"]
+
+
+def test_a_phone_extension_of_five_digits_or_more_is_masked():
+    out = redact("Call 212-555-0199 ext. 000123454821")
+    assert surviving_account_digits(out) == set() and parse_phone(out) == ["+12125550199"]
+    assert redact("Call 212-555-0199 ext. 4821") == "Call 212-555-0199 ext. 4821"
+
+
+def test_a_loosely_labeled_account_is_not_a_routing_number():
+    text = "Our new acct at Evergreen: 026009593"                                      # P9
+    assert find_routing(text) == [] and "026009593" not in redact(text)
+    assert find_routing("Account 1234567, routing 026009593") == ["026009593"]
+
+
+# P3 was not spelled out in the review message; these two stand in for it: an unlabeled valid routing
+# number and a plain phone, both of which redact() keeps for the ledger and the model must not see.
+MODEL_PROBES = [
+    "Please wire to 7783110245 at Evergreen Bank.",                                  # P1
+    "Account at Chase: 2299100477",                                                  # P2
+    "Send it to 026009593 at Evergreen.",                                            # P3 stand-in
+    "Call Dana at 212-555-0199 with questions.",                                     # P3 stand-in
+    "Send the ACH to 12125550199 tomorrow.",                                         # P5
+    "Call 212-555-0199 ext. 000123454821",                                           # the extension case
+    "Our new acct at Evergreen: 026009593",                                          # P9
+    "Account: 7783110245.\nTo confirm, it is 7783110245.",                           # the repeat
+]
+
+
+@pytest.mark.parametrize("text", MODEL_PROBES)
+def test_the_model_sees_no_run_of_five_digits(text):
+    out = rules.redact_for_model(text)
+    assert [m.group(0) for m in DIGIT_RUN.finditer(out) if sum(c.isdigit() for c in m.group(0)) >= 5] == []
+
+
+def test_redact_for_model_passes_also_mask_through():
+    assert rules.redact_for_model("Re: 1234", also_mask=["0001234"]) == "Re: 1234"
+    assert rules.redact_for_model("Re: 7783110245", also_mask=["7783110245"]) == "Re: ******0245"
 
 
 # Fingerprint ---------------------------------------------------------------------------------------
