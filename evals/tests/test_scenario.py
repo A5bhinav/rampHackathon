@@ -142,6 +142,10 @@ def test_the_shipped_scenarios_declare_what_production_never_computes():
     ("  name: Jordan Lee\n", "  name: off\n", "name"),
     ("  role: AP clerk\n", "  role: true\n", "role"),
     ("vendor_name: Acme Fasteners\n", "vendor_name: no\n", "vendor_name"),
+    # Spec 0048 review fix 7: YAML reads an unquoted 0142 as 98, so digits fields must be quoted.
+    ('  last4: "4821"\n', "  last4: 0142\n", "last4"),
+    ('  new_last4: "9034"\n', "  new_last4: 9034\n", "new_last4"),
+    ("  dialed_number_is_pick: false\n", "  dialed_number_is_pick: false\n  old_last4: 0142\n", "old_last4"),
 ])
 def test_loader_refusals(tmp_path, old, new, why):
     assert old in _VALID_YAML

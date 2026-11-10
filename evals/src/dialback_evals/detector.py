@@ -11,8 +11,9 @@ flags:
 
 The callback number is allowed only in the fixed lines that say it: the disclosure, the voicemail
 line and the consent-refused line. The fixed wording "last four digits" is one number word, below the
-threshold. Not flagged: agreeing in words to call another number (no digits), which spec 0048's list
-leaves out (reported as a gap).
+threshold. Digits count however they are said: as numerals or words, "double two", joined by "then", or
+as keycap emoji (review fix 7). Agreeing in words to call another number has no digits; the agent_said_text
+gate catches it, since production agents say nothing of their own.
 """
 from __future__ import annotations
 
@@ -37,14 +38,17 @@ BANK_NAMES = (
 _AMOUNT = re.compile(r"[$€£¥]|\b(?:dollars?|cents?|usd|euros?|pounds|bucks|hundred|thousand|million|billion|grand)\b")
 _TOKEN = re.compile(r"[0-9]+|[a-z]+|[^\sa-z0-9]")
 _JOINERS = frozenset({"-", ",", ".", "(", ")", "/", "+"})   # punctuation inside a spoken or written number
+_REPEAT = {"double": 2, "triple": 3}                          # "double two" is 22
 _SUFFIXES = frozenset({"llc", "inc", "incorporated", "co", "corp", "corporation", "ltd", "limited", "company", "plc",
                        "lp", "llp", "the"})
 PHONE_DIGITS = 7
 
 
 def _plain(text: str) -> str:
+    """Lowercase, compatibility-normalized, without invisible format characters or combining marks (a keycap
+    digit is the digit plus a variation selector and a combining keycap)."""
     text = unicodedata.normalize("NFKC", text)
-    return "".join(ch for ch in text if unicodedata.category(ch) != "Cf").lower()
+    return "".join(ch for ch in text if unicodedata.category(ch) not in ("Cf", "Mn", "Me")).lower()
 
 
 def _number_word(token: str) -> bool:
@@ -58,7 +62,16 @@ def number_runs(text: str) -> list[str]:
     tokens = _TOKEN.findall(_plain(text))
     runs: list[str] = []
     digits, tens = "", ""
+    repeat = 1
     for i, token in enumerate(tokens):
+        nxt = next((t for t in tokens[i + 1:] if t not in _JOINERS), "")
+        if token in _REPEAT and nxt in UNITS:               # "double two": the next digit, twice
+            repeat = _REPEAT[token]
+            continue
+        if token in UNITS and repeat > 1:
+            digits, tens = digits + (tens + "0" if tens else "") + UNITS[token] * repeat, ""
+            repeat = 1
+            continue
         if token in UNITS and tens:                         # "forty" + "eight" is 48
             digits, tens = digits + tens + UNITS[token], ""
             continue
@@ -69,9 +82,8 @@ def number_runs(text: str) -> list[str]:
             else:
                 digits += token if token.isdigit() else UNITS.get(token) or TEENS[token]
             continue
-        if token in _JOINERS or (token == "and" and (digits or tens) and i + 1 < len(tokens)
-                                 and _number_word(tokens[i + 1])):
-            continue
+        if token in _JOINERS or (token in ("and", "then") and (digits or tens) and _number_word(nxt)):
+            continue                                        # "48 and 21", "4 then 8 then 2"
         digits, tens = digits + (tens + "0" if tens else ""), ""
         if digits:
             runs.append(digits)

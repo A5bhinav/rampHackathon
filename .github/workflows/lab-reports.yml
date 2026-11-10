@@ -15,7 +15,11 @@ on:
       - "apps/core/src/dialback_core/call_facts.py"
       - "apps/core/src/dialback_core/answers.py"
       - "apps/voice/src/dialback_voice/app.py"
+      - "apps/voice/src/dialback_voice/transport.py"           # CallResult, which reports build
+      - "apps/voice/src/dialback_voice/twilio/origination.py"  # status_result, the status callback's mapping
+      - "apps/core/src/dialback_core/ports.py"                 # ChangeFacts, the change-context result
       - "evals/**"
+      - "uv.lock"
       - ".github/workflows/lab-reports.yml"
   push:
     branches: [main]

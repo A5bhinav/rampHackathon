@@ -31,7 +31,7 @@ same outcome whenever it fires.
 | `NR20_manual_answers` | No call or generated report reaches it: it fires only on answers entered by hand (`source="manual"`), which the call path never uses. |
 | `V04_recording_consent` | Another rule gives the same outcome: whenever consent is refused, contradicted, missing or not first while other answers exist, NR02 fires first (block 0); with no answers at all, V06 and V07 fail too. |
 | `V08_digits_match` | Another rule gives the same outcome: every last-four result but a match fires a digits rule (NV02, NV03, NR05 to NR08), and a report with no answers fails NR01. |
-| `V09_same_person` | No honest call or generated report reaches it alone: two names fire NR17, and an unknown speaker arises from a name given after the change (NR14, out of order) or a name that cannot be read, which neither the scripted line nor the report generator produces. |
+| `V09_same_person` | Another rule gives the same outcome in production: two names fire NR17; a name given after the change is out of order (NR14); and a name that cannot be read ("?") is recorded but not grounded, since the policy finds no word of it in the turn, so NR14 fires first (spec 0048 review fix 7, checked by a scripted call). |
 | `V10_answers_grounded` | Another rule gives the same outcome: an ungrounded answer or answers out of order fire NR14; with no change answer V07 fails too, and with no checks V11 fails too. |
 | `V11_script_clean` | Another rule gives the same outcome: checks that are not clean fire NR15; with no checks at all V10 fails too. |
 | `V12_no_flags` | Another rule gives the same outcome: every flag fires its own needs-review rule (NR10 to NR13, NR16, NR17), and an offered number fires NR13. |

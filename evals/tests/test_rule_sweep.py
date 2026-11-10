@@ -77,3 +77,23 @@ def test_a_rule_moving_into_stand_in_only_fails_the_sweep():
     stale = {**standins, production: "listed by mistake"}
     assert any(p.startswith(f"{production}: listed as seen only through a stand-in") for p in
                sweep.problems(_seen(), listed, stale))
+
+
+def test_v09s_reason_holds_in_production():
+    # Spec 0048 review fix 7: V09's reason describes production. A name production can't read ("?") is recorded
+    # but not grounded, so NR14 fires first and V09 never decides alone.
+    from dialback_decision import decide
+    from dialback_evals.runner import facts_for, run_scenario
+    from dialback_evals.scenario import CallerBehavior, DeclaredFacts, Scenario
+    from dialback_voice.agent import ScriptedAgent
+    reason = sweep.listed(UNREACHABLE)["V09_same_person"]
+    assert "NR14" in reason and "generator" not in reason
+    s = Scenario(id="v09", scenario_class="legit_odd_contact", is_attack=False, customer_name="Northwind Traders",
+                 vendor_name="Acme Fasteners",
+                 caller=CallerBehavior(consent="yes", company="Acme Fasteners", company_is="vendor", department="AP",
+                                       name="?", role="AP clerk", change="yes", last4_mode="keypad", last4="4821"),
+                 facts=DeclaredFacts(dialed_eligible_number=True, new_last4="4821", dialed_number_is_pick=True,
+                                     speaker_in_change_thread=False, offered_number_from_request=False))
+    facts = facts_for(s, run_scenario(s, ScriptedAgent(), clock=_clock()))
+    assert facts.same_person_yes_and_digits is None and facts.checks.answers_grounded is False
+    assert decide(facts).rules_fired == ("NR14_answer_not_in_transcript",)

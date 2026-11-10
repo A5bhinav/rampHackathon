@@ -95,3 +95,16 @@ def test_lab_smoke_runs_the_rule_sweep():
     triggers, runs = _workflow("lab-smoke.yml")
     assert "packages/decision/**" in triggers["pull_request"]["paths"]
     assert any(r.strip() == "uv run lab sweep" for r in runs)
+
+
+
+def test_the_lab_jobs_trigger_on_everything_they_run():
+    # Spec 0048 review fix 7: the call-report job also runs the status callback's mapping (origination.py), the
+    # change-context port (ports.py) and the locked dependencies; lab-smoke runs ports.py too.
+    triggers, _ = _workflow("lab-reports.yml")
+    for path in ("apps/voice/src/dialback_voice/twilio/origination.py", "apps/voice/src/dialback_voice/transport.py",
+                 "apps/core/src/dialback_core/ports.py", "uv.lock"):
+        assert path in triggers["pull_request"]["paths"], path
+    triggers, _ = _workflow("lab-smoke.yml")
+    for path in ("apps/core/src/dialback_core/ports.py", "uv.lock"):
+        assert path in triggers["pull_request"]["paths"], path

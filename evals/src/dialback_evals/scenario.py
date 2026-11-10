@@ -142,6 +142,12 @@ def _parse(path: Path) -> Scenario:
     def phase(value: Any, what: str) -> str | None:
         return None if value is None else one_of(value, _PHASES, what)
 
+    def digits_text(value: Any, what: str) -> str:
+        # YAML reads an unquoted 0142 as the number 98: a digits field must be quoted (review fix 7).
+        if not isinstance(value, str):
+            raise ValueError(f"{path.name}: {what} must be quoted digits, not {value!r} (YAML read it as a number)")  # noqa: TRY004
+        return value
+
     def text(value: Any, what: str) -> str:
         # YAML reads a bare no, yes, on or off as a boolean: refuse it rather than say "False" (A6).
         if isinstance(value, bool) or value is None:
@@ -158,7 +164,7 @@ def _parse(path: Path) -> Scenario:
         role=text(need("role", c), "role"),
         change=one_of(need("change", c), _CHANGE, "change"),
         last4_mode=one_of(need("last4_mode", c), LAST4_MODES, "last4_mode"),
-        last4=str(c.get("last4", "")),
+        last4=digits_text(c.get("last4", ""), "last4"),
         answered_by=one_of(c.get("answered_by", "human"), _ANSWERED_BY, "answered_by"),
         inject=None if c.get("inject") is None else text(c["inject"], "inject"),
         inject_phase=phase(c.get("inject_phase"), "inject_phase"),
@@ -173,7 +179,8 @@ def _parse(path: Path) -> Scenario:
         raise ValueError(f"{path.name}: offer_other_number: the scripted line cannot play it, and no production "
                          "agent records an offered number")
     f = only(need("facts", raw), _FACT_KEYS, "facts")
-    new_last4, old_last4 = str(need("new_last4", f)), f.get("old_last4")
+    new_last4 = digits_text(need("new_last4", f), "new_last4")
+    old_last4 = None if f.get("old_last4") is None else digits_text(f["old_last4"], "old_last4")
     for what, digits in (("new_last4", new_last4), ("old_last4", old_last4)):
         if digits is not None and not _FOUR_DIGITS.fullmatch(str(digits)):
             raise ValueError(f"{path.name}: {what} must be four digits, not {digits!r}")

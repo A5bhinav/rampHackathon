@@ -15,6 +15,7 @@ on:
       - "apps/core/src/dialback_core/calls.py"     # the report's arrival step (spec 0048, A1)
       - "apps/core/src/dialback_core/call_facts.py"   # the facts the worker builds, which the lab chains
       - "apps/core/src/dialback_core/worker.py"    # and the worker that calls it
+      - "apps/core/src/dialback_core/ports.py"     # ChangeFacts, the change-context result the lab builds
       - "evals/**"
       - "pyproject.toml"
       - "uv.lock"
