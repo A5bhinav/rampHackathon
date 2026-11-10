@@ -28,6 +28,7 @@ from __future__ import annotations
 import dataclasses
 import datetime as dt
 import hashlib
+import itertools
 import json
 import re
 from collections.abc import Callable, Iterable
@@ -315,7 +316,7 @@ def _in_order(case: ReportCase) -> bool:
     """The questions' answers come in the script's order, each in a turn after the last, consent first: the
     first turn of each slot strictly rises along the order, and nothing is recorded at or before consent."""
     firsts = [min(a["turn_id"] for a in case.answers if a["slot"] == slot) for slot in _ORDER if case.values(slot)]
-    if any(b <= a for a, b in zip(firsts, firsts[1:], strict=False)):
+    if any(b <= a for a, b in itertools.pairwise(firsts)):
         return False
     consent = [a["turn_id"] for a in case.answers if a["slot"] == "recording_consent"]
     return not consent or all(a["turn_id"] > min(consent) for a in case.answers if a["slot"] != "recording_consent")
