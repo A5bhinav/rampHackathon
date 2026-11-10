@@ -80,8 +80,8 @@ sample is drawn with pinned draws (C1).
    - A new field, `caller.company_is: vendor | other | partial`, is the scenario author's judgment
      of what the caller said. The oracle reads it instead of calling `every_name_matches`.
    - Where the author's truth and production's check disagree, the scorecard reports a finding. That
-     is how A10 shows. It is gated only as Q101 decides.
-   - An A10 voice scenario is added only if Q101 gives a known-failures list to put it on.
+     is how A10 shows.
+   - An A10 voice scenario is added, and goes on `lab-smoke`'s known-failures list (D3).
 5. **Every reachable rule has a scenario.**
    - Add scenarios for NR05, NV03, NR07, NR10, V01, V05 and V07, which an honest scripted call can
      reach (C9).
@@ -190,7 +190,7 @@ This tests the step after the call, the way the fuzz lab tests `select()`. No ca
      as they do `selection_gate`.
    - It has its own CI job, `lab-reports`. That job triggers on `packages/decision`, on `worker.py`,
      `calls.py` and `company.py` in `apps/core`, on the voice service's `app.py`, and on `evals`.
-     Whether the job may be red on main is Q101.
+     It carries a known-failures list (D3).
 
 ## C. The fuzz generator: pinned draws and its boundaries (B5, B6, B7, B10)
 
@@ -240,14 +240,26 @@ This tests the step after the call, the way the fuzz lab tests `select()`. No ca
    3. The fuzz lab's core (the renumbered 0033): the generator, the checks, freezing, `lab fuzz`,
       the frozen worlds and the `lab-fuzz` job, with part C.
    4. The sweeps: `lab frontier` and `lab overblock`.
-   5. Spec 0046's search that keeps going, then its guided search and its measurement. If Q101 picks
-      a known-failures list, `lab-fuzz` needs the keep-going search before it can carry one, since
-      today's search stops at the first hit (B3).
+   5. Spec 0046's search that keeps going, then its guided search and its measurement. `lab-fuzz`
+      switches to `--search archive` here. It needs that search before it can carry its
+      known-failures list, since today's search stops at the first hit, which is always a known
+      one (B3).
    6. Part B, `lab reports`.
-3. **Red gates on main (Q101).**
-   - `lab-fuzz` is red today: 8 of the 9 frozen worlds still fail.
-   - `lab-reports` will be red at once, because of A10.
-   - Both jobs run on other owners' PRs.
+3. **A known-failures list per job (Q101, decided).** `lab-fuzz` is red today (8 of the 9 frozen
+   worlds still fail), and `lab-reports` and the A10 voice scenario will be red at once. All of them
+   run on other owners' PRs. So each job reads a strict list, `evals/known-failures.json`.
+   - **What an entry is:** a frozen case or scenario, the labels it fails with, its finding (A1,
+     A10, ...), and the owner.
+   - **A listed entry must still fail with those labels.** One that starts passing turns the job
+     red, with a message to take it off the list, so a fix is noticed.
+   - **Anything unlisted that fails turns the job red:** a frozen case, a scenario, or a new search
+     hit.
+   - **A new search hit is known** only when every label it shows belongs to some listed entry.
+     That costs something: a new defect that shows only an already-listed label is hidden until
+     its entry is fixed. The job reports how many such hits it saw.
+   - **Changing the list:** an entry is added only with its finding written in FINDINGS. An entry
+     is removed only when the job says it now passes.
+   - Sami decided this on Nov 9. Inesh and Abhi see it in the PRs, since the jobs run on theirs.
 4. **Spec 0046's pin.** Tag `e3d57b5` as `lab-0046-select-pin` before any rebase. The planted
    breaks name that commit as the rule under test.
 5. **Coordination.**
@@ -281,7 +293,9 @@ This tests the step after the call, the way the fuzz lab tests `select()`. No ca
 - [ ] Within the lab's own spec and question numbers, none collides with main. Collisions with other
   branches are checked by hand when each PR opens (D1).
 - [ ] The tag `lab-0046-select-pin` exists on `e3d57b5`.
-- [ ] Each PR's commands pass, except the known failures Q101 allows.
+- [ ] Each job's known-failures list holds. Every listed entry still fails with its labels, nothing
+  unlisted fails, and a listed entry that passes, or an unlisted failure, turns the job red.
+- [ ] Each PR's commands pass with those lists.
 
 ## Tests (written first)
 
@@ -298,6 +312,7 @@ This tests the step after the call, the way the fuzz lab tests `select()`. No ca
 | C2 | `evals/tests/test_breaks_selection.py` (one test per B5 change) |
 | C3, C4 | `evals/tests/test_worldgen.py::test_first_cut_generator_fails_coverage`, plus one test per item |
 | D1 | `evals/tests/test_numbering.py::test_lab_numbers_do_not_collide_with_main` |
+| D3 | `evals/tests/test_known_failures.py::test_a_passing_entry_turns_red`, `::test_an_unlisted_failure_turns_red`, `::test_a_hit_with_only_listed_labels_is_known_and_counted`, `::test_an_entry_needs_a_finding` |
 
 ## Out of scope
 
@@ -311,10 +326,7 @@ This tests the step after the call, the way the fuzz lab tests `select()`. No ca
 
 ## Open questions
 
-- **Q101 (Sami, with Inesh and Abhi).** How red jobs live on main.
-  - My recommendation: a strict list of known failures for each job. Each listed case must keep
-    failing, so a fix gets noticed and taken off the list, and any other failure turns the job red.
-  - The alternatives: a job that isn't required, or a required job that stays red.
+- **Q101, resolved (Sami, Nov 9):** a strict known-failures list for each job, as D3 describes.
 - **Q102 (Abhi).** Whether Abhi pulls `call_facts` out of `worker.py`, or Sami does it as partner,
   with Abhi's review.
 - **Q103.** `UNREACHABLE.md` is reviewed by Abhi, who owns the decision rules (my call).
