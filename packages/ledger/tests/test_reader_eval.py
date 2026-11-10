@@ -116,6 +116,33 @@ def test_a_truth_number_code_does_not_find_is_refused():
         ev.check(labeled, "dev")
 
 
+def dev_set(*docs) -> dict:
+    """A dev set of 30 documents: `docs`, then complete fillers of both kinds."""
+    fillers = [doc(f"fill-{i}", "hard" if i % 2 else "ordinary", [f"Fill {i}", "Main: (206) 555-0118"],
+                   [truth(1, "+12065550118", "main", "vendor", explicit_role=True)]) for i in range(30 - len(docs))]
+    return {"split": "dev", "documents": [*docs, *fillers]}
+
+
+def test_the_labeled_set_must_label_every_visible_number():
+    # Review G9: a number left out of the set is never scored, so an unsafe label on it never counts.
+    ev.check(dev_set(), "dev")
+    partial = doc("p-0", "ordinary", ["Bank doc", "Main: (206) 555-0118", "Bank 206-555-0186"],
+                  [truth(1, "+12065550118", "main", "vendor", explicit_role=True)])     # the bank line has no label
+    with pytest.raises(ev.LabeledSetError, match="p-0: line 2 holds a visible phone number with no label"):
+        ev.check(dev_set(partial), "dev")
+
+
+def test_the_labeled_set_must_not_repeat_a_document_or_a_number():
+    # Review G10: listing the same hard documents twice doubled the McNemar pairs (p 0.125 to 0.0156).
+    one = doc("h-0", "hard", ["Hard 0", "Call us at (206) 555-0117"], [truth(1, "+12065550117", "main", "vendor", us=True)])
+    with pytest.raises(ev.LabeledSetError, match="h-0: the document is listed twice"):
+        ev.check(dev_set(one, one), "dev")
+    twice = doc("h-1", "hard", ["Hard 1", "Call us at (206) 555-0117"],
+                [truth(1, "+12065550117", "main", "vendor", us=True), truth(1, "+12065550117", "main", "vendor", us=True)])
+    with pytest.raises(ev.LabeledSetError, match="h-1: line 1 is labeled twice"):
+        ev.check(dev_set(twice), "dev")
+
+
 def test_read_matches_what_ingest_stores():
     # The eval labels each number the way ingestion does; if they drift apart, the eval measures
     # something else.
@@ -183,11 +210,11 @@ def test_every_bar_must_hold_on_every_run():
 def heldout(non_vendor: int) -> dict:
     docs = []
     for i in range(70):
-        numbers = [truth(1, "+12065550117", "main", "vendor")]
-        if i < non_vendor:
+        texts, numbers = ["Hi", "Main: 206-555-0117"], [truth(1, "+12065550117", "main", "vendor")]
+        if i < non_vendor:     # only these hold the bank's line: the set must label every visible number
+            texts.append("Bank 206-555-0186")
             numbers.append(truth(2, "+12065550186", "unknown", "bank"))
-        docs.append(doc(f"heldout-doc-{i}", "hard" if i % 2 else "ordinary",
-                        ["Hi", "Main: 206-555-0117", "Bank 206-555-0186"], numbers))
+        docs.append(doc(f"heldout-doc-{i}", "hard" if i % 2 else "ordinary", texts, numbers))
     return {"split": "heldout", "documents": docs}
 
 

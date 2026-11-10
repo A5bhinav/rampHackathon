@@ -42,7 +42,8 @@ The labeled set, one JSON file (a provisional format: spec 0049 doesn't fix one)
                                  "party": "vendor" | "customer" | "bank" | "unknown",
                                  "explicit_role": <a role word names it>, "us": <an "us" mention>}]}]}
 
-Every labeled number must be a visible phone candidate code finds on that line. Held-out: 70
+The set must be complete and unique: every visible phone candidate code finds has exactly one label,
+every label is such a candidate, and no document id appears twice. Held-out: 70
 documents holding at least 30 numbers that aren't the vendor's, and its SHA-256 must match the one
 committed (`--expect-sha256`). Dev: 30 documents.
 """
@@ -184,11 +185,22 @@ def check(labeled: dict, split: str) -> None:
     docs = labeled.get("documents")
     if not isinstance(docs, list):
         raise LabeledSetError("the labeled set has no list of documents")
+    seen: set = set()
     for entry in docs:
         doc_id = entry["document"]["id"]
+        if doc_id in seen:
+            raise LabeledSetError(f"{doc_id}: the document is listed twice")
+        seen.add(doc_id)
         if entry.get("kind") not in ("ordinary", "hard"):
             raise LabeledSetError(f"{doc_id}: kind must be ordinary or hard")
         found = {(c.line, c.e164) for c in find_phones(lines(entry["document"])) if c.visibility == "visible"}
+        keys = [(n["line"], n["e164"]) for n in entry["numbers"]]
+        repeated = sorted({k for k in keys if keys.count(k) > 1})
+        if repeated:
+            raise LabeledSetError(f"{doc_id}: line {repeated[0][0]} is labeled twice for the same number")
+        unlabeled = sorted(found - set(keys))
+        if unlabeled:     # complete: every visible number has a label (review G9)
+            raise LabeledSetError(f"{doc_id}: line {unlabeled[0][0]} holds a visible phone number with no label")
         for n in entry["numbers"]:
             if (n["line"], n["e164"]) not in found:
                 raise LabeledSetError(f"{doc_id}: line {n['line']} holds no visible candidate {n['e164']}")
