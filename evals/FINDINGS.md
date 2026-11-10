@@ -476,6 +476,13 @@ These are not reachable today, but each is frozen as a regression.
   the first failure. Until `select()` is fixed, the search cannot report any other new defect.
 - **Spec:** 0046 on `sami/guided-search` (approved Nov 9): a search that runs its whole budget and keeps the
   first world for every label.
+- **Landed (Nov 10, lab landing PR 4):** `lab-fuzz` runs `lab fuzz --search archive`, which evaluates
+  every world in its budget and holds the known-failures list: every failing world is a search hit,
+  and one with a label no entry holds turns the job red. Ran at seed 0 with 2000 examples on the
+  landed generator: 1622 distinct worlds, I12 first at world 1 and I11 at world 64, 524 failing worlds
+  in all, every one with only listed labels; 2 near misses written; nothing new frozen. Spec 0046's
+  Result saw I1, I4 and I5 at seed 0 on its older generator; this run shows none of them (other seeds
+  and budgets not checked).
 - **Anomaly (not reconciled):** the I12 failure rate differs by source: about 18% here, 454 of 2000
   (23%) in A6, and 82 of 300 (27%) at seed 0 in spec 0046's census. These are probably different
   samples and oracle versions, but nothing checks that.

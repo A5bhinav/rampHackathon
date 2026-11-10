@@ -12,6 +12,12 @@ parsing (classification, not the decision), so a classifier bug is invisible to 
 `metamorphic(world)` re-runs the rule on mutated copies of the world (I8, I10, I11, I12, and "attacker
 evidence never helps"). `liveness(world, out)` is the L1 over-blocking floor. Every function returns
 violation labels; an empty list means the rule held.
+
+Spec 0046: `metamorphic` and `all_violations` take two optional keywords. `rule` is a rule module (an
+object with `select` and `change_context_documents`, such as a pinned or broken copy of select.py) to
+check instead of the working tree's; without it they call `run`, which tests replace. `probes` is a
+`Probes` recorder that metamorphic() fills with the base output and the output of every must-not-help
+probe it runs, for the guided search's score. Neither changes which runs are made or any label.
 """
 from __future__ import annotations
 
@@ -28,6 +34,11 @@ from dialback_ledger.select import DocumentRef, Sighting, change_context_documen
 from jsonschema import Draft202012Validator
 
 from .worldgen import World, run, sender_address
+
+# The must-not-help moves (spec 0046): the probes below that add attacker evidence, by the label each
+# one reports when the evidence makes a number eligible.
+MUST_NOT_HELP = {"incontext": "M_incontext_helped", "lookalike": "M_lookalike_helped",
+                 "shared_id": "M_shared_id_helped"}
 
 COUNTING = frozenset({"email", "contract", "vendor_portal", "listing", "paper_mail"})  # not vendor_master
 FRESH = "+10895550199"   # fictional, at least 3 digits from every generated number; a probe target
@@ -69,6 +80,28 @@ def _near(a: str, b: str, distance: int) -> bool:
 
 def _own(sd: str | None, domains: tuple[str, ...]) -> bool:
     return sd is not None and any(sd == v or sd.endswith("." + v) for v in domains)
+
+
+@dataclasses.dataclass
+class Probes:
+    """What metamorphic() saw on a world (spec 0046): the base output, and each must-not-help probe it
+    ran, in order, as (move, probe, output). Filled only when passed in; no label reads it."""
+    base: dict | None = None
+    runs: list[tuple[str, str, dict]] = dataclasses.field(default_factory=list)
+
+
+def _keep(probes: Probes | None, move: str, probe: str, out: dict) -> dict:
+    if probes is not None:
+        probes.runs.append((move, probe, out))
+    return out
+
+
+def _runner(rule):
+    """The select() a check calls: `run` (looked up when called, so tests can replace it), or the given
+    rule module's own select()."""
+    if rule is None:
+        return run
+    return lambda world: rule.select(**world.kwargs)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -219,16 +252,18 @@ def _with(world: World, *, documents=None, sightings=None) -> World:
     return dataclasses.replace(world, kwargs=kw)
 
 
-def metamorphic(world: World, base: dict | None = None) -> list[str]:
+def metamorphic(world: World, base: dict | None = None, *, rule=None, probes: Probes | None = None) -> list[str]:
     """Re-run the rule on mutated copies of the world. Attacker evidence (an in-context sighting, a
     lookalike email, a second document under an existing id) must never make a number eligible; hidden
     text and late records must change nothing at all; and a label in the change context must never
     move the call to a different number (I12, gated Nov 8)."""
-    kw, found = world.kwargs, []
-    base = run(world) if base is None else base
-    if run(world) != base:
+    kw, found, call = world.kwargs, [], _runner(rule)
+    base = call(world) if base is None else base
+    if probes is not None:
+        probes.base = base
+    if call(world) != base:
         found.append("M_determinism")
-    if run(_with(world, documents=list(reversed(kw["documents"])), sightings=list(reversed(kw["sightings"])))) != base:
+    if call(_with(world, documents=list(reversed(kw["documents"])), sightings=list(reversed(kw["sightings"])))) != base:
         found.append("M_reorder")
     eligible = _eligible(base)
     target = min((c["e164"] for c in base.get("candidates", [])), default=FRESH)
@@ -245,26 +280,27 @@ def metamorphic(world: World, base: dict | None = None) -> list[str]:
     # thread path (spec 0048, C2), so there they do not apply: their document would sit outside the
     # rule's change context, where a clean contract sighting may rightly help.
     threaded = thread is not None
-    if threaded and _eligible(run(plus("m_ctx", "contract", 1, f"ar@{domain}", thread, "visible"))) - eligible:
+    if threaded and _eligible(_keep(probes, "incontext", "m_ctx", call(plus("m_ctx", "contract", 1, f"ar@{domain}",
+                                                                              thread, "visible")))) - eligible:
         found.append("M_incontext_helped")
     rows = [r for r in kw["sightings"] if r.e164 == target]
     if threaded and rows and kw["request"] is not None:   # R2: a sighting in context older than all others blocks it
         days = (t_req - min(r.received_at for r in rows)).days + 1
-        if target in _eligible(run(plus("m_first", "contract", days, f"ar@{domain}", thread, "visible"))):
+        if target in _eligible(call(plus("m_first", "contract", days, f"ar@{domain}", thread, "visible"))):
             found.append("M_first_seen_ignored")
-    hidden = run(plus("m_hidden", "contract", 400, f"ar@{domain}", "t_m_hidden", "white"))
+    hidden = call(plus("m_hidden", "contract", 400, f"ar@{domain}", "t_m_hidden", "white"))
     if _eligible(hidden) != eligible or hidden.get("e164") != base.get("e164"):
         found.append("M_hidden_helped")
     for days in LOOKALIKE_PROBE_DAYS:
         probe = plus(f"m_look{days}", "email", days, sender_address("lookalike", domain), f"t_m_look{days}", "visible")
-        if _eligible(run(probe)) - eligible:
+        if _eligible(_keep(probes, "lookalike", f"m_look{days}", call(probe))) - eligible:
             found.append("M_lookalike_helped")
             break
     opened = kw["case_opened_at"]
     if any(d.recorded_at >= opened for d in kw["documents"]) or any(r.recorded_at >= opened for r in kw["sightings"]):
         trimmed = _with(world, documents=[d for d in kw["documents"] if d.recorded_at < opened],
                         sightings=[r for r in kw["sightings"] if r.recorded_at < opened])
-        if run(trimmed) != base:
+        if call(trimmed) != base:
             found.append("M_late_changed")
     req_id = kw["request"].document_id if kw["request"] is not None else None
     tried: set[str] = set()
@@ -272,10 +308,16 @@ def metamorphic(world: World, base: dict | None = None) -> list[str]:
         if doc.id == req_id or doc.id in tried:
             continue
         tried.add(doc.id)
-        if any(_eligible(run(_with(world, documents=[*kw["documents"], twin]))) - eligible for twin in _twins(doc)):
+        helped = False
+        for k, twin in enumerate(_twins(doc)):    # stops at the first twin that helps, as any() did
+            out = _keep(probes, "shared_id", f"twin{k}:{doc.id}", call(_with(world, documents=[*kw["documents"], twin])))
+            if _eligible(out) - eligible:
+                helped = True
+                break
+        if helped:
             found.append("M_shared_id_helped")
             break
-    if moved := _label_probe(world, base):
+    if moved := _label_probe(world, base, rule):
         found.append(moved)
     return found
 
@@ -287,13 +329,14 @@ def metamorphic(world: World, base: dict | None = None) -> list[str]:
 LABEL_KINDS = (("unknown", "bank"), ("ar", "bank"), ("fax", "vendor"), ("unknown", "unknown"), ("unknown", "customer"))
 
 
-def _context_labels_removed(world: World) -> World:
+def _context_labels_removed(world: World, rule=None) -> World:
     """The world with every sighting in the rule's own change context relabeled the vendor's and not a
     fax: the same documents, times and visibility, without what the attacker's text says about them.
     It uses select()'s change context, not this oracle's conservative one, so a shared id the rule
     reads as clean keeps its labels and a fixed rule is never flagged for the frame's own defect."""
     kw = world.kwargs
-    ctx = {d.id for d in change_context_documents(**kw)}
+    context = change_context_documents if rule is None else rule.change_context_documents
+    ctx = {d.id for d in context(**kw)}
     return _with(world, sightings=[dataclasses.replace(s, party="vendor", role="main") if s.document_id in ctx else s
                                    for s in kw["sightings"]])
 
@@ -303,7 +346,7 @@ def _calls(out: dict) -> list[str]:
     return ([out["e164"]] if out.get("e164") else []) + [a["e164"] for a in out.get("alternates", [])]
 
 
-def _label_probe(world: World, base: dict) -> str | None:
+def _label_probe(world: World, base: dict, rule=None) -> str | None:
     """I12: a label in the change context never moves a call to a different number; refusing the case,
     or calling fewer backups, is allowed. Two halves. Removal: with the labels already in the context
     made neutral, what the rule calls (the pick, then its alternates) must be the start of what it
@@ -318,7 +361,8 @@ def _label_probe(world: World, base: dict) -> str | None:
     kw, request, pick = world.kwargs, world.kwargs["request"], base.get("e164")
     if pick is None:
         return None
-    calls, without = _calls(base), _calls(run(_context_labels_removed(world)))
+    call = _runner(rule)
+    calls, without = _calls(base), _calls(call(_context_labels_removed(world, rule)))
     if calls != without[:len(calls)]:
         return "M_incontext_label_moved_pick"
     if request is None or request.received_at >= kw["case_opened_at"]:
@@ -357,7 +401,7 @@ def _label_probe(world: World, base: dict) -> str | None:
             continue                                   # a path this world's request does not open
         for role, party in LABEL_KINDS:
             row = Sighting(pick, doc_id, "email", at, "visible", role, party, at)
-            now = run(_with(world, documents=documents, sightings=[*kw["sightings"], row])).get("e164")
+            now = call(_with(world, documents=documents, sightings=[*kw["sightings"], row])).get("e164")
             if now is not None and now != pick:
                 return "M_incontext_label_moved_pick"
     return None
@@ -403,6 +447,6 @@ def liveness(world: World, out: dict) -> list[str]:
     return ["L1_clean_world_no_pick"] if l1_premise(world) and out.get("e164") is None else []
 
 
-def all_violations(world: World) -> list[str]:
-    out = run(world)
-    return violations(world, out) + metamorphic(world, out) + liveness(world, out)
+def all_violations(world: World, *, rule=None, probes: Probes | None = None) -> list[str]:
+    out = _runner(rule)(world)
+    return violations(world, out) + metamorphic(world, out, rule=rule, probes=probes) + liveness(world, out)

@@ -3,7 +3,9 @@ scorecard.json, and exit non-zero when any hard gate fails."""
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
+import pytest
 from dialback_evals.cli import main
 
 _LEGIT = """\
@@ -97,6 +99,20 @@ def test_lab_fuzz_fails_on_a_frozen_finding_and_passes_the_seed_through(tmp_path
     monkeypatch.setattr("dialback_evals.gencorpus.fuzz", lambda **k: seen.update(k) or [])
     assert main(["fuzz", "--examples", "7", "--seed", "3", "--out", str(tmp_path)]) == 1
     assert seen["examples"] == 7 and seen["seed"] == 3 and str(seen["out_dir"]) == str(tmp_path)
+
+
+def test_fuzz_default_search_is_today(tmp_path, monkeypatch):
+    # Spec 0046: with no --search, or --search first, lab fuzz makes exactly today's call and nothing else.
+    monkeypatch.chdir(tmp_path)
+    seen = []
+    monkeypatch.setattr("dialback_evals.gencorpus.rerun", lambda d: [])
+    monkeypatch.setattr("dialback_evals.gencorpus.fuzz", lambda **k: seen.append(k) or [])
+    monkeypatch.setattr("dialback_evals.guided.archive_fuzz", lambda *a, **k: pytest.fail("the archive search ran"))
+    for extra in ([], ["--search", "first"]):
+        assert main(["fuzz", "--examples", "7", "--seed", "3", "--out", "cg", *extra]) == 0
+    assert [{k: v for k, v in call.items() if k != "keep"} for call in seen] == [
+        {"examples": 7, "seed": 3, "out_dir": Path("cg")}] * 2
+    assert not (tmp_path / "evals").exists()                 # no near-miss file, nothing else written
 
 
 # Review fix F7: a run that would test nothing, or spend money, is refused.
@@ -209,3 +225,23 @@ def test_lab_fuzz_counts_a_known_hit_and_does_not_freeze_it(tmp_path, monkeypatc
     monkeypatch.setattr("dialback_evals.gencorpus.all_violations", lambda w: ["I5_too_young_eligible"])
     assert main(["fuzz", "--examples", "5", "--seed", "0", "--out", str(out), "--known-failures", listed]) == 1
     assert len(load_all(out)) == 1                                      # an unlisted hit is frozen, and red
+
+
+def test_lab_fuzz_archive_holds_the_known_failures_list(tmp_path, monkeypatch, capsys):
+    # Spec 0048, D2 step 5 and D3: the archive search runs the whole budget, so every failing world is a hit.
+    # Hits with only listed labels are counted and never frozen; an unlisted label is frozen, and red.
+    from dialback_evals.gencorpus import load_all
+    from dialback_evals.guided import Evaluation
+    entry = {"case": "elsewhere", "labels": ["M_shared_id_helped"], "finding": "A5", "owner": "Inesh"}
+    out, near = tmp_path / "corpus", tmp_path / "out" / "near-misses.json"
+    args = ["fuzz", "--search", "archive", "--examples", "5", "--seed", "0", "--out", str(out),
+            "--near-misses", str(near), "--known-failures", _list(tmp_path, "lab-fuzz", [entry])]
+    monkeypatch.setattr("dialback_evals.gencorpus.rerun", lambda d: [("elsewhere", ["M_shared_id_helped"])])
+    monkeypatch.setattr("dialback_evals.guided.evaluate", lambda w, **k: Evaluation(labels=["M_shared_id_helped"]))
+    assert main(args) == 0
+    printed = capsys.readouterr().out
+    assert load_all(out) == [] and "search hit(s) showed only listed labels" in printed and near.is_file()
+    monkeypatch.setattr("dialback_evals.guided.evaluate", lambda w, **k: Evaluation(labels=["I5_too_young_eligible"]))
+    assert main(args) == 1
+    assert len(load_all(out)) == 1                                      # the unlisted label's world is frozen
+    assert "I5_too_young_eligible" in capsys.readouterr().out
