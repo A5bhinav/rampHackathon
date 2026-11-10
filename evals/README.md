@@ -16,14 +16,18 @@ uv run lab freeze --split voice               # re-freeze scenario hashes and re
 uv run lab fuzz --search archive --examples 2000 --seed 0 --out evals/corpus-generated   # selection: frozen cases, then every world
 uv run lab frontier                           # measurement: what an attack costs (prints its grid)
 uv run lab overblock                          # measurement: what a defense costs
-cd evals && uv run pytest -q -m "not selection_gate"   # the checks that must stay green
+uv run lab reports --examples 2000 --seed 0   # call reports: frozen findings, then F1 to F3 (spec 0048)
+uv run lab sweep                              # remove each decision rule: seen, or in UNREACHABLE.md
+cd evals && uv run pytest -q -m "not selection_gate and not report_gate"   # the checks that must stay green
 ```
 
 `lab run` writes `results.jsonl` and `scorecard.json`, and exits non-zero when a hard gate
 fails, which is what CI checks (`lab-smoke` on PRs that touch the agent, the call flow, the
 decision engine or the lab). `lab fuzz` exits non-zero on a frozen case that still fails or a
 new finding (`lab-fuzz`); `--search archive` (spec 0046) runs the whole budget instead of stopping at
-the first hit, and writes near misses to `evals/out/near-misses.json`, which never gate. `voice` is the only split today; the dev and held-out sets, and
+the first hit, and writes near misses to `evals/out/near-misses.json`, which never gate.
+`lab reports` exits non-zero on a frozen report that still fails or any violation on reports
+production can send (`lab-reports`). `voice` is the only split today; the dev and held-out sets, and
 `lab-full`, come later.
 
 ## Scenarios

@@ -79,3 +79,39 @@ def test_the_lab_docs_do_not_overclaim():
     assert "lab run --split dev" not in spec + readme
     l13 = (ROOT / "evals" / "scenarios" / "voice" / "l13-machine-answers.yaml").read_text(encoding="utf-8")
     assert "text line only" in l13
+
+
+def test_lab_reports_runs_on_what_turns_answers_into_outcomes():
+    # Spec 0048, B7: its own job, on the decision engine, the worker, the report's arrival, the company
+    # check, the voice service's report and the lab; the green steps deselect report_gate everywhere.
+    triggers, runs = _workflow("lab-reports.yml")
+    paths = triggers["pull_request"]["paths"]
+    for path in ("packages/decision/**", "apps/core/src/dialback_core/worker.py", "apps/core/src/dialback_core/calls.py",
+                 "apps/core/src/dialback_core/company.py", "apps/core/src/dialback_core/call_facts.py",
+                 "apps/voice/src/dialback_voice/app.py", "evals/**"):
+        assert path in paths, path
+    assert any("lab reports" in r and "--examples 2000" in r and "--seed 0" in r for r in runs)
+    for name in ("lab-smoke.yml", "lab-fuzz.yml", "lab-reports.yml"):
+        _, runs = _workflow(name)
+        tests = [r for r in runs if "pytest" in r]
+        assert tests and all("not selection_gate" in r and "not report_gate" in r for r in tests), name
+
+
+def test_lab_smoke_runs_the_rule_sweep():
+    # Spec 0048, A5: lab-smoke (which triggers on the decision engine) runs lab sweep.
+    triggers, runs = _workflow("lab-smoke.yml")
+    assert "packages/decision/**" in triggers["pull_request"]["paths"]
+    assert any(r.strip() == "uv run lab sweep" for r in runs)
+
+
+
+def test_the_lab_jobs_trigger_on_everything_they_run():
+    # Spec 0048 review fix 7: the call-report job also runs the status callback's mapping (origination.py), the
+    # change-context port (ports.py) and the locked dependencies; lab-smoke runs ports.py too.
+    triggers, _ = _workflow("lab-reports.yml")
+    for path in ("apps/voice/src/dialback_voice/twilio/origination.py", "apps/voice/src/dialback_voice/transport.py",
+                 "apps/core/src/dialback_core/ports.py", "uv.lock"):
+        assert path in triggers["pull_request"]["paths"], path
+    triggers, _ = _workflow("lab-smoke.yml")
+    for path in ("apps/core/src/dialback_core/ports.py", "uv.lock"):
+        assert path in triggers["pull_request"]["paths"], path

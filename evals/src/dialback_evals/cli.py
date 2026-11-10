@@ -5,6 +5,10 @@ writes `results.jsonl` and `scorecard.json`, prints a one-line summary, and exit
 hard gate fails. Deterministic (the production ScriptedAgent, scripted callers), so CI is reproducible
 and needs no key. `--max-usd` is accepted for forward compatibility; the scripted slice never spends.
 
+`lab reports` (spec 0048, part B) checks generated call reports: it re-runs the frozen ones under
+`--out`, then checks `--examples` reports per domain at `--seed`, freezing the first report for each new
+label; it exits non-zero on a frozen report that still fails or any reachable-domain violation.
+
 `lab fuzz` re-runs every frozen finding under `--out`, then searches `--examples` generated worlds at
 `--seed`, freezing the first shrunk violation there; it exits non-zero on any frozen case that still
 fails or any new finding. `lab frontier` and `lab overblock` write the two measurement tables and exit
@@ -85,6 +89,17 @@ def main(argv: list[str] | None = None) -> int:
     fr.add_argument("--out", default="evals/out/frontier.json")
     ob = sub.add_parser("overblock", help="sweep single pieces of attacker noise (spec 0083)")
     ob.add_argument("--out", default="evals/out/overblock.json")
+    sw = sub.add_parser("sweep", help="remove each decision rule in turn; every one must be seen or listed (spec 0048)")
+    sw.add_argument("--split", default="voice")
+    sw.add_argument("--scenarios-root", default=str(_REPO / "evals" / "scenarios"))
+    sw.add_argument("--examples", type=int, default=2000)
+    sw.add_argument("--seed", type=int, default=0)
+    sw.add_argument("--unreachable", default=str(_REPO / "evals" / "UNREACHABLE.md"))
+    rp = sub.add_parser("reports", help="re-run frozen report findings, then check generated call reports (spec 0048)")
+    rp.add_argument("--examples", type=int, default=2000)
+    rp.add_argument("--seed", type=int, default=0)
+    rp.add_argument("--out", default=str(_REPO / "evals" / "reports-generated"))
+    rp.add_argument("--known-failures", default="auto", help=_KNOWN_HELP)
     freeze = sub.add_parser("freeze", help="record each scenario's hash and required outcome (expected.lock.json)")
     freeze.add_argument("--split", default="voice")
     freeze.add_argument("--scenarios-root", default=str(_REPO / "evals" / "scenarios"))
@@ -109,6 +124,11 @@ def main(argv: list[str] | None = None) -> int:
         return _frontier(Path(args.out))
     if args.command == "overblock":
         return _overblock(Path(args.out))
+    if args.command == "sweep":
+        return _sweep(Path(args.scenarios_root) / args.split, args.examples, args.seed, Path(args.unreachable))
+    if args.command == "reports":
+        return _reports(args.examples, args.seed, Path(args.out),
+                        _known(args.known_failures, Path(args.out), _REPO / "evals" / "reports-generated"))
     return 2
 
 
@@ -160,6 +180,55 @@ def _search(examples: int, seed: int, out_dir: Path, near_misses: Path, known_fa
           f"{len(arc.worlds)} distinct worlds)")
     held = _held("lab-fuzz", known_failures, dict(failing), [labels for labels in arc.labels if labels])
     return (1 if failing or arc.first else 0) if held is None else held
+
+
+def _sweep(scenarios_dir: Path, examples: int, seed: int, unreachable: Path) -> int:
+    """Spec 0048, A5: remove each rule; fail on a rule neither seen nor listed, or a listed rule that is seen.
+    The generated reports need Hypothesis, which this imports only when it draws them."""
+    from . import sweep
+    subjects = sweep.scenario_subjects(scenarios_dir, _clock) + sweep.report_subjects(examples, seed)
+    seen = sweep.sweep(subjects)
+    listed, standins = sweep.listed(unreachable), sweep.standin_listed(unreachable)
+    for rule_id, by in seen.items():
+        print(f"lab sweep: {rule_id}: " + (sweep.how(by) if by else "not seen; listed in UNREACHABLE.md"
+                                           if rule_id in listed else "not seen"))
+    found = sweep.problems(seen, listed, standins)
+    for problem in found:
+        print(f"lab sweep: {problem}")
+    only = sweep.standin_only(seen)
+    print(f"lab sweep: {sum(1 for by in seen.values() if by) - len(only)} of {len(seen)} rules seen through "
+          f"production, {len(only)} only through stand-ins, {len(listed)} listed as unreachable, {len(found)} "
+          f"problem(s) ({len(subjects)} subjects, seed {seed})")
+    return 1 if found else 0
+
+
+def _reports(examples: int, seed: int, out_dir: Path, known_failures: Path | None = None) -> int:
+    """Spec 0048, part B: F1 to F3 on generated call reports. Fails on a frozen report that still fails or
+    on any violation in the reachable domain; contract-only violations are printed as future-state
+    findings for their owners and never fail the run."""
+    from .reports import run_checks
+    done = run_checks(examples=examples, seed=seed, out_dir=out_dir)
+    for name, found in done.frozen_failing:
+        print(f"lab reports: frozen report {name} still fails: {', '.join(found)}")
+    for domain in ("reachable", "contract"):
+        for label, count in sorted(done.hits.get(domain, {}).items()):
+            print(f"lab reports: {domain} {label} on {count} of {examples} reports")
+    if done.future_state:
+        print(f"lab reports: contract-only future-state findings (not gated): {', '.join(done.future_state)}")
+    if done.new_frozen:
+        print(f"lab reports: new finding(s) frozen under {out_dir}: {', '.join(done.new_frozen)}")
+    from .phrasebank import CLASSES
+    for cls, truth in CLASSES.items():          # spec 0048 review fix 5: F3 per phrase class, reachable domain
+        accepted, total = done.per_class.get("reachable", {}).get(cls, [0, 0])
+        if total:
+            print(f"lab reports: F3 {cls} (truth {truth}): accepted {accepted} of {total} reachable answers")
+    share = done.vendor_rejected / done.vendor_answers if done.vendor_answers else 0.0
+    print(f"lab reports: over-blocking (reported, not gated): {done.vendor_rejected} of {done.vendor_answers} "
+          f"names-the-vendor answers rejected, both domains ({share:.1%})")
+    print(f"lab reports: {len(done.frozen_failing)} frozen report(s) failing, {len(done.gated)} reachable "
+          f"label(s) (seed {seed}, {examples} reports per domain)")
+    held = _held("lab-reports", known_failures, dict(done.frozen_failing), done.reachable_hits)
+    return (1 if done.frozen_failing or done.gated else 0) if held is None else held
 
 
 def _write(path: Path, body: dict) -> None:

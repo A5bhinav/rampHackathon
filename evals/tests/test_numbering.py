@@ -17,6 +17,7 @@ LAB = {
     "0017-attack-lab-voice-slice.md": {150, 140, 141},
     "0083-generative-selection-pressure.md": {142, 143, 62, 63, 64, 144},
     "0046-guided-search-on-selection.md": {145, 146, 147, 148, 149},
+    "0048-honest-lab-on-main.md": {101, 102, 103, 104, 105},
 }
 
 _DEFINES = re.compile(r"^\s*(?:[-*]|\d+\.)\s+(?:\*\*)?Q(\d+)\b", re.MULTILINE)
