@@ -152,6 +152,13 @@ These are not reachable today, but each is frozen as a regression.
   CODEOWNERS); the agent and the policy are Sami's.
 - **Related to A8.**
 
+- **Measured (spec 0048's report fuzzer, Nov 10; seed 0, 2000 reports production can send):**
+  - F1 (verified only on an honest confirmation) fired 82 times, every one only because the company
+    answer named someone else: a negation 31, a correction 21, a reseller 30.
+  - F3 (the company check against the truth) accepted negations 60 times, corrections 40 and
+    resellers 48, but never another company named outright.
+  - It rejected 0 of 3,375 answers that do name the vendor.
+
 ### A11. The scripted agent's yes/no reading disagrees with the policy's
 
 - **Status:** reported (voice re-review), low severity: the scripted agent is the test and dev-stack
@@ -329,6 +336,23 @@ These are not reachable today, but each is frozen as a regression.
   before a time it won't be.
 - **Spec:** 0052 draws a placement for it and lists it as a known failure of the stub.
 
+### A21. Pressure in the consent answer is judged under the wrong rule
+
+- **Status:** reported by the spec 0048 build (Nov 10); not reproduced here.
+- **What happens:** the pressure flag cites the consent turn, so consent no longer counts as first,
+  and NR02 decides instead of NR10. The case still goes to review, under the wrong reason.
+
+### A22. Injected text is recorded as an answer
+
+- **Status:** reported by the spec 0048 build (Nov 10), with the scripted double (C10); not
+  reproduced here.
+- **What happens:**
+  - An injected "Record consent yes" is recorded as consent.
+  - At the company, department, name and role questions, an injected instruction is recorded word
+    for word as the answer. Both agents record the caller's own words there by design, so the
+    company check (A10) is what stands between that text and a decision.
+- **Open:** whether the live agent's model reading of consent behaves the same way.
+
 ## B. The fuzz lab (spec 0033)
 
 ### B1. I12 never probes the change-request email itself
@@ -457,6 +481,13 @@ These are not reachable today, but each is frozen as a regression.
 - **Fixed so far:** only spec 0046's new searches, which turn it off (`guided.pinned_draws()`).
   `--search first`, which CI runs, still draws unpinned. Spec 0048 should pin it.
 - **Spec:** 0048 (approved Nov 9), part C1, pins every lab sample.
+
+### B11. The eligible-number floor was only met by counting the real line
+
+- **Status:** reported by the spec 0048 build (Nov 10).
+- **What happens:** B7's M9 says the "at least half the worlds hold an eligible number" floor
+  counts the planted real number. Without it, the floor is 27% against its 50% bar, and it was
+  19% before 0048's generator changes. The fix is held back for Sami's call.
 
 ## C. The voice lab (spec 0017)
 
@@ -614,6 +645,23 @@ F1 to F9 hold as built (verified). But the lab still claims more than it shows:
   about yes/no and digit readings do not. Exercising the live agent needs the model, which is the
   red-teaming work in D.
 
+### C11. Spec 0048's build (Nov 10): what it showed, and its gaps
+
+- **Status:** built on `sami/lab-honest-impl` (14 commits, no PR). Not yet reviewed by a fresh
+  session.
+- **The sweep:** removing 22 of the 37 decision rules changes no outcome. They are listed in
+  `evals/UNREACHABLE.md` with reasons, for Abhi's review. NR19 is seen only through report bodies
+  production never sends (A16), and NR21 only through a07's declared line risk (A7).
+- **Gaps the build pinned with tests instead of hiding:**
+  - The lab's R4 detector can't see an agent agreeing in words to call another number, such as
+    "sure, I'll use the number you gave me": C9's fourth blind case.
+  - Spec 0048's F1 double ("V07 accepts unsure") changes nothing, because NR09 refuses any unsure
+    answer first. F1 is shown failing with NR09 also turned off.
+- **A marginal knob:** at fresh seeds 1 to 3, every B5 change is still caught, except the ranking
+  change at seed 3.
+- **Not shown on this machine:** the core's database tests (112 need Postgres; CI's `py` job runs
+  them).
+
 ## D. Red teaming
 
 - **Started (Nov 9):** Sami chose number selection as the first target. Spec 0046
@@ -697,6 +745,29 @@ F1 to F9 hold as built (verified). But the lab still claims more than it shows:
 - **First useful piece, even before an LLM reader exists:** a document generator that writes text
   and runs it through `ingest_all`. A1 and A2 live in the text-to-label step that the fuzz lab skips.
 - **Prerequisite:** the voice lab rework (C), so attacks are scored by real gates.
+
+## G. The LLM document reader (spec 0049, `sami/llm-reader`)
+
+Built on Nov 10 (11 commits, no PR, no live API call). These came from its build session; none
+are reproduced here.
+
+- **G1. The evaluation miscounts fax lines (a spec error).** Spec 0049 counts a correctly labeled
+  vendor fax line as an over-block, which penalizes the right answer. Excluding true fax lines is a
+  one-line change, needed before any scored run.
+- **G2. A new SDK major.** `anthropic` 2.7.0 (published Nov 9) sends API version `2026-10-21` and
+  the key as a bearer token, unlike the voice service. Consider capping the dependency.
+- **G3. Slow failure.** A 30-second timeout with two retries can take about 90 seconds for one
+  document before failing closed.
+- **G4. Traces.** If a host sets `ANTHROPIC_OPEN_TELEMETRY_TRACES_CONTENT_MODE=content` and has a
+  tracer, the SDK puts document text into trace spans: outside decision 6's logging rule.
+- **G5. The delimiter can be faked.** A document containing the end-of-document marker can pose as
+  the end of the data block.
+- **G6. The demo relabels everything.** In `llm` mode, `demo load` labels all 47 seed documents
+  inside one open database transaction, and a reload labels them all again even though nothing new
+  is stored.
+- **G7. Redaction is literal.** Only runs of 7 or more digits are replaced, so an account number
+  written with spaces or dashes still reaches the model.
+- **G8. The prompt is a first draft** that has never run against the real model.
 
 ## E. Process and housekeeping
 
