@@ -1,7 +1,7 @@
 """The email door's quarantined model, `DIALBACK_EMAIL_CLASSIFIER=rule+model` (spec 0086, Task 6b; design,
 "Flagging: the rule plus a model").
 
-A model with no tools reads one email's subject and text, with every digit replaced by `#`
+A model with no tools reads one email's subject and text, with every numeral replaced by `#`
 (rules.redact_for_model), and returns schema-checked JSON {change_request, quote}. It can only add a flag:
 rules.flag_email asks it only when the rule says no, and code decides everything that follows (R9, ADR-4).
 Every failure is one ClassifierFailed, so the inbox retries the email (R7). Nothing here logs email text
@@ -124,9 +124,9 @@ class AnthropicClassifier:
         quiet_sdk_logs()
 
     def classify(self, subject: str, text: str) -> Verdict:
-        if any(c.isdigit() for c in subject) or any(c.isdigit() for c in text):
-            # Defense in depth: flag_email sends redact_for_model's copies only, which hold no digit.
-            raise ClassifierFailed("schema", detail="the input holds a digit (send redact_for_model's copy only)")
+        if any(c.isnumeric() for c in subject) or any(c.isnumeric() for c in text):
+            # Defense in depth: flag_email sends redact_for_model's copies only, which hold no numeral.
+            raise ClassifierFailed("schema", detail="the input holds a numeral (send redact_for_model's copy only)")
         quiet_sdk_logs()   # again, in case something raised them since
         failure: ClassifierFailed | None = None
         try:

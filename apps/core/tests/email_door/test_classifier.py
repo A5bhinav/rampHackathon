@@ -13,7 +13,8 @@ import httpx2
 import pytest
 from anthropic.types.beta import BetaMessage
 from conftest import core_settings
-from dialback_core.app import email_classifier
+from dialback_core import app as app_module
+from dialback_core.app import create_app, email_classifier
 from dialback_core.email_door.classifier import (
     MODEL,
     SCHEMA,
@@ -23,7 +24,14 @@ from dialback_core.email_door.classifier import (
     Verdict,
     anthropic_client,
 )
-from dialback_core.email_door.rules import FlagDecision, flag, flag_email, model_text, redact_for_model
+from dialback_core.email_door.rules import (
+    MAX_CHARS,
+    FlagDecision,
+    flag,
+    flag_email,
+    model_text,
+    redact_for_model,
+)
 from dialback_core.flags import ClassifierMode
 from dialback_core.settings import ConfigurationError, Settings
 from dialback_core.worker import Worker
@@ -130,22 +138,29 @@ def test_a_classifier_failure_propagates(reason):
     assert flag_email("October invoice", ASKS, "", model) == FlagDecision(True, "rule", None)
 
 
-def test_the_model_sees_no_digit_however_the_email_writes_them():
+def test_the_model_sees_no_numeral_however_the_email_writes_them():
     text = ("Account number: 000123454821, routing 026009593 (ABA). Questions: (212) 555-0199 or +44 20 7946 0958.\n"
             "Fullwidth \uff10\uff10\uff10\uff11\uff12\uff13\uff14\uff15\uff14\uff18\uff12\uff11, Arabic-Indic "
             "\u0660\u0661\u0662\u0663\u0664\u0665\u0666\u0667\u0668\u0669, Devanagari \u0966\u0967\u0968, "
-            "superscript \u00b9\u00b2\u00b3, circled \u2460\u2461, keycap 4\ufe0f\u20e3.")
+            "superscript \u00b9\u00b2\u00b3, circled \u2460\u2461, keycap 4\ufe0f\u20e3, "
+            "CJK \u4e00\u4e8c\u4e09\u56db\u3007\u516d, half \u00bd.")
     html = text.replace("Questions", "Phone") + " Bengali \u09ea\u09ee\u09e8\u09e7."
-    subject = "Invoice 4821, PO \uff17\uff17-1234 \u2460"
+    subject = "Invoice 4821, PO \uff17\uff17-1234 \u2460 \u4e09"
     assert not flag(subject, text).flagged and not flag(subject, html).flagged   # so the model is asked
     model = FakeClassifier(Verdict(False, ""))
     flag_email(subject, text, html, model)
     ((seen_subject, seen_text),) = model.calls
     assert any(c.isdigit() for c in subject + text + html)
-    assert not any(c.isdigit() for c in seen_subject + seen_text)
+    assert any(c.isnumeric() and not c.isdigit() for c in subject + text)   # CJK numerals are numeric, not digits
+    assert not any(c.isnumeric() for c in seen_subject + seen_text)
     assert "000123454821" not in seen_text and "############" in seen_text
     assert "Bengali" in seen_text   # the differing HTML part was sent, redacted too
-    assert (seen_subject, seen_text) == (redact_for_model(subject), redact_for_model(model_text(text, html)))
+    assert (seen_subject, seen_text) == (redact_for_model(subject), redact_for_model(text) + "\n\n" + redact_for_model(html))
+
+
+def test_the_model_copy_has_no_numeric_character():
+    out = redact_for_model("Account \u4e00\u4e8c\u4e09\u56db \u3007 \u5341\u4e07, \u00bd, \u2167, \u0f2a, 12")
+    assert out and not any(c.isnumeric() for c in out)
 
 
 def test_the_html_part_reaches_the_model_only_when_it_differs():
@@ -159,7 +174,39 @@ def test_the_html_part_reaches_the_model_only_when_it_differs():
                        (differs, text + "\n\n" + differs)):
         model = FakeClassifier(Verdict(False, ""))
         flag_email("October invoice", text, html, model)
-        assert model.calls == [("October invoice", redact_for_model(sent))]
+        assert model.calls == [("October invoice", sent)]
+
+
+class PhraseClassifier:
+    """TEST DOUBLE: says yes exactly when `phrase` is in the text it is given, as a model that reads it would."""
+
+    def __init__(self, phrase: str) -> None:
+        self.phrase, self.calls = phrase, []
+
+    def classify(self, subject: str, text: str) -> Verdict:
+        self.calls.append((subject, text))
+        return Verdict(True, self.phrase) if self.phrase in text else Verdict(False, "")
+
+
+def test_each_part_is_capped_separately_so_a_long_text_part_cannot_hide_the_html_part():
+    filler = "Thanks for your business. "
+    text = (filler * (MAX_CHARS // len(filler) + 1))[:MAX_CHARS]
+    html = "Kindly route the remaining balance to Evergreen Mutual from now on."
+    assert len(text) == MAX_CHARS
+    assert not flag("Re: invoice", text).flagged and not flag("Re: invoice", html).flagged   # so the model is asked
+    model = PhraseClassifier(html)
+    assert flag_email("Re: invoice", text, html, model) == FlagDecision(True, "model", html)
+    ((_, seen_text),) = model.calls
+    assert seen_text == text + "\n\n" + html
+    assert model_text(text, html) == text + "\n\n" + html
+
+
+def test_missing_parts_read_as_empty():
+    model = FakeClassifier(Verdict(False, ""))
+    assert flag_email("October invoice", PLAIN, None, model) == FlagDecision(False, "none", None)
+    assert flag_email(None, None, None, model) == FlagDecision(False, "none", None)
+    assert flag_email("October invoice", None, ASKS, model) == FlagDecision(True, "rule", None)
+    assert model.calls == [("October invoice", redact_for_model(PLAIN)), ("", "")]
 
 
 # The classifier's fixed constants -------------------------------------------------------------------
@@ -270,8 +317,10 @@ def test_every_failure_is_one_typed_error_without_email_text(what, outcome, reas
 
 
 @pytest.mark.parametrize("subject, text", [("Invoice 12", "No digits here"), ("Invoice", "Account 0001"),
-                                           ("Invoice", "fullwidth \uff11"), ("Invoice \u00b2", "superscript")])
-def test_input_with_a_digit_is_refused_before_any_call(subject, text):
+                                           ("Invoice", "fullwidth \uff11"), ("Invoice \u00b2", "superscript"),
+                                           ("Invoice", "CJK \u4e00\u4e8c\u4e09"), ("Invoice \u3007", "CJK zero"),
+                                           ("Invoice", "a half \u00bd")])
+def test_input_with_a_numeral_is_refused_before_any_call(subject, text):
     client = FakeAnthropic(message(reply(False, "")))
     with pytest.raises(ClassifierFailed) as err:
         AnthropicClassifier(client).classify(subject, text)
@@ -337,11 +386,15 @@ def test_the_real_sdk_sends_the_pinned_request_to_the_pinned_host(monkeypatch):
     (lambda r: (_ for _ in ()).throw(httpx2.ReadTimeout(EMAIL_TEXT, request=r)), "timeout"),
     (lambda r: (_ for _ in ()).throw(httpx2.ConnectError(EMAIL_TEXT, request=r)), "api_error"),
 ], ids=["HTTP 500", "unreadable 200", "a 200 that is not JSON", "read timeout", "connection refused"])
-def test_what_the_real_sdk_raises_maps_to_a_typed_error(respond, reason):
+def test_what_the_real_sdk_raises_maps_to_a_typed_error(respond, reason, caplog):
+    # Debug logging on everywhere, as ANTHROPIC_LOG=debug would set it: the SDK would log the request body.
+    for name in (None, "anthropic", "httpx2", "httpcore2"):
+        caplog.set_level(logging.DEBUG, logger=name)
     with pytest.raises(ClassifierFailed) as err:
-        sdk_classifier(respond, retries=0).classify("Bank update", "Please pay our new bank.")
+        sdk_classifier(respond, retries=0).classify("Bank update", EMAIL_TEXT)   # the request body holds EMAIL_TEXT
     assert err.value.reason == reason and err.value.__context__ is None
     assert EMAIL_TEXT not in str(err.value) and EMAIL_TEXT not in repr(err.value)
+    assert EMAIL_TEXT not in caplog.text and "Evergreen" not in caplog.text
 
 
 # The flag and its credentials -----------------------------------------------------------------------------
@@ -375,3 +428,74 @@ def test_the_worker_gets_the_model_only_with_rule_and_model():
         email_classifier(core_settings(email_classifier=ClassifierMode.RULE_AND_MODEL))
     assert Worker(None, core_settings(), None, None, None, classifier=model).classifier is model
     assert Worker(None, core_settings(), None, None, None).classifier is None
+
+
+class Opened:
+    """TEST DOUBLE for what the lifespan opens itself: the HTTP client (aclose) and the pool (close)."""
+
+    def __init__(self, *args, **kwargs) -> None:
+        self.closed = False
+
+    async def aclose(self) -> None:
+        self.closed = True
+
+    async def close(self) -> None:
+        self.closed = True
+
+
+class SdkClient:
+    """TEST DOUBLE for the classifier's anthropic.Anthropic: records close()."""
+
+    def __init__(self) -> None:
+        self.closed = False
+
+    def close(self) -> None:
+        self.closed = True
+
+
+def record_opened(monkeypatch) -> list[Opened]:
+    """Every HTTP client and pool the lifespan opens, as test doubles."""
+    opened: list[Opened] = []
+
+    def make(*args, **kwargs) -> Opened:
+        opened.append(Opened())
+        return opened[-1]
+
+    async def open_pool(url: str) -> Opened:
+        return make()
+
+    monkeypatch.setattr(app_module, "httpx", SimpleNamespace(AsyncClient=make))
+    monkeypatch.setattr(app_module, "open_pool", open_pool)
+    return opened
+
+
+@pytest.mark.anyio
+async def test_the_lifespan_closes_what_it_opened_when_the_classifier_cannot_be_built(monkeypatch):
+    opened = record_opened(monkeypatch)
+    settings = core_settings(run_worker=True, email_classifier=ClassifierMode.RULE_AND_MODEL)   # and no key
+    app = create_app(settings, connector=object())
+    with pytest.raises(ConfigurationError, match="ANTHROPIC_API_KEY"):
+        async with app.router.lifespan_context(app):
+            pass
+    assert len(opened) == 2 and all(o.closed for o in opened)   # the HTTP client and the pool
+
+
+@pytest.mark.anyio
+async def test_the_lifespan_closes_the_classifier_even_when_the_worker_failed(monkeypatch):
+    opened = record_opened(monkeypatch)
+    sdk = SdkClient()
+    monkeypatch.setattr(app_module, "email_classifier", lambda settings: AnthropicClassifier(sdk))
+
+    class FailingWorker:
+        def __init__(self, *args, **kwargs) -> None:
+            pass
+
+        async def run_forever(self, stop) -> None:
+            raise RuntimeError("the worker failed")
+
+    monkeypatch.setattr(app_module, "Worker", FailingWorker)
+    app = create_app(core_settings(run_worker=True), connector=object())
+    with pytest.raises(RuntimeError, match="the worker failed"):
+        async with app.router.lifespan_context(app):
+            pass
+    assert sdk.closed and len(opened) == 2 and all(o.closed for o in opened)

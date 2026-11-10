@@ -50,33 +50,36 @@ def create_app(settings: Settings, pool: AsyncConnectionPool | None = None, conn
     @contextlib.asynccontextmanager
     async def lifespan(app: FastAPI):
         http = httpx.AsyncClient(timeout=10.0)
-        if pool is None:
-            app.state.pool = await open_pool(settings.database_url)
-        if connector is None:
-            app.state.connector = RampConnector(settings, http)
-        stop, task, classifier = asyncio.Event(), None, None
-        if settings.run_worker:
-            classifier = email_classifier(settings)
-            worker = Worker(app.state.pool, settings, app.state.connector,
-                            resolver or LedgerResolver(settings.resolver_mode),
-                            caller or (VoiceServiceClient(settings.voice_base_url, settings.internal_api_token, http)
-                                       if settings.voice_base_url else NoVoiceService()),
-                            change_context=change_context,
-                            resend=ResendClient(settings.resend_api_key, http)
-                            if settings.email_mode is EmailMode.RESEND and settings.resend_api_key else None,
-                            classifier=classifier)
-            task = asyncio.create_task(worker.run_forever(stop))
-        try:
+        stop, task, classifier, opened_pool = asyncio.Event(), None, None, False
+        try:   # whatever fails on the way up or down, everything opened here is closed
+            if pool is None:
+                app.state.pool = await open_pool(settings.database_url)
+                opened_pool = True
+            if connector is None:
+                app.state.connector = RampConnector(settings, http)
+            if settings.run_worker:
+                classifier = email_classifier(settings)
+                worker = Worker(app.state.pool, settings, app.state.connector,
+                                resolver or LedgerResolver(settings.resolver_mode),
+                                caller or (VoiceServiceClient(settings.voice_base_url, settings.internal_api_token, http)
+                                           if settings.voice_base_url else NoVoiceService()),
+                                change_context=change_context,
+                                resend=ResendClient(settings.resend_api_key, http)
+                                if settings.email_mode is EmailMode.RESEND and settings.resend_api_key else None,
+                                classifier=classifier)
+                task = asyncio.create_task(worker.run_forever(stop))
             yield
         finally:
             stop.set()
-            if task:
-                await task
-            if isinstance(classifier, AnthropicClassifier):
-                classifier.client.close()
-            await http.aclose()
-            if pool is None:
-                await app.state.pool.close()
+            try:
+                if task:
+                    await task
+            finally:
+                if isinstance(classifier, AnthropicClassifier):
+                    classifier.client.close()
+                await http.aclose()
+                if opened_pool:
+                    await app.state.pool.close()
 
     app = FastAPI(title="Dialback core", lifespan=lifespan)
     app.state.settings = settings

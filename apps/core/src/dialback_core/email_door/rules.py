@@ -155,26 +155,31 @@ def flag_email(subject: str, text: str, html_text: str, classifier: ChangeClassi
     """Whether the email asks to change where a vendor's payments go: the rule OR a quarantined model
     (Sami's decision 11). The rule reads the subject with the text part, and with the HTML part's text;
     when it flags, the model is not asked. Otherwise a configured classifier gets redact_for_model's
-    copies only (no digits) of the subject and of model_text(text, html_text). The model can add a flag,
-    never remove the rule's. A ClassifierFailed propagates, so the inbox retries the email (R7)."""
+    copies only (no numerals) of the subject, and model_text(text, html_text). The model can add a flag,
+    never remove the rule's. A ClassifierFailed propagates, so the inbox retries the email (R7). A missing
+    part (None) reads as empty."""
+    subject, text, html_text = subject or "", text or "", html_text or ""
     if flag(subject, text).flagged or (html_text != text and flag(subject, html_text).flagged):
         return FlagDecision(True, "rule", None)
     if classifier is None:
         return FlagDecision(False, "none", None)
-    verdict = classifier.classify(redact_for_model(subject or ""), redact_for_model(model_text(text, html_text)))
+    verdict = classifier.classify(redact_for_model(subject), model_text(text, html_text))
     if verdict.change_request:
         return FlagDecision(True, "model", verdict.quote)
     return FlagDecision(False, "none", None)
 
 
 def model_text(text: str, html_text: str) -> str:
-    """The email's text for the model, before redaction: the text part, then a blank line and the HTML
-    part's text when that is non-empty and differs from the text part once whitespace is collapsed (a
-    request can sit in the part one mail reader shows and another hides)."""
-    text, html_text = text or "", html_text or ""
+    """The email's text as the model sees it: redact_for_model(text), then a blank line and
+    redact_for_model(html_text) when the HTML part is non-empty and differs from the text part once
+    whitespace is collapsed (a request can sit in the part one mail reader shows and another hides). Each
+    part is cut to MAX_CHARS on its own, so a long text part cannot push the HTML part out. The parts are
+    compared on their first MAX_CHARS characters, so the time stays bounded; parts that differ only past
+    that compare equal, and the model would see the same first MAX_CHARS characters of either."""
+    text, html_text = (text or "")[:MAX_CHARS], (html_text or "")[:MAX_CHARS]
     if html_text.strip() and " ".join(html_text.split()) != " ".join(text.split()):
-        return text + "\n\n" + html_text
-    return text
+        return redact_for_model(text) + "\n\n" + redact_for_model(html_text)
+    return redact_for_model(text)
 
 
 def _sentences(text: str) -> list[list[str]]:
@@ -431,10 +436,11 @@ def _canonical(e164: str) -> str:
 
 def redact_for_model(text: str) -> str:
     """The model's copy of the first MAX_CHARS of `text`: NFKC-normalized (so fullwidth digits, keycaps'
-    digits and superscripts become plain digits), then every digit replaced by `#`. The model needs no
-    digits, and masking them format by format is an arms race."""
+    digits and superscripts become plain digits), then every numeric character (str.isnumeric: every digit,
+    and also CJK numerals such as U+4E00, U+4E8C and U+4E09, and vulgar fractions) replaced by `#`. The
+    model needs no numbers, and masking them format by format is an arms race."""
     normalized = unicodedata.normalize("NFKC", text[:MAX_CHARS])[:MAX_CHARS]   # NFKC can grow text up to 18 times
-    return "".join("#" if c.isdigit() else c for c in normalized)
+    return "".join("#" if c.isnumeric() else c for c in normalized)
 
 
 def requested_fingerprint(key: bytes, routing: str, account: str) -> str:
