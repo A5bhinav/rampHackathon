@@ -56,16 +56,17 @@ def corpus_world(truth_path: Path) -> tuple[dict, dict]:
                    "documents": docs, "sightings": sightings}
 
 
-def _frozen_module():
-    """tests/fixtures/select_v1_frozen.py: today's select() as main had it when spec 0079 began."""
-    spec = importlib.util.spec_from_file_location("select_v1_frozen", Path(__file__).parent / "fixtures" / "select_v1_frozen.py")
+def _frozen_module(name: str):
+    """A frozen copy in tests/fixtures/, as main had it when spec 0079 began."""
+    spec = importlib.util.spec_from_file_location(name, Path(__file__).parent / "fixtures" / f"{name}.py")
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module  # dataclasses look their module up while the class is built
     spec.loader.exec_module(module)
     return module
 
 
-FROZEN = _frozen_module()
+_frozen_module("lookalike_v1_frozen")       # the classifier select_v1_frozen imports by this name
+FROZEN = _frozen_module("select_v1_frozen")
 
 
 def frozen(w: dict) -> dict:

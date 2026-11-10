@@ -1,8 +1,8 @@
-# FROZEN: select() as it was on origin/main at 907b007 (Nov 10), when spec 0079 began. Never edit.
+# FROZEN: select() as it was on origin/main at 907b0077 (Nov 10), when spec 0079 began. Never edit.
 # Spec 0079's prefix property compares the new rule with this copy, not with _select_v1, so a later
 # change to _select_v1 can't hide behind its own baseline. One line differs from the original: the
-# lookalike classifier is imported absolutely, so this file runs outside the package. The
-# classifier itself is not frozen.
+# lookalike classifier comes from the frozen copy beside this file (lookalike_v1_frozen.py), so a
+# change to the live classifier can't move the baseline either. test_frozen_baseline.py pins both.
 # ruff: noqa: I001  (the original import order, kept as it was)
 """ledger-select-v1: which number a case will call, or none (spec 0021, design §4).
 
@@ -27,7 +27,7 @@ from dataclasses import asdict, dataclass
 
 import rfc8785
 
-from dialback_ledger.lookalike import is_lookalike, sender_domain
+from lookalike_v1_frozen import is_lookalike, sender_domain
 
 RULE_VERSION = "ledger-select-v1"
 NAMESPACE = uuid.UUID("0f4e2b8a-6c1d-4e3f-9a5b-7d2c1e0f3a64")
