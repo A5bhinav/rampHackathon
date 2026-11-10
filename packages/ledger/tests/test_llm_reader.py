@@ -227,6 +227,18 @@ def test_never_falls_back_to_the_stub(monkeypatch):
     assert seen == []
 
 
+# The demo (its database tests are in test_demo.py) -------------------------------------------------
+
+@pytest.mark.parametrize("argv", [["demo", "load"], ["demo", "request", "--vendor", "acme"]])
+def test_missing_key_refuses_to_start(monkeypatch, capsys, argv):
+    monkeypatch.setenv("DIALBACK_READER", "llm")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://nobody@127.0.0.1:9/never")   # refused before it's reached
+    assert demo.main(argv) == 2
+    assert "ANTHROPIC_API_KEY" in capsys.readouterr().err
+    with pytest.raises(ReaderUnavailable):
+        reader_for(ReaderMode.LLM, env={"ANTHROPIC_API_KEY": "   "})                # a blank key is no key
+
+
 # What reaches the model ---------------------------------------------------------------------------
 
 def test_long_digit_runs_never_reach_the_model():

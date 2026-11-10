@@ -34,7 +34,7 @@ from psycopg.rows import dict_row
 from .custody import document_sha256
 from .flags import reader_mode
 from .ingest import IngestResult, ingest_all
-from .reader import Reader, reader_for
+from .reader import Reader, ReaderFailed, ReaderUnavailable, reader_for
 from .store import add_vendor_domain, mark_change_request, stored_id, write_ingest
 
 
@@ -85,8 +85,14 @@ def labeled(documents: list[dict], reader: Reader, swap: tuple[str, str] | None 
     """Ingest documents with `reader`, storing its version as `extractor_version`. The reader sees
     the documents as the seed wrote them, so a team phone never reaches a model (spec 0049, decision
     5). With `swap` = (fictional AR line, team phone), the team phone then goes into the rows: the
-    numbers, the quotes and the documents' hashes, exactly as if it had been in the text."""
-    result = ingest_all(documents, extractor_version=reader.version, reader=reader)
+    numbers, the quotes and the documents' hashes, exactly as if it had been in the text.
+
+    A document the reader can't label stops everything (spec 0049, decision 4): the DemoError rolls
+    back the caller's transaction, so nothing is written."""
+    try:
+        result = ingest_all(documents, extractor_version=reader.version, reader=reader)
+    except ReaderFailed as exc:
+        raise DemoError(f"{exc}; nothing was written") from None
     if swap is None:
         return result
     old, new = swap
@@ -99,6 +105,16 @@ def labeled(documents: list[dict], reader: Reader, swap: tuple[str, str] | None 
         if o["quote"] is not None:
             o["quote"] = _swap_text(o["quote"], swap)
     return result
+
+
+def _reader(reader: Reader | None) -> Reader:
+    """The given reader, else the one DIALBACK_READER names; `llm` without its key refuses to start."""
+    if reader is not None:
+        return reader
+    try:
+        return reader_for(reader_mode())
+    except ReaderUnavailable as exc:
+        raise DemoError(str(exc)) from None
 
 
 def _phones(given: dict[str, str], seed: dict) -> dict[str, str]:
@@ -167,7 +183,7 @@ async def load(database_url: str | None = None, *, phones: dict[str, str], datas
                with_requests: bool = False, now: dt.datetime | None = None, reader: Reader | None = None) -> dict:
     """Write each seeded vendor's history and domain (and, with `with_requests`, its request).
     `reader` defaults to the one DIALBACK_READER names."""
-    reader = reader or reader_for(reader_mode())
+    reader = _reader(reader)
     seed = load_seed()
     swaps = _phones(phones, seed)
     now = now or dt.datetime.now(dt.UTC)
@@ -194,7 +210,7 @@ async def request(database_url: str | None = None, *, vendor: str, dataset_id: U
                   now: dt.datetime | None = None, reader: Reader | None = None) -> bool:
     """Ingest one vendor's change-request email and mark it (beat 2). False if it was already in.
     `reader` defaults to the one DIALBACK_READER names."""
-    reader = reader or reader_for(reader_mode())
+    reader = _reader(reader)
     seed = load_seed()
     if vendor not in seed["vendors"]:
         raise DemoError(f"the demo seed has no vendor {vendor!r} (it has {', '.join(seed['vendors'])})")
