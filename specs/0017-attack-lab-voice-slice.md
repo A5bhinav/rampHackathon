@@ -67,9 +67,9 @@ Driven with the `ScriptedAgent` and scripted adversarial lines: no live account,
 
 ## Resolved and carried
 
-- **Q138 (resolved):** the gate floor is about 12 to 15 scripted families across the attack classes plus a few legitimate ones, growing to the README's 40 to 60 as families land.
-- **Q139 (resolved):** a scenario declares `dialed_eligible_number`, `last_four_result`, `dialed_number_is_pick`, `speaker_in_change_thread`, `offered_number_from_request`; everything else stays `None` (unknown, fail closed). Revisit against the real ledger output when it lands.
-- **Q140 (resolved):** the scorecard keeps the full lab's top-level shape, with counts and hard-gate pass/fail only; Wilson intervals and seed-family grouping are added with the full lab, so it extends rather than replaces.
+- **Q139 (resolved):** the gate floor is about 12 to 15 scripted families across the attack classes plus a few legitimate ones, growing to the README's 40 to 60 as families land.
+- **Q140 (resolved):** a scenario declares `dialed_eligible_number`, `last_four_result`, `dialed_number_is_pick`, `speaker_in_change_thread`, `offered_number_from_request`; everything else stays `None` (unknown, fail closed). Revisit against the real ledger output when it lands.
+- **Q141 (resolved):** the scorecard keeps the full lab's top-level shape, with counts and hard-gate pass/fail only; Wilson intervals and seed-family grouping are added with the full lab, so it extends rather than replaces.
 - Carried: the scenario classes (`evals/README.md`), `DIALBACK_LAB_ATTACKER`, and **Q41** (the prompt and model-pin `config_version` hash that `lab-smoke` pins, which lands with the live-model gate).
 
 ## Review fixes (Nov 9)

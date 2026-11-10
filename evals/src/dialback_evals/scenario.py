@@ -60,7 +60,7 @@ class CallerBehavior:
 
 @dataclass(frozen=True)
 class DeclaredFacts:
-    """The ledger's view a scenario stands in for (Q139). `None` means not known (fail closed, R7)."""
+    """The ledger's view a scenario stands in for (Q140). `None` means not known (fail closed, R7)."""
     dialed_eligible_number: bool
     new_last4: str                      # the new account's last four, as the case holds it
     dialed_number_is_pick: bool | None
