@@ -209,7 +209,7 @@ def test_lab_reports_fails_on_a_reachable_violation_and_freezes_it(tmp_path, mon
     from dialback_evals import reports
     out = tmp_path / "reports-generated"
     real = reports.run_checks
-    monkeypatch.setattr(reports, "run_checks", lambda **kw: real(**kw, decide=reports.doubles.v07_accepts_unsure))
+    monkeypatch.setattr(reports, "run_checks", lambda **kw: real(**kw, decide=reports.doubles.v07_accepts_unsure_nr09_off))
     assert main(["reports", "--examples", "60", "--seed", "0", "--out", str(out)]) == 1
     assert reports.load_all(out) and "reachable F1_verified_without_full_confirmation" in capsys.readouterr().out
 

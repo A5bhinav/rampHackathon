@@ -492,14 +492,9 @@ _RULES_READING = {**rules.SLOT_RULES, "answered_by": ("NR01_no_live_person", "V0
 
 class doubles:  # a namespace of broken stand-ins, each the double its check must fail on
     @staticmethod
-    def v07_only_accepts_unsure(facts: CaseFacts) -> Decision:
-        """Spec 0048's F1 double as written: V07 accepts "unsure", the rest of the table as it is."""
-        with _table(replace={"V07_right_person_confirmed": _accepting_unsure}):
-            return dialback_decision.decide(facts)
-
-    @staticmethod
-    def v07_accepts_unsure(facts: CaseFacts) -> Decision:
-        """V07 accepts "unsure", and NR09 (an unsure answer) is off, which the double as written needs."""
+    def v07_accepts_unsure_nr09_off(facts: CaseFacts) -> Decision:
+        """F1's double (spec 0048, B5): a decide() whose V07 accepts "unsure" and whose NR09 is turned off.
+        NR09 refuses any unsure answer first, so the V07 change alone would change nothing."""
         with _table(skip=("NR09_change_unsure",), replace={"V07_right_person_confirmed": _accepting_unsure}):
             return dialback_decision.decide(facts)
 
