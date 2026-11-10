@@ -11,6 +11,10 @@ when either:
 
 Nothing is fuzzy: "acne" is not "Acme" (D8). Anything else is not a match, and the case goes to a
 person; an answer with no readable words is unknown.
+
+An answer that says the person is not with the vendor, or only works with it, is not a match even
+when it names the vendor (D7a): "Not Acme, this is Globex", "We're a reseller for Acme", "I used to
+work at Acme". Bare "no" and "sorry" never count, and a word in the vendor's own name doesn't count.
 """
 from __future__ import annotations
 
@@ -28,6 +32,23 @@ def words(name: str) -> frozenset[str]:
     return frozenset(w for w in cleaned.split() if w not in SUFFIXES)
 
 
+# D7a: words that say the person is not with the vendor, or only works with it ("isn't" reads as "isn").
+REFUSAL_WORDS = frozenset({"not", "isn", "aren", "wasn", "weren", "never", "former", "formerly", "until",
+                           "reseller", "resellers", "resell", "resells", "distribute", "distributes",
+                           "distributor", "behalf"})
+REFUSAL_PHRASES = (("used", "to"), ("i", "mean"))
+
+
+def _refuses(named: str, names: tuple[str, ...]) -> bool:
+    """`named` holds a refusal word or phrase (D7a) that isn't part of one of the vendor's own names."""
+    said = re.findall(r"[a-z0-9]+", clean(named))
+    own = {w for n in names for w in re.findall(r"[a-z0-9]+", clean(n))}
+    if any(w in REFUSAL_WORDS and w not in own for w in said):
+        return True
+    return any(said[i:i + len(p)] == list(p) and not set(p) <= own
+               for p in REFUSAL_PHRASES for i in range(len(said) - len(p) + 1))
+
+
 def _says_a_variant(named: str, names: tuple[str, ...]) -> bool:
     """One of the vendor's name variants is in `named` as a run of whole words, read as the guard reads text."""
     said = re.findall(r"[a-z0-9]+", clean(named))
@@ -43,6 +64,8 @@ def company_matches(named: str | None, legal_name: str, trade_names: Iterable[st
         return None
     names = (legal_name, *trade_names)
     said = words(named)
+    if said and _refuses(named, names):
+        return False
     if said and any(core and core <= said for core in (words(n) for n in names)):
         return True
     if _says_a_variant(named, names):
