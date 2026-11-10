@@ -85,10 +85,15 @@ Rules served:
   - New flag `DIALBACK_ONBOARDING_FALLBACK`, `off` or `on`, safe default `off`, read in
     `packages/ledger/src/dialback_ledger/flags.py`. It goes in the AGENTS.md flag table.
   - With `off`, `select()` and the risk list drop every `onboarding` document and its sightings
-    before doing anything else. Output is byte-for-byte today's, including `rule_version =
-    ledger-select-v1`, `rule_settings` and `inputs_sha256`.
+    before doing anything else. Output is byte-for-byte what `select()` gives without this spec,
+    including `rule_version`, `rule_settings` and `inputs_sha256`. Since spec 0079, that is
+    `ledger-select-v3` with its guard on (the default) and `ledger-select-v1` with
+    `DIALBACK_CONTEXT_GUARD=off`; it is no longer always `ledger-select-v1`.
   - With `on`, `rule_version` is `ledger-select-v2` per call, and `rule_settings` gains
     `onboarding_fallback: true`.
+  - When this spec lands, each of the four combinations of `DIALBACK_CONTEXT_GUARD` and
+    `DIALBACK_ONBOARDING_FALLBACK` needs its own `rule_version` name (spec 0079, Q130). The name
+    `ledger-select-v2` above was claimed before spec 0079 took `ledger-select-v3`.
 - **D5. Everything downstream is unchanged.**
   - The pick is an ordinary ledger selection and contact point, so the voice service's dial path,
     the call script, V01 and every decision rule work as today.
