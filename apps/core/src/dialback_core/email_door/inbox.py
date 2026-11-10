@@ -13,7 +13,7 @@ a message can hold an email's values (ADR-8). The email's body is held in memory
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 from psycopg_pool import AsyncConnectionPool
@@ -24,6 +24,9 @@ from ..settings import Settings
 from .door import handle_email
 from .masking import mask_digit_runs, strip_nul
 from .resend import ResendError, ResendPort
+
+if TYPE_CHECKING:
+    from .classifier import ChangeClassifier
 
 # Seconds to wait after failed try 1, 2, 3, 4. The fifth failure records outcome `failed`.
 RETRY_SECONDS = (30, 120, 600, 1800)
@@ -79,10 +82,11 @@ async def _waiting(pool: AsyncConnectionPool, dataset_id: UUID, email_id: str) -
 
 
 async def process_inbound_emails(pool: AsyncConnectionPool, settings: Settings, resend: ResendPort, keys: Keys, limit: int = 20,
-                                 dataset_id: UUID | None = None) -> int:
+                                 dataset_id: UUID | None = None, classifier: ChangeClassifier | None = None) -> int:
     """Fetch and record the stored Resend deliveries (all datasets, or one). Returns how many were finished.
 
     Any error on one email counts a try for that email only; it never stops the others or the rest of the tick.
+    `classifier` is the email door's model (DIALBACK_EMAIL_CLASSIFIER=rule+model), else None.
     """
     handled, claimed, seen = 0, 0, set()
     while claimed < limit:  # every claimed row counts, so a tick's work is bounded whatever the fetches do
@@ -125,7 +129,7 @@ async def process_inbound_emails(pool: AsyncConnectionPool, settings: Settings, 
                 elif state is not None:
                     try:
                         email = await resend.get_received(email_id)
-                        await handle_email(pool, settings, keys, resend, row["dataset_id"], row["id"], email)
+                        await handle_email(pool, settings, keys, resend, row["dataset_id"], row["id"], email, classifier)
                     except Exception as exc:  # noqa: BLE001  one email's failure must not stop the worker
                         # Only our own ResendError text is kept; any other error is kept as its type name, because
                         # its message can hold the email's values (ADR-8).

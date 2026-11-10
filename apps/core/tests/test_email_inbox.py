@@ -297,7 +297,8 @@ async def test_a_nul_byte_in_a_subject_or_sender_is_stripped(demo):
     demo.worker.resend = FakeResend({email_id: received(email_id, subject="a\x00b 0001 2345 4821", message_id="<m\x00@v>")})
     await demo.worker.tick(demo.dataset.id)
     (row,) = await rows(demo)
-    assert (row["outcome"], row["subject"], row["sender"], row["message_id"]) == ("not_flagged", "ab **** **** 4821", "Dana <ar@vendor.example>", "<m@v>")
+    # "Please update our account." is a change request (spec 0087) and this dataset has no vendors: no_vendor.
+    assert (row["outcome"], row["subject"], row["sender"], row["message_id"]) == ("no_vendor", "ab **** **** 4821", "Dana <ar@vendor.example>", "<m@v>")
     assert (await delivery(demo))["processed_at"] is not None
 
 
@@ -309,14 +310,15 @@ async def test_an_unexpected_error_on_one_email_does_not_stall_the_rest(demo, mo
     demo.worker.resend = FakeResend({bad: received(bad), good: received(good)})
     real = inbox.handle_email
 
-    async def flaky(pool, settings, keys, resend, dataset_id, delivery_id, email):
+    async def flaky(pool, settings, keys, resend, dataset_id, delivery_id, email, classifier=None):
         if email.email_id == bad:
             raise RuntimeError(f"boom {ACCOUNT}")
-        return await real(pool, settings, keys, resend, dataset_id, delivery_id, email)
+        return await real(pool, settings, keys, resend, dataset_id, delivery_id, email, classifier)
     monkeypatch.setattr(inbox, "handle_email", flaky)
     await demo.worker.tick(demo.dataset.id)  # does not raise
     by_id = {r["resend_email_id"]: r for r in await rows(demo)}
-    assert by_id[good]["outcome"] == "not_flagged" and by_id[bad]["outcome"] == "pending" and by_id[bad]["tries"] == 1
+    # The good email asks to update an account and this dataset has no vendors: no_vendor (spec 0087).
+    assert by_id[good]["outcome"] == "no_vendor" and by_id[bad]["outcome"] == "pending" and by_id[bad]["tries"] == 1
     for _ in range(4):
         await demo.worker.tick(demo.dataset.id)
     by_id = {r["resend_email_id"]: r for r in await rows(demo)}

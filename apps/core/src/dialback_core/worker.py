@@ -145,7 +145,8 @@ class Worker:
     async def tick(self, dataset_id: UUID | None = None) -> int:
         done = await process_inbound_webhooks(self.pool, self.connector, self.keys, dataset_id=dataset_id)
         if self.resend is not None:  # the email door (spec 0085)
-            done += await process_inbound_emails(self.pool, self.settings, self.resend, self.keys, dataset_id=dataset_id)
+            done += await process_inbound_emails(self.pool, self.settings, self.resend, self.keys, dataset_id=dataset_id,
+                                                 classifier=self.classifier)
         if self.settings.run_jobs:
             done += await self.jobs.run_due(dataset_id)  # the poller and reconciliation (spec 0003)
         done += await self.fire_timers(dataset_id)
