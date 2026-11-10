@@ -186,6 +186,11 @@ These are not reachable today, but each is frozen as a regression.
     accepted, a different company sharing the vendor's first word ("Acme Fastening Co") 3 of 36,
     and short partial names ("Acme") 36 of 36, which 0082 accepts on purpose;
   - typos still 0 of 12 (no fuzzy matching).
+- **Decided (Sami, Nov 10): demote the company check, but keep a flag for a clear mismatch.** Naming
+  the vendor stops being required to verify, so a short or garbled name ("Acme", "acne") no longer
+  blocks. An answer with a refusal word (D7a above) still goes to review. Being built in another chat.
+  When it lands, the lab must change with it: F1's company condition, F3's bar, the known-failures
+  entries for A8 and A10 (including a09), the oracle's company expectation and the sweep.
 
 ### A11. The scripted agent's yes/no reading disagrees with the policy's
 
