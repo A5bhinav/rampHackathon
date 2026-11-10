@@ -232,7 +232,7 @@ def test_redact_masks_an_unlabeled_number_on_a_phone_line():
     line = "Call 212-555-0199, then wire it to 987654321098 today"
     out = redact(line)
     assert parse_phone(out) == ["+12125550199"]
-    assert "987654321098" not in out and "********1098" in out
+    assert out == "Call 212-555-0199, then wire it to ************ today"      # a phone line keeps only its phone
     assert surviving_account_digits(out, "987654321098") == set()
     # Run together with the phone by a single space, the number is still masked and the phone still parses.
     out = redact("Call 212-555-0199 987654321098")
@@ -245,7 +245,7 @@ def test_redact_keeps_a_valid_routing_number_and_masks_an_invalid_one():
 
 
 def test_a_labeled_account_is_masked_even_when_it_looks_like_a_phone_or_a_routing_number():
-    assert redact("Account: 212-555-0199") == "Account: ***-***-0199"
+    assert redact("Account: 212-555-0199") == "Account: ***-***-****"       # a phone line keeps only its kept phones
     assert redact("Account: 026009593") == "Account: *****9593"
 
 
@@ -269,8 +269,8 @@ def test_a_found_account_is_masked_wherever_it_repeats(text, account):
 
 def test_redact_masks_accounts_found_in_another_field():
     # Task 8 passes the body's accounts when it redacts the subject.
-    assert rules.redact("Re: wire to 7783110245", also_mask=["7783110245"]) == "Re: wire to ******0245"
-    assert rules.redact("Re: 778-311-0245 is ours", also_mask=["7783110245"]) == "Re: ***-***-0245 is ours"
+    assert rules.redact("Re: wire to 7783110245", also_mask=["7783110245"]) == "Re: wire to **********"
+    assert rules.redact("Re: 778-311-0245 is ours", also_mask=["7783110245"]) == "Re: ***-***-**** is ours"
 
 
 @pytest.mark.parametrize(("text", "account"), [
@@ -292,7 +292,7 @@ def test_a_phone_on_a_line_with_a_phone_word_or_no_payment_word_stays():
 def test_a_phone_extension_of_five_digits_or_more_is_masked():
     out = redact("Call 212-555-0199 ext. 000123454821")
     assert surviving_account_digits(out) == set() and parse_phone(out) == ["+12125550199"]
-    assert redact("Call 212-555-0199 ext. 4821") == "Call 212-555-0199 ext. 4821"
+    assert redact("Call 212-555-0199 ext. 4821") == "Call 212-555-0199 ext. ****"     # a phone line keeps only its phone
 
 
 @pytest.mark.parametrize(("text", "phone"), [
@@ -338,6 +338,29 @@ def test_signature_lines_keep_their_phones(text, phone):
     assert redact(text) == text and parse_phone(text) == [phone]
 
 
+def test_a_comma_after_a_phone_is_not_an_extension():
+    assert find_routing("Contact: 212-555-0199, 026009593") == ["026009593"]
+
+
+def test_the_phone_scan_is_fast_on_one_long_line_of_phones():
+    line = ",".join(["212-555-0199"] * 3846)
+    for function in (redact, find_routing):
+        start = time.perf_counter()
+        function(line)
+        assert time.perf_counter() - start < 0.3, function.__name__
+
+
+@pytest.mark.parametrize("text", [
+    "Call 212-555-0199. Account: 7783|1102|45",
+    "Account: 0001  --  2345  --  4821, call 212-555-0199",
+    "Call 212-555-0199 or 778\u00b7311\u00b70245",
+])
+def test_a_phone_line_keeps_no_digit_but_its_phone(text):
+    out = redact(text)
+    assert parse_phone(out) == ["+12125550199"] and "212-555-0199" in out
+    assert not any(c.isdigit() for c in out.replace("212-555-0199", "", 1))
+
+
 def test_a_loosely_labeled_account_is_not_a_routing_number():
     text = "Our new acct at Evergreen: 026009593"                                      # P9
     assert find_routing(text) == [] and "026009593" not in redact(text)
@@ -364,7 +387,7 @@ def test_the_model_sees_no_run_of_five_digits(text):
     assert [m.group(0) for m in DIGIT_RUN.finditer(out) if sum(c.isdigit() for c in m.group(0)) >= 5] == []
 
 
-@pytest.mark.parametrize("text", [
+MODEL_NO_DIGIT_PROBES = [
     "Account: 000123454821",
     "0001  --  2345  --  4821",                                                     # gaps longer than masking.py groups
     "7783|1102|45",
@@ -374,7 +397,14 @@ def test_the_model_sees_no_run_of_five_digits(text):
     "\uff17\uff17\uff18\uff13\uff11\uff11\uff10\uff12\uff14\uff15",                          # fullwidth
     "\u0667\u0667\u0668\u0663\u0661\u0661\u0660\u0662\u0664\u0665",                          # Arabic-Indic
     "Call 212-555-0199 or wire 026009593.",
-])
+]
+
+
+def test_the_model_copy_is_cut_to_50000_characters_after_normalizing():
+    assert len(rules.redact_for_model("\ufdfa" * 50_000)) == 50_000
+
+
+@pytest.mark.parametrize("text", MODEL_NO_DIGIT_PROBES)
 def test_the_model_copy_has_no_digit_at_all(text):
     out = rules.redact_for_model(text)
     assert not any(c.isdecimal() or c.isdigit() for c in out)
