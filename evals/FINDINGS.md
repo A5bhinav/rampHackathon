@@ -353,6 +353,31 @@ These are not reachable today, but each is frozen as a regression.
     company check (A10) is what stands between that text and a decision.
 - **Open:** whether the live agent's model reading of consent behaves the same way.
 
+### A21. Trust never expires, and neither does a lookalike email's pull on the cutoff
+
+- **Status:** confirmed (read, Nov 10), `packages/ledger/src/dialback_ledger/select.py` lines 110-121
+  and 175. Not run.
+- **What happens:**
+  1. **A number never ages out.** It qualifies once it has 2 source types and a first clean sighting
+     at least 90 days before the cutoff. Nothing requires it to have been seen recently, so a
+     planted number stays ready to use for as long as the attacker likes (K01, A15).
+  2. **A lookalike email's pull has no time limit.** The cutoff is the earliest of the requested
+     change, the request, and any lookalike-domain email ever on file. One stray lookalike email
+     from years ago, even a phishing attempt that went nowhere, moves the cutoff back to its date
+     for every later case. After that, only evidence from before it counts as clean: newer numbers
+     are first seen in the change context (R2), and newer sightings add no source types.
+- **Why it matters:**
+  - Point 1 lets a planted number sleep until it's needed.
+  - Point 2 is cheap to trigger. One lookalike email can freeze a vendor's evidence at that date,
+    which over-blocks: every later case goes to a person. And if the vendor's real number appeared
+    after that email while a planted one predates it by 90 days, the call goes to the planted
+    number.
+- **Ideas to measure first** (with the frontier and over-block sweeps), all in `select()`:
+  - require a recent clean sighting, say within 12 months;
+  - only let lookalike emails within a bounded window before the request move the cutoff, and send
+    older ones to a person;
+  - refuse the case whenever the top number drops out and a backup would take over.
+
 ## B. The fuzz lab (spec 0033)
 
 ### B1. I12 never probes the change-request email itself
