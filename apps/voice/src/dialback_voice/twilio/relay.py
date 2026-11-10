@@ -58,7 +58,7 @@ def map_message(msg: dict[str, Any], at: dt.datetime) -> policy.Event | None:
     return None
 
 
-KEYPAD_TIMEOUT = 5.0  # seconds after the last kept digit before the entry goes in (spec 0043, Q78)
+KEYPAD_TIMEOUT = 10.0  # seconds after the last kept digit before the entry goes in (spec 0043, Q78, revised Nov 9)
 MAX_KEYS = 16         # digits held per entry; later ones are dropped, the entry still goes in, and step refuses it
 
 

@@ -279,8 +279,9 @@ def test_keypad_sequences(row, make_ctx, clock, monkeypatch):
 
 
 def test_keypad_timeout_submits(make_ctx, clock, monkeypatch):
-    # A live call waits 5 seconds after the last key (Q78).
-    assert relay_module.KEYPAD_TIMEOUT == 5
+    # A live call waits 10 seconds after the last key (Q78, revised from 5 by Sami on Nov 9: a caller
+    # may pause mid-entry to find the rest of the digits).
+    assert relay_module.KEYPAD_TIMEOUT == 10
     assert inspect.signature(run_relay).parameters["keypad_timeout"].default == relay_module.KEYPAD_TIMEOUT
     seen = _spy_on_keypad(monkeypatch)
     # With no digits in hand a long pause submits nothing; a pause shorter than the wait keeps one
