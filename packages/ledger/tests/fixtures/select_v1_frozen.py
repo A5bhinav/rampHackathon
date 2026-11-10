@@ -3,6 +3,7 @@
 # change to _select_v1 can't hide behind its own baseline. One line differs from the original: the
 # lookalike classifier is imported absolutely, so this file runs outside the package. The
 # classifier itself is not frozen.
+# ruff: noqa: I001  (the original import order, kept as it was)
 """ledger-select-v1: which number a case will call, or none (spec 0021, design §4).
 
 A pure function: sightings and their documents' custody in, a selection.schema.json document

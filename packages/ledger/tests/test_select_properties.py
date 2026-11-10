@@ -36,7 +36,14 @@ def eligible(out: dict) -> set[str]:
 def test_the_result_is_always_a_valid_selection(rs):
     out = run(world(rs))
     assert list(Draft202012Validator(SCHEMA).iter_errors(out)) == []
-    assert (out["outcome"] == "picked") == bool(eligible(out))
+    # Spec 0079, decision 4: a withheld selection keeps today's eligible candidates and calls none, so
+    # "picked exactly when something is eligible" became three cases.
+    if out["outcome"] == "no_provable_number":
+        assert not eligible(out)
+    else:
+        assert eligible(out), out["outcome"]
+        if out["outcome"] == "picked":
+            assert out["e164"] == next(c["e164"] for c in out["candidates"] if c.get("rank") == 1)
 
 
 @many

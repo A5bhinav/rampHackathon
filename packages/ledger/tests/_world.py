@@ -1,6 +1,8 @@
 """Builds select() inputs for the tests: hand-made worlds and the frozen corpus."""
 import datetime as dt
+import importlib.util
 import json
+import sys
 import uuid
 from pathlib import Path
 
@@ -52,3 +54,25 @@ def corpus_world(truth_path: Path) -> tuple[dict, dict]:
                    "request": ChangeRequest(req.id, req.received_at, req.thread_id, req.subject, req.sender),
                    "requested_cutoff": ramp, "case_opened_at": ramp + dt.timedelta(hours=1),
                    "documents": docs, "sightings": sightings}
+
+
+def _frozen_module():
+    """tests/fixtures/select_v1_frozen.py: today's select() as main had it when spec 0079 began."""
+    spec = importlib.util.spec_from_file_location("select_v1_frozen", Path(__file__).parent / "fixtures" / "select_v1_frozen.py")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module  # dataclasses look their module up while the class is built
+    spec.loader.exec_module(module)
+    return module
+
+
+FROZEN = _frozen_module()
+
+
+def frozen(w: dict) -> dict:
+    """The frozen copy of today's rule on a world (spec 0079's baseline)."""
+    return FROZEN.select(**w)
+
+
+def calls(out: dict) -> list[str]:
+    """What a selection would call, in order: the pick, then its alternates (spec 0079's call list)."""
+    return ([out["e164"]] if out.get("e164") else []) + [a["e164"] for a in out.get("alternates", [])]

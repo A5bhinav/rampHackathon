@@ -9,6 +9,7 @@ import pytest
 from _world import ROOT, SCHEMA, at
 from dialback_ledger import change_context, select_number
 from dialback_ledger.ingest import ingest_all
+from dialback_ledger.select import RULE_VERSION
 from dialback_ledger.store import add_vendor_domain, mark_change_request, write_ingest
 from jsonschema import Draft202012Validator
 from psycopg.rows import dict_row
@@ -84,7 +85,7 @@ def test_gate_every_scenario_through_the_database(database_url, path):
     assert list(Draft202012Validator(SCHEMA).iter_errors(doc)) == []
     assert doc["outcome"] == truth["expected"]["outcome"]
     assert doc.get("e164") == truth["expected"]["pick"]
-    assert out["rule_version"] == "ledger-select-v1"
+    assert out["rule_version"] == RULE_VERSION == "ledger-select-v3"  # the real rule ran (spec 0079 renamed it), not the stub
     assert (out.get("contact_point_id") is not None) == (truth["expected"]["pick"] is not None)
 
 
