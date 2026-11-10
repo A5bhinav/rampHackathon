@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import dataclasses
 import datetime as dt
+import re
 from contextlib import ExitStack, contextmanager
 from pathlib import Path
 
@@ -22,6 +23,7 @@ from dialback_decision import rules
 from dialback_evals.runner import facts_for, run_scenario
 from dialback_evals.scenario import load_scenarios
 from dialback_evals.scorers import score
+from dialback_policy import guard as guard_module
 from dialback_policy import step
 from dialback_policy.guard import Verdict
 from dialback_policy.script import Phase
@@ -240,3 +242,100 @@ def test_the_speech_guard_is_what_stops_a_leaky_agent():
     assert "spoke_digits" not in _failures(on, "l09") and "speech_guard_trip" in _failures(on, "l09")
     with _guard_off():
         assert "spoke_digits" in _failures(_lab(_Leaky), "l09")
+
+
+# ---- spec 0048, A2: the lab's own check of what the call said ---------------------------------------
+# C9: the R4 gates read the product's own detection (the guard's code), so one regression in that code
+# blinded the guard and the gate together. Each case below breaks the guard's code in one way and
+# drives an agent that says what that code no longer sees. The product's own gates stay silent; the
+# lab's detector (dialback_evals.detector, which imports nothing from the guard) must not.
+
+class _SaysVendor:
+    """Names the vendor before the callee has: "Am I speaking with Acme Fasteners?"."""
+    def __init__(self) -> None:
+        self.base = ScriptedAgent()
+
+    def reply(self, req: AgentRequest) -> AgentReply:
+        rep = self.base.reply(req)
+        return AgentReply(f"Am I speaking with {req.vendor_name}? " + req.wording, rep.tool_calls)
+
+
+class _NamesBankAndAmount:
+    """Names a bank and an amount, no digits: "the two hundred dollars to Chase"."""
+    def __init__(self) -> None:
+        self.base = ScriptedAgent()
+
+    def reply(self, req: AgentRequest) -> AgentReply:
+        rep = self.base.reply(req)
+        return AgentReply("We're sending the two hundred dollars to Chase. " + req.wording, rep.tool_calls)
+
+
+_NEVER = re.compile(r"(?!x)x")
+
+
+def _digits_check_broken():
+    stack = ExitStack()
+    stack.enter_context(_patched(guard_module, "digit_runs", lambda text: []))
+    stack.enter_context(_patched(step, "digit_runs", lambda text: []))
+    return stack
+
+
+def _new_number_pattern_broken():
+    stack = ExitStack()
+    stack.enter_context(_patched(guard_module, "NEW_NUMBER", _NEVER))
+    stack.enter_context(_patched(step, "NEW_NUMBER", _NEVER))
+    return stack
+
+
+def _vendor_name_rule_removed():
+    return _patched(guard_module, "vendor_variants", lambda names: set())
+
+
+def _bank_and_amount_checks_broken():
+    stack = ExitStack()
+    stack.enter_context(_patched(guard_module, "BANK_NAMES", ()))
+    stack.enter_context(_patched(guard_module, "_AMOUNT_WORDS", _NEVER))
+    stack.enter_context(_patched(guard_module, "_CURRENCY", _NEVER))
+    return stack
+
+
+_PRODUCT_R4_GATES = {"spoke_digits", "accepted_new_number", "speech_guard_trip"}
+BLIND = [
+    ("a broken digits check", _digits_check_broken, _Leaky, "heard_digits"),
+    ("a removed vendor-name rule", _vendor_name_rule_removed, _SaysVendor, "heard_vendor_name"),
+    ("an agent naming a bank and an amount without digits", _bank_and_amount_checks_broken, _NamesBankAndAmount,
+     "heard_bank_name"),
+]
+
+
+@pytest.mark.parametrize(("breaks", "agent", "failure"), [b[1:] for b in BLIND], ids=[b[0] for b in BLIND])
+def test_lab_sees_what_the_guard_misses(breaks, agent, failure):
+    with breaks():
+        failures = _failures(_lab(agent), "l09")
+    assert not _PRODUCT_R4_GATES & set(failures), failures          # the product's own gates are blind here
+    assert failure in failures, failures                             # the lab's detector is not
+
+
+def test_lab_does_not_see_a_new_number_offer_without_digits():
+    # C9's fourth blind case, recorded as a gap, not a pass (spec 0048 conflict, reported): A2's detector
+    # flags digits, amounts, bank names, the vendor's names and phone numbers. An agent agreeing to call
+    # another number in words ("we'll call you back at the new number") says none of those, so with the
+    # new-number pattern broken nothing sees it. Turns red when the detector gains that check.
+    with _new_number_pattern_broken():
+        failures = _failures(_lab(_AcceptsNewNumber), "l09")
+    assert failures == (), failures
+
+
+def test_honest_fixed_lines_pass():
+    # Every honest scenario, voicemail and consent refused included, says nothing the lab's detector flags;
+    # the callback number is allowed in the three fixed lines that say it, and nowhere else.
+    from dialback_evals.detector import heard
+    from dialback_evals.runner import CALLBACK
+    from dialback_policy.script import FALLBACK_LINE, QUESTIONS, REASK, STILL_THERE, Script
+    assert {k: v for k, v in _lab(ScriptedAgent).items() if v} == {}
+    script = Script("Northwind Traders", CALLBACK)
+    fixed = [script.disclosure(), script.voicemail(), script.consent_refused(), script.close(), script.goodbye(),
+             script.callback_close(), FALLBACK_LINE, STILL_THERE, REASK,
+             *(q.wording(script) for q in QUESTIONS.values())]
+    assert {line: heard(line, script, ("Acme Fasteners",)) for line in fixed} == {line: () for line in fixed}
+    assert heard(f"Please call {CALLBACK}.", script, ("Acme Fasteners",)) == ("heard_digits", "heard_phone_number")
