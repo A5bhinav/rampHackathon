@@ -182,7 +182,7 @@ async def seed(pool, settings: Settings) -> tuple[uuid.UUID, dict, dict]:
         await conn.execute("update app.datasets set demo_refs = %s where id = %s",
                            (Jsonb({"users": {"clerk": refs["clerk"]}, "vendors": vendors}), dataset.id))
     async with httpx.AsyncClient(timeout=10.0) as http:
-        await import_all(pool, RampConnector(settings, http).for_dataset(dataset.id),
+        await import_all(pool, RampConnector(settings, http, pool=pool).for_dataset(dataset.id),
                          Keys(settings.fingerprint_key, settings.fingerprint_key_version), dataset.id)
     return dataset.id, refs, users
 

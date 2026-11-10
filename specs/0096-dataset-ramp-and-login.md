@@ -33,9 +33,11 @@ None. The dashboard API is unchanged; its settings row for Ramp stays "not repor
   so these credentials can never reach production Ramp. `RAMP_SANDBOX_SCOPES` defaults to the five
   the core uses (`vendors:read vendors:write bills:read bills:write audit_logs:read`). A read-only
   app sets the three read scopes, and the hold then fails closed.
-- **D3. Routing.** `RampConnector.for_dataset(id)` still returns one `RampPort`, so no caller changes.
-  On first use it reads the dataset's `ramp` (it never changes, so once) and talks to the mock with
-  the dataset's mock token, or to the sandbox with the login. A dataset whose Ramp this server can't
+- **D3. Routing.** `RampConnector.for_dataset(id)` still returns one `RampPort`, so no caller changes,
+  and it is the dataset's one port: the same object every call, so a method swapped on it (the
+  tests' faults and spies) is what the worker calls. On first use it reads the dataset's `ramp` (it
+  never changes, so once) and talks to the mock with the dataset's mock token, or to the sandbox
+  with the login. A dataset whose Ramp this server can't
   reach, or an unknown dataset, is a `RampError` that isn't retried. The demo's bank change from the
   dashboard (spec 0077) also requires the dataset to be on the mock.
 - **D4. The login.** Client credentials: `POST {base}/developer/v1/token`, HTTP Basic auth with the
@@ -53,21 +55,22 @@ None. The dashboard API is unchanged; its settings row for Ramp stays "not repor
 
 ## Acceptance
 
-- [ ] Every existing dataset reads `mock`. The database refuses a change to `ramp`, a demo dataset
+- [x] Every existing dataset reads `mock`. The database refuses a change to `ramp`, a demo dataset
       on the sandbox, and a second current sandbox dataset; a retired one doesn't count.
-- [ ] `create_dataset(..., ramp=...)` stores the setting.
-- [ ] Settings: the sandbox values are read; one credential without the other, an address other
+- [x] `create_dataset(..., ramp=...)` stores the setting.
+- [x] Settings: the sandbox values are read; one credential without the other, an address other
       than `https://demo-api.ramp.com`, and `DIALBACK_RAMP=sandbox` without credentials each stop
       the server.
-- [ ] A mock dataset reaches the mock with its own token; a sandbox dataset reaches the sandbox with
+- [x] A mock dataset reaches the mock with its own token; a sandbox dataset reaches the sandbox with
       the login's token. A sandbox dataset on a server without credentials, and an unknown dataset,
-      raise a `RampError` that isn't retried. The dataset's setting is read once.
-- [ ] The login sends Basic auth and the form fields, keeps the token, renews it near expiry, renews
+      raise a `RampError` that isn't retried. The dataset's setting is read once, and each dataset
+      has one port.
+- [x] The login sends Basic auth and the form fields, keeps the token, renews it near expiry, renews
       once under concurrent calls, drops it on a 401 from Ramp, and classifies failures as in D4.
       No secret or token appears in an error message.
-- [ ] The dashboard's demo bank change refuses a sandbox dataset.
-- [ ] `new-dataset` refuses a demo dataset on the sandbox, and the sandbox without credentials.
-- [ ] Everything else is unchanged: the core and SQL suites pass.
+- [x] The dashboard's demo bank change refuses a sandbox dataset.
+- [x] `new-dataset` refuses a demo dataset on the sandbox, and the sandbox without credentials.
+- [x] Everything else is unchanged: the core and SQL suites pass.
 
 ## Tests (written first)
 

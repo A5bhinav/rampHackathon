@@ -12,7 +12,7 @@ import asyncio
 import datetime as dt
 import time
 from collections.abc import Awaitable, Callable
-from typing import Any
+from typing import Any, Protocol
 from urllib.parse import urlsplit
 
 import httpx
@@ -76,13 +76,24 @@ def audit_from(j: dict[str, Any]) -> RampAuditEvent:
                           occurred_at=_ts(j.get("occurred_at")), payload=j.get("payload") or {})
 
 
+class TokenSource(Protocol):
+    """A login that hands out a bearer token and forgets it when Ramp refuses it (spec 0096)."""
+
+    async def token(self) -> str: ...
+    def drop(self) -> None: ...
+
+
 class RampHttpAdapter:
-    def __init__(self, base_url: str, token: str, http: httpx.AsyncClient, limiter: TokenBucket,
+    def __init__(self, base_url: str, token: str | TokenSource, http: httpx.AsyncClient, limiter: TokenBucket,
                  max_retries: int = 3, sleep: Sleep = asyncio.sleep) -> None:
         self.base_url = base_url.rstrip("/")
         self._host = urlsplit(self.base_url).netloc
-        self._headers = {"Authorization": f"Bearer {token}", "Accept": "application/json"}
+        self._token = token  # the mock's fixed per-dataset token, or Ramp's login
         self._http, self._limiter, self._max_retries, self._sleep = http, limiter, max_retries, sleep
+
+    async def _headers(self) -> dict[str, str]:
+        bearer = self._token if isinstance(self._token, str) else await self._token.token()
+        return {"Authorization": f"Bearer {bearer}", "Accept": "application/json"}
 
     async def _request(self, method: str, url: str, **kwargs: Any) -> dict[str, Any]:
         if url.startswith("/"):
@@ -92,8 +103,9 @@ class RampHttpAdapter:
         for attempt in range(self._max_retries + 1):
             await self._limiter.acquire()
             last = attempt == self._max_retries
+            headers = await self._headers()
             try:
-                response = await self._http.request(method, url, headers=self._headers, **kwargs)
+                response = await self._http.request(method, url, headers=headers, **kwargs)
             except httpx.TransportError as exc:
                 if last:
                     raise RampError(f"{method} {url}: {type(exc).__name__}", retryable=True) from exc
@@ -106,6 +118,9 @@ class RampHttpAdapter:
             if code >= 500 and not last:
                 await self._sleep(min(8.0, 0.5 * 2 ** attempt))
                 continue
+            if code == 401 and not isinstance(self._token, str):  # Ramp refused the token: log in again next try
+                self._token.drop()
+                raise RampError(f"{method} {url}: HTTP 401", status=401, retryable=True)
             if code == 404:
                 raise RampNotFound(f"{method} {url}: not found")
             if code >= 400:

@@ -41,7 +41,7 @@ def create_app(settings: Settings, pool: AsyncConnectionPool | None = None, conn
         if pool is None:
             app.state.pool = await open_pool(settings.database_url)
         if connector is None:
-            app.state.connector = RampConnector(settings, http)
+            app.state.connector = RampConnector(settings, http, pool=app.state.pool)
         own_mock = None
         if demo_mock is None:  # the admin's demo commands talk to the Ramp mock, as `dialback-core demo` does
             own_mock = app.state.demo_mock = httpx.AsyncClient(base_url=settings.ramp_base_url, timeout=15.0)
