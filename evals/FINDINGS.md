@@ -1,5 +1,8 @@
 # Attack lab: open findings
 
+> **Retired (Nov 10).** The lab is on main, and `evals/FINDINGS.md` on main is the copy to update,
+> through PRs. This branch's copy was merged into it in PR #122 and is no longer kept up to date.
+
 Every potential issue the attack lab, its reviews and its fix trials have turned up, in one place, so
 none is lost. Last updated Nov 9. Each entry says how sure we are:
 
