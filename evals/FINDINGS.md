@@ -418,6 +418,19 @@ These are not reachable today, but each is frozen as a regression.
 - **Spec:** 0046 steers its search by the metamorphic checks for this reason, and keeps the direct
   checks as the regression net.
 
+### B10. A pinned seed does not pin the worlds
+
+- **Status:** reported by the spec 0046 implementation session (Nov 9); not reproduced here.
+- **What happens:** Hypothesis 6.170.14 also draws integer literals of 100 or more that it finds in
+  every loaded first-party module, about 5% of the time. So `--seed 0` gives different worlds in a
+  script, under pytest, from the CLI, or in a bench worker, depending on what is imported.
+- **Effect:**
+  - The `lab-fuzz` job's "2000 worlds at seed 0" is not one fixed sample.
+  - Spec 0046's census (I12 in 82 and I11 in 34 of 300 worlds) was such a draw. Pinned, it is 69
+    and 26.
+- **Fixed so far:** only spec 0046's new searches, which turn it off (`guided.pinned_draws()`).
+  `--search first`, which CI runs, still draws unpinned. Spec 0048 should pin it.
+
 ## C. The voice lab (spec 0017)
 
 From the fresh review on Nov 9. C1 to C3 were blocking. **All of C1 to C8 were fixed on Nov 9** on
@@ -578,6 +591,15 @@ F1 to F9 hold as built (verified). But the lab still claims more than it shows:
   (`sami/guided-search`, approved Nov 9) is a guided search on `select()` with no model: it scores each
   world by how much a must-not-help attacker move helped, steers toward higher scores, and fixes
   the measurement that decides whether the steering stays. The model-driven targets below remain.
+- **Spec 0046, dev seed 0 (exploratory: one seed, not the result; Nov 9):**
+  - Every arm found all 6 `helps` breaks by world 106, before targeting starts at world 200, so the
+    primary metric was 0 on that seed by construction. If other seeds look the same, the pass bar
+    can't be met and the measurement reports no evidence for steering.
+  - `gain_new` was never above 0, so `guided-new` steers by a constant.
+  - No arm found D01 or D03. D03 needs an upper-case "FAX" role, which the generator never draws;
+    D01's number stays refused for other reasons.
+  - `lab fuzz --search guided --seed 0` found I1, I4 and I5 on today's rule at world 459, from A5's
+    latent shared-id lookalike class. Not frozen.
 - **Targets:** the two model-driven parts.
   - **The live voice agent** (`apps/voice/src/dialback_voice/claude_agent.py`): a model playing the
     person who answers.
