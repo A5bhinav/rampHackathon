@@ -141,6 +141,25 @@ def test_backups_are_cut_to_the_agreed_prefix():
     assert list(Draft202012Validator(SCHEMA).iter_errors(out)) == []
 
 
+def test_the_run_without_the_context_keeps_todays_cutoff():
+    # Decision 2. FB is a fax line seen 500 days back and FA is one digit off it at 380 days; P is
+    # provable at 300 days. A lookalike's email 30 days back pulls today's cutoff to it, where FA and FB
+    # are not both 365 days old, so FA is a near miss and today's rule calls P. Rerun at that cutoff,
+    # the run without the change context agrees. Rerun at the requested cutoff instead, FA and FB would
+    # both be established, FA (older than P) would be eligible, and the case would be withheld.
+    fb, fa, p = "+14155550142", "+14155550143", "+13035550101"
+    look = {"e164": UNRELATED, "channel": "email", "days_before": 30, "visibility": "visible", "role": "ar",
+            "party": "vendor", "lookalike": True, "thread": "t_look"}
+    w = world(provable(fb, 500, role="fax") + provable(fa, 380) + provable(p, 300) + [look])
+    today, out = frozen(w), run(w)
+    assert calls(today)[:1] == [p]
+    assert out["outcome"] == "picked" and calls(out) == calls(today)
+    context = {d.id for d in change_context_documents(**w)}
+    at_requested = frozen(w | {"documents": [d for d in w["documents"] if d.id not in context],
+                               "sightings": [s for s in w["sightings"] if s.document_id not in context]})
+    assert calls(at_requested)[:1] == [fa], "the world tells the two cutoffs apart"
+
+
 def test_no_pick_today_stays_no_provable_number():
     # Decision 3: when today's rule picks nothing, the outcome stays no_provable_number with today's reason.
     w = world(provable(REAL, 30) + [in_thread(REAL, party="bank")])
