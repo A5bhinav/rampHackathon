@@ -1,7 +1,8 @@
 # Attack lab: open findings
 
 Every potential issue the attack lab, its reviews and its fix trials have turned up, in one place, so
-none is lost. Last updated Nov 9. Each entry says how sure we are:
+none is lost. Last updated Nov 10. This copy on main is the one to update; the older copy on
+`sami/attack-lab-generative` is retired. Each entry says how sure we are:
 
 - **confirmed (ran)**: reproduced by running code.
 - **confirmed (read)**: checked in the code, not run.
@@ -170,6 +171,27 @@ These are not reachable today, but each is frozen as a regression.
     the vendor's name (103 of 103) and every past connection (61 of 61), and rejected every singular
     (0 of 95) and every typo (0 of 144). Over-blocking is 18.3% (533 of 2,920 answers that do name the
     vendor), all from the singular and the typo.
+- **What it's worth (Nov 10).** Every verified report the lab counts here also has the new account's
+  last four typed on the keypad, so A10 lets a call verify only when the person on the line knows the
+  new digits: the real vendor, or a fraudster who holds the line. A fraudster knows the vendor's name
+  anyway. So A10 weakens the "clearly a different company" signal, not the protection of money.
+- **Spec 0082** (`sami/company-name-match`, draft, Nov 10) goes the other way on purpose: it accepts
+  short names ("Acme") and speech hints, and lists negated short names as an accepted cost. Its D10
+  measures over-blocking and other-company acceptance with spec 0048's fuzzer.
+- **Spec 0082 amendment D7a, refusal words** (`sami/company-refusal-words`, stacked on 0082's
+  matcher, Nov 10). On the lab's phrase bank, against main (exploratory: the word list was chosen
+  after reading the bank):
+  - negations 48 to 0, resellers 36 to 0, past connections 24 to 0, corrections 24 to 12 (the "I
+    mean" ones);
+  - unchanged costs of 0082 itself: other companies containing the vendor's name 36 of 36 still
+    accepted, a different company sharing the vendor's first word ("Acme Fastening Co") 3 of 36,
+    and short partial names ("Acme") 36 of 36, which 0082 accepts on purpose;
+  - typos still 0 of 12 (no fuzzy matching).
+- **Decided (Sami, Nov 10): demote the company check, but keep a flag for a clear mismatch.** Naming
+  the vendor stops being required to verify, so a short or garbled name ("Acme", "acne") no longer
+  blocks. An answer with a refusal word (D7a above) still goes to review. Being built in another chat.
+  When it lands, the lab must change with it: F1's company condition, F3's bar, the known-failures
+  entries for A8 and A10 (including a09), the oracle's company expectation and the sweep.
 
 ### A11. The scripted agent's yes/no reading disagrees with the policy's
 
@@ -390,7 +412,9 @@ These are not reachable today, but each is frozen as a regression.
     older ones to a person;
   - refuse the case whenever the top number drops out and a backup would take over.
 
-### A23. The guard's new-number check misses a plain agreement
+### A27. The guard's new-number check misses a plain agreement
+
+- **Numbering:** first recorded as a second A23 on Nov 10; renumbered to A27 when FINDINGS moved to main.
 
 - **Status:** reported by the spec 0048 build (Nov 10); latent.
 - **What happens:** with the product unbroken, an agent line "Sure, I'll use the number you gave me."
@@ -431,10 +455,52 @@ These are not reachable today, but each is frozen as a regression.
   - **The ledger's own property tests:** spec 0021's random worlds gave today's rule a pick in 0 of
     3000 draws. So those properties almost never test a pick. The new prefix test uses its own
     targeted generator.
+- **Fresh review of the code (Nov 10; ran the suites with Postgres in Docker, re-ran the
+  measurement):**
+  - **Nothing critical.** The prefix property holds by the code's construction, a withheld case is
+    never treated as picked, and the measurement re-ran byte for byte.
+  - **Important:**
+    - the web was not changed, so the lineage page shows a withheld case's planted number as
+      "alternate 0" to the person who must verify;
+    - `risk.py` reports `provable` with no number when withheld, and needs a contract status;
+    - the prefix test can't see drift in a fourth call;
+    - the edited validity property never draws a pick.
+  - **Minor:**
+    - nothing pins "keep today's cutoff" or the frozen copy to main;
+    - refusals report v3 with the flag off;
+    - spec 0047's flag-off wording is now stale.
+- **Fix pass (Nov 10):** all 10 review items fixed, each with a test that failed first.
+  - The contract branch is at `ad12e94`, and the guard branch at `9148c5f`.
+  - Re-checked here: the guard's non-database tests pass (45), and the review's fourth-call mutant
+    now fails 3 tests.
+  - **Still open:**
+    - The money-path SQL's alert says "No provable phone number" on withheld cases too, where a
+      number is provable; the web's alert label says the same.
+    - The pages were type-checked and unit-tested, but not looked at in a browser.
+    - Properties 1 to 6 in `test_select_properties.py` still draw worlds where today's rule never
+      picks, so their pick checks never run. That's spec 0021's, and was there before.
 - **Coordination with the lab:** when spec 0079 merges, A1's four known-failure entries start
   passing, so `lab-fuzz` turns red until they come off the list. The lab's schema check also needs
   the `withheld` outcome, and its selection invariants need to learn it. Whichever of the two
   lands second makes those changes.
+
+### A26. An attacker's label can mark the vendor's real line opted out on every case
+
+- **Status:** reported by the fresh review of spec 0079's code (Nov 10), read in
+  `packages/ledger/src/dialback_ledger/store.py` (`_store`) and
+  `apps/voice/src/dialback_voice/pg_store.py:101`. Present on main, not introduced by spec 0079.
+- **What happens:**
+  1. A label in the change context (A1's "Bank verification line: <real>") makes the rule refuse
+     the real line.
+  2. `_store` writes that contact point's status, vendor-wide, as `excluded`.
+  3. The voice service reads `excluded` as opted out and refuses the call. That applies to any
+     other case of that vendor whose pick is that line.
+- **Why it matters:** one attacker email blocks the vendor's real line on other cases too. It fails
+  safe (a person reviews), but it is cross-case denial of service. Spec 0079's decision 4 avoids
+  this only for `withheld`, and the change context's own vetoes still write `excluded`.
+- **Where to fix:** store a case's refusal reasons with the selection, not on the vendor-wide
+  contact point, or never let change-context reasons set the vendor-wide status. That's in
+  `packages/ledger` (Inesh).
 
 ## B. The fuzz lab (spec 0083)
 
