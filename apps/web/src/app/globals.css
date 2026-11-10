@@ -930,7 +930,7 @@ ol.slots li.is-filled { animation: slot-in 360ms var(--ease) both; }
 .live-decided { display: grid; gap: 8px; justify-items: start; padding: 14px; border-radius: var(--radius-sm); background: var(--surface-2); margin-bottom: 12px; }
 .live-decided p { margin: 0; font-size: 15px; line-height: 22px; color: var(--ink); }
 
-.flow-mode { position: relative; isolation: isolate; overflow: hidden; min-height: 100vh; background: #121211; color: #f6f4ee;
+.flow-mode { position: relative; isolation: isolate; overflow: hidden; min-height: max(100vh, 56.25vw); background: #121211; color: #f6f4ee;
   display: flex; flex-direction: column; padding: 32px 48px; gap: 32px; }
 .flow-mode a { color: #bfe8d6; }
 .flow-mode .brand { color: #fff; }

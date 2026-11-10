@@ -19,9 +19,9 @@ export async function Shell({ app, datasetId, children }: { app: AppKey; dataset
     throw e;
   })]);
   const current = datasets.find((d) => d.id === datasetId);
-  // The Present menu (spec 0065): demo datasets in AP workspace only, for the newest case.
+  // The Present menu (spec 0065): demo datasets in AP workspace only, for the newest open case.
   const present = app === "ap" && current?.kind === "demo"
-    ? presentLinks(current.kind, await core.allCases(datasetId).catch(() => []), datasetId) : [];
+    ? presentLinks(current.kind, await core.cases(datasetId).catch(() => []), datasetId) : [];  // open cases only: lighter than every case
   const control = app === "control" || canSeeControl(me.roles, current?.kind ?? "");
   const go = switchTargets(datasetId);
   const demo = demoAccounts(process.env) !== null;

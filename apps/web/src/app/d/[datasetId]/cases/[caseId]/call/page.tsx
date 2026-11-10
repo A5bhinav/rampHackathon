@@ -15,6 +15,7 @@ export default async function LiveCallPage({ params }: { params: Promise<{ datas
     }),
     core.selection(caseId).catch((): SelectionView | null => null),
   ]);
+  if (detail.case.dataset_id !== datasetId) notFound();  // outside the AP shell, so check the dataset here
   const base = `/d/${datasetId}/cases/${caseId}`;
   return <LiveCall initial={liveCallView(detail, selection)} stateUrl={`${base}/call/state`} caseHref={base} flowHref={`${base}/flow`} />;
 }

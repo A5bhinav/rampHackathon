@@ -121,7 +121,7 @@ export default async function CaseDetailPage({ params, searchParams }: {
           <NumberCard view={view} path={path} />
 
           {(detail.calls ?? []).map((call) => (
-            <CallCard key={call.call_id} call={call} script={detail.call_script} decision={decision} total={detail.calls?.length ?? 0} watchHref={`${path}/call`} />
+            <CallCard key={call.call_id} call={call} script={detail.call_script} decision={decision} total={detail.calls?.length ?? 0} watchHref={canWatchCall(detail.timeline) ? `${path}/call` : undefined} />
           ))}
           {detail.calls && detail.calls.length === 0 && c.state !== "open" ? (
             <section className="card" aria-labelledby="call-none-h">

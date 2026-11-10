@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { CallAttempt, CallScript, DecisionInfo } from "@/lib/api-types";
 import { SLOT_LABEL, answerText, checkRows, conversation, ruleChips } from "@/lib/call";
 import { when, words } from "@/lib/format";
@@ -22,7 +23,7 @@ export function CallCard({ call, script, decision, total, watchHref }: {
         </span>
         <span className="card-meta">
           <span className="badge tone-muted">AI agent: collects answers only</span>
-          {watchHref ? <a className="button-link" href={watchHref}>Watch the call</a> : null}
+          {watchHref ? <Link className="button-link" href={watchHref}>Watch the call</Link> : null}
         </span>
       </div>
       <div className="card-body">

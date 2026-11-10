@@ -15,7 +15,7 @@ export const POLL_STATES: ReadonlySet<CaseState> = new Set(["open", "held", "cal
 export type Phase = "choosing" | "dialing" | "on_call" | "answers" | "not_connected" | "decided" | "no_call";
 export type LiveSlot = { slot: string; label: string; wording: string; answer: string | null; turn: number | null; method: string | null; order: number | null };
 export type LiveCallView = {
-  caseId: string; vendor: string; state: CaseState; stateLabel: string; phase: Phase; status: string;
+  caseId: string; version: number; vendor: string; state: CaseState; stateLabel: string; phase: Phase; status: string;
   dialed: string | null; attempt: number | null; startedAt: string | null; endedAt: string | null;
   result: string | null; reason: string | null; waiting: string | null; lastStep: string | null;
   disclosure: string | null; note: string | null; slots: LiveSlot[]; checks: CheckRow[];
@@ -26,8 +26,15 @@ const capital = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 export function liveCallView(detail: CaseDetail, selection: SelectionView | null): LiveCallView {
   const c = detail.case;
-  const calls = [...(detail.calls ?? [])].sort((a, b) => a.attempt - b.attempt);
-  const call = calls.at(-1) ?? null;
+  // Only this version's calls: a new bank change restarts the attempts and cuts off a call in
+  // progress, so a call that started before the version began is never the current one.
+  const since = Date.parse(currentVersion(detail.timeline)[0]?.occurred_at ?? "");
+  const calls = (detail.calls ?? []).filter((x) => !Number.isFinite(since) || !x.started_at || Date.parse(x.started_at) >= since)
+    .sort((a, b) => (a.started_at ?? "").localeCompare(b.started_at ?? "") || a.attempt - b.attempt);
+  const last = calls.at(-1) ?? null;
+  // A retry being dialed: the last call ended without answers and the case is calling again.
+  const redialing = Boolean(last && last.result && last.result !== "answers_recorded" && c.state === "calling");
+  const call = redialing ? null : last;
   const pick = selection?.selection ? split(selection.selection).pick : null;
   const dialed = pick ? phone(pick.e164) : null;
   const script = detail.call_script;
@@ -66,7 +73,7 @@ export function liveCallView(detail: CaseDetail, selection: SelectionView | null
   });
 
   return {
-    caseId: c.id, vendor: c.vendor.legal_name, state: c.state, stateLabel: stateLabel(c.state), phase, status,
+    caseId: c.id, version: c.version, vendor: c.vendor.legal_name, state: c.state, stateLabel: stateLabel(c.state), phase, status,
     dialed, attempt: call?.attempt ?? null, startedAt: call?.started_at ?? null, endedAt: call?.ended_at ?? null,
     result: call?.result ?? null, reason: call?.reason ?? null,
     waiting: phase === "on_call" ? "Answers arrive when the call ends." : null,
@@ -87,13 +94,19 @@ type Deps = {
 
 /** The live call's polling read, server-side (the route handler wires the real core). Signed out is
  *  401; an unknown case 404; anything else 502. The body is only what the page draws. */
-export async function callStateResponse(deps: Deps, caseId: string, withSelection: boolean): Promise<{ status: number; body: Partial<LiveCallView> & { error?: string } }> {
+export async function callStateResponse(deps: Deps, caseId: string, withSelection: boolean, datasetId?: string): Promise<{ status: number; body: Partial<LiveCallView> & { error?: string } }> {
   if (!(await deps.token())) return { status: 401, body: { error: "signed out" } };
   try {
     const detail = await deps.getCase(caseId);
-    const selection = withSelection ? await deps.getSelection(caseId).catch(() => null) : null;
+    if (datasetId && detail.case.dataset_id !== datasetId) return { status: 404, body: { error: "not found" } };  // another dataset's case
+    const selection = withSelection ? await deps.getSelection(caseId).catch((e) => {
+      if (String((e as { digest?: unknown }).digest ?? "").startsWith("NEXT_REDIRECT")) throw e;
+      return null;
+    }) : null;
     return { status: 200, body: liveCallView(detail, selection) };
   } catch (e) {
+    // The core client redirects to sign-in when the core refuses the token; for a fetch that is 401.
+    if (String((e as { digest?: unknown }).digest ?? "").startsWith("NEXT_REDIRECT")) return { status: 401, body: { error: "signed out" } };
     const status = (e as { status?: number }).status;
     return { status: status === 404 || status === 422 ? 404 : 502, body: { error: "unavailable" } };
   }

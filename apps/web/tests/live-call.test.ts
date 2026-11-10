@@ -22,7 +22,7 @@ const SCRIPT = {
 let seq = 0;
 const tl = (type: string, to_state: string, summary = `${type} happened`) =>
   ({ seq: ++seq, type, to_state, from_state: null, version: 1, summary, hash: `h${seq}`.padEnd(64, "0"),
-    occurred_at: `2026-11-09T14:${String(seq).padStart(2, "0")}:00Z`, actor: { kind: "system", id: null, display_name: "Dialback" } });
+    occurred_at: new Date(Date.UTC(2026, 10, 9, 14, 0) + seq * 1000).toISOString(), actor: { kind: "system", id: null, display_name: "Dialback" } });
 const answer = (slot: string, value: string | null, turn: number, extra: object = {}) =>
   ({ slot, value, digit_count: null, turn_id: turn, capture_method: "speech", captured_at: "2026-11-09T14:20:00Z", feeds: [], ...extra });
 const call = (over: object = {}) => ({
@@ -167,4 +167,50 @@ test("entry points: Watch the call from number_resolved on; Present only on demo
   assert.deepEqual(presentLinks("demo", [], "d1"), []);
   assert.deepEqual(presentLinks("demo", cases, "d1").map((l) => [l.label, l.href]),
     [["Live call", "/d/d1/cases/new/call"], ["Flow mode", "/d/d1/cases/new/flow"]]);
+});
+
+// From the 0065 review.
+test("calls from an earlier version are not this version's call", () => {
+  const old = call({ call_id: "old", attempt: 2, started_at: "2026-11-09T13:00:00Z", result: "no_answer" });
+  const midCall = call({ call_id: "cut", attempt: 1, started_at: "2026-11-09T13:30:00Z", result: null });
+  const d = detail("held", { calls: [old, midCall] as never,
+    timeline: [tl("change_detected", "open"), tl("hold_confirmed", "held")] as never });  // this version began at 14:xx
+  const v = liveCallView(d, selection);
+  assert.equal(v.phase, "choosing", "an old or cut-off call never shows as the current one");
+  assert.equal(v.attempt, null);
+  assert.equal(v.poll, true);
+});
+
+test("a retry being dialed shows dialing, not the last failure", () => {
+  const missed = call({ result: "voicemail", reason: "Voicemail picked up.", ended_at: "2026-11-09T14:11:00Z" });
+  const v = liveCallView(detail("calling", { calls: [missed] as never }), selection);
+  assert.equal(v.phase, "dialing");
+  assert.equal(v.attempt, null, "the next attempt's number isn't known yet");
+});
+
+test("not connected covers every non-answer result; blocked with no call shows the core's sentence", () => {
+  for (const result of ["voicemail", "busy", "failed", "machine", "declined", "callback_requested", "timed_out"]) {
+    const v = liveCallView(detail("needs_review", { calls: [call({ result, reason: "The core's reason." })] as never }), selection);
+    assert.equal(v.phase, "not_connected", result);
+    assert.equal(v.reason, "The core's reason.");
+  }
+  const blocked = liveCallView(detail("blocked", { timeline: [tl("change_detected", "open"), tl("hold_failed", "needs_review", "Ramp did not confirm the hold."),
+    tl("review_blocked", "blocked", "A reviewer blocked the case.")] as never }), null);
+  assert.equal(blocked.phase, "no_call");
+  assert.equal(blocked.lastStep, "A reviewer blocked the case.");
+});
+
+test("the route: an expired session (core's redirect) is 401, not 502; 422 is 404", async () => {
+  const redirect = Object.assign(new Error("NEXT_REDIRECT"), { digest: "NEXT_REDIRECT;replace;/sign-in?expired=1;307;" });
+  const deps = (err: unknown) => ({ token: async () => "tok", getCase: async () => { throw err; }, getSelection: async () => selection });
+  assert.equal((await callStateResponse(deps(redirect), "c1", false)).status, 401);
+  assert.equal((await callStateResponse(deps(Object.assign(new Error("x"), { status: 422 })), "c1", false)).status, 404);
+  assert.equal((await callStateResponse(deps(new Error("down")), "c1", false)).status, 502);
+  const fine = { token: async () => "tok", getCase: async () => detail("calling"), getSelection: async () => selection };
+  assert.equal((await callStateResponse(fine, "c1", false, "d1")).status, 200);
+  assert.equal((await callStateResponse(fine, "c1", false, "another")).status, 404, "a case from another dataset");
+});
+
+test("the view carries the case version, so a client never keeps a number from an earlier change", () => {
+  assert.equal(liveCallView(detail("calling"), selection).version, 1);
 });

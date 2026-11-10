@@ -18,6 +18,7 @@ export default async function FlowMode({ params }: { params: Promise<{ datasetId
     throw e;
   });
   const c = detail.case;
+  if (c.dataset_id !== datasetId) notFound();  // outside the AP shell, so check the dataset here
   const cols = flowColumns(detail.timeline, c.state, detail.decision?.outcome ?? null);
   const base = `/d/${datasetId}/cases/${caseId}`;
   return (
@@ -35,7 +36,7 @@ export default async function FlowMode({ params }: { params: Promise<{ datasetId
         {cols.map((s, i) => (
           <li key={s.key} className={`flow-col is-${s.status} st-${s.tone}`} aria-current={s.status === "current" ? "step" : undefined}>
             <span className="flow-n">{String(i + 1).padStart(2, "0")}</span>
-            <span className="flow-label">{s.label}</span>
+            <span className="flow-label">{s.label}<span className="sr-only">: {s.status === "todo" ? "not reached" : s.status === "branched" ? "stopped" : s.status === "current" ? "now" : "done"}</span></span>
             {s.marker ? <span className="flow-marker">{s.marker}</span> : null}
             <span className="flow-summary">{s.summary ?? (s.status === "current" ? "Now" : "")}</span>
             <span className="flow-meta">
