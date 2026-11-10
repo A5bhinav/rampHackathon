@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { sessionToken } from "./session";
 import type {
   ActionResult, Alert, ApiError, BankChangeResult, CaseDetail, CaseState, CaseSummary, ChainStatus, Dataset, EvidenceLog, Me,
-  SelectionView, VendorAccounts, VendorRisk,
+  MailItem, SelectionView, VendorAccounts, VendorRisk,
 } from "./api-types";
 
 // The only way the dashboard talks to the core: server-side, with the signed-in user's
@@ -38,6 +38,9 @@ export const core = {
   me: () => call<Me>("/api/me"),
   datasets: () => call<{ datasets: Dataset[] }>("/api/datasets").then((r) => r.datasets),
   evidence: (datasetId: string) => call<EvidenceLog>(`/api/datasets/${datasetId}/evidence`),
+  /** What the email door did with each inbound email, newest first. No body, no full account number. */
+  mail: (datasetId: string) =>
+    call<{ items: MailItem[] }>(`/api/datasets/${encodeURIComponent(datasetId)}/mail`).then((r) => r.items),
   chain: (datasetId: string) => call<ChainStatus>(`/api/datasets/${datasetId}/chain`),
   alerts: (datasetId: string) => call<{ alerts: Alert[] }>(`/api/datasets/${datasetId}/alerts`).then((r) => r.alerts),
   vendorRisk: (datasetId: string) =>

@@ -12,6 +12,7 @@ const AP: Item[] = [
   { label: "Inbox", path: "cases", icon: "inbox", not: ["cases/all"] },
   { label: "Cases", path: "cases/all", icon: "folder" },
   { label: "Vendors", path: "vendors", icon: "building" },
+  { label: "Mail", path: "mail", icon: "mail" },
 ];
 
 const CONTROL: Item[] = [

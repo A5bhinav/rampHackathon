@@ -11,6 +11,8 @@ import { PaymentPath } from "@/components/path";
 import { CardHead, Callout, PageHead } from "@/components/page";
 import type { CaseDetail, Candidate, SelectionView } from "@/lib/api-types";
 import { CoreError, core } from "@/lib/core";
+import { flagLabel } from "@/lib/mail";
+import { formatAccount } from "@/lib/ramp-portal";
 import { brief, datasetNow, date, dueLabel, relative, when, words } from "@/lib/format";
 import { phone, seenBefore, sourceLabel, split } from "@/lib/lineage";
 import { REFRESH_STATES, stations } from "@/lib/stations";
@@ -116,6 +118,26 @@ export default async function CaseDetailPage({ params, searchParams }: {
               </dl>
             </div>
           </section>
+
+          {change.email ? (
+            <section className="card" aria-labelledby="email-h">
+              <CardHead title="Email" id="email-h" meta={<>Opened by an email</>} />
+              <div className="card-body">
+                <dl className="facts">
+                  <dt>From</dt><dd className="mono">{change.email.sender}</dd>
+                  <dt>Subject</dt><dd>{change.email.subject ?? <span className="muted">(no subject)</span>}</dd>
+                  <dt>Received</dt><dd>{when(change.email.received_at)}</dd>
+                  <dt>Payment details asked for</dt><dd className="mono">{formatAccount(change.new_account)}</dd>
+                  <dt>Red flags</dt>
+                  <dd>
+                    {change.email.red_flags.length === 0 ? <span className="muted">None</span> : (
+                      <span className="tags">{change.email.red_flags.map((f) => <span key={f} className="badge tone-bad">{flagLabel(f)}</span>)}</span>
+                    )}
+                  </dd>
+                </dl>
+              </div>
+            </section>
+          ) : null}
 
           <HoldCard detail={detail} now={now} />
           <NumberCard view={view} path={path} />
