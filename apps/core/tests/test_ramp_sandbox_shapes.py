@@ -61,7 +61,13 @@ def event(event_id: str, event_type: str, when: str, about: str = V, actor: str 
     """Ramp's AuditLogEventResource."""
     return {"id": event_id, "event_type": event_type, "event_time": when, "actor_id": actor, "actor_type": "user",
             "event_details": details if details is not None else {"description": event_type},
-            "primary_reference": {"id": about, "label": "Acme Fasteners LLC", "resource_name": "Bill payment", "url": "/x"}}
+            "primary_reference": {"id": about, "label": "Acme Fasteners LLC", "resource_name": "Vendor / Merchant", "url": "/x"}}
+
+
+def ramp_error(status: int, message: str) -> httpx.Response:
+    """Ramp's DeveloperApiErrorResponse."""
+    return httpx.Response(status, json={"error_v2": {"error_code": "DEVELOPER_7000", "error_id": "0a1b2c3d", "message": message,
+                                                     "notes": "", "additional_info": {}}})
 
 
 class SandboxRamp:
@@ -78,6 +84,7 @@ class SandboxRamp:
         self.events = [event("ev-1", "Vendor placed on hold", "2026-11-01T10:00:00+00:00"),
                        event("ev-2", "Vendor hold released", "2026-11-02T10:00:00+00:00")]
         self.hold_status = 204
+        self.bills_error: str | None = None
         self.clock = 0
 
     def _now(self) -> str:
@@ -108,6 +115,8 @@ class SandboxRamp:
                         b["payment"] = None
             return httpx.Response(self.hold_status, content=b"{}" if self.hold_status == 202 else b"")
         if parts == ["bills"]:
+            if self.bills_error:
+                return ramp_error(422, self.bills_error)
             return httpx.Response(200, json={"data": self.bills, "page": {"next": None}})  # vendor_id ignored on purpose
         if parts[0] == "bills" and request.method == "PATCH":
             b = next(b for b in self.bills if b["id"] == parts[1])
@@ -115,9 +124,13 @@ class SandboxRamp:
             b["payment"] = None if day is None else {"id": f"pay-{b['id']}", "payment_date": f"{day}T00:00:00+00:00"}
             return httpx.Response(200, json=b)
         if parts == ["audit-logs", "events"]:
+            # Ramp's document, and the sandbox (found by the probe's first run): object_id needs resource_name.
+            if ("object_id" in q) != ("resource_name" in q):
+                return ramp_error(422, "The resource name must also be provided when filtering by object ID.")
             wanted = set(q["event_types"][0].split(",")) if "event_types" in q else None
             data = [e for e in self.events  # oldest first on purpose: a layer that took the first event would be wrong
                     if e["primary_reference"]["id"] == q.get("object_id", [None])[0]
+                    and e["primary_reference"]["resource_name"] == q.get("resource_name", [None])[0]
                     and (wanted is None or e["event_type"] in wanted)]
             return httpx.Response(200, json={"data": data, "page": {"next": None}})
         return httpx.Response(404, json={})
@@ -151,7 +164,8 @@ async def test_a_vendor_is_mapped_and_its_hold_is_read_from_ramps_audit_log(ramp
     assert v == RampVendor(id=V, name="Acme Fasteners LLC", status="ACTIVE",
                            updated_at=dt.datetime(2026, 11, 10, 9, tzinfo=UTC), hold_id=None)
     [audit] = ramp.api("/audit-logs/events")
-    assert query(audit) == {"object_id": [V], "event_types": ["Vendor placed on hold,Vendor hold released"], "page_size": ["100"]}
+    assert query(audit) == {"object_id": [V], "resource_name": ["Vendor / Merchant"],
+                            "event_types": ["Vendor placed on hold,Vendor hold released"], "page_size": ["100"]}
 
 
 async def test_an_inactive_vendor_reads_inactive(ramp):
@@ -248,7 +262,17 @@ async def test_the_bank_change_event_is_asked_for_and_answered_under_the_cores_n
                                occurred_at=dt.datetime(2026, 11, 10, 11, tzinfo=UTC),
                                payload={"description": "Bank account updated"})
     [r] = ramp.api("/audit-logs/events")
-    assert query(r) == {"object_id": [V], "event_types": ["Bill pay bank account updated"], "page_size": ["100"]}
+    assert query(r) == {"object_id": [V], "resource_name": ["Vendor / Merchant"],
+                        "event_types": ["Bill pay bank account updated"], "page_size": ["100"]}
+
+
+async def test_a_refusal_carries_ramps_own_explanation(ramp):
+    # The probe's first run showed only "HTTP 422"; Ramp's error_v2 says what was wrong.
+    ramp.bills_error = "page_size must be between 2 and 100"
+    with pytest.raises(RampError) as err:
+        await ramp.adapter.list_bills_for_vendor(V)
+    assert "page_size must be between 2 and 100" in str(err.value) and "0a1b2c3d" in str(err.value)
+    assert err.value.status == 422 and not err.value.retryable
 
 
 async def test_an_event_with_no_ramp_name_fails_closed(ramp):

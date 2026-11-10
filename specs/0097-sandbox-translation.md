@@ -34,8 +34,14 @@ None.
 
   Paths: `GET /vendors` (`from_updated_at`), `GET /vendors/{id}`, `GET /vendors/{id}/accounts`,
   `GET /bills` (`vendor_id`), `POST /vendors/{id}/hold` (`reason`) and `/release`,
-  `PATCH /bills/{id}` (`payment_date`), `GET /audit-logs/events` (`object_id`, `event_types` joined
-  with commas). Pages of 100, Ramp's largest, followed through `page.next`.
+  `PATCH /bills/{id}` (`payment_date`), `GET /audit-logs/events` (`object_id` with
+  `resource_name=Vendor / Merchant`, which Ramp requires together; `event_types` joined with
+  commas). Pages of 100, Ramp's largest, followed through `page.next`. A refusal carries Ramp's
+  `error_v2` code, id and message; the mock's errors are unchanged.
+
+  Found on the sandbox, 2026-11-10: the probe's first run (spec 0098) got a 422 for `object_id`
+  without `resource_name`. Ramp's document says so (on `object_id`); the first version missed it
+  because the fake didn't enforce it. The fake now refuses the same way.
 - **D3. The hold read-back.** The worker confirms a hold only when the vendor shows one and every
   unpaid bill shows held. Ramp's vendor has no hold field, so `hold_id` is the newest of Ramp's
   `Vendor placed on hold` and `Vendor hold released` audit events for the vendor, when it is a

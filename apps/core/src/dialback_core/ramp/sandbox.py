@@ -10,11 +10,16 @@ import datetime as dt
 import re
 from typing import Any
 
+import httpx
+
 from .http import API, RampHttpAdapter
 from .port import RampAccount, RampAuditEvent, RampBill, RampError, RampHold, RampVendor
 
 PAGE = 100  # Ramp's largest page
 PLACED, RELEASED = "Vendor placed on hold", "Vendor hold released"
+# Ramp's audit-log filter takes object_id only together with resource_name (Ramp's document; the
+# sandbox answers 422 otherwise, as the probe's first run showed). The core only asks about vendors.
+VENDOR_RESOURCE = "Vendor / Merchant"
 RAMP_EVENT_NAMES = {"VENDOR_BANK_ACCOUNT_UPDATED": "Bill pay bank account updated"}  # the core's name: Ramp's (D4)
 FOUR_DIGITS = re.compile(r"^[0-9]{4}$")
 OLDEST = dt.datetime.min.replace(tzinfo=dt.UTC)
@@ -57,12 +62,23 @@ def audit_from(j: dict[str, Any], event_type: str) -> RampAuditEvent:
 
 
 class RampSandboxAdapter(RampHttpAdapter):
+    def _error_detail(self, response: httpx.Response) -> str:
+        """Ramp's error_v2: its code, id and explanation, so a refusal says what was wrong."""
+        try:
+            error = response.json().get("error_v2") or {}
+        except ValueError:
+            return ""
+        words = " ".join(str(error.get(k) or "") for k in ("error_code", "error_id")).strip()
+        message = str(error.get("message") or "")[:200]
+        return f" ({words}: {message})" if words or message else ""
+
     async def get_vendor(self, vendor_id: str) -> RampVendor:
         return vendor_from(await self._request("GET", f"{API}/vendors/{vendor_id}"), await self._hold_id(vendor_id))
 
     async def _hold_id(self, vendor_id: str) -> str | None:
         """D3: Ramp's vendor has no hold field, so the newest hold or release event for it says."""
-        params = {"object_id": vendor_id, "event_types": f"{PLACED},{RELEASED}", "page_size": PAGE}
+        params = {"object_id": vendor_id, "resource_name": VENDOR_RESOURCE, "event_types": f"{PLACED},{RELEASED}",
+                  "page_size": PAGE}
         events = await self._all_pages("/audit-logs/events", params)
         if not events:
             return None
@@ -92,7 +108,7 @@ class RampSandboxAdapter(RampHttpAdapter):
         return bill_from(await self._request("PATCH", f"{API}/bills/{bill_id}", json=body))
 
     async def get_audit_events(self, target_id: str, event_type: str | None = None) -> list[RampAuditEvent]:
-        params: dict[str, Any] = {"object_id": target_id, "page_size": PAGE}
+        params: dict[str, Any] = {"object_id": target_id, "resource_name": VENDOR_RESOURCE, "page_size": PAGE}
         ramp_name = None
         if event_type is not None:
             ramp_name = RAMP_EVENT_NAMES.get(event_type)

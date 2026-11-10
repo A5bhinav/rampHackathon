@@ -28,7 +28,7 @@ from ..settings import ConfigurationError, RampSandbox, _ramp_sandbox
 from .http import API, TokenBucket
 from .login import RampLogin
 from .port import RampAccount, RampBill, RampError, RampVendor
-from .sandbox import PLACED, RELEASED, RampSandboxAdapter
+from .sandbox import PLACED, RELEASED, VENDOR_RESOURCE, RampSandboxAdapter
 
 DOC_PATH = Path(__file__).resolve().parents[5] / "packages" / "contracts" / "openapi" / "ramp-developer-api.json"
 DOC_URL = "https://docs.ramp.com/openapi/developer-api.json"
@@ -102,7 +102,8 @@ async def probe(sandbox: RampSandbox, http: httpx.AsyncClient, *, vendor_id: str
     raw.append(("ApiVendorDetailResource", await layer._request("GET", f"{API}/vendors/{vendor_id}")))
     accounts = await layer._all_pages(f"/vendors/{vendor_id}/accounts", {"page_size": 100})
     bills = await layer._all_pages("/bills", {"vendor_id": vendor_id, "page_size": 100})
-    events = await layer._all_pages("/audit-logs/events", {"object_id": vendor_id, "page_size": 100})
+    events = await layer._all_pages("/audit-logs/events", {"object_id": vendor_id, "resource_name": VENDOR_RESOURCE,
+                                                           "page_size": 100})
     raw += [("ApiVendorBankAccountResource", a) for a in accounts] + [("Bill", b) for b in bills]
     raw += [("AuditLogEventResource", e) for e in events]
 
