@@ -7,6 +7,7 @@ every number, grounding.py checks every quote, and the value always comes from t
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -69,6 +70,18 @@ USER_BEFORE = ("Label every phone number in this document. Its visible text is e
 USER_AFTER = "\nEND DOCUMENT"
 
 
+log = logging.getLogger(__name__)
+SDK_LOGGERS = ("anthropic", "httpx2", "httpcore2")   # the SDK's and its HTTP library's
+
+
+def quiet_sdk_logs() -> None:
+    """Set the SDK's loggers and its HTTP library's, children included, to WARNING, so debug logging
+    (ANTHROPIC_LOG=debug, say) can't print a request body, which holds the document's text."""
+    names = {n for n in logging.root.manager.loggerDict if n.split(".")[0] in SDK_LOGGERS}
+    for name in {*SDK_LOGGERS, *names}:
+        logging.getLogger(name).setLevel(logging.WARNING)
+
+
 def anthropic_client(api_key: str, http_client: httpx2.Client | None = None) -> anthropic.Anthropic:
     """The SDK client: the given key only (no other credential source), a 30-second timeout and the
     SDK's default retries."""
@@ -108,7 +121,11 @@ class AnthropicLabelModel:
 
     client: anthropic.Anthropic
 
+    def __post_init__(self) -> None:
+        quiet_sdk_logs()
+
     def label(self, text: str) -> Reply:
+        quiet_sdk_logs()   # again, in case something raised them since
         try:
             msg = self.client.messages.create(
                 model=MODEL, max_tokens=MAX_TOKENS, system=SYSTEM_PROMPT,
@@ -137,12 +154,19 @@ class AnthropicLabelModel:
 @dataclass(frozen=True)
 class LlmReader:
     """`Reader` over a `LabelModel`. Returns `[{quote, role, party}]` for grounding to check, or
-    raises `ReaderFailed`: it never returns a partial answer and never falls back to another reader."""
+    raises `ReaderFailed`: it never returns a partial answer and never falls back to another reader.
+    It logs counts and the API's request id only, never document text or model output."""
 
     model: LabelModel
 
     def label(self, visible_text: str) -> list[dict]:
-        reply = self.model.label(visible_text)
-        if not matches_schema(reply.data):
-            raise ReaderFailed("schema", detail="the reply doesn't match the schema", request_id=reply.request_id)
-        return reply.data["labels"]
+        try:
+            reply = self.model.label(visible_text)
+            if not matches_schema(reply.data):
+                raise ReaderFailed("schema", detail="the reply doesn't match the schema", request_id=reply.request_id)
+        except ReaderFailed as exc:
+            log.warning("llm reader: no labels (%s, request %s)", exc.reason, exc.request_id)
+            raise
+        labels = reply.data["labels"]
+        log.info("llm reader: %d labels (request %s)", len(labels), reply.request_id)
+        return labels

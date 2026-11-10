@@ -6,6 +6,7 @@ live. No test calls the API: conftest.py removes the key and blocks the real tra
 """
 import copy
 import json
+import logging
 
 import anthropic
 import httpx2
@@ -221,3 +222,42 @@ def test_never_falls_back_to_the_stub(monkeypatch):
     with pytest.raises(ReaderUnavailable):
         ingest_all([BAD], extractor_version="test", reader=reader_for(reader_mode()))
     assert seen == []
+
+
+# Logs --------------------------------------------------------------------------------------------
+
+SECRET_TEXT = "Wire questions to Dana Whitfield"     # document text: must never reach a log line
+SECRET_OUTPUT = "the model's private words"           # model output: likewise
+SDK_LOGGERS = ("anthropic", "httpx2", "httpcore2")
+
+
+def test_no_text_in_logs(caplog):
+    doc = page(span(SECRET_TEXT), span(LINE)) | {"id": "doc-secret"}
+    handlers = [handler for handler, _, _ in FAILURES.values()] + [
+        replying(SECRET_OUTPUT),                                                          # not JSON
+        replying({"labels": [{"quote": LINE, "role": "ar", "party": "vendor", "why": SECRET_OUTPUT}]}),
+        replying({"labels": [{"quote": SECRET_OUTPUT, "role": "ar", "party": "vendor"}]}),  # dropped by grounding
+        like_the_stub]                                                                    # a good reply
+    saved = {name: logging.getLogger(name).level for name in SDK_LOGGERS}
+    errors = []
+    try:
+        for name in SDK_LOGGERS:          # what ANTHROPIC_LOG=debug leaves behind
+            logging.getLogger(name).setLevel(logging.DEBUG)
+        caplog.set_level(logging.DEBUG)
+        for handler in handlers:
+            try:
+                ingest_all([doc], extractor_version="test", reader=llm_reader(handler))
+            except ReaderFailed as exc:
+                errors.append(exc)
+    finally:
+        for name, level in saved.items():
+            logging.getLogger(name).setLevel(level)
+    logged = "\n".join(logging.Formatter().format(r) for r in caplog.records)   # with any traceback
+    raised = "\n".join(f"{e!r} {e.__cause__!r} {e.__context__!r}" for e in errors)
+    assert len(errors) == len(FAILURES) + 2
+    for secret in (SECRET_TEXT, "Dana", SECRET_OUTPUT, "555-0142", "5550142"):
+        assert secret not in logged, secret
+        assert secret not in raised, secret
+    # What it does log: counts and the API's request id.
+    ours = [r.getMessage() for r in caplog.records if r.name == "dialback_ledger.llm_reader"]
+    assert any("req_test_ok" in m for m in ours) and any("req_test_500" in m for m in ours)
