@@ -30,7 +30,7 @@ The lab has two kinds of check (FINDINGS B9).
 
 So the score that steers the search is metamorphic. The direct checks stay, as the regression net.
 
-## Decisions (my calls; Sami can overrule)
+## Decisions
 
 1. **The score.**
    - The **must-not-help moves** are the probes `metamorphic()` already runs that add attacker
@@ -216,18 +216,19 @@ and never in CI.
 
 ## Open questions
 
-These are my calls; Sami can overrule them.
+None open. Sami approved the spec and every call in it as written on Nov 9:
 
-- **Q87.** Every reason weighs 1 in `gain`, so a move that trades a strong defense for a weak one
-  scores 0. Ranking defenses is a follow-up if near misses turn out too rare to steer by.
-- **Q88.** Near misses stay lab numbers. A person decides which ones go to Inesh.
-- **Q89.** Whether `lab-fuzz` switches to `--search archive` or a guided search is a follow-up PR.
-  The archive part is settled (decision 5); the guided part waits for the measurement.
-- **Q90.** 10 held-out seeds keep the measurement under an hour across 8 processes, but give little
-  power: a guided arm passes with 9 wins if all 10 seeds differ, or 6 of 6 if only 6 differ. A
-  larger budget or more seeds can't be chosen after seeing results.
-- **Q91.** Who writes the planted breaks. A fresh session is my call. Inesh, as the rule's owner,
-  would write more realistic ones.
+- **Q87, resolved:** every reason weighs 1 in `gain`, so a move that trades a strong defense for a
+  weak one scores 0. Ranking defenses is a follow-up if near misses turn out too rare to steer by.
+- **Q88, resolved:** near misses stay lab numbers. A person decides which ones go to Inesh.
+- **Q89, resolved for now:** whether `lab-fuzz` switches to `--search archive` or a guided search
+  is a follow-up PR. The archive part is settled (decision 5); the guided part waits for the
+  measurement.
+- **Q90, resolved:** 10 held-out seeds, which keep the measurement under an hour across 8
+  processes but give little power: a guided arm passes with 9 wins if all 10 seeds differ, or 6 of
+  6 if only 6 differ. A larger budget or more seeds can't be chosen after seeing results.
+- **Q91, resolved:** a fresh session writes the planted breaks. Inesh, as the rule's owner, could
+  write more realistic ones in a later round.
 
 ## Commands
 
