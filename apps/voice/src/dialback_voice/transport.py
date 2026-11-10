@@ -68,13 +68,18 @@ def run_call(ctx: policy.CallContext, agent: Agent, line: Line, *, clock: Clock,
 
 
 def _ask(agent: Agent, request: policy.AgentRequest, at: dt.datetime) -> policy.Event:
-    """Call the model behind the Agent port. Any error, timeout or empty reply fails closed (R7)."""
+    """Call the model behind the Agent port. Any error, timeout or empty reply fails closed (R7).
+    A reply that says the answer was unclear is AgentUnclear, and anything else it carries is
+    dropped: unclear is never an answer, so step asks once more (spec 0043, D6)."""
     try:
         reply = agent.reply(request)
     except TimeoutError as exc:
         return policy.AgentFailed(at, f"timeout:{exc}")
     except Exception as exc:  # noqa: BLE001  a model bug must never leave the call running
         return policy.AgentFailed(at, type(exc).__name__)
+    if reply is not None and reply.unclear:
+        # A mixed reply drops its tool calls, flags too: a turn the agent could not read records nothing (D6).
+        return policy.AgentUnclear(at)
     if reply is None or (not (reply.text or "").strip() and not reply.tool_calls):
         return policy.AgentFailed(at, "empty_reply")   # blank text with no tool call says nothing
     return policy.AgentReplied(at, reply.text, tuple(reply.tool_calls))

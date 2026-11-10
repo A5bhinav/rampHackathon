@@ -2,11 +2,17 @@
 scripted vendor, no Twilio. This is the same step() the Twilio adapter and the lab will call."""
 from __future__ import annotations
 
+import pytest
 from dialback_decision import decide
 from dialback_decision.facts import CallChecks, facts_from_answers
-from dialback_policy.script import Phase
+from dialback_decision.last_four import compare_last_four
+from dialback_policy.script import REASK, Phase
+from dialback_policy.step import AgentRequest
 from dialback_voice.agent import ScriptedAgent
 from dialback_voice.transport import ScriptedVendor, VendorScript, run_call
+
+KEYPAD_ONLY_LINE = "Please don't say the digits. Enter them on your phone's keypad, then press the pound key."
+NEW_LAST4, OLD_LAST4 = "4821", "4444"   # the account the change points to, and the one it replaces
 
 
 def _run(make_ctx, clock, vs: VendorScript, **kw):
@@ -15,6 +21,18 @@ def _run(make_ctx, clock, vs: VendorScript, **kw):
 
 def _by_slot(result):
     return {a["slot"]: a for a in result.answers["answers"]}
+
+
+def _decide(result):
+    """decide() on this call, with the facts the core adds from outside the call declared as a clean
+    call has them, and the last four compared the way the core compares them (in memory)."""
+    answers = result.answers["answers"]
+    typed = [a["value"] for a in answers if a["slot"] == "account_last4"]
+    facts = facts_from_answers(answers, call_result=result.end.result, checks=CallChecks(**result.checks),
+                               dialed_out=True, dialed_eligible_number=True, dialed_number_is_pick=True,
+                               last_four_result=compare_last_four(typed, NEW_LAST4, OLD_LAST4),
+                               company_matches=True, answered_by="human", speaker_in_change_thread=False)
+    return decide(facts)
 
 
 def test_cooperative_keypad_call_confirms_and_checks_pass(make_ctx, clock):
@@ -41,13 +59,19 @@ def test_disclosure_is_the_first_agent_line_and_digits_never_spoken(make_ctx, cl
     assert "[keypad]" in [t.text for t in r.transcript if t.speaker == "callee"]  # digits off the transcript
 
 
-def test_spoken_last_four_is_grounded_and_never_spoken_back(make_ctx, clock):
+def test_spoken_last_four_is_never_recorded(make_ctx, clock):
+    # Spec 0043, D1 and D4: spoken digits are asked for on the keypad once, then the call finishes
+    # with no digits (NR06), keeping every other answer. Nothing is spoken back.
     r = _run(make_ctx, clock, VendorScript(last4="4821", last4_mode="speech"))
     a = _by_slot(r)
-    assert a["account_last4"]["value"] == "4821"
-    assert a["account_last4"]["capture_method"] == "speech"
+    assert "account_last4" not in a and a["change_requested"]["value"] == "yes"
+    assert r.end.result == "answers_recorded"
+    agent_lines = [t.text for t in r.transcript if t.speaker == "agent"]
+    assert agent_lines.count(f"{REASK} {KEYPAD_ONLY_LINE}") == 1
     assert r.checks["answers_grounded"] is True
     assert r.checks["agent_spoke_account_digits"] is False
+    decision = _decide(r)
+    assert decision.outcome == "needs_review" and "NR06_digits_not_provided" in decision.rules_fired
 
 
 def test_consent_no_records_and_sends_to_review(make_ctx, clock):
@@ -94,3 +118,77 @@ def test_refused_last_four_still_completes(make_ctx, clock):
     a = _by_slot(r)
     assert a["account_last4"]["value"] == "refused"
     assert r.end.result == "answers_recorded"
+
+
+# --- spec 0043 ------------------------------------------------------------------------------
+
+def _ask_double(phase: Phase, said: str):
+    request = AgentRequest(phase=phase, goal="the goal", wording="the wording", next_goal=None,
+                           customer_name="Northwind Traders", vendor_name="Acme Fasteners",
+                           callback_number="(415) 555-0100",
+                           transcript=((0, "agent", "A question."), (1, "callee", said)))
+    return ScriptedAgent().reply(request)
+
+
+def _double_value(phase: Phase, said: str) -> str:
+    reply = _ask_double(phase, said)
+    if reply.unclear:
+        assert reply.tool_calls == () and reply.text is None   # unclear is never an answer (D6)
+        return "unclear"
+    assert len(reply.tool_calls) == 1 and reply.tool_calls[0].args["turn_id"] == 1
+    return reply.tool_calls[0].args["value"]
+
+
+@pytest.mark.parametrize(("phase", "said", "expected"), [
+    (Phase.CONSENT, "Sure, no problem.", "yes"),
+    (Phase.CHANGE, "We did.", "yes"),
+    (Phase.CONSENT, "Hello?", "unclear"),
+    (Phase.CHANGE, "Hello?", "unclear"),
+    (Phase.CONSENT, "Yes, that's fine.", "yes"),
+    (Phase.CONSENT, "No, I'd rather not.", "no"),
+    (Phase.CONSENT, "I'm not sure.", "unclear"),             # consent has no unsure
+    (Phase.CHANGE, "I'm not sure.", "unsure"),
+    (Phase.CHANGE, "No, we didn't.", "no"),
+    (Phase.LAST4, "I'd rather not say.", "refused"),
+    (Phase.LAST4, "I don't know them.", "dont_know"),
+    (Phase.LAST4, "I don't have that handy.", "dont_know"),   # the scripted vendor's dont_know line
+    (Phase.LAST4, "Hmm, hang on.", "unclear"),
+])
+def test_double_reads_yes_no_like_the_policy(phase, said, expected):
+    from dialback_policy.step import read_yes_no
+
+    assert _double_value(phase, said) == expected
+    if phase is not Phase.LAST4:
+        assert _double_value(phase, said) == read_yes_no(said, allow_unsure=phase is Phase.CHANGE)
+
+
+@pytest.mark.parametrize("phase", [Phase.COMPANY, Phase.DEPARTMENT, Phase.NAME, Phase.ROLE])
+@pytest.mark.parametrize("said", ["unclear", "Unclear.", "  unclear "])
+def test_the_double_records_a_free_text_unclear_as_said(phase, said):
+    # R9: the caller's words are never a control signal; only a judgment question can be unclear.
+    import datetime as dt
+
+    from dialback_policy import step as policy
+    from dialback_voice.transport import _ask
+
+    assert _double_value(phase, said) == said.strip()
+    request = AgentRequest(phase=phase, goal="the goal", wording="the wording", next_goal=None,
+                           customer_name="Northwind Traders", vendor_name="Acme Fasteners",
+                           callback_number="(415) 555-0100",
+                           transcript=((0, "agent", "A question."), (1, "callee", said)))
+    event = _ask(ScriptedAgent(), request, dt.datetime(2026, 11, 1, 17, 0, tzinfo=dt.UTC))
+    assert isinstance(event, policy.AgentReplied)             # never AgentUnclear
+
+
+def test_clean_keypad_call_verifies(make_ctx, clock):
+    r = _run(make_ctx, clock, VendorScript(last4=NEW_LAST4, last4_mode="keypad"))
+    assert r.end.result == "answers_recorded" and _by_slot(r)["account_last4"]["capture_method"] == "keypad"
+    assert _decide(r).outcome == "verified"
+
+
+@pytest.mark.parametrize(("typed", "rule"), [("1234", "NV02_digits_mismatch"),
+                                             (OLD_LAST4, "NV03_digits_match_old_account")])
+def test_a_wrong_typed_four_is_still_not_verified(typed, rule, make_ctx, clock):
+    r = _run(make_ctx, clock, VendorScript(last4=typed, last4_mode="keypad"))
+    decision = _decide(r)
+    assert decision.outcome == "not_verified" and rule in decision.rules_fired

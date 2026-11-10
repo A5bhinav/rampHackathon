@@ -36,8 +36,10 @@ _TOKENS = re.compile(r"\d+|[a-z]+|:|[^\sa-z\d]")
 
 _STATUS = re.compile(r"\b\w*(?:verif|approv|match)\w*\b")
 _CURRENCY = re.compile(r"[$€£¥]")
-_AMOUNT_WORDS = re.compile(r"\b(?:dollars?|cents?|usd|eur|euros?|pounds?|bucks|hundred|thousand|million|billion"
-                           r"|grand)\b|\b\d+\s?[km]\b")
+# "Pound" is an amount everywhere except right before "key" or "sign": the keypad question asks for
+# the pound key (spec 0043, D1), while "50 pounds" and "the pound amount" still trip the guard.
+_AMOUNT_WORDS = re.compile(r"\b(?:dollars?|cents?|usd|eur|euros?|bucks|hundred|thousand|million|billion"
+                           r"|grand)\b|\bpounds?\b(?! (?:key|sign)\b)|\b\d+\s?[km]\b")
 BANK_NAMES = (
     "chase", "jpmorgan", "jp morgan", "j p morgan", "bank of america", "bofa", "b of a", "wells fargo", "wells",
     "citibank", "citi", "us bank", "u s bank", "pnc", "truist", "capital one", "td bank", "bmo", "fifth third",
@@ -93,26 +95,53 @@ def _words(text: str) -> str:
 words = _words
 
 
-def digit_runs(text: str) -> list[str]:
-    """Every run of digits in `text`, with spoken digits ("four", "forty") turned into digits."""
-    tokens = _TOKENS.findall(_clean(text))
-    runs, current = [], ""
+def _runs(tokens: list[str]) -> list[tuple[str, int, int]]:
+    """Each run of digits in `tokens`, with the index of its first and last digit token."""
+    runs: list[tuple[str, int, int]] = []
+    current, first, last = "", 0, 0
     for i, token in enumerate(tokens):
-        if token.isdigit():
-            current += token
-        elif token in DIGIT_WORDS:
-            current += DIGIT_WORDS[token]
+        if token.isdigit() or token in DIGIT_WORDS:
+            if not current:
+                first = i
+            current += token if token.isdigit() else DIGIT_WORDS[token]
+            last = i
         elif token == "and" and current and i + 1 < len(tokens) and (
                 tokens[i + 1].isdigit() or tokens[i + 1] in DIGIT_WORDS):
             continue
         elif token == ":" or token.isalpha():
             if current:
-                runs.append(current)
+                runs.append((current, first, last))
             current = ""
         # any other punctuation between digits keeps the run going
     if current:
-        runs.append(current)
+        runs.append((current, first, last))
     return runs
+
+
+def digit_runs(text: str) -> list[str]:
+    """Every run of digits in `text`, with spoken digits ("four", "forty") turned into digits."""
+    return [run for run, _, _ in _runs(_TOKENS.findall(_clean(text)))]
+
+
+def redact_digits(text: str) -> str:
+    """`text` with each run of three or more digits, as `digit_runs` reads them, replaced by
+    "[digits]", and everything else kept as said ("Yes, the account ending four eight two one" is
+    "Yes, the account ending [digits]"; "84 Lumber" is unchanged). Only the model gets this copy
+    (spec 0043, D8). Each character is cleaned on its own, so every token maps back to the text."""
+    cleaned, origin = [], []
+    for i, ch in enumerate(text):
+        for c in _clean(ch):
+            cleaned.append(c)
+            origin.append(i)
+    tokens = list(_TOKENS.finditer("".join(cleaned)))
+    out, kept = [], 0
+    for run, first, last in _runs([t.group() for t in tokens]):
+        if len(run) < 3:
+            continue
+        start, end = origin[tokens[first].start()], origin[tokens[last].end() - 1] + 1
+        out += [text[kept:start], "[digits]"]
+        kept = end
+    return "".join(out) + text[kept:]
 
 
 def _allowed_runs(ctx: GuardContext) -> set[str]:

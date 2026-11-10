@@ -66,6 +66,20 @@ def test_connect_carries_disclosure_and_token():
     assert NUMBER not in xml
 
 
+def test_keys_pressed_while_the_agent_speaks_still_reach_the_relay():
+    # Spec 0043: callers often start typing the last four before the question finishes. Since May
+    # 2025 Twilio's default for reportInputDuringAgentSpeech is "none", which drops those keys, so
+    # the call asks for DTMF during speech. Keys still never cut the agent off (interruptible stays
+    # "false", R8), and speech during the agent's turn is still not reported.
+    path = f"/twilio/twiml/{CALL}"
+    r = _client().get(path, headers={"X-Twilio-Signature": _sign(BASE + path, {})})
+    assert r.status_code == 200, r.text
+    xml = r.text
+    assert 'reportInputDuringAgentSpeech="dtmf"' in xml
+    assert 'interruptible="false"' in xml
+    assert 'dtmfDetection="true"' in xml
+
+
 def test_a_forged_twiml_fetch_is_rejected_and_mints_no_token():
     path = f"/twilio/twiml/{CALL}"
     r = _client().get(path, headers={"X-Twilio-Signature": "forged"})
