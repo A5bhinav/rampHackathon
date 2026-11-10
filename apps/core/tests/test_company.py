@@ -1,5 +1,8 @@
 """Did the person name this vendor (spec 0082, Part B): the caller's whole turn, as said, against
-the vendor's legal and trade names. Unit tests, no database."""
+the vendor's legal and trade names. Unit tests, no database.
+
+D7b (Sami, Nov 10): only a refusal word (D7a) gives False. An answer that names someone else, or
+nothing recognizable, is None, which blocks nothing; B2 to B6 and D6's former False rows are None."""
 from __future__ import annotations
 
 import re
@@ -43,6 +46,7 @@ def test_b1_short_names_match_and_todays_matches_still_do(said, names, variant):
 
 
 # B2: clearly different companies, including near-sounding and common-word cases (the builder check).
+# None of them is a match; with no refusal word, D7b makes each unknown (B9).
 B2 = [
     ("Globex Corporation", "Acme Fasteners LLC"),
     ("Hi, this is Globex, how can I help you?", "Yelp Inc"),
@@ -55,19 +59,19 @@ B2 = [
 
 
 @pytest.mark.parametrize("said, vendor", B2, ids=[f"{s} / {v}" for s, v in B2])
-def test_b2_clearly_different_companies_stay_false(said, vendor):
-    assert company_matches(said, vendor) is False
+def test_b2_clearly_different_companies_are_unknown(said, vendor):
+    assert company_matches(said, vendor) is None
 
 
 @pytest.mark.parametrize("said", ["acne", "This is acne"])
-def test_b3_no_fuzzy_matching_so_a_misheard_name_stays_false(said):
-    assert company_matches(said, "Acme Fasteners LLC") is False
+def test_b3_no_fuzzy_matching_so_a_misheard_name_is_unknown(said):
+    assert company_matches(said, "Acme Fasteners LLC") is None
 
 
 @pytest.mark.parametrize("said, vendor", [("First", "First Solar Inc"), ("Main", "Main Street Supply LLC")])
 def test_b4_a_common_first_word_alone_does_not_match(said, vendor):
     assert said.lower() not in vendor_variants((vendor,)), "the guard's common-word list keeps it out"
-    assert company_matches(said, vendor) is False
+    assert company_matches(said, vendor) is None
 
 
 def test_b5_llc_alone_and_no_answers_are_unknown():
@@ -78,23 +82,26 @@ def test_b5_llc_alone_and_no_answers_are_unknown():
 
 def test_b5_several_answers_any_false_is_false_then_any_unknown_is_unknown():
     vendor = "Acme Fasteners LLC"
-    assert every_name_matches(["This is Acme", "Globex Corporation"], vendor) is False
-    assert every_name_matches(["Globex Corporation", "LLC"], vendor) is False
+    assert every_name_matches(["This is Acme", "Not Acme, this is Globex"], vendor) is False
+    assert every_name_matches(["Not Acme, this is Globex", "LLC"], vendor) is False
+    assert every_name_matches(["This is Acme", "Globex Corporation"], vendor) is None, "D7b: not a refusal"
     assert every_name_matches(["This is Acme", "LLC"], vendor) is None
     assert every_name_matches(["This is Acme", "Acme Fasteners"], vendor) is True
 
 
-@pytest.mark.parametrize("said, legal_name, trade_names, today", [
-    ("Acme", "", (), False),
-    ("Acme", "LLC", (), False),
-    ("This is Acme", "The Company", ("Inc",), False),
+@pytest.mark.parametrize("said, legal_name, trade_names, expected", [
+    ("Acme", "", (), None),
+    ("Acme", "LLC", (), None),
+    ("This is Acme", "The Company", ("Inc",), None),
     ("LLC", "", (), None),
     ("", "", (), None),
     (None, "LLC", (), None),
-], ids=["empty", "suffix-only", "suffixes-only-with-trade-name", "llc-to-empty", "nothing-to-empty", "none"])
-def test_b5_a_vendor_with_no_usable_name_gives_todays_result(said, legal_name, trade_names, today):
+    ("Not Acme", "", (), False),
+], ids=["empty", "suffix-only", "suffixes-only-with-trade-name", "llc-to-empty", "nothing-to-empty", "none",
+        "refusal-to-empty"])
+def test_b5_a_vendor_with_no_usable_name_never_matches(said, legal_name, trade_names, expected):
     assert vendor_variants((legal_name, *trade_names)) == set()
-    assert company_matches(said, legal_name, trade_names) is today
+    assert company_matches(said, legal_name, trade_names) is expected
 
 
 @pytest.mark.parametrize("said, names, variant", B1, ids=[s for s, _, _ in B1])
@@ -109,7 +116,7 @@ def test_b6_the_variant_that_matches_is_one_of_the_guards(said, names, variant, 
 @pytest.mark.parametrize("said, names, variant", SHORT_NAMES, ids=[s for s, _, _ in SHORT_NAMES])
 def test_b6_short_names_match_only_through_the_guards_variants(said, names, variant, monkeypatch):
     monkeypatch.setattr(company, "vendor_variants", lambda _names: set())
-    assert matches(said, names) is False
+    assert matches(said, names) is None
 
 
 NAMES = ["", "LLC", "The Company", "&", "Ünïcödé Werkzeug GmbH", "株式会社テスト", "Ａｃｍｅ Ｆａｓｔｅｎｅｒｓ",
@@ -135,7 +142,7 @@ def test_b7_the_matcher_is_pure_and_total(name):
     ("The main line, on Elm Street", "Main Street Supply LLC"),
 ], ids=["run-together-inside-within-air", "run-together-inside-domain-street", "words-apart"])
 def test_d6_a_variant_matches_only_as_a_run_of_whole_words(said, vendor):
-    assert company_matches(said, vendor) is False
+    assert company_matches(said, vendor) is None
 
 
 def test_d6_trade_names_give_variants_too():
@@ -170,3 +177,18 @@ def test_b8_refusal_words_override_a_match(said):
 ], ids=["no-problem", "sorry", "yes", "own-name-word", "correction-cost", "not-sure-cost"])
 def test_b8_honest_answers_and_pinned_costs(said, names, expected):
     assert matches(said, names) is expected
+
+
+# B9 (spec 0082, D7b): code can't tell another company's name from a garbled vendor name, so an
+# answer with no refusal word that doesn't match is unknown, and blocks nothing. The person who
+# releases sees it on the call record. Only a refusal is False (NR03).
+@pytest.mark.parametrize("said", ["This is Globex", "Globex Corporation", "Purple monkey dishwasher"],
+                         ids=["this-is-globex", "globex-corporation", "nonsense"])
+def test_b9_another_company_or_nonsense_is_unknown(said):
+    assert matches(said, ACME) is None
+    assert every_name_matches([said], ACME[0]) is None
+
+
+def test_b9_a_refusal_in_any_answer_is_false():
+    assert every_name_matches(["This is Globex", "Not Acme, this is Globex"], "Acme Fasteners LLC") is False
+    assert every_name_matches(["Not Acme, this is Globex", "This is Globex"], "Acme Fasteners LLC") is False
