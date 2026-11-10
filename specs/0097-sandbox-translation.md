@@ -81,9 +81,14 @@ None.
 
 ## Open questions (a sandbox run answers each; a wrong answer fails closed)
 
-- **Q202:** does Ramp file a vendor's hold and release events under the vendor's id (`object_id`)?
-  If not, no hold is ever confirmed, and every sandbox case goes to a person.
-- **Q203:** do a held vendor's bills show `ON_HOLD`, or lose their payment date? If neither, the same.
+- **Q202, answered for placement:** does Ramp file a vendor's hold and release events under the
+  vendor's id (`object_id`)? Yes for a placement: the probe (spec 0098), 2026-11-10, after a hold
+  placed by hand on a sandbox vendor with two unpaid bills, found `Vendor placed on hold` under the
+  vendor's id with `resource_name=Vendor / Merchant`, and the layer read the hold as on. A release
+  has not been seen yet; remove the hold and run the probe again to confirm it reads as off.
+- **Q203, answered:** do a held vendor's bills show `ON_HOLD`, or lose their payment date? Both, in
+  the same run: each unpaid bill showed `status_summary` `ON_HOLD` and no payment date, so by the
+  layer's reading the worker's read-back would pass. (One vendor, one hold: confirmed, not general.)
 - **Q204:** is `Bill pay bank account updated` the event for a vendor's new bank account, and does
   its `event_details` name the new account? Until then, the author is unknown (two approvers).
 
