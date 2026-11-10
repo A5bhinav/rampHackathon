@@ -620,6 +620,15 @@ F1 to F9 hold as built (verified). But the lab still claims more than it shows:
   (`sami/guided-search`, approved Nov 9) is a guided search on `select()` with no model: it scores each
   world by how much a must-not-help attacker move helped, steers toward higher scores, and fixes
   the measurement that decides whether the steering stays. The model-driven targets below remain.
+- **Spec 0046 closed (Sami, Nov 10), without the held-out run.**
+  - **Kept:** the search that keeps going, as B3's fix.
+  - **Parked:** the guided searches and the bench, unproven and out of CI.
+  - **Why:** the review below showed the measurement could barely come out in steering's favor.
+  - **Exploratory lesson:** on `select()`, coverage (what the generator draws, what the checks
+    see) limits the search more than steering does.
+  - **Where red teaming moves next:** the language surfaces, which are the document reader and the
+    live call agent.
+  - The result is written into the spec (`sami/guided-search-impl`, cabb46b).
 - **Spec 0046 code review (fresh session, Nov 10; exploratory, dev seeds 0 to 9 only).** The code
   matches the spec where it counts: "found", the sign test, the guard and kill rule, pinned draws
   across processes, and the probe refactor (labels and call counts identical on 300 worlds). But:
