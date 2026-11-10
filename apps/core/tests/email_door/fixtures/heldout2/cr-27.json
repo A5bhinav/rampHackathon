@@ -1,0 +1,8 @@
+{
+  "subject": "Cobalt bank info",
+  "sender": "Steve Kaminski <skaminski@larkspur-ind.com>",
+  "text": "Hey AP,\n\nCobalt's dispatcher called me this morning and said they changed banks and asked us to update it so their next payment doesn't bounce. He gave me the new numbers over the phone:\n\nrouting 044000037\naccount 5590 2271 8830\n\nCan one of you plug that into their vendor record? They said it's urgent because of the holiday week.\n\nThanks\nSteve Kaminski\nLogistics Manager",
+  "label": "change_request",
+  "vendor": "cobalt",
+  "note": "Relayed by an internal employee from a phone call; sender is internal and not in AP, request originates with the 'vendor'."
+}

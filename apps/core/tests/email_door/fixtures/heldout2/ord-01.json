@@ -1,0 +1,8 @@
+{
+  "subject": "Invoice 88402 from Acme Fasteners LLC",
+  "sender": "Acme Fasteners LLC <billing@acmefasteners.com>",
+  "text": "Dear Customer,\n\nPlease find invoice 88402 below. Thank you for your order.\n\nInvoice: 88402\nDate: 11/09/2026\nPO: 45655\nTerms: Net 30\nAmount due: $1,284.60\n\nRemit to:\nAcme Fasteners LLC\nJPMorgan Chase Bank, N.A.\nABA Routing: 021000021\nAccount: 000011112222\n\nPlease reference the invoice number with your payment.\n\nAcme Fasteners LLC | 4410 Industrial Parkway, Dayton, OH 45414",
+  "label": "ordinary",
+  "vendor": "acme",
+  "note": "Invoice listing the on-file routing and account in full under 'Remit to'. Matches on file, so nothing changes."
+}

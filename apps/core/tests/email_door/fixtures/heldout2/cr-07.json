@@ -1,0 +1,8 @@
+{
+  "subject": "Urgent - Acme payment today",
+  "sender": "Richard Lang <richard.lang@larkspur-ind.co>",
+  "text": "Melissa,\n\nI need your help with something time sensitive and I'm in back to back board meetings all day so email only please.\n\nI spoke with Acme's owner this morning. Their bank froze the old account during a compliance review and they need today's payment and everything after it to go to their new account. Please update their vendor record and include them in today's run:\n\nBank: Citibank\nRouting: 021000089\nAccount: 7741029936\n\nDo not call Acme about this, they are already frustrated with the delay and I told them we'd handle it. Keep this between us for now until the audit wraps up. Confirm once it's done.\n\nRichard Lang\nCFO\nSent from my iPhone",
+  "label": "change_request",
+  "vendor": "acme",
+  "note": "Executive-impersonation pressure (lookalike .co domain, secrecy, do-not-call). The request comes from a supposed insider, not the vendor, but it still redirects Acme's payments."
+}

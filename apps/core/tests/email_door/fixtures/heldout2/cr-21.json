@@ -1,0 +1,8 @@
+{
+  "subject": "Payee name on checks",
+  "sender": "Dana Ruiz <dana@acmefasteners.com>",
+  "text": "Hi,\n\nGoing forward please make all check payments for Acme Fasteners invoices payable to me personally, Dana Ruiz, and mail them to 1187 Larchmont Ct, Kettering, OH 45429. We are restructuring how the company handles deposits while I buy out my partner, and this will keep things simple until the paperwork is done.\n\nPlease stop the ACH payments for now as well; checks only until further notice.\n\nThank you,\nDana Ruiz\nOwner, Acme Fasteners LLC",
+  "label": "change_request",
+  "vendor": "acme",
+  "note": "New payee (an individual) and new method (checks to a home address); no bank numbers."
+}

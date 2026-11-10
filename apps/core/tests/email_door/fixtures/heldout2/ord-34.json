@@ -1,0 +1,8 @@
+{
+  "subject": "Security notice: please ignore any request to change our bank details",
+  "sender": "Margaret Ostrowski <m.ostrowski@acmefasteners.com>",
+  "text": "Dear Customer,\n\nWe recently learned that an outside party gained access to one employee's mailbox at Acme Fasteners and may have sent emails to some of our customers asking them to update our banking information. Those emails are fraudulent.\n\nAcme Fasteners has not changed its bank account. Please continue to pay only to the account already on file in your system, and do not act on any request to change our payment details. If you have already changed our banking information in response to such an email, please contact me immediately at (937) 555-0148, a number you can verify on our website.\n\nWe apologize for the concern this may cause.\n\nMargaret Ostrowski\nController\nAcme Fasteners LLC",
+  "label": "ordinary",
+  "vendor": "acme",
+  "note": "Vendor warns of a mailbox compromise and says NOT to change banking; dense with change-request vocabulary."
+}

@@ -1,0 +1,8 @@
+{
+  "subject": "Invoice 55291 from Brightline Office Supply Inc",
+  "sender": "Brightline Office Supply Inc <invoices@brightlineoffice.com>",
+  "text": "INVOICE\n\nBrightline Office Supply Inc\n2250 Commerce Dr, Columbus, OH 43219\n\nBill To: Larkspur Industries, Attn: Accounts Payable\nInvoice #: 55291\nInvoice Date: 11/09/2026\nTerms: Net 30\nPO #: 45602\n\nQty   Item                                   Unit      Ext\n40    Copy paper, 8.5x11, 20 lb, case         38.50   1,540.00\n12    Toner cartridge, black, HY             112.00   1,344.00\n6     Desk organizer, mesh                    14.25      85.50\n\nSubtotal: 2,969.50\nTax: 0.00\nTotal Due: 2,969.50\n\n*** PLEASE NOTE OUR NEW BANK DETAILS ***\nEffective this invoice, remit ACH payments to:\nKeyBank N.A., ABA 041001039, Account 359811204477\nPayments to our previous account will no longer be accepted.\n\nThank you for your business!",
+  "label": "change_request",
+  "vendor": "brightline",
+  "note": "Routine-looking invoice whose footer announces new bank details. Subject and most of the body look ordinary."
+}
