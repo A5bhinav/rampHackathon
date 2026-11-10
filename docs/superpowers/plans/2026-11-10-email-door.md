@@ -385,7 +385,7 @@ The worker for this task must not read `email_door/rules.py` or `match.py`, and 
 ### Task 13: SQL: two guards, two transitions, `release_case` from `blocked` (plan mode, Abhi reviews)
 
 **Files:**
-- Create: `supabase/migrations/app/0014_email_dismiss.sql`, `supabase/tests/017_email_dismiss.sql`
+- Create: `supabase/migrations/app/0015_email_dismiss.sql`, `supabase/tests/017_email_dismiss.sql`
 - Regenerate: `docs/state-machine.md` (`scripts/db/render_state_machine.py`)
 
 **Interfaces:**
@@ -411,7 +411,7 @@ The worker for this task must not read `email_door/rules.py` or `match.py`, and 
   - no reason: refused;
   - a clerk: refused.
 - [ ] **Step 2:** Run `scripts/db/test.sh`. Expected: FAIL.
-- [ ] **Step 3:** Write `0014_email_dismiss.sql` in plan mode.
+- [ ] **Step 3:** Write `0015_email_dismiss.sql` in plan mode.
 - [ ] **Step 4:** Run `scripts/db/test.sh`, then `DATABASE_URL=... python3 scripts/db/render_state_machine.py docs/state-machine.md`. Expected: PASS, and the redrawn state machine shows the two `blocked` moves.
 - [ ] **Step 5:** Commit: `db: two people can dismiss a blocked email-only case (lifts the hold)`.
 
