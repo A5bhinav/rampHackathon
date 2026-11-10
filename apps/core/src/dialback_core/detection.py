@@ -61,15 +61,19 @@ async def sync_vendor(pool: AsyncConnectionPool, ramp: RampPort, keys: Keys, dat
     vendor = await ramp.get_vendor(ramp_vendor_id)
     accounts = await ramp.list_vendor_accounts(ramp_vendor_id)
 
-    # Phase 1: which of Ramp's accounts do we already know?
+    # Phase 1: have we synced this vendor before, and which of Ramp's accounts do we know?
+    # One statement, so both answers come from one snapshot: a webhook and a poll racing at
+    # first sight can't see the vendor row without the accounts written with it (spec 0048).
     async with system_tx(pool) as conn:
         rows = await (await conn.execute(
-            "select b.ramp_account_id from app.bank_accounts b join app.vendors v on v.id = b.vendor_id "
+            "select b.ramp_account_id from app.vendors v left join app.bank_accounts b on b.vendor_id = v.id "
             "where v.dataset_id = %s and v.ramp_vendor_id = %s", (dataset_id, ramp_vendor_id))).fetchall()
-    known = {r["ramp_account_id"] for r in rows}
-    # First sight of a vendor is a baseline, not a change. That is only safe after the
-    # dataset's initial import (spec 0002, D4 and Q2).
-    baseline = not known
+    known = {r["ramp_account_id"] for r in rows if r["ramp_account_id"] is not None}
+    # First sight of the vendor itself (no row yet) is a baseline, not a change. That is only
+    # safe after the dataset's initial import (spec 0002, D4 and Q2). A vendor we synced before
+    # is never a baseline, even with no account on file: its first account is a change with no
+    # previous account ("we're moving from checks to ACH", spec 0048).
+    baseline = not rows
     new_active = [] if baseline else [a for a in accounts if a.is_active and a.id not in known]
 
     # Phase 2: who made each new account, from Ramp's audit log.
