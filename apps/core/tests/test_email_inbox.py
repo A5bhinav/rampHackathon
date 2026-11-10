@@ -89,6 +89,9 @@ def test_mask_digit_runs():
     ("acct 0001,2345,4821", "acct ****,****,4821"),
     ("acct 0001\u20132345\u22124821", "acct ****\u2013****\u22124821"),
     ("acct 0001\ufeff\u20602345 4821", "acct ****\ufeff\u2060**** 4821"),
+    ("acct 0001\u00ad2345\u00ad4821", "acct ****\u00ad****\u00ad4821"),
+    ("acct 0001\u200e2345\u200f4821", "acct ****\u200e****\u200f4821"),
+    ("acct 0001\u20662345\u20694821", "acct ****\u2066****\u20694821"),
 ])
 def test_mask_digit_runs_other_separators(subject, masked):
     assert mask_digit_runs(subject) == masked
@@ -350,3 +353,28 @@ async def test_handle_email_acts_once_per_email(demo):
     again = received(email_id, subject="changed later")
     outcome = await handle_email(demo.pool, demo.worker.settings, demo.worker.keys, demo.worker.resend, demo.dataset.id, delivery_row["id"], again)
     assert outcome == "door_off" and (await rows(demo))[0]["subject"] == "New bank details"
+
+
+async def test_nul_between_digit_groups_in_the_sender_does_not_hide_the_number(demo, caplog):
+    caplog.set_level(logging.DEBUG)
+    email_id = await deliver(demo, sender="Acct 0001\x002345\x004821 <a@b.example>")
+    assert json.loads((await delivery(demo))["raw_body"])["data"]["from"] == "Acct ********4821 <a@b.example>"
+    demo.worker.resend = FakeResend({email_id: received(email_id, subject="Acct 0001\x002345\x004821")})
+    await demo.worker.tick(demo.dataset.id)
+    (row,) = await rows(demo)
+    assert row["sender"] == "Acct ********4821 <a@b.example>" and row["subject"] == "Acct ********4821"
+    await assert_nowhere(demo.pool, caplog, ACCOUNT)
+
+
+async def test_one_call_claims_at_most_limit_deliveries_and_does_not_starve_the_rest(demo, monkeypatch):
+    monkeypatch.setattr(inbox, "RETRY_SECONDS", (0, 0, 0, 0))
+    ids = [await deliver(demo) for _ in range(5)]
+    fake = FakeResend({i: ResendError("resend answered 503", retryable=True) for i in ids})
+
+    async def call() -> int:
+        return await inbox.process_inbound_emails(demo.pool, demo.worker.settings, fake, demo.worker.keys, limit=3, dataset_id=demo.dataset.id)
+    await call()
+    assert fake.fetched == ids[:3]
+    await call()
+    assert set(fake.fetched[3:5]) == set(ids[3:])  # the two never tried come before any second try
+    assert len(fake.fetched) == 6

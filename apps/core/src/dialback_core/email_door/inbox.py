@@ -84,20 +84,25 @@ async def process_inbound_emails(pool: AsyncConnectionPool, settings: Settings, 
 
     Any error on one email counts a try for that email only; it never stops the others or the rest of the tick.
     """
-    handled, seen = 0, set()
-    while handled < limit:
+    handled, claimed, seen = 0, 0, set()
+    while claimed < limit:  # every claimed row counts, so a tick's work is bounded whatever the fetches do
         async with system_tx(pool) as conn:
             # No casts in the claim: whatever the stored text holds, it must never make the claim itself fail.
             # `for no key update`: the inbound_emails row's foreign key to a delivery takes a key-share lock,
             # which a plain `for update` would make this claim wait on forever.
+            # Due and never-tried deliveries come before waiting and often-tried ones, so a few failing emails
+            # can't use up a tick's budget ahead of fresh mail. `of w`: only the delivery is locked.
             row = await (await conn.execute(
-                "select id, dataset_id, raw_body from app.inbound_webhooks "
-                "where source = 'resend' and signature_valid and event_type = 'email.received' and processed_at is null "
-                "and not (id = any(%s::bigint[])) and (%s::uuid is null or dataset_id = %s::uuid) "
-                "order by received_at, id for no key update skip locked limit 1", (list(seen), dataset_id, dataset_id))).fetchone()
+                "select w.id, w.dataset_id, w.raw_body from app.inbound_webhooks w "
+                "left join app.inbound_emails e on e.delivery_id = w.id "
+                "where w.source = 'resend' and w.signature_valid and w.event_type = 'email.received' and w.processed_at is null "
+                "and not (w.id = any(%s::bigint[])) and (%s::uuid is null or w.dataset_id = %s::uuid) "
+                "order by coalesce(e.next_try_at > app.now(w.dataset_id), false), coalesce(e.tries, 0), w.received_at, w.id "
+                "for no key update of w skip locked limit 1", (list(seen), dataset_id, dataset_id))).fetchone()
             if row is None:
                 return handled
             seen.add(row["id"])
+            claimed += 1
             error = None
             try:
                 payload = json.loads(row["raw_body"])

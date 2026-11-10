@@ -5,8 +5,8 @@ import re
 
 # A run of digits, possibly grouped by up to 5 separator characters: whitespace (a no-break space too),
 # `,` `.` `-` `/` `_`, the Unicode dashes U+2010 to U+2015 and U+2212, and the zero-width characters
-# U+200B, U+200C, U+200D, U+2060 and U+FEFF. A separator never matches a digit, so the pattern is linear.
-_RUN = re.compile(r"(?<!\d)\d(?:[\s,.\-/_\u2010-\u2015\u2212\u200b\u200c\u200d\u2060\ufeff]{0,5}\d)*")
+# U+200B, U+200C, U+200D, U+2060 and U+FEFF, and the invisible formatting characters U+00AD, U+200E, U+200F and U+2066 to U+2069. A separator never matches a digit, so the pattern is linear.
+_RUN = re.compile(r"(?<!\d)\d(?:[\s,.\-/_\u2010-\u2015\u2212\u200b\u200c\u200d\u2060\ufeff\u00ad\u200e\u200f\u2066-\u2069]{0,5}\d)*")
 
 
 def strip_nul(text: str) -> str:

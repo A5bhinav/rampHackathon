@@ -65,7 +65,7 @@ def _kept(raw: bytes) -> str:
     data = payload.get("data") if isinstance(payload.get("data"), dict) else {}
     kept = {k: data.get(k) for k in ("email_id", "message_id", "from", "to") if k in data}
     if isinstance(kept.get("from"), str):  # a display name is typed by a person: it can carry an account number (ADR-8)
-        kept["from"] = mask_digit_runs(kept["from"])
+        kept["from"] = mask_digit_runs(strip_nul(kept["from"]))  # strip first: a NUL can split a number
     try:  # a non-finite number is not JSON Postgres accepts: keep the hash and length instead
         return json.dumps(_no_nul({"type": payload.get("type"), "created_at": payload.get("created_at"), "data": kept}), allow_nan=False)
     except ValueError:
