@@ -280,7 +280,7 @@ def test_keypad_timeout_submits(make_ctx, clock, monkeypatch):
     # entry going; a pause past the wait submits what is typed as if '#' were pressed, whatever its
     # length (three digits here, so only the wait can have submitted it).
     inbound = [_good_setup(), {"pause": 3 * FAST}, *_say(*SPOKEN), *_keys("48"), {"pause": FAST / 10},
-               *_keys("2"), {"pause": LONG}, *_keys("4821"), {"pause": LONG}]
+               *_keys("2"), {"pause": 3 * FAST}, *_keys("4821"), {"pause": LONG}]
     r, sent = _relay(make_ctx(), clock, inbound)
     assert seen == ["482", "4821"]
     assert sum(line.startswith(REASK) for line in sent) == 1   # the short entry used the one more try
