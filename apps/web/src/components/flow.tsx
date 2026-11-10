@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { CaseSummary } from "@/lib/api-types";
 import { dayWindow, heldLanes, place } from "@/lib/flow";
-import { STATIONS, type StationCount, type StationView } from "@/lib/stations";
+import { STATIONS, stationIndex, type StationCount, type StationView } from "@/lib/stations";
 import { brief, date, dueLabel, when } from "@/lib/format";
 import { Icon } from "./icons";
 
@@ -22,7 +22,7 @@ export function QueueRail({ counts }: { counts: StationCount[] }) {
             <span className="station-count">{s.count}<span className="sr-only"> {s.count === 1 ? "change" : "changes"}</span></span>
             {s.markers.length ? (
               <span className="station-split">
-                {s.markers.map((m) => <span key={m.label} className={`badge tone-${m.tone}`}>{m.count} {m.label.toLowerCase()}</span>)}
+                {s.markers.map((m) => <span key={m.label} className={`badge tone-${m.tone}`}>{m.count} {m.label}</span>)}
               </span>
             ) : null}
           </li>
@@ -31,6 +31,8 @@ export function QueueRail({ counts }: { counts: StationCount[] }) {
     </section>
   );
 }
+
+const SAY: Record<StationView["status"], string> = { done: "done", current: "now", todo: "not reached", branched: "stopped" };
 
 const SEG: Record<StationView["status"], string> = { done: "done", current: "current", todo: "todo", branched: "branched" };
 
@@ -45,15 +47,17 @@ export function MiniRail({ views }: { views: StationView[] }) {
 
 /** A case's stepper: this change's status at each of the seven stations. */
 export function CaseRail({ steps }: { steps: StationView[] }) {
+  const at = stationIndex(steps);  // where the case stands: the step screen readers hear as current
   return (
     <section className="stepper-card" aria-label="Progress">
       <ol className="stepper stepper-7">
-        {steps.map((s) => (
-          <li key={s.key} className={`step is-${s.status === "branched" ? "failed" : s.status} st-${s.tone}`} aria-current={s.status === "current" ? "step" : undefined}>
+        {steps.map((s, i) => (
+          <li key={s.key} className={`step is-${s.status === "branched" ? "failed" : s.status} st-${s.tone}`}
+              aria-current={i === at && s.status !== "done" ? "step" : undefined}>
             <span className="step-node" aria-hidden="true">
               {s.status === "done" ? <Check /> : s.status === "branched" ? (s.tone === "bad" ? "✕" : "!") : null}
             </span>
-            <span className="step-label">{s.label}<span className="sr-only">: {s.status === "todo" ? "not reached" : s.status}</span></span>
+            <span className="step-label">{s.label}<span className="sr-only">: {SAY[s.status]}{s.marker ? `, ${s.marker}` : ""}</span></span>
             <span className="step-note">{s.marker ?? (s.at ? brief(s.at) : s.status === "current" ? "Now" : "—")}</span>
           </li>
         ))}

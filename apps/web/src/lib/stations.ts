@@ -3,7 +3,7 @@
 // evidence chain. One function feeds the case stepper, the queue's rails and the station counts.
 // Display only: it reads the events the core sent and decides nothing; an unknown state never
 // shows as approved or released.
-import type { CaseState } from "./api-types";
+import type { CaseState, HoldStatus } from "./api-types";
 import type { IconName } from "../components/icons";
 import { STATE_LABEL } from "./states.ts";
 
@@ -26,6 +26,12 @@ export const STATIONS: { key: StationKey; label: string; event: string; icon: Ic
 /** States in which code is still working, so the case page keeps itself fresh. */
 export const REFRESH_STATES: ReadonlySet<CaseState> = new Set(["open", "held", "calling", "retry_wait", "deciding", "releasing"]);
 
+/** How long to wait before the next refresh: every 2 seconds for the first minute on the page, then
+ *  every 10 (a case can wait hours for its calling window, and each read recomputes the chain). */
+export function refreshDelay(elapsedMs: number): number {
+  return elapsedMs < 60_000 ? 2000 : 10_000;
+}
+
 /** The current version's events: from the latest change_detected on (all of them if it isn't listed). */
 export function currentVersion<T extends StationEvent>(events: readonly T[]): T[] {
   let from = 0;
@@ -41,16 +47,21 @@ export function stations(events: readonly StationEvent[], state: CaseState, outc
   const has = (...types: string[]) => Boolean(lastOf(...types));
   const known = Object.hasOwn(STATE_LABEL, state);
   const decided = has("decision_made");
-  const callEnd = ev.find((e, i) => e.type === "call_ended"
+  const callEnd = ev.findLast((e, i) => e.type === "call_ended"
     && (e.to_state === "deciding" || (e.to_state == null && ev.slice(i + 1).some((x) => x.type === "decision_made"))));
+  const approvedAt = ev.findLastIndex((e) => e.type === "release_approved");
+  const approval = approvedAt >= 0 && !ev.slice(approvedAt + 1).some((e) => ["command_failed", "review_cleared", "review_blocked"].includes(e.type))
+    ? ev[approvedAt] : undefined;
   const done: Record<StationKey, StationEvent | true | undefined> = {
     detected: lastOf("change_detected") ?? true,  // a case exists, so a change was detected
     held: lastOf("hold_confirmed"),
     number: lastOf("number_resolved"),
     called: callEnd ?? (decided ? true : undefined),
     decided: lastOf("decision_made"),
-    approved: lastOf("release_approved") ?? (known && (state === "releasing" || state === "released") ? true : undefined),
-    released: lastOf("hold_release_confirmed") ?? (state === "released" ? true : undefined),
+    // An approval counts only if no failed release, or review after it, voided it; and never in a
+    // state the dashboard doesn't know (fail closed: never draw money as approved or released).
+    approved: known ? (approval ?? (state === "releasing" || state === "released" ? true : undefined)) : undefined,
+    released: known && state === "released" ? (lastOf("hold_release_confirmed") ?? true) : undefined,
   };
 
   const branch: Partial<Record<StationKey, Branch>> = {};
@@ -86,47 +97,63 @@ export function stations(events: readonly StationEvent[], state: CaseState, outc
     const v = views.find((x) => x.key === key)!;
     if (v.status === "todo") Object.assign(v, { status: "current", tone: "info" }, extra);
   };
-  const coApproved = has("release_co_approved") ? { tone: "warn" as const, marker: "1 of 2" } : {};
+  const coApproved = has("release_co_approved") && !done.approved ? { tone: "warn" as const, marker: "1 of 2" } : {};
   if (state === "awaiting_release" || (state === "needs_review" && decided)) current("approved", coApproved);
   else if (state === "releasing") current("released");
-  else if (known && state !== "released" && Object.keys(branch).length === 0) {
+  else if (REFRESH_STATES.has(state) && Object.keys(branch).length === 0) {  // never in review or blocked
     const first = views.find((v) => v.status === "todo");
     if (first) current(first.key);
   }
   return views;
 }
 
-// What a state alone says happened, for a case whose evidence rows aren't in the loaded log.
+// What a state alone says happened, for a case whose evidence rows aren't in the loaded log. Code's
+// own states imply the steps before them; a state a person reached (ready to release, releasing,
+// released) implies the call and decision only when the case has an outcome, since a reviewer can
+// clear a case that never got that far. Held follows the hold's own status.
 const IMPLIED: Partial<Record<CaseState, string[]>> = {
   open: [],
   held: ["hold_confirmed"],
   calling: ["hold_confirmed", "number_resolved"],
   retry_wait: ["hold_confirmed", "number_resolved"],
   deciding: ["hold_confirmed", "number_resolved", "call_ended"],
-  awaiting_release: ["hold_confirmed", "number_resolved", "call_ended", "decision_made"],
-  releasing: ["hold_confirmed", "number_resolved", "call_ended", "decision_made", "release_approved"],
-  released: ["hold_confirmed", "number_resolved", "call_ended", "decision_made", "release_approved", "hold_release_confirmed"],
 };
+const DECIDED_PATH = ["hold_confirmed", "number_resolved", "call_ended", "decision_made"];
+const HOLD_IN_PLACE: readonly (HoldStatus | null | undefined)[] = ["confirmed", "releasing", "released"];
 
 type Row = { case_id: string | null; type: string; seq: number; occurred_at?: string };
-type CaseLike = { id: string; state: CaseState; outcome: string | null };
+type CaseLike = { id: string; state: CaseState; outcome: string | null; hold_status?: HoldStatus | null };
+
+function implied(c: CaseLike): StationEvent[] {
+  let types = IMPLIED[c.state] ?? (c.outcome ? DECIDED_PATH : []);
+  if (!c.outcome && !IMPLIED[c.state]) types = [];
+  if (HOLD_IN_PLACE.includes(c.hold_status) && !types.includes("hold_confirmed")) types = ["hold_confirmed", ...types];
+  if (c.state === "releasing" || c.state === "released") types = [...types, "release_approved", ...(c.state === "released" ? ["hold_release_confirmed"] : [])];
+  return [{ type: "change_detected" }, ...types.map((type) => ({ type, ...(type === "call_ended" ? { to_state: "deciding" as const } : {}) }))];
+}
 
 /** The same seven stations from the dataset's evidence rows (no to_state): grouped by case, by seq. */
 export function stationsFromEvidence(rows: readonly Row[], c: CaseLike): StationView[] {
   const mine = rows.filter((r) => r.case_id === c.id).sort((a, b) => a.seq - b.seq);
-  if (mine.length) return stations(mine, c.state, c.outcome);
-  const implied = IMPLIED[c.state] ?? (c.outcome ? IMPLIED.awaiting_release! : []);
-  return stations([{ type: "change_detected" }, ...implied.map((type) => ({ type, ...(type === "call_ended" ? { to_state: "deciding" as const } : {}) }))],
-    c.state, c.outcome);
+  if (!mine.length) return stations(implied(c), c.state, c.outcome);
+  // The log keeps the newest rows; a case whose first rows aged out gets them back from its state.
+  return stations(mine[0].type === "change_detected" ? mine : [...implied(c), ...mine], c.state, c.outcome);
 }
 
 /** Where a case stands: its current or branched station, else the first not done (Released when all are). */
 export function stationIndex(views: readonly StationView[]): number {
-  const i = views.findIndex((v) => v.status === "current" || v.status === "branched");
+  const now = views.findIndex((v) => v.status === "current");  // where it waits beats an earlier branch
+  if (now >= 0) return now;
+  const i = views.findIndex((v) => v.status === "branched");
   if (i >= 0) return i;
   const todo = views.findIndex((v) => v.status === "todo");
   return todo >= 0 ? todo : views.length - 1;
 }
+
+// How a marker reads after a count on the Inbox rail ("2 awaiting a second approver").
+const COUNT_LABEL: Record<string, string> = {
+  "1 of 2": "awaiting a second approver", "A step could not finish": "with a failed step", "Deadline reached": "past the deadline",
+};
 
 export type StationCount = { key: StationKey; label: string; count: number; markers: { label: string; tone: Tone; count: number }[] };
 
@@ -138,8 +165,9 @@ export function stationCounts(cases: readonly CaseLike[], rows: readonly Row[]):
     out[i].count += 1;
     const v = views[i];
     if (v.marker) {
-      const m = out[i].markers.find((x) => x.label === v.marker);
-      if (m) m.count += 1; else out[i].markers.push({ label: v.marker, tone: v.tone, count: 1 });
+      const label = COUNT_LABEL[v.marker] ?? v.marker.toLowerCase();
+      const m = out[i].markers.find((x) => x.label === label);
+      if (m) m.count += 1; else out[i].markers.push({ label, tone: v.tone, count: 1 });
     }
   }
   return out;

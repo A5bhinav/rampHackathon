@@ -1,7 +1,7 @@
 // The seven stations (spec 0064), read from the current version's evidence events. `pnpm test`.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { REFRESH_STATES, STATIONS, stationCounts, stations, stationsFromEvidence, type StationEvent } from "../src/lib/stations.ts";
+import { REFRESH_STATES, STATIONS, refreshDelay, stationCounts, stations, stationsFromEvidence, type StationEvent } from "../src/lib/stations.ts";
 
 let t = 0;
 const ev = (type: string, to_state?: string): StationEvent => ({ type, to_state: to_state as StationEvent["to_state"], occurred_at: new Date(Date.UTC(2026, 10, 9, 14, t++)).toISOString(), seq: t });
@@ -146,9 +146,89 @@ test("station counts: each case at its current or branched station, released at 
     { seq: 1, case_id: "d", type: "change_detected", occurred_at: "x" }, { seq: 2, case_id: "d", type: "decision_made", occurred_at: "y" },
   ]);
   assert.equal(blocked[4].count, 1);
-  assert.deepEqual(blocked[4].markers, [{ label: "Not verified", tone: "bad", count: 1 }]);
+  assert.deepEqual(blocked[4].markers, [{ label: "not verified", tone: "bad", count: 1 }]);
 });
 
 test("the case page refreshes only while code is working", () => {
   assert.deepEqual([...REFRESH_STATES].sort(), ["calling", "deciding", "held", "open", "releasing", "retry_wait"]);
+});
+
+// From the 0064 review: paths the first version drew wrongly.
+test("a release that failed and went back to review voids the approval", () => {
+  const failed = [...APPROVED, ev("command_failed", "needs_review")];
+  const review = stations(failed, "needs_review", "verified");
+  assert.equal(review[5].status, "branched");
+  assert.equal(marker(review, "approved"), "A step could not finish");
+  assert.equal(review[6].status, "todo");
+  const cleared = stations([...failed, ev("review_cleared", "awaiting_release")], "awaiting_release", "verified");
+  assert.equal(cleared[5].status, "current");
+  assert.equal(cleared[5].at, undefined, "not stamped with the voided approval's time");
+  const blocked = stations([...failed, ev("review_blocked", "blocked")], "blocked", "verified");
+  assert.equal(marker(blocked, "approved"), "Rejected");
+  assert.ok(blocked.every((s) => s.status !== "current"), "a blocked case is never drawn as releasing");
+});
+
+test("blocked or in review with nothing branched: no station is current", () => {
+  assert.ok(stations(HELD, "needs_review", null).every((s) => s.status !== "current"));
+  assert.ok(stations(HELD, "blocked", null).every((s) => s.status !== "current"));
+});
+
+test("one approval then the second: approved, and the marker is gone", () => {
+  const s = stations([...DECIDED, ev("release_co_approved", "awaiting_release"), ev("release_approved", "releasing")], "releasing", "verified");
+  assert.equal(s[5].status, "done");
+  assert.equal(s[5].marker, undefined);
+  assert.equal(s[6].status, "current");
+});
+
+test("an unknown state never shows approved or released, even with those events", () => {
+  const s = stations(RELEASED, "on_ice" as never, "verified");
+  assert.equal(s[5].status, "todo");
+  assert.equal(s[6].status, "todo");
+});
+
+test("after a retry, the lists time Called from the call that led to the decision", () => {
+  const rows = [
+    { seq: 1, case_id: "a", type: "change_detected", occurred_at: "2026-11-09T14:01:00Z" },
+    { seq: 2, case_id: "a", type: "hold_confirmed", occurred_at: "2026-11-09T14:02:00Z" },
+    { seq: 3, case_id: "a", type: "number_resolved", occurred_at: "2026-11-09T14:03:00Z" },
+    { seq: 4, case_id: "a", type: "call_ended", occurred_at: "2026-11-09T14:04:00Z" },
+    { seq: 5, case_id: "a", type: "retry_timer_fired", occurred_at: "2026-11-09T15:00:00Z" },
+    { seq: 6, case_id: "a", type: "call_ended", occurred_at: "2026-11-09T15:05:00Z" },
+    { seq: 7, case_id: "a", type: "decision_made", occurred_at: "2026-11-09T15:06:00Z" },
+  ];
+  assert.equal(stationsFromEvidence(rows, { id: "a", state: "awaiting_release", outcome: "verified" })[3].at, "2026-11-09T15:05:00Z");
+});
+
+test("the state-only fallback claims nothing a null outcome or an unconfirmed hold doesn't say", () => {
+  const cleared = stationsFromEvidence([], { id: "z", state: "awaiting_release", outcome: null, hold_status: "confirmed" });
+  assert.equal(status(cleared), "ddtttct");
+  const unheld = stationsFromEvidence([], { id: "z", state: "awaiting_release", outcome: null, hold_status: "failed" });
+  assert.equal(unheld[1].status, "todo");
+  assert.ok(stationsFromEvidence([], { id: "z", state: "needs_review", outcome: null }).every((s) => s.status !== "current"));
+});
+
+test("a case whose first rows aged out of the log keeps its earlier stations", () => {
+  const rows = [
+    { seq: 900, case_id: "a", type: "call_started", occurred_at: "2026-11-09T14:04:00Z" },
+    { seq: 901, case_id: "a", type: "call_ended", occurred_at: "2026-11-09T14:05:00Z" },
+  ];
+  assert.equal(status(stationsFromEvidence(rows, { id: "a", state: "deciding", outcome: null, hold_status: "confirmed" })), "ddddctt");
+});
+
+test("the inbox counts a case where it waits, not at an earlier branch, and labels counts in words", () => {
+  const counts = stationCounts([{ id: "a", state: "awaiting_release", outcome: "verified" }], [
+    { seq: 1, case_id: "a", type: "change_detected" }, { seq: 2, case_id: "a", type: "hold_confirmed" },
+    { seq: 3, case_id: "a", type: "no_provable_number" }, { seq: 4, case_id: "a", type: "review_cleared" },
+  ]);
+  assert.equal(counts[5].count, 1);
+  const co = stationCounts([{ id: "b", state: "awaiting_release", outcome: "verified" }], [
+    { seq: 1, case_id: "b", type: "change_detected" }, { seq: 2, case_id: "b", type: "decision_made" }, { seq: 3, case_id: "b", type: "release_co_approved" },
+  ]);
+  assert.deepEqual(co[5].markers, [{ label: "awaiting a second approver", tone: "warn", count: 1 }]);
+});
+
+test("the refresh backs off: every 2 seconds for the first minute, then every 10", () => {
+  assert.equal(refreshDelay(0), 2000);
+  assert.equal(refreshDelay(59_000), 2000);
+  assert.equal(refreshDelay(61_000), 10_000);
 });
