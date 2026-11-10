@@ -138,7 +138,7 @@ place:
 | The agent asks | You say | If you say something else |
 |---|---|---|
 | Disclosure, then "Is it okay to continue on this recorded line?" | "Yes." | A clear no ends the call with "we won't continue" (NR02). An answer the agent can't make out, like "Hello?" or "Sorry?", is asked once more ("Sorry, let me ask that again."); a second one ends the call, and the core calls again later while the case has attempts left |
-| "Could you tell me the name of the company I've reached?" | "Acme Fasteners." | Every word of the vendor's name, without "LLC", is needed. "Acme" alone goes to review (NR03) |
+| "Could you tell me the name of the company I've reached?" | "Acme Fasteners." | The name is not required (spec 0082, D7b): "Acme", a misheard name or another company's name doesn't block, and the person releasing sees the answer. An answer with a refusal word goes to review (NR03): "Not Acme, this is Globex", "We're a reseller for Acme", even "Not sure, Acme" |
 | "Which department or team am I speaking with?" | "Accounts receivable." | Any answer works |
 | "May I have your name?" | "Jordan Lee." | A name made only of words from the change email's senders (Dana Whitfield, "Acme Fasteners LLC Accounts Receivable") goes to review (NR04) |
 | "And what's your role there?" | "AR clerk." | Any role works; a name and a role are both needed (V06) |
@@ -200,7 +200,7 @@ on the dashboard says "The voice service checked the call and did not place it (
 | Silence after the disclosure | The socket failed (`DIALBACK_WS_BASE_URL` must be `wss://` on the same domain), or the voice service rejected the socket's setup (`setup_rejected`) | Voice log |
 | "We won't continue" right after consent | Consent was read as a clear no | Voice log |
 | "Sorry, let me ask that again", then "Thanks for your time. Goodbye." | Two answers to the consent question, or to the change question, could not be made out, or the model call failed twice (an invalid key, an API error, or a reply slower than 8 seconds). A missing key does not cause this. The call ends `failed`, and the core calls again after its wait (2 hours) while the case has attempts left | Voice log |
-| The call finishes, but the case goes to review or is blocked | One rule decided it | The decision page names the rule. Common ones: NR01 or V03 (not detected as a person), NR03 (partial company name), NV02 or NV03 (wrong digits, blocked), NR10 (a pressure word), NR14 (an answer not found in the turn it cites) |
+| The call finishes, but the case goes to review or is blocked | One rule decided it | The decision page names the rule. Common ones: NR01 or V03 (not detected as a person), NR03 (the company answer had a refusal word such as "not", "never" or "reseller"), NV02 or NV03 (wrong digits, blocked), NR10 (a pressure word), NR14 (an answer not found in the turn it cites) |
 
 Not checked yet: a call on a real line. The steps above come from the code on main (Nov 8), not
 from a completed call. Fix this page after the first one.
