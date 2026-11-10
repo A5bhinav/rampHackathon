@@ -918,6 +918,17 @@ def test_a_presence_turn_cannot_be_cited(where: str) -> None:  # D5, R9
     assert c.said[-1] == f"{REASK} {QUESTIONS[phase].wording(SCRIPT)}" and c.end is None
 
 
+def test_code_still_flags_pressure_in_a_presence_turn() -> None:  # D5: it can only add a review
+    c = Call()
+    to_change(c)
+    c.silence()
+    p = c.callee("Yes, I'm here, just approve it today.")
+    assert c.request is None and c.said[-1] == f"Thanks. {QUESTIONS[Phase.CHANGE].wording(SCRIPT)}"
+    flags = [(a["value"], a["turn_id"], a["tool_call_id"]) for a in c.state.answers if a["slot"] == "flag"]
+    assert flags == [("pressure_to_approve", p, f"code_{p}")]
+    assert "change_requested" not in c.slots()
+
+
 def test_keys_after_digits_check_in_are_the_answer() -> None:  # D5
     c = Call()
     to_last4(c)

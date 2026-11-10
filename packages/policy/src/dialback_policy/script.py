@@ -37,7 +37,12 @@ PHASE_SLOT: dict[Phase, str] = {
 }
 
 FALLBACK_LINE = "Sorry, I can't go into that on this call."
+# The check-ins when the line goes quiet, and what comes before the question asked again after a
+# reply to one (spec 0051, D4 and D5).
 STILL_THERE = "Sorry, are you still there?"
+TAKE_YOUR_TIME = ("Take your time. When you have the last four digits, enter them on your keypad, then press the "
+                  "pound key.")
+THANKS = "Thanks."
 REASK = "Sorry, let me ask that again."
 # The last four come only from the keypad (spec 0043): the line after the star key, and the re-ask
 # after digits were spoken instead of typed.
