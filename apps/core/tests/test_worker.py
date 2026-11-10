@@ -275,6 +275,7 @@ async def test_withheld_selection_goes_to_review(world, database_url, monkeypatc
     # FINDINGS A1 (the change request's own text calls the vendor's line a bank's; a planted number
     # is provable), withholds, and the core treats the selection like no_provable_number: no call,
     # its reason, and a person reviews.
+    from dialback_core.timeline import summary
     from dialback_ledger.ingest import ingest_all
     from dialback_ledger.select import WITHHELD
     from dialback_ledger.store import add_vendor_domain, mark_change_request, write_ingest
@@ -316,6 +317,11 @@ async def test_withheld_selection_goes_to_review(world, database_url, monkeypatc
                                    "where id = %s", event["body"]["number_selection_id"])
     assert stored["outcome"] == "withheld" and stored["contact_point_id"] is None
     assert event["body"]["rule_version"] == stored["rule_version"]
+    # The case timeline says why, not "no number is provable".
+    assert summary("no_provable_number", event["body"], "system") == (
+        "The change request would change which phone number is called, so no call was made and a person must verify.")
+    assert summary("no_provable_number", {"reason": "No number met the rule."}, "system").startswith(
+        "No phone number for this vendor is provable")
 
 
 async def test_a_pre_dial_refusal_sends_the_case_to_a_person(world):

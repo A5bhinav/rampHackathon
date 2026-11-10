@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from dialback_ledger.select import WITHHELD
+
 OUTCOME = {"verified": "Verified", "not_verified": "Not verified", "needs_review": "Needs review"}
 
 LAST_FOUR = {
@@ -81,6 +83,8 @@ def summary(event_type: str, body: dict[str, Any], actor_name: str) -> str:
         case "number_resolved":
             return "The Trust Ledger found a provable phone number for this vendor."
         case "no_provable_number":
+            if b.get("reason") == WITHHELD:   # spec 0079: a number is provable, but the change request would move the call
+                return "The change request would change which phone number is called, so no call was made and a person must verify."
             return "No phone number for this vendor is provable, so no call was made and a person must verify."
         case "call_started":
             return f"Call attempt {b.get('attempt', '?')} started."
