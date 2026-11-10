@@ -140,3 +140,33 @@ def test_d6_a_variant_matches_only_as_a_run_of_whole_words(said, vendor):
 
 def test_d6_trade_names_give_variants_too():
     assert company_matches("This is Acme", "Globex Holdings Inc", ("Acme Fasteners",)) is True
+
+
+# B8 (spec 0082, D7a): refusal words override a match. Each of these names the vendor and says the
+# person is not with it, or only works with it, so it must not count as naming the vendor.
+REFUSALS = [
+    "Not Acme, this is Globex",
+    "This isn't Acme",
+    "We're a reseller for Acme",
+    "We distribute for Acme",
+    "I used to work at Acme",
+    "I was at Acme until last year",
+    "Acme, sorry, I mean Globex",
+]
+
+
+@pytest.mark.parametrize("said", REFUSALS)
+def test_b8_refusal_words_override_a_match(said):
+    assert matches(said, ACME) is False
+
+
+@pytest.mark.parametrize("said, names, expected", [
+    ("No problem, this is Acme", ACME, True),          # bare "no" never counts
+    ("Sorry, Acme Fasteners", ACME, True),             # bare "sorry" never counts
+    ("Yes, Acme", ACME, True),
+    ("Never Summer", ("Never Summer Industries",), True),  # a word in the vendor's own name doesn't count
+    ("Acme? No, Globex", ACME, True),                  # accepted cost: a correction with no refusal word
+    ("Not sure, I think this is Acme", ACME, False),   # the safe cost: an honest answer goes to review
+], ids=["no-problem", "sorry", "yes", "own-name-word", "correction-cost", "not-sure-cost"])
+def test_b8_honest_answers_and_pinned_costs(said, names, expected):
+    assert matches(said, names) is expected
