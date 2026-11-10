@@ -645,8 +645,8 @@ F1 to F9 hold as built (verified). But the lab still claims more than it shows:
     that never matched (`git grep -E` with `\b`), so they were wrong. Search with a plain pattern.
   - Spec 0048 is taken twice: `sami/lab-honest` (the lab, added 22:34 on Nov 9, Q101 to Q105) and
     `sami/detect-first-account` (added 22:44, Q102 to Q106). The later one should renumber.
-  - Spec 0049 (`sami/llm-reader-spec`, the LLM document reader) takes Q107 to Q111. The next free
-    numbers are spec 0050 and Q112.
+  - Spec 0049 (`sami/llm-reader-spec`, the LLM document reader) takes Q107 to Q112. The next free
+    numbers are spec 0050 and Q113.
 
 ## F. How other services verify a bank change (Nov 9)
 
