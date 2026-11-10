@@ -42,6 +42,13 @@ reply: bank changes are not accepted by email, please use the portal.
 4. Dialback **never calls a number taken from the email**. This is rule R2, and the Trust Ledger
    already enforces it once the email is filed as the change request.
 5. Flagged emails without enough information get a reply pointing to the formal portal.
+6. **A way out of `blocked`:** two people can dismiss an email case while Ramp's account is
+   unchanged, which lifts the hold.
+7. **On stage, the email beat runs alongside the clerk beat (0077) on a different vendor,** and
+   the door acts only on that vendor while the address is public.
+8. **Build without a domain for now:** receive at the free Resend address, no replies until a
+   domain exists.
+9. **The reply links to a small public page on the dashboard.**
 
 ## Goals
 
@@ -53,6 +60,7 @@ reply: bank changes are not accepted by email, please use the portal.
    in it is excluded from selection (R2) and the lineage panel says why.
 5. Every flagged email gets the same fixed reply.
 6. People can see every flagged email and what happened to it.
+7. Two people can dismiss a blocked email case, which lifts the hold, while Ramp's account is unchanged.
 
 ## Non-goals (version 1)
 
@@ -225,8 +233,9 @@ Consequences, all through existing behavior:
 
 ### 8. The reply
 
-One fixed message for every flagged email, with or without a case: payment details are not changed
-by email, please use the portal, plus the link. The wording is Sami's to approve.
+One fixed message for every flagged email, with or without a case, plus the link to the public page
+(see "What Sami's later decisions add"; wording pending Sami). Until a domain exists, replies are
+built and tested but switched off.
 
 - Sent only to the `From` address, never `Reply-To`, threaded with `In-Reply-To`.
 - **Sent only when the `From` domain passed authentication** (DMARC, or SPF or DKIM aligned with
@@ -300,56 +309,77 @@ Tests written before code, following the repo's spec loop:
 - How the inbox list looks, within the existing dashboard style.
 - Whether the email door also writes a masked `bank_account` observation to the ledger.
 
-## Decisions pending (Sami)
+## What Sami's later decisions add
 
-Raised by the builder check; each changes what gets built.
+Decided after the builder check (decisions 6 to 9 above).
 
-A. **A way out of `blocked` for email cases** (open question 4). Either a new person action,
-   "dismiss: nothing changed in Ramp", that moves an email case from `blocked` to `releasing` (lifting
-   the hold so the real account is paid), allowed only while Ramp's current account is unchanged
-   and with two approvers. That is one more PR in Abhi's money-path SQL, a contract change, a
-   dashboard button and a state-machine redraw. Or accept the freeze and reset the demo between runs.
-B. **Demo staging.** Does the email beat run next to the clerk beat (0077) or replace it? Should
-   the door act only on the vendors named at `demo prepare` while the address is public on stage?
-   Two things depend on this. Both doors on one vendor collide, because there is one unfinished case
-   per vendor. And the email door ends Not verified with an unknown changer, so it can't show R5
-   refusing the changer's release; only the clerk beat can.
-C. **The domain** (open question 6). It is effectively required: the free `<id>.resend.app` address
-   is hard to type on a phone, and replies need a verified domain.
-D. **The portal link** (open question 1). The repo has no vendor-facing portal; 0077's page is a
-   signed-in clerk tool.
+**A way out of `blocked` for email cases.** When an email case is decided Not verified it goes to
+`blocked`, and today the only way out of `blocked` is another `change_detected`
+(`supabase/migrations/app/0003_case_transitions.sql`). The deadline doesn't help: it acts only in
+held, calling, retry_wait and deciding (`worker.py::DEADLINE_ACTIVE`). In the clerk path that dead
+end is defensible, because the fraudulent account sits in Ramp. In the email door Ramp never changed,
+so without a way out, catching a fraud would freeze the real vendor's real account for good.
+
+- New person transition, `blocked` to `releasing` (event name the builder's, for example
+  `email_case_dismissed`), which lifts the hold so bills pay the account already on file.
+- Guard: every change on the case came in by email (no Ramp-detected change joined it), and the
+  vendor's current Ramp account is the one that was current when the case opened.
+- Two different people, each giving a written reason, the first co-approving like ADR-10's
+  unknown-changer release. The timeline says "dismissed: Ramp never changed; hold lifted".
+- This is money-path SQL in Abhi's area: plan mode (repo `CLAUDE.md`), a contract change in its own
+  PR, a dashboard button, and a state-machine redraw.
+
+**Demo staging: alongside the clerk beat, one vendor.**
+
+- The clerk beat (0077) stays on Acme and still shows R5 refusing the changer's release, which the
+  email door can't show (its changer is unknown and it ends Not verified).
+- The email beat uses **Cobalt**. Its ledger story (spec 0025) already ends with the real AR line
+  called and the real vendor denying, which is Not verified.
+- `demo prepare` gets a way to name the email door's vendor(s) and turns the per-dataset switch on.
+  It must not load Cobalt's canned change-request email, because the live email is the request.
+- While the address is public, mail naming any other vendor opens nothing and is listed as "not this
+  demo's email vendor". The reply still goes out the same as for everyone.
+
+**No domain for now.** Mail is received at the free `<name>@<id>.resend.app` address. Replies stay off
+and every flagged email is listed as "reply not sent: sending not configured". The authentication
+check still runs and still feeds the red flags. Demo suggestion: put a QR code on the slide that opens
+a `mailto:` link with the address, a subject and a sample body (naming Cobalt Freight, with a phone
+number including its area code) already filled in. Judges don't have to type the address, the email
+matches, and they can still edit it.
+
+**A small public page on the dashboard** that the reply links to. It needs no sign-in and shows no
+data. **Its content is pending Sami:** the repo has no vendor-facing portal and no formal request
+channel. Dialback's model is that requests arrive however they arrive and a clerk types them into
+Ramp. Proposed wording for the page and the reply: "We never change payment details because of an
+email. Every change is confirmed using contact details we already have for you, not ones sent in the
+request. To change your payment details, contact your account contact at <company> using details
+you already have for them. We will never ask you to confirm by replying to an email or calling a
+number someone sent you."
 
 ## Open questions (team)
 
-1. **Where does the portal link point?** Ramp's real vendor portal, or a page in the dashboard?
-   Pending Sami (D).
+1. **The page and reply wording** (above). Pending Sami.
 2. **Should red flags feed `decide()`?** That changes decision logic (Abhi and Inesh's area).
 3. **The verified ending.** One option: a Ramp change whose routing number and last four match a
    request verified in the last N days skips the second call. Note that today the two fingerprints
    can't be compared: the email side uses the full number and the Ramp side uses routing, last four
    and Ramp's account ID (`detection.py::fingerprint`).
-4. **Freezing by email: a blocked case never lets go.** When an email case is decided Not verified it
-   goes to `blocked`, and the only way out of `blocked` is another `change_detected`
-   (`supabase/migrations/app/0003_case_transitions.sql`). The deadline doesn't help: it acts only in
-   held, calling, retry_wait and deciding (`worker.py::DEADLINE_ACTIVE`). In the clerk path that dead
-   end is defensible, because the fraudulent account sits in Ramp. In the email door Ramp never
-   changed, so catching a fraud freezes the real vendor's real account indefinitely, and any
-   convincing email can do it. **Pending Sami** (see "Decisions pending").
-5. **A heads-up to the vendor's contact on file** ("we received a request to change your bank
+4. **A heads-up to the vendor's contact on file** ("we received a request to change your bank
    details"), sent to the address Dialback already trusts, not the sender. Wanted in v1?
-6. **The domain:** who buys it, and what is it called?
+5. **The domain, later:** who buys it, and what is it called? Until then there are no replies.
 
 ## Rough size
 
-About 7 to 9 working days for one person, as 5 or 6 PRs under 400 lines each. This is an estimate
-from reading the code, not from building it.
+About 9 to 11 working days for one person, as 7 PRs under 400 lines each. This is an estimate from
+reading the code, not from building it.
 
 | PR | Contents | Days |
 |---|---|---|
 | 1 | Contracts (new route, outcome values) and the migration for stored deliveries | 1 |
 | 2 | Inbox route, signature check, worker fetch | 1 |
 | 3 | Flag, extract and match: pure code with the labeled test emails | 2 |
-| 4 | Opening the case (ledger write, then case) and the end-to-end test | 1.5 |
-| 5 | The reply and its suppression rules | 0.5 |
-| 6 | Case page additions and the inbox list | 1 to 1.5 |
-| | Inbox setup (Resend, domain, Railway variables) | 0.5 |
+| 4 | Opening the case (ledger write, then case), `demo prepare` changes, the end-to-end test | 2 |
+| 5 | The reply and its suppression rules (built and tested, switched off until a domain exists) | 0.5 |
+| 6 | Case page additions, the inbox list and the public page | 1.5 to 2 |
+| 7 | The dismiss action: transition, guard, two approvers, button, state-machine redraw | 1 to 1.5 |
+| | Inbox setup (Resend account, Railway variables) | 0.5 |
