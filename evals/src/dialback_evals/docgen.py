@@ -27,6 +27,8 @@ from collections import Counter
 from collections.abc import Iterable
 from pathlib import Path
 
+import phonenumbers as pn
+
 from .docbank import (
     AREA_CODES,
     AUTHORS,
@@ -360,6 +362,20 @@ def draw_worlds(*, count: int, seed: int) -> list[WorldPlan]:
     return [_draw_world(rng, f"world-s{seed}-{i:04d}", planted=i % 2 == 0) for i in range(count)]
 
 
+# --- Fictional numbers ------------------------------------------------------------------------------
+
+def real_looking(texts: Iterable[str]) -> list[str]:
+    """Every phone number phonenumbers finds in `texts` (leniently, so more than ingestion's strict
+    matcher) that is outside the block reserved for fiction, as E.164, in order of first appearance."""
+    found: list[str] = []
+    for text in texts:
+        for m in pn.PhoneNumberMatcher(text, "US", leniency=pn.Leniency.POSSIBLE):
+            e164 = pn.format_number(m.number, pn.PhoneNumberFormat.E164)
+            if not fictional(e164) and e164 not in found:
+                found.append(e164)
+    return found
+
+
 # --- The frozen JSON ---------------------------------------------------------------------------------
 
 def plan_to_json(plan: Plan) -> dict:
@@ -394,7 +410,8 @@ def freeze_case(plan: Plan, name: str, out_dir: Path, *, patterns: Iterable[str]
     """Write the plan and its rendered documents as `<out_dir>/<name>/case.json`. Refuses a real-looking
     number, and never replaces a frozen case with a different plan; freezing the same plan again leaves
     the case as it is (its patterns record what failed when it was frozen)."""
-    if bad := sorted({n for n in all_numbers(plan) if not fictional(n)}):
+    texts = [span["text"] for d in rendered(plan) for page in d["pages"] for span in page["spans"]]
+    if bad := sorted({n for n in all_numbers(plan) if not fictional(n)} | set(real_looking(texts))):
         raise ValueError(f"refusing to freeze real-looking numbers {bad}: the lab writes only NPA-555-0100 to 0199")
     case = Path(out_dir) / name
     body = {"name": name, "patterns": list(patterns), "why": why, "plan": plan_to_json(plan),

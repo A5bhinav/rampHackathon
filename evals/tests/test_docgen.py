@@ -2,6 +2,7 @@
 ingestion (with a named reader) and select(), held to checks any reader must pass."""
 from __future__ import annotations
 
+import dataclasses
 import json
 from functools import lru_cache
 from pathlib import Path
@@ -93,3 +94,27 @@ def test_draws_are_pinned_by_the_seed():
     # smaller sample is the start of a larger one.
     assert docgen.draw_docs(examples=50, seed=SEED) == list(_docs()[:50])
     assert docgen.draw_docs(examples=50, seed=1) != list(_docs()[:50])
+
+
+# --- Fictional numbers -------------------------------------------------------------------------------
+
+def test_rendered_text_holds_only_fictional_numbers(tmp_path):
+    # Every number in the plans and rendered documents is in NPA-555-0100 to 0199. The scan reads the
+    # rendered text with phonenumbers (lenient), not an E.164 pattern, and it can fail.
+    real_looking = "+1201" + "5551234"                    # built in pieces so no file scan sees it whole
+    assert docgen.real_looking(["Call (415) 555-0142", "Or call 201-555-" + "1234 today"]) == [real_looking]
+    plans = [*_docs(), *_worlds()]
+    texts = [span["text"] for plan in plans for d in docgen.rendered(plan) for span in d["pages"][0]["spans"]]
+    for case in sorted(FROZEN.glob("*/case.json")):
+        _, documents, _ = docgen.load_case(case.parent)
+        texts += [span["text"] for d in documents for page in d["pages"] for span in page["spans"]]
+    assert docgen.real_looking(texts) == []
+    assert all(docgen.fictional(n) for plan in plans for n in docgen.all_numbers(plan))
+    # Nothing real-looking is ever frozen, whether in the plan or only in its rendered text.
+    plan = _docs()[0]
+    bad = dataclasses.replace(plan, numbers=(dataclasses.replace(plan.numbers[0], e164=real_looking), *plan.numbers[1:]))
+    with pytest.raises(ValueError, match="real-looking"):
+        docgen.freeze_case(bad, "bad", tmp_path)
+    worded = dataclasses.replace(plan, filler=("Ring 201-555-" + "1234 after hours",))
+    with pytest.raises(ValueError, match="real-looking"):
+        docgen.freeze_case(worded, "worded", tmp_path)
