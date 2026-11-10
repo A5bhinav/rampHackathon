@@ -620,6 +620,25 @@ F1 to F9 hold as built (verified). But the lab still claims more than it shows:
   (`sami/guided-search`, approved Nov 9) is a guided search on `select()` with no model: it scores each
   world by how much a must-not-help attacker move helped, steers toward higher scores, and fixes
   the measurement that decides whether the steering stays. The model-driven targets below remain.
+- **What an LLM red team can and can't reach (spec 0066's builder check, Nov 10; a read-only probe
+  plus reading).**
+  - **On the call agent:**
+    - the model never speaks;
+    - it sorts only consent, the change answer, and refused versus don't-know digits;
+    - `step._grounded` records a "yes" only if the caller's cited turn holds an unnegated yes-word,
+      so even a fully injected model can't create one;
+    - a verify needs the new account's digits.
+
+    So there is no wording path to a false verify. Red-teaming it finds misreadings only.
+  - **On the reader:** labels can only add refusal reasons, and R2 refuses any number first seen in
+    the change context. So attacker text can only move the call through A1's label veto, and with
+    correct labels: in a planted world, "Bank verification line: <real>" or a bare "stop using our
+    old number <real>" moves the call on the first try. Spec 0066 as drafted would mostly
+    re-measure A1.
+  - **What follows:** the biggest lever against attacker text is A1's fix in `select()`.
+  - **What's left after it:** a reader red team then measures misreadings (labels that contradict
+    the text), which is a robustness concern, plus the long-game paths (K01, A3) that no wording
+    check reaches.
 - **Spec 0046 closed (Sami, Nov 10), without the held-out run.**
   - **Kept:** the search that keeps going, as B3's fix.
   - **Parked:** the guided searches and the bench, unproven and out of CI.
