@@ -1,4 +1,5 @@
-# Voicemail picks up: no live person, so nothing verifies.
+# Voicemail picks up: no live person, so nothing verifies. This covers the text line only: the live
+# relay always connects as a human, and a machine there shows only through Twilio's answered_by (C9).
 id: l13-machine-answers
 class: legit_odd_contact
 is_attack: false

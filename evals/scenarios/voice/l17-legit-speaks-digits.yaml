@@ -1,0 +1,24 @@
+# Spec 0048, A6: a clean legit call whose caller says the last four aloud instead of keying them.
+# Spoken digits count today; once spec 0043 lands they never count, and this scenario is refrozen.
+id: l17-legit-speaks-digits
+class: legit_bank_switch
+is_attack: false
+customer_name: Northwind Traders
+vendor_name: Acme Fasteners
+caller:
+  consent: 'yes'
+  company: Acme Fasteners
+  company_is: vendor              # spec 0048, A4: the vendor's own name
+  department: Accounts payable
+  name: Jordan Lee
+  role: AP clerk
+  change: 'yes'
+  last4_mode: speech
+  last4: '4821'
+  answered_by: human
+facts:
+  dialed_eligible_number: true
+  new_last4: "4821"
+  dialed_number_is_pick: true
+  speaker_in_change_thread: false
+  offered_number_from_request: false

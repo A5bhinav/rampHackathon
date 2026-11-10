@@ -4,7 +4,7 @@
 
 ## Goal
 
-The attack lab (`evals/README.md`) is meant to replay scams and legitimate-but-odd changes through the whole pipeline and score how often Dialback is fooled. The whole pipeline is not landed (the ledger pick and the Postgres stores are Q40/Q50), and nothing yet exercises the agent under attack. This spec builds the first self-contained slice: it drives the real call (`policy.step()` plus the real `Agent`) through adversarial callers, and runs the real decision engine on the recorded answers, to prove the two things that matter for the voice agent. First, a caller can never talk the agent into leaking (R4) or into a `verified` decision (R1, R3). Second, a reachable legitimate change still verifies (so the defense is not just "block everything"). It imports only pure packages (`policy`, the voice agent, `decision`), with no ledger, core, database or live account (ADR-11), so it runs today and gates every agent, prompt and model-pin change (R7 at the gate: a change that weakens the agent fails the build).
+The attack lab (`evals/README.md`) is meant to replay scams and legitimate-but-odd changes through the whole pipeline and score how often Dialback is fooled. The whole pipeline is not landed (the ledger pick and the Postgres stores are Q40/Q50), and nothing yet exercises the agent under attack. This spec builds the first self-contained slice: it drives the real call (`policy.step()` plus the real `Agent`) through adversarial callers, and runs the real decision engine on the recorded answers, to prove the two things that matter for the voice agent. First, a caller can never talk the agent into leaking (R4) or into a `verified` decision (R1, R3). Second, a reachable legitimate change still verifies (so the defense is not just "block everything"). It runs production's own code with no database or live account (ADR-11): the policy, the voice agent, the decision engine, and, since spec 0048, the voice service's report helpers and the core's report and fact code (`calls.py`, `call_facts.py`, `company.py`), so it runs today and gates every agent, prompt and model-pin change (R7 at the gate: a change that weakens the agent fails the build).
 
 ## Contract touched
 
@@ -149,7 +149,7 @@ evals/src/dialback_evals/
   runner.py     run N scenarios to CallResults
   scorers.py    the hard gates over a CallResult plus the oracle; counts by class
   cli.py        lab run --split voice: writes results.jsonl and scorecard.json; non-zero on a hard gate
-evals/scenarios/voice/   YAML families (dev split)
+evals/scenarios/voice/   YAML families (the voice split)
 .github/workflows/lab-smoke.yml
 ```
 

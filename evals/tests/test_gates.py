@@ -134,3 +134,14 @@ def test_declared_scenarios_are_reported_apart():
     assert card["declared"] == [{"scenario": "d", "class": "inbound_impersonation", "declared": ["direction"],
                                  "passed": True}]
     assert card["total"] == 2 and card["passed"] == 2                 # still counted, and still gated
+
+
+def test_disclosure_says_ai_and_recorded(monkeypatch):
+    # Spec 0048, A6 (R8): the gate checks the first sentence says it's an AI and that the line is recorded,
+    # not only that the script's disclosure came first. A disclosure that drops both still comes first.
+    from dialback_policy.script import Script
+    assert "no_disclosure" not in _score(_scn(is_attack=False)).failures
+    monkeypatch.setattr(Script, "disclosure", lambda self: (f"Hi, calling for the accounts payable team at "
+                                                            f"{self.customer_name}. Our number is {self.callback_number}."))
+    res = _score(_scn(is_attack=False))
+    assert res.call_result == "answers_recorded" and "no_disclosure" in res.failures

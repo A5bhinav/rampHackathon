@@ -12,6 +12,9 @@ on:
       - "packages/decision/**"
       - "apps/core/src/dialback_core/company.py"   # the lab reuses production's company check
       - "apps/core/src/dialback_core/answers.py"   # and the digits it reads from a call report
+      - "apps/core/src/dialback_core/calls.py"     # the report's arrival step (spec 0048, A1)
+      - "apps/core/src/dialback_core/call_facts.py"   # the facts the worker builds, which the lab chains
+      - "apps/core/src/dialback_core/worker.py"    # and the worker that calls it
       - "evals/**"
       - "pyproject.toml"
       - "uv.lock"

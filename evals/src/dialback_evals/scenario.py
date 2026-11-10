@@ -28,7 +28,7 @@ _CONSENT = frozenset({"yes", "no"})
 _CHANGE = frozenset({"yes", "no", "unsure"})
 _ANSWERED_BY = frozenset({"human", "machine"})
 _DIRECTIONS = frozenset({"outbound", "inbound"})
-_ENDS = frozenset({"answers_recorded", "voicemail", "failed", "no_answer"})
+_ENDS = frozenset({"answers_recorded", "voicemail", "failed", "no_answer", "declined"})   # declined: spec 0048, A6
 LEGIT_CLASSES = frozenset({"legit_bank_switch", "legit_odd_contact"})
 _RULE_ID = re.compile(r"(V|NV|NR|S)[0-9]{2}_[a-z_]+")
 _FOUR_DIGITS = re.compile(r"[0-9]{4}")
@@ -142,25 +142,36 @@ def _parse(path: Path) -> Scenario:
     def phase(value: Any, what: str) -> str | None:
         return None if value is None else one_of(value, _PHASES, what)
 
+    def text(value: Any, what: str) -> str:
+        # YAML reads a bare no, yes, on or off as a boolean: refuse it rather than say "False" (A6).
+        if isinstance(value, bool) or value is None:
+            raise ValueError(f"{path.name}: {what} must be text; quote it ({value!r} is what YAML read)")
+        return str(value)
+
     only(raw, _KEYS, "scenario")
     c = only(need("caller", raw), _CALLER_KEYS, "caller")
     caller = CallerBehavior(
         consent=one_of(need("consent", c), _CONSENT, "consent"),
-        company=str(need("company", c)),
-        department=str(need("department", c)),
-        name=str(need("name", c)),
-        role=str(need("role", c)),
+        company=text(need("company", c), "company"),
+        department=text(need("department", c), "department"),
+        name=text(need("name", c), "name"),
+        role=text(need("role", c), "role"),
         change=one_of(need("change", c), _CHANGE, "change"),
         last4_mode=one_of(need("last4_mode", c), LAST4_MODES, "last4_mode"),
         last4=str(c.get("last4", "")),
         answered_by=one_of(c.get("answered_by", "human"), _ANSWERED_BY, "answered_by"),
-        inject=c.get("inject"),
+        inject=None if c.get("inject") is None else text(c["inject"], "inject"),
         inject_phase=phase(c.get("inject_phase"), "inject_phase"),
         offer_other_number=flag(c.get("offer_other_number", False), "offer_other_number"),
         hang_up_at=phase(c.get("hang_up_at"), "hang_up_at"),
         silent=flag(c.get("silent", False), "silent"),
         company_is=one_of(need("company_is", c), COMPANY_TRUTHS, "company_is"),
     )
+    if caller.inject is not None and caller.inject_phase is None:
+        raise ValueError(f"{path.name}: inject without inject_phase would never be played")
+    if caller.offer_other_number:
+        raise ValueError(f"{path.name}: offer_other_number: the scripted line cannot play it (only the live agent "
+                         "records an offered number)")
     f = only(need("facts", raw), _FACT_KEYS, "facts")
     new_last4, old_last4 = str(need("new_last4", f)), f.get("old_last4")
     for what, digits in (("new_last4", new_last4), ("old_last4", old_last4)):
@@ -199,8 +210,8 @@ def _parse(path: Path) -> Scenario:
         id=str(need("id", raw)),
         scenario_class=scenario_class,
         is_attack=is_attack,
-        customer_name=str(need("customer_name", raw)),
-        vendor_name=str(need("vendor_name", raw)),
+        customer_name=text(need("customer_name", raw), "customer_name"),
+        vendor_name=text(need("vendor_name", raw), "vendor_name"),
         caller=caller,
         facts=facts,
         expect_rule=None if expect_rule is None else str(expect_rule),

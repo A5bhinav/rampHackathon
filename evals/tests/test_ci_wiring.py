@@ -50,3 +50,25 @@ def test_every_lab_command_is_documented():
     table = agents[agents.index("## Commands"):agents.index("## Never")]
     readme = (ROOT / "evals" / "README.md").read_text(encoding="utf-8")
     assert {c: (f"lab {c}" in table, f"lab {c}" in readme) for c in commands} == {c: (True, True) for c in commands}
+
+
+def test_lab_smoke_triggers_on_the_code_the_lab_chains():
+    # Spec 0048, A6: the voice lab now runs the worker's fact assembly, the report's arrival step and the
+    # voice service's report helpers, so a change to any of them runs lab-smoke.
+    triggers, _ = _workflow("lab-smoke.yml")
+    paths = triggers["pull_request"]["paths"]
+    for path in ("apps/core/src/dialback_core/worker.py", "apps/core/src/dialback_core/calls.py",
+                 "apps/core/src/dialback_core/call_facts.py"):
+        assert path in paths, path
+    assert "apps/voice/**" in paths                                    # covers apps/voice/.../app.py
+
+
+def test_the_lab_docs_do_not_overclaim():
+    # Spec 0048, A6: spec 0017 and the README stop saying the lab imports no core code and stop showing
+    # --split dev; l13 (voicemail) says it covers the text line only.
+    spec = (ROOT / "specs" / "0017-attack-lab-voice-slice.md").read_text(encoding="utf-8")
+    readme = (ROOT / "evals" / "README.md").read_text(encoding="utf-8")
+    assert "with no ledger, core, database" not in spec
+    assert "lab run --split dev" not in spec + readme
+    l13 = (ROOT / "evals" / "scenarios" / "voice" / "l13-machine-answers.yaml").read_text(encoding="utf-8")
+    assert "text line only" in l13
