@@ -326,13 +326,17 @@ This tests the step after the call, the way the fuzz lab tests `select()`. No ca
 
 ## Open questions
 
+Sami approved the spec and every call in it as written on Nov 9. One question is still open, and
+it is Abhi's:
+
+- **Q102 (Abhi, open).** Whether Abhi pulls `call_facts` out of `worker.py`, or Sami does it as
+  partner, with Abhi's review. Until he answers, `call_facts` may be drafted on a branch for his
+  review, but no PR touching `apps/core` opens without his OK.
 - **Q101, resolved (Sami, Nov 9):** a strict known-failures list for each job, as D3 describes.
-- **Q102 (Abhi).** Whether Abhi pulls `call_facts` out of `worker.py`, or Sami does it as partner,
-  with Abhi's review.
-- **Q103.** `UNREACHABLE.md` is reviewed by Abhi, who owns the decision rules (my call).
-- **Q104.** The report fuzzer's findings live in `evals/reports-generated/` (my call).
-- **Q105.** The company phrase bank is hand-written, so it covers only phrasings we think of. A
-  model-written bank comes with the live agent (my call).
+- **Q103, resolved:** `UNREACHABLE.md` is reviewed by Abhi, who owns the decision rules.
+- **Q104, resolved:** the report fuzzer's findings live in `evals/reports-generated/`.
+- **Q105, resolved for now:** the company phrase bank is hand-written, so it covers only phrasings
+  we think of. A model-written bank comes with the live agent.
 
 ## Commands
 
