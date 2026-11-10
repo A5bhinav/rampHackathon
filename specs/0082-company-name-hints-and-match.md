@@ -121,8 +121,9 @@ say (Part B), and keeps the clear-mismatch signal.
 
    **7a. Refusal words override a match** (amendment, Sami, Nov 10). An answer that says the person
    is not with the vendor, or only works with it, is `False` (NR03) even when the vendor's name is in
-   it. It keeps the "clearly a different company" signal the Goal wants, at almost no cost to honest
-   answers.
+   it. It keeps the "clearly a different company" signal the Goal wants. Its cost to honest answers
+   was small for the first list; the extension below raises it, since everyday contractions now count
+   ("Sorry, I didn't catch that, this is Acme" goes to review).
    - **The words,** read as whole words the way the guard reads text: `not`, `isn` (from "isn't"),
      `aren`, `wasn`, `weren`, `never`, `former`, `formerly`, `until`, `reseller`, `resellers`,
      `resell`, `resells`, `distribute`, `distributes`, `distributor`, `behalf`.

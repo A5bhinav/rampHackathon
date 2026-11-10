@@ -1004,8 +1004,14 @@ F1 to F9 hold as built (verified). But the lab still claims more than it shows:
     number" and "different company".
   - **Not measured here:** the phrase bank has none of these phrases, so only `test_company.py` pins
     them, and the lab's numbers above are unchanged.
-  - **Not added:** an outsourced AP firm ("We handle AP for Acme"). Its words are everyday words, so it
-    still passes as "anything else".
+  - **Not added:** an outsourced AP firm ("We handle AP for Acme"). Its words are everyday words. It
+    still passes, as a match: "acme" is a distinctive first word (D6), so it is True.
+  - **The cost rose** (the commit's review): everyday contractions now count, so conversational repair
+    goes to review ("Sorry, I didn't catch that, this is Acme"; pinned in `test_company.py`), as do "No,
+    you don't have the wrong number, this is Acme" and a colleague's "Jim's no longer here". All fail
+    closed.
+  - **Still missed:** "ain't", "haven't", "hasn't", "hadn't" and their no-apostrophe spellings. Not
+    added without Sami's call; "haven't" would need the phrase form, since "Haven" is a name.
 
 ## D. Red teaming
 

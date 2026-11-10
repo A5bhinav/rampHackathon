@@ -138,7 +138,7 @@ place:
 | The agent asks | You say | If you say something else |
 |---|---|---|
 | Disclosure, then "Is it okay to continue on this recorded line?" | "Yes." | A clear no ends the call with "we won't continue" (NR02). An answer the agent can't make out, like "Hello?" or "Sorry?", is asked once more ("Sorry, let me ask that again."); a second one ends the call, and the core calls again later while the case has attempts left |
-| "Could you tell me the name of the company I've reached?" | "Acme Fasteners." | The name is not required (spec 0082, D7b): "Acme", a misheard name or another company's name doesn't block, and the person releasing sees the answer. An answer with a refusal word goes to review (NR03): "Not Acme, this is Globex", "We're a reseller for Acme", even "Not sure, Acme" |
+| "Could you tell me the name of the company I've reached?" | "Acme Fasteners." | The name is not required (spec 0082, D7b): "Acme", a misheard name or another company's name doesn't block, and the person releasing sees the answer. An answer with a refusal word goes to review (NR03): "Not Acme, this is Globex", "We're a reseller for Acme", even "Not sure, Acme", "Sorry, I didn't catch that, Acme" or "Wrong number?". Say only the name |
 | "Which department or team am I speaking with?" | "Accounts receivable." | Any answer works |
 | "May I have your name?" | "Jordan Lee." | A name made only of words from the change email's senders (Dana Whitfield, "Acme Fasteners LLC Accounts Receivable") goes to review (NR04) |
 | "And what's your role there?" | "AR clerk." | Any role works; a name and a role are both needed (V06) |

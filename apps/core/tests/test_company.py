@@ -174,7 +174,8 @@ def test_b8_refusal_words_override_a_match(said):
     ("Never Summer", ("Never Summer Industries",), True),  # a word in the vendor's own name doesn't count
     ("Acme? No, Globex", ACME, True),                  # accepted cost: a correction with no refusal word
     ("Not sure, I think this is Acme", ACME, False),   # the safe cost: an honest answer goes to review
-], ids=["no-problem", "sorry", "yes", "own-name-word", "correction-cost", "not-sure-cost"])
+    ("Sorry, I didn't catch that, this is Acme", ACME, False),   # D7a's extension raised that cost
+], ids=["no-problem", "sorry", "yes", "own-name-word", "correction-cost", "not-sure-cost", "repair-cost"])
 def test_b8_honest_answers_and_pinned_costs(said, names, expected):
     assert matches(said, names) is expected
 
@@ -215,7 +216,7 @@ def test_d7a_the_refusal_lists_are_exactly_the_specs():
     "We resell Acme", "He resells Acme", "We distribute Acme", "She distributes Acme", "An Acme distributor",
     "On behalf of Acme", "I used to be Acme", "Acme, I mean Globex",
     # D7a's extension
-    "I don't work for Acme", "Acme doesn't take calls here", "We didn't ask Acme", "This isnt Acme",
+    "I don't work for Acme", "I don’t work for Acme", "Acme doesn't take calls here", "We didn't ask Acme", "This isnt Acme",
     "They arent Acme", "That wasnt Acme", "We werent Acme", "I dont work for Acme", "Acme doesnt sit here",
     "We didnt ask Acme", "We're no longer Acme", "Sorry, wrong number", "Acme? Sorry, wrong number",
     "This is a different company", "Acme is a different company",

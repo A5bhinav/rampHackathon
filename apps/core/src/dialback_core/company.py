@@ -11,10 +11,10 @@ when either:
 
 Nothing is fuzzy: "acne" is not "Acme" (D8).
 
-An answer that says the person is not with the vendor, or only works with it, is False even when
+An answer that says the person is not with the vendor, or only works with it, is False, even when
 it names the vendor (D7a): "Not Acme, this is Globex", "We're a reseller for Acme", "I used to work
-at Acme", "I don't work for Acme", "Sorry, wrong number". Bare "no" and "sorry" never count, and a
-word in the vendor's own name doesn't count.
+at Acme", "I don't work for Acme". So is one that says the call reached the wrong place ("Sorry,
+wrong number"). Bare "no" and "sorry" never count, and a word in the vendor's own name doesn't count.
 False fires NR03, and the case goes to a person.
 
 Anything else is unknown (None), and blocks nothing (D7b): another company ("This is Globex"), a
