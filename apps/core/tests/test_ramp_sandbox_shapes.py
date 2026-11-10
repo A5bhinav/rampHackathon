@@ -86,6 +86,9 @@ class SandboxRamp:
         self.events = [event("ev-1", "Vendor placed on hold", "2026-11-01T10:00:00+00:00"),
                        event("ev-2", "Vendor hold released", "2026-11-02T10:00:00+00:00")]
         self.hold_status = 204
+        self.lag = 0  # audit-log reads before a hold or release event shows (Ramp answers 202: it may apply it later)
+        self.delayed: list[list] = []  # [reads left, event]
+        self.release_error: int | None = None
         self.bills_error: str | None = None
         self.clock = 0
 
@@ -112,8 +115,14 @@ class SandboxRamp:
             return httpx.Response(200, json={"data": data, "page": {"next": None}})
         if parts[0] == "vendors" and parts[2] in ("hold", "release"):
             held = parts[2] == "hold"
-            self.events.append(event(f"ev-{len(self.events) + 1}", "Vendor placed on hold" if held else "Vendor hold released",
-                                     self._now(), about=parts[1]))
+            if not held and self.release_error:
+                return ramp_error(self.release_error, "The vendor's hold could not be released.")
+            made = event(f"ev-{len(self.events) + len(self.delayed) + 1}",
+                         "Vendor placed on hold" if held else "Vendor hold released", self._now(), about=parts[1])
+            if self.lag:
+                self.delayed.append([self.lag, made])
+            else:
+                self.events.append(made)
             if held:  # Ramp: open, unpaid bills are taken out of scheduled payment
                 for b in self.bills:
                     if b["vendor"]["id"] == parts[1] and b["status"] == "OPEN":
@@ -129,6 +138,10 @@ class SandboxRamp:
             b["payment"] = None if day is None else {"id": f"pay-{b['id']}", "payment_date": f"{day}T00:00:00+00:00"}
             return httpx.Response(200, json=b)
         if parts == ["audit-logs", "events"]:
+            for waiting in self.delayed:
+                waiting[0] -= 1
+            self.events += [made for left, made in self.delayed if left <= 0]
+            self.delayed = [waiting for waiting in self.delayed if waiting[0] > 0]
             # Ramp's document, and the sandbox (found by the probe's first run): object_id needs resource_name.
             if ("object_id" in q) != ("resource_name" in q):
                 return ramp_error(422, "The resource name must also be provided when filtering by object ID.")
