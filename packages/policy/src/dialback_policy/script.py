@@ -39,6 +39,10 @@ PHASE_SLOT: dict[Phase, str] = {
 FALLBACK_LINE = "Sorry, I can't go into that on this call."
 STILL_THERE = "Sorry, are you still there?"
 REASK = "Sorry, let me ask that again."
+# The last four come only from the keypad (spec 0043): the line after the star key, and the re-ask
+# after digits were spoken instead of typed.
+START_OVER = "Okay, let's start over. Please enter the last four digits, then press the pound key."
+KEYPAD_ONLY = "Please don't say the digits. Enter them on your phone's keypad, then press the pound key."
 
 
 @dataclass(frozen=True)
@@ -96,8 +100,9 @@ QUESTIONS: dict[Phase, Question] = {
                          lambda s: "And what's your role there?"),
     Phase.CHANGE: Question("Ask whether their company recently asked the customer to change how they get paid.",
                            lambda s: f"Has your company recently asked {s.customer_name} to change how you get paid?"),
-    Phase.LAST4: Question("Ask for the last four digits of the account they want to be paid into. They may say "
-                          "them or type them on the keypad. Never say any digits yourself.",
-                          lambda s: "For the account you'd like to be paid into, what are the last four digits? "
-                                    "You can say them or enter them on your keypad."),
+    Phase.LAST4: Question("Ask them to enter the last four digits of the account they want to be paid into on "
+                          "their phone's keypad. Never say any digits yourself.",
+                          lambda s: "For the account you'd like to be paid into, please use your phone's keypad to "
+                                    "enter the last four digits, then press the pound key. To start over, press the "
+                                    "star key."),
 }
