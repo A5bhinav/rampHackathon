@@ -238,6 +238,15 @@ def test_first_seen_probe_catches_a_rule_that_ignores_it(monkeypatch):
 # which ingestion records as party "unknown") must never move the call to another number. Refusing
 # the case is allowed. Two fix shapes stand in for the rule's owner's choice; both must pass.
 
+@pytest.fixture
+def _today_rule(monkeypatch):
+    """The broken doubles below are today's rule with one defect, built by calling select(). Spec 0079's
+    guard (DIALBACK_CONTEXT_GUARD, on by default once it lands) would make every one of them refuse to
+    move the call, leaving I12 nothing to catch, so the tests that need a double to move the call run the
+    rule unguarded. Before spec 0079 the flag is ignored and the rule is today's anyway."""
+    monkeypatch.setenv("DIALBACK_CONTEXT_GUARD", "off")
+
+
 def _context_blind(world):
     """One fix shape: a sighting on a document in select()'s own change context keeps its timing and
     visibility but loses its party and role. A number first seen in the context is still refused, by R2."""
@@ -320,6 +329,7 @@ def _label_hits(world) -> list[str]:
     return [m for m in metamorphic(world) if m.startswith(LABEL_PREFIX)]
 
 
+@pytest.mark.usefixtures("_today_rule")
 @pytest.mark.parametrize("path", sorted(_PATHS))
 @pytest.mark.parametrize("kind", sorted(_KINDS))
 def test_context_label_probe_catches_a_rule_that_moves_the_call(kind, path, monkeypatch):
@@ -331,6 +341,7 @@ def test_context_label_probe_catches_a_rule_that_moves_the_call(kind, path, monk
     assert _label_hits(world) == [CONTEXT_LABEL]          # one leaky kind on one path moves the call to X
 
 
+@pytest.mark.usefixtures("_today_rule")
 def test_label_already_in_the_world_that_moved_the_call_is_caught(monkeypatch):
     # The reachable finding as it arrives: the attacker's in-thread bank line is already there, the real
     # number is refused, and the planted number is the pick. Adding more labels to that pick only
@@ -428,6 +439,7 @@ def _three_numbers_label_on_the_backup():
     return base, a, b, c
 
 
+@pytest.mark.usefixtures("_today_rule")
 def test_fail_closed_trims_backups_and_a_version_that_does_not_is_caught(monkeypatch):
     # never_trims calls the same pick as the fail-closed shape, so I12's pick checks cannot see it; only
     # comparing the whole call list can (the backups shift from [B, C] to [C]).
