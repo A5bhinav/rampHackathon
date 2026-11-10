@@ -6,7 +6,7 @@ import { Callout, PageHead, Stats } from "@/components/page";
 import { RingMotif } from "@/components/ring-band";
 import type { EvidenceLog } from "@/lib/api-types";
 import { core } from "@/lib/core";
-import { stationCounts } from "@/lib/flow";
+import { stationCounts, stationsFromEvidence } from "@/lib/stations";
 import { heldTotals } from "@/lib/overview";
 import { demoStory } from "@/lib/story";
 import { ago, brief, datasetNow, dueLabel, when, words } from "@/lib/format";
@@ -34,7 +34,9 @@ export default async function CaseQueue({ params, searchParams }: {
   const unconfirmed = cases.filter((c) => c.hold_status === "failed").length;
   const held = heldTotals(cases);
   const missing = asked && !cases.some((c) => c.vendor.legal_name === asked.legal_name) ? asked : undefined;
-  const feed = (log?.events ?? []).slice(0, 6);
+  const rows = log?.events ?? [];  // without the log, each case is placed by its state alone
+  const feed = rows.slice(0, 6);
+  const rails = new Map(cases.map((c) => [c.id, stationsFromEvidence(rows, c)]));
 
   return (
     <main className="inbox">
@@ -58,7 +60,7 @@ export default async function CaseQueue({ params, searchParams }: {
           sub: soon.length ? soon.slice(0, 3).map((c) => c.vendor.legal_name).join(" · ") : "payments overdue or due soon" },
         { label: "Hold not confirmed", value: unconfirmed, tone: "bad" },
       ]} />
-      <QueueRail counts={stationCounts(cases)} />
+      <QueueRail counts={stationCounts(cases, rows)} />
 
       <div className="tabs-row">
         <nav className="tabs" aria-label="Queue sections">
@@ -75,8 +77,8 @@ export default async function CaseQueue({ params, searchParams }: {
           <p>No open cases. A case opens here when a vendor&apos;s bank details change in Ramp.{released.length ? " Released changes are listed below." : ""}</p>
         </div>
       ) : null}
-      {waiting.length > 0 ? <QueueTable id="waiting" title="Waiting on a person" cases={waiting} datasetId={datasetId} now={now} /> : null}
-      {working.length > 0 ? <QueueTable id="working" title="In progress" cases={working} datasetId={datasetId} now={now} /> : null}
+      {waiting.length > 0 ? <QueueTable id="waiting" title="Waiting on a person" cases={waiting} datasetId={datasetId} now={now} rails={rails} /> : null}
+      {working.length > 0 ? <QueueTable id="working" title="In progress" cases={working} datasetId={datasetId} now={now} rails={rails} /> : null}
 
       <div className="inbox-lower">
         <div className="inbox-lanes"><PaymentLanes cases={cases} now={now} datasetId={datasetId} /></div>

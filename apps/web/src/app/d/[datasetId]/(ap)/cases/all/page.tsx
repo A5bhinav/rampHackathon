@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { PageHead } from "@/components/page";
 import { NEEDS_A_PERSON, QueueTable, bySoonestPayment } from "@/components/queue";
-import type { CaseSummary } from "@/lib/api-types";
+import type { CaseSummary, EvidenceLog } from "@/lib/api-types";
+import { stationsFromEvidence } from "@/lib/stations";
 import { core } from "@/lib/core";
 import { datasetNow } from "@/lib/format";
 
@@ -19,7 +20,8 @@ export default async function CasesPage({ params, searchParams }: {
   searchParams: Promise<{ state?: string }>;
 }) {
   const [{ datasetId }, { state }] = await Promise.all([params, searchParams]);
-  const [all, datasets] = await Promise.all([core.allCases(datasetId), core.datasets()]);
+  const [all, datasets, log] = await Promise.all([core.allCases(datasetId), core.datasets(), core.evidence(datasetId).catch((): EvidenceLog | null => null)]);
+  const rails = new Map(all.map((c) => [c.id, stationsFromEvidence(log?.events ?? [], c)]));
   const dataset = datasets.find((d) => d.id === datasetId);
   const now = datasetNow(dataset?.sim_now);
   const tab = TABS.find((t) => t.key === state) ?? TABS[0];
@@ -40,7 +42,7 @@ export default async function CasesPage({ params, searchParams }: {
         </nav>
         <span className="section-marker">Sorted by soonest payment</span>
       </div>
-      {shown.length ? <QueueTable id="cases" title={tab.label === "All" ? "Every case" : tab.label} cases={shown} datasetId={datasetId} now={now} />
+      {shown.length ? <QueueTable id="cases" title={tab.label === "All" ? "Every case" : tab.label} cases={shown} datasetId={datasetId} now={now} rails={rails} />
         : <div className="empty-card"><p>No cases here. A case opens when a vendor&apos;s bank details change in Ramp.</p></div>}
     </main>
   );
