@@ -76,3 +76,14 @@ def frozen(w: dict) -> dict:
 def calls(out: dict) -> list[str]:
     """What a selection would call, in order: the pick, then its alternates (spec 0079's call list)."""
     return ([out["e164"]] if out.get("e164") else []) + [a["e164"] for a in out.get("alternates", [])]
+
+
+def source_doc(doc_id: str, channel: str, received: dt.datetime, lines: list[str], *, sender: str | None = None,
+               thread: str | None = None, subject: str | None = None) -> dict:
+    """A source document in the corpus's shape (corpus/README.md), for ingest_all."""
+    return {"id": doc_id, "kind": {"vendor_master": "vendor_master_record"}.get(channel, channel), "claimed_date": None,
+            "header_date": received.isoformat() if channel == "email" else None, "scan": False,
+            "custody": {"channel": channel, "parent_document_id": None, "received_at": received.isoformat(),
+                        "sender": sender, "subject": subject, "thread_id": thread},
+            "pages": [{"width": 612, "height": 792, "spans": [
+                {"text": t, "x": 72, "y": 72 + 14 * i, "size": 10, "color": "#000000"} for i, t in enumerate(lines)]}]}

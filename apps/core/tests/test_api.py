@@ -320,6 +320,44 @@ async def test_the_vendor_risk_list_reads_the_ledger(world):
     assert row["provable_number"] == truth["expected"]["pick"] and row["status_text"]
 
 
+async def test_the_vendor_risk_list_says_when_a_person_is_needed(world, monkeypatch):
+    # Spec 0079: when the selection rule withholds, the row reads needs_person, and the response
+    # still matches the contract (checked against dialback.yaml by get()).
+    import datetime as dt
+
+    from dialback_ledger.ingest import ingest_all
+    from dialback_ledger.risk import STATUS_TEXT
+    from dialback_ledger.store import add_vendor_domain, write_ingest
+    monkeypatch.delenv("DIALBACK_READER", raising=False)
+    monkeypatch.delenv("DIALBACK_CONTEXT_GUARD", raising=False)
+    await import_all(world.pool, world.ramp, world.keys, world.dataset.id)
+    now = dt.datetime.now(dt.UTC)
+
+    def doc(doc_id, channel, days, line, **custody):
+        at = (now - dt.timedelta(days=days)).isoformat()
+        return {"id": doc_id, "kind": "vendor_master_record" if channel == "vendor_master" else channel, "claimed_date": None,
+                "header_date": None, "scan": False, "pages": [{"width": 612, "height": 792, "spans": [
+                    {"text": line, "x": 72, "y": 72, "size": 10, "color": "#000000"}]}],
+                "custody": {"channel": channel, "parent_document_id": None, "received_at": at, "sender": custody.get("sender"),
+                            "subject": custody.get("subject"), "thread_id": custody.get("thread")}}
+    docs = [doc("vm", "vendor_master", 500, "Phone on file: (415) 555-0142"),
+            doc("c1", "contract", 400, "Accounts receivable: (415) 555-0142"),
+            doc("l1", "listing", 400, "Accounts receivable: (415) 555-0142"),
+            doc("c2", "contract", 600, "Accounts receivable: (303) 555-0101"),
+            doc("l2", "listing", 600, "Accounts receivable: (303) 555-0101"),
+            doc("lbl", "listing", 10, "Bank verification line: (303) 555-0101"),
+            doc("look", "email", 30, "Main: (303) 555-0177", sender="ar@acrne.example", thread="t-look", subject="Hello")]
+    async with world.pool.connection() as conn, conn.transaction():
+        vendor = (await (await conn.execute("select id from app.vendors where dataset_id = %s order by legal_name limit 1",
+                                            (world.dataset.id,))).fetchone())["id"]
+        await write_ingest(conn, dataset_id=world.dataset.id, vendor_id=vendor, result=ingest_all(docs, extractor_version="t"))
+        await add_vendor_domain(conn, dataset_id=world.dataset.id, vendor_id=vendor, domain="acme.example")
+    body = await get(world, f"/api/datasets/{world.dataset.id}/vendor-risk", "clerk", RISK)
+    (row,) = body["vendors"]
+    assert row["status"] == "needs_person" and row["provable_number"] is None and row["number_on_file"] == "+14155550142"
+    assert row["status_text"] == STATUS_TEXT["needs_person"]
+
+
 async def test_the_vendor_risk_list_of_an_unknown_dataset_is_not_found(world):
     await get(world, f"/api/datasets/{uuid.uuid4()}/vendor-risk", "clerk", RISK, status=404)
 

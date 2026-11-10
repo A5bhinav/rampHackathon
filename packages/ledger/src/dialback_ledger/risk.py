@@ -1,8 +1,11 @@
 """The vendor risk list (spec 0026): is each vendor's number on file one the rule can prove?
 
-The status is decided by code from `ledger-select-v1`'s candidates, run as of now with no change
-request: nothing counts against a number except what arrived after now. "Number on file" is what
-the old vendor master says (`vendor_master` sightings), which the rule shows but never counts.
+The status is decided by code from the selection rule's candidates (`select()`, specs 0021 and
+0079), run as of now with a placeholder request that matches nothing. So the change context is only
+what the rule treats as suspect anyway: a lookalike domain's messages, a second document under an
+existing id, and anything after now. When that context would change which number is called, the rule
+withholds and the vendor reads `needs_person` (spec 0079). "Number on file" is what the old vendor
+master says (`vendor_master` sightings), which the rule shows but never counts.
 """
 from __future__ import annotations
 
@@ -14,8 +17,10 @@ import psycopg
 from .select import ChangeRequest, near_miss, select
 from .store import vendor_rows
 
-ORDER = ("near_miss", "unproven", "missing", "provable")  # worst first
+ORDER = ("needs_person", "near_miss", "unproven", "missing", "provable")  # worst first
 STATUS_TEXT = {
+    "needs_person": "Needs a person: documents the Trust Ledger treats as suspect, such as a message from a lookalike "
+                    "domain, would change which number is called, so no number is called until a person verifies one.",
     "near_miss": "Not provable, and a warning: the number on file is one digit off, or two swapped digits away from, "
                  "a number the Trust Ledger can prove for this vendor.",
     "unproven": "Not provable: the number on file fails at least one part of the rule, such as two independent "
@@ -59,6 +64,8 @@ async def risk_list(conn: psycopg.AsyncConnection, dataset_id: UUID, *, now: dt.
         doc = select(case_id=_NIL, dataset_id=dataset_id, vendor_id=v["id"], requested_cutoff=now, case_opened_at=now,
                      request=ChangeRequest("", now, None, None, None), **rows)
         status, on_file = _status(doc["candidates"], doc.get("e164"))
+        if doc["outcome"] == "withheld":                 # spec 0079: a person decides, whatever the number on file
+            status = "needs_person"
         out.append({"vendor_id": str(v["id"]), "legal_name": v["legal_name"], "status": status, "number_on_file": on_file,
                     "provable_number": doc.get("e164"), "status_text": STATUS_TEXT[status]})
     return sorted(out, key=lambda r: (ORDER.index(r["status"]), r["legal_name"]))

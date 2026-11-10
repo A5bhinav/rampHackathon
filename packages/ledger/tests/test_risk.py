@@ -1,11 +1,15 @@
 """Spec 0026: the vendor risk list, read under a signed-in person's connection."""
 import asyncio
+import datetime as dt
 import json
 import uuid
 
 import psycopg
+from _world import source_doc
 from dialback_ledger.demo import load, load_seed
+from dialback_ledger.ingest import ingest_all
 from dialback_ledger.risk import STATUS_TEXT, risk_list
+from dialback_ledger.store import add_vendor_domain, write_ingest
 from psycopg.rows import dict_row
 from test_demo import demo_dataset
 from test_store import load as load_truth
@@ -55,9 +59,52 @@ def test_a_dataset_with_no_ledger_documents_is_empty(database_url):
 
 
 def test_status_text_never_says_safe():
-    assert set(STATUS_TEXT) == {"near_miss", "unproven", "missing", "provable"}
+    # needs_person joined the statuses with spec 0079 (the review's fix pass).
+    assert set(STATUS_TEXT) == {"needs_person", "near_miss", "unproven", "missing", "provable"}
     assert all("safe" not in t.lower() for t in STATUS_TEXT.values())
     assert STATUS_TEXT["provable"].startswith("Provable") and STATUS_TEXT["unproven"].startswith("Not provable")
+    assert STATUS_TEXT["needs_person"].startswith("Needs a person")
+
+
+ON_FILE = "+14155550142"
+
+
+def withheld_vendor(now: dt.datetime) -> list[dict]:
+    """The number on file is provable, and an older provable number was called a bank's line ten days
+    ago by a clean listing. A lookalike's email 30 days ago pulls the cutoff back past that listing, so
+    the change context now holds the label: the run without it would call the older number, and the
+    guard withholds (spec 0079)."""
+
+    def days(n: int) -> dt.datetime:
+        return now - dt.timedelta(days=n)
+
+    return [source_doc("vm", "vendor_master", days(500), ["Vendor master: Acme Fasteners", "Phone on file: (415) 555-0142"]),
+            source_doc("c1", "contract", days(400), ["Supply agreement: Acme", "Accounts receivable: (415) 555-0142"]),
+            source_doc("l1", "listing", days(400), ["Acme Fasteners", "Accounts receivable: (415) 555-0142"]),
+            source_doc("c2", "contract", days(600), ["Master agreement: Acme", "Accounts receivable: (303) 555-0101"]),
+            source_doc("l2", "listing", days(600), ["Acme Fasteners, east office", "Accounts receivable: (303) 555-0101"]),
+            source_doc("lbl", "listing", days(10), ["Acme Fasteners", "Bank verification line: (303) 555-0101"]),
+            source_doc("look", "email", days(30), ["Hello from Acme", "Main: (303) 555-0177"], sender="ar@acrne.example",
+                       thread="t-look", subject="Hello")]
+
+
+def test_a_vendor_the_rule_withholds_needs_a_person(database_url, monkeypatch):
+    monkeypatch.delenv("DIALBACK_READER", raising=False)
+    monkeypatch.delenv("DIALBACK_CONTEXT_GUARD", raising=False)
+    v = new_vendor(database_url, "Acme Fasteners")
+
+    async def go():
+        async with await psycopg.AsyncConnection.connect(database_url) as conn, conn.transaction():
+            await write_ingest(conn, dataset_id=v["dataset_id"], vendor_id=v["vendor_id"],
+                               result=ingest_all(withheld_vendor(dt.datetime.now(dt.UTC)), extractor_version="test"))
+            await add_vendor_domain(conn, dataset_id=v["dataset_id"], vendor_id=v["vendor_id"], domain="acme.example")
+    asyncio.run(go())
+    (row,) = as_person(database_url, v["dataset_id"])
+    assert row["status"] == "needs_person" and row["status_text"] == STATUS_TEXT["needs_person"]
+    assert row["provable_number"] is None and row["number_on_file"] == ON_FILE
+    monkeypatch.setenv("DIALBACK_CONTEXT_GUARD", "off")              # today's rule calls the number on file
+    (row,) = as_person(database_url, v["dataset_id"])
+    assert row["status"] == "provable" and row["provable_number"] == ON_FILE
 
 
 def _c(e164, eligible, on_file):

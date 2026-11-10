@@ -4,7 +4,7 @@ import { CoreError, core } from "@/lib/core";
 import { phone } from "@/lib/lineage";
 import { counts, digitMarks, shares, statusLabel, statusTone, type RiskStatus } from "@/lib/risk";
 
-const STRIPE = { near_miss: "is-bad", unproven: "is-warn", missing: "", provable: "is-ok" } as const;
+const STRIPE = { needs_person: "is-bad", near_miss: "is-bad", unproven: "is-warn", missing: "", provable: "is-ok" } as const;
 
 // The vendor risk list (spec 0026, owner Inesh), the demo's opening screen: is each vendor's number
 // on file one the Trust Ledger can prove? Every explanation is the ledger's status_text.
@@ -52,16 +52,16 @@ function cap(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-const STAT_TONE = { near_miss: "bad", unproven: "warn", missing: undefined, provable: "ok" } as const;
+const STAT_TONE = { needs_person: "bad", near_miss: "bad", unproven: "warn", missing: undefined, provable: "ok" } as const;
 
-/** The count strip, worst first: near miss, unproven, missing, provable. */
+/** The count strip, worst first: needs a person, near miss, unproven, missing, provable. */
 function CountStrip({ vendors }: { vendors: { status: RiskStatus }[] }) {
   return (
     <Stats label="Vendors by status" items={counts(vendors).map(([status, n]) => ({ label: cap(statusLabel(status)), value: n, tone: STAT_TONE[status] }))} />
   );
 }
 
-const KEY = { near_miss: "bad", unproven: "warn", missing: "muted", provable: "ok" } as const;
+const KEY = { needs_person: "bad", near_miss: "bad", unproven: "warn", missing: "muted", provable: "ok" } as const;
 
 /** Vendors by status as one segmented bar (spec 0032): shares inside the blocks that fit them,
  *  the legend naming each with its count, worst first. */

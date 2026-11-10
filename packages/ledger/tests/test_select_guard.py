@@ -10,7 +10,7 @@ import uuid
 
 import psycopg
 import pytest
-from _world import SCHEMA, at, calls, frozen, run, world
+from _world import SCHEMA, at, calls, frozen, run, source_doc, world
 from dialback_ledger import select_number
 from dialback_ledger.ingest import ingest_all
 from dialback_ledger.select import RULE_VERSION, WITHHELD, change_context_documents
@@ -175,26 +175,15 @@ def test_flag_default_and_unknown_values_give_the_new_rule(monkeypatch, value):
 
 # Storage (decision 4), on a real migrated Postgres ------------------------------------------------
 
-def _doc(doc_id: str, channel: str, received: dt.datetime, lines: list[str], *, sender: str | None = None,
-         thread: str | None = None, subject: str | None = None) -> dict:
-    """A source document in the corpus's shape (corpus/README.md), for ingest_all."""
-    return {"id": doc_id, "kind": {"listing": "listing"}.get(channel, channel), "claimed_date": None,
-            "header_date": received.isoformat() if channel == "email" else None, "scan": False,
-            "custody": {"channel": channel, "parent_document_id": None, "received_at": received.isoformat(),
-                        "sender": sender, "subject": subject, "thread_id": thread},
-            "pages": [{"width": 612, "height": 792, "spans": [
-                {"text": t, "x": 72, "y": 72 + 14 * i, "size": 10, "color": "#000000"} for i, t in enumerate(lines)]}]}
-
-
 def a1_documents(now: dt.datetime) -> list[dict]:
     """FINDINGS A1 through real ingestion: the request email's own text calls the real line a bank's."""
     days = lambda n: now - dt.timedelta(days=n)
     return [
-        _doc("real-contract", "contract", days(200), ["Master supply agreement: Acme", "Accounts receivable: (415) 555-0142"]),
-        _doc("real-listing", "listing", days(200), ["Acme Fasteners", "Accounts receivable: (415) 555-0142"]),
-        _doc("planted-contract", "contract", days(150), ["Supply agreement: Acme", "Accounts receivable: (645) 555-0177"]),
-        _doc("planted-listing", "listing", days(150), ["Acme Fasteners, west office", "Accounts receivable: (645) 555-0177"]),
-        _doc("request", "email", now - dt.timedelta(hours=1), ["Please update our bank details for future payments.",
+        source_doc("real-contract", "contract", days(200), ["Master supply agreement: Acme", "Accounts receivable: (415) 555-0142"]),
+        source_doc("real-listing", "listing", days(200), ["Acme Fasteners", "Accounts receivable: (415) 555-0142"]),
+        source_doc("planted-contract", "contract", days(150), ["Supply agreement: Acme", "Accounts receivable: (645) 555-0177"]),
+        source_doc("planted-listing", "listing", days(150), ["Acme Fasteners, west office", "Accounts receivable: (645) 555-0177"]),
+        source_doc("request", "email", now - dt.timedelta(hours=1), ["Please update our bank details for future payments.",
                                                                 "Bank verification line: (415) 555-0142"],
              sender="ar@acme.example", thread="thr-request", subject="Updated banking details"),
     ]
