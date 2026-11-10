@@ -245,7 +245,10 @@ This tests the step after the call, the way the fuzz lab tests `select()`. No ca
    - The lab's `0033`.
    - Its Q60, Q61 and Q65, which collide with main.
    - Spec 0017's Q56, Q57 and Q58, which collide with main's spec 0030.
-   - Spec 0046's Q87 to Q91, which collide with spec 0045, written first.
+   - Spec 0046's Q87 to Q91, which collide with spec 0045, written first. Q87 and Q91 are also on
+     main now.
+   - Checked Nov 10: main goes up to spec 0077 and Q116, and the open branches up to spec 0081 and
+     Q135. Spec numbers 0017, 0046, 0048 and 0049 are free on main and stay.
 2. **PR order.** Each PR is stacked on the one before, and kept as close to 400 changed lines as its
    parts allow. Any of them may be split further. The voice and fuzz labs never share a PR.
    1. `apps/core`: pull out `call_facts`, with no change in behavior. `apps/voice`:
@@ -256,11 +259,14 @@ This tests the step after the call, the way the fuzz lab tests `select()`. No ca
    3. The fuzz lab's core (the renumbered 0033): the generator, the checks, freezing, `lab fuzz`,
       the frozen worlds and the `lab-fuzz` job, with part C.
    4. The sweeps: `lab frontier` and `lab overblock`.
-   5. Spec 0046's search that keeps going, then its guided search and its measurement. `lab-fuzz`
-      switches to `--search archive` here. It needs that search before it can carry its
-      known-failures list, since today's search stops at the first hit, which is always a known
-      one (B3).
-   6. Part B, `lab reports`.
+   5. Spec 0046's search that keeps going (`--search archive`), with its shrinker and near-miss
+      output. `lab-fuzz` switches to `--search archive` here. It needs that search before it can
+      carry its known-failures list, since today's search stops at the first hit, which is always a
+      known one (B3). Spec 0046 is closed, so its guided searches and bench stay parked on
+      `sami/guided-search-impl` and don't land (updated Nov 10).
+   6. Part B, `lab reports`, with the sweep and its job.
+   - **The LLM reader (spec 0049)** lands on its own, in one or two PRs from `sami/llm-reader`,
+     independent of this order.
 3. **A known-failures list per job (Q101, decided).** `lab-fuzz` is red today (8 of the 9 frozen
    worlds still fail), and `lab-reports` and the A10 voice scenario will be red at once. All of them
    run on other owners' PRs. So each job reads a strict list, `evals/known-failures.json`.
