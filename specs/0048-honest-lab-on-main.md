@@ -314,6 +314,16 @@ the known-failures list hides new bugs (FINDINGS C12). Before Abhi's review and 
      digits.
    - The loader refuses an unquoted number in a digits field: YAML reads `0142` as 98.
    - CI triggers add `origination.py`, `ports.py` and `uv.lock`.
+8. **Calls after the fixes (Sami accepted them, Nov 10):**
+   - **A bug seen only on reports production never sends is reported, not gated.** "Read only the
+     first company answer" needs two company answers in one report, which production never sends
+     today. A test pins it, and it's revisited if production ever records two answers to one
+     question.
+   - **The F1 list names five company conditions:** negation, correction and reseller (A10), plus a
+     company whose name contains the vendor's (A8) and a past connection. The near-variants showed
+     the last two verify today. Any other F1 failure is red.
+   - **The `unanswered_question` gate exempts code's own `unclear:` endings,** which spec 0043 makes
+     on purpose. An agent that ends a call early still fails it.
 
 ## Acceptance
 
