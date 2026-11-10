@@ -13,8 +13,9 @@ from dialback_core.email_door.door import handle_email
 from dialback_core.email_door.masking import mask_digit_runs
 from dialback_core.email_door.resend import ResendClient, ResendError, html_to_text
 from flows import FakeResend, assert_nowhere, received
-from test_email_route import SECRET, _now, demo, post, sign  # noqa: F401  (demo is a fixture)
+from test_email_route import _now, post, sign
 
+pytest_plugins = ["test_email_route"]  # registers its `demo` fixture here
 pytestmark = pytest.mark.anyio
 
 BODY_MARKER = "BODYMARKER-7f3"

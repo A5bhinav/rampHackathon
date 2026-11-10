@@ -102,10 +102,11 @@ async def assert_nowhere(pool, caplog, needle: str) -> None:
 
 
 def received(email_id: str, **changes) -> ReceivedEmail:
-    base = dict(email_id=email_id, message_id=f"<{email_id}@vendor.example>", sender="Dana <ar@vendor.example>", reply_to=(),
-                to=("inbox@dialback.example",), subject="New bank details", text="Please update our account.", html_text="",
-                headers={}, authentication={"spf": "pass", "dkim": "pass", "dmarc": "pass"}, raw_sha256="ab" * 32,
-                has_attachments=False)
+    base = {"email_id": email_id, "message_id": f"<{email_id}@vendor.example>", "sender": "Dana <ar@vendor.example>",
+            "reply_to": (), "to": ("inbox@dialback.example",), "subject": "New bank details",
+            "text": "Please update our account.", "html_text": "", "headers": {},
+            "authentication": {"spf": "pass", "dkim": "pass", "dmarc": "pass"}, "raw_sha256": "ab" * 32,
+            "has_attachments": False}
     return ReceivedEmail(**(base | changes))
 
 

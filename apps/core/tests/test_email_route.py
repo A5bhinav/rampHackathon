@@ -203,7 +203,7 @@ async def test_an_account_number_in_a_notice_is_stored_nowhere(demo):
             "select (select count(*) from app.inbound_webhooks w where w::text like %s) + "
             "(select count(*) from app.alerts a where a::text like %s) as n", (f"%{ACCOUNT}%", f"%{ACCOUNT}%"))).fetchone()
     assert seen["n"] == 0
-    unsigned = [r for r in await deliveries(demo.pool, demo.dataset.id) if not r["signature_valid"]][0]
+    unsigned = next(r for r in await deliveries(demo.pool, demo.dataset.id) if not r["signature_valid"])
     assert json.loads(unsigned["raw_body"]) == {"sha256": hashlib.sha256(body).hexdigest(), "length": len(body)}
     assert unsigned["event_id"] == "unsigned:" + hashlib.sha256(body).hexdigest()
 

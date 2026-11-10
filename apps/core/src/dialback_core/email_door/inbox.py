@@ -108,7 +108,7 @@ async def process_inbound_emails(pool: AsyncConnectionPool, settings: Settings, 
                 payload = json.loads(row["raw_body"])
                 data = payload.get("data") if isinstance(payload, dict) else None
                 email_id = data.get("email_id") if isinstance(data, dict) else None
-            except Exception:  # not JSON, or not JSON this process can read: this delivery only
+            except Exception:  # noqa: BLE001  not JSON, or not JSON this process can read: this delivery only
                 email_id = None
             if not isinstance(email_id, str) or not strip_nul(email_id):
                 error = "ignored: the notice has no readable email id"
@@ -118,7 +118,7 @@ async def process_inbound_emails(pool: AsyncConnectionPool, settings: Settings, 
                 data["email_id"] = email_id = strip_nul(email_id)
                 try:
                     state = await _open_row(pool, row, data)
-                except Exception as exc:  # the notice cannot be recorded, so there is no row to retry
+                except Exception as exc:  # noqa: BLE001  the notice cannot be recorded, so there is no row to retry
                     state, error = None, f"failed: {type(exc).__name__}"
                 if state is not None and state["outcome"] != "pending":
                     error = "duplicate: this email was already recorded"
@@ -126,7 +126,7 @@ async def process_inbound_emails(pool: AsyncConnectionPool, settings: Settings, 
                     try:
                         email = await resend.get_received(email_id)
                         await handle_email(pool, settings, keys, resend, row["dataset_id"], row["id"], email)
-                    except Exception as exc:
+                    except Exception as exc:  # noqa: BLE001  one email's failure must not stop the worker
                         # Only our own ResendError text is kept; any other error is kept as its type name, because
                         # its message can hold the email's values (ADR-8).
                         if isinstance(exc, ResendError):

@@ -9,9 +9,9 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass, field
-from urllib.parse import quote
 from html.parser import HTMLParser
 from typing import Any, Protocol
+from urllib.parse import quote
 
 import httpx
 

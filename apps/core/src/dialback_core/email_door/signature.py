@@ -12,7 +12,6 @@ import hashlib
 import hmac
 from collections.abc import Mapping
 
-
 MIN_KEY_BYTES = 16
 
 
