@@ -18,11 +18,12 @@ pressed. Typed digits are never logged or written anywhere; step sees them once,
 So is the quiet clock (spec 0051), for the same reason. Each time the relay waits for the caller it
 arms the clock: after a step that spoke, it starts when Twilio reports the agent stopped speaking,
 or at an estimate of when the lines finish if no such report comes; after a step that said nothing,
-at once. Activity from the caller (a prompt, partial or final, even an empty one; a key; Twilio's
-clientSpeaking) postpones it, and nothing stops it for good. When the quiet has lasted from the
-latest activity, the relay hands step a Silence, and step checks in or ends the call closed. Code,
-never the model, decides what counts as activity (R3). While digits are held, the keypad wait
-governs instead (D7)."""
+the start still pending from the last lines sent carries over (at once, if none is). Activity from
+the caller (a prompt, partial or final, even an empty one; a key; Twilio's clientSpeaking) postpones
+it, and a caller mid-sentence holds it, but never past QUIET_CAP_FACTOR waits, so nothing keeps a
+wait open for good. When the quiet has lasted from the latest activity, the relay hands step a
+Silence, and step checks in or ends the call closed. Code, never the model, decides what counts as
+activity (R3). While digits are held, the keypad wait governs instead (D7)."""
 from __future__ import annotations
 
 import asyncio
@@ -31,7 +32,6 @@ from dataclasses import dataclass
 from typing import Any, Protocol
 
 from dialback_policy import step as policy
-from dialback_policy.script import Phase
 
 from .. import tokens as _tokens
 from ..agent import Agent
@@ -79,6 +79,9 @@ QUIET_SECONDS = 10.0                 # after the agent finishes, before the chec
 QUIET_SECONDS_LAST4 = 20.0           # the same at the digits question
 AFTER_CHECK_IN_SECONDS = 10.0        # after a check-in, before the call ends
 AFTER_CHECK_IN_SECONDS_LAST4 = 20.0  # the same after the digits check-in
+# Activity postpones the clock, and a caller mid-sentence holds it, but never past this many quiet
+# waits from the moment the clock could first start, so nothing keeps a wait open for good.
+QUIET_CAP_FACTOR = 3
 
 # When the lines finish playing, if Twilio does not say (spec 0051, D3; Q118): 1 second, plus 1
 # second per 12 characters of every line the step said, plus 3 seconds of margin.
@@ -116,15 +119,15 @@ async def run_relay(ctx: policy.CallContext, agent: Agent, ws: WebSocketLike, *,
     disclosure): step still produces and records it, but it is not sent again over the socket, so the
     callee hears it once (R8). `keypad_timeout` is the wait after the last key; the quiet timings and
     the speech `estimate` set the quiet clock (spec 0051). Tests shorten them all."""
-    setup = await ws.receive_json()
-    if setup.get("type") != "setup" or not verify(setup):
+    setup = await _setup_message(ws)
+    if not verify(setup):
         await ws.close()                                     # a stray or cross-wired socket (R7)
         return _failed(ctx, "setup_rejected")
 
     def quiet_limit(state: policy.State) -> float:
-        """The seconds of quiet this wait allows: longer at the digits question, and its own after a
-        check-in (spec 0051, D1)."""
-        last4 = state.phase is Phase.LAST4
+        """The seconds of quiet this wait allows: longer while the digits question is the open one,
+        and its own after a check-in (spec 0051, D1)."""
+        last4 = policy.asking_digits(state)
         if state.check_in_pending:
             return after_check_in_seconds_last4 if last4 else after_check_in_seconds
         return quiet_seconds_last4 if last4 else quiet_seconds
@@ -151,11 +154,24 @@ async def run_relay(ctx: policy.CallContext, agent: Agent, ws: WebSocketLike, *,
     raise RuntimeError("the relay did not reach an end within max_steps")  # step caps turns; a guard
 
 
+async def _setup_message(ws: WebSocketLike) -> dict[str, Any]:
+    """The ConversationRelay `setup` message. Anything before it (a speaker event, now that those are
+    subscribed, or anything malformed) is ignored; only a setup that does not verify rejects the
+    socket. A receive that raises propagates, as before."""
+    while True:
+        msg = await ws.receive_json()
+        if isinstance(msg, dict) and msg.get("type") == "setup":
+            return msg
+
+
 async def _send(ws: WebSocketLike, lines: tuple[str, ...], greeting: str | None = None) -> None:
     for line in lines:
         if greeting is not None and line == greeting:
             continue  # ConversationRelay already spoke this as the welcomeGreeting (R8); don't repeat it
         await ws.send_json({"type": "text", "token": line, "last": True})
+
+
+_TIMED_OUT = object()   # what _Inbox._receive returns when a wait runs out: never a message
 
 
 class _Inbox:
@@ -169,8 +185,10 @@ class _Inbox:
     message is ever lost to a cancelled read.
 
     With no digits held, the quiet clock armed by `arm` bounds every wait (spec 0051): when it runs
-    out, the event is a Silence. A message that is not a JSON object, an `info` this does not know,
-    or a malformed one is ignored: it is not activity, and it neither starts nor stops the clock."""
+    out, the event is a Silence. A caller mid-sentence (a clientSpeaking "on" with no "off" yet) holds
+    it, and QUIET_CAP_FACTOR waits after it could first start it fires whatever came in between. A
+    message that is not a JSON object (a null included), an `info` this does not know, or a malformed
+    one is ignored: it is not activity, and it neither starts nor stops the clock."""
 
     def __init__(self, ws: WebSocketLike, timeout: float) -> None:
         self._ws = ws
@@ -178,29 +196,40 @@ class _Inbox:
         self._digits: list[str] = []
         self._deadline = 0.0                                 # loop time the entry goes in by, once typed
         self._pending: asyncio.Future[dict[str, Any]] | None = None
-        # The quiet clock, re-armed for every wait (spec 0051, D3). All loop times.
+        # The quiet clock (spec 0051, D3). All loop times.
         self._limit = 0.0                                    # seconds of quiet this wait allows
-        self._spoke = False                                  # the step before this wait said something
-        self._estimate_at = 0.0                              # when the estimate says the lines finish
-        self._started: float | None = None                   # when the clock started, once known
+        self._armed_at = 0.0                                 # the clock never starts before its wait began
+        self._estimate_at = 0.0                              # when the estimate says the last lines finish
+        self._stopped_at: float | None = None                # when Twilio said the agent stopped, since the send
         self._agent_on = False                               # agentSpeaking "on" seen since the last send
-        self._activity = float("-inf")                       # the caller's latest activity
+        self._client_on = False                              # clientSpeaking "on" with no "off": mid-sentence
+        self._activity = float("-inf")                       # the caller's latest activity in this wait
+        self._cap_at = 0.0                                   # when this wait ends, whatever comes
 
     def arm(self, said: tuple[str, ...], limit: float, estimate: SpeechEstimate) -> None:
-        """Start a new wait, just after the step's lines were sent. After a step that spoke, the clock
-        starts when Twilio says the agent stopped, or at the estimate if it never says; after a step
-        that said nothing, at once (spec 0051, D3)."""
+        """Start a new wait, just after the step's lines were sent (spec 0051, D3). After a step that
+        spoke, the clock starts when Twilio says the agent stopped, or at the estimate if it never
+        says. After a step that said nothing (a '#' or '*' while the question still plays, say), the
+        start still pending from the last lines sent carries over, so a key cannot bring the check-in
+        early; with nothing pending, it starts at once. The cap counts from the later of now and the
+        estimate, so a long line never eats into it."""
         now = asyncio.get_running_loop().time()
         self._limit = limit
-        self._spoke = bool(said)
-        self._estimate_at = now + estimate.seconds(said) if said else now
-        self._started = None if said else now
-        self._agent_on = False
+        self._armed_at = now
+        if said:
+            self._estimate_at = now + estimate.seconds(said)
+            self._stopped_at = None
+            self._agent_on = False
+            self._client_on = False
         self._activity = float("-inf")
+        self._cap_at = max(now, self._estimate_at) + QUIET_CAP_FACTOR * limit
 
     def _quiet_deadline(self) -> float:
-        start = self._started if self._started is not None else self._estimate_at
-        return max(start, self._activity) + self._limit    # measured from the latest activity (D2)
+        pending = self._stopped_at if self._stopped_at is not None else self._estimate_at
+        start = max(self._armed_at, pending)
+        if self._client_on:
+            return self._cap_at                              # the caller is mid-sentence: hold, up to the cap
+        return min(max(start, self._activity) + self._limit, self._cap_at)   # from the latest activity (D2)
 
     def _info(self, msg: dict[str, Any], now: float) -> None:
         """Twilio's speaker events (Q117): {"type": "info", "name": ..., "value": "on" | "off"}. Any
@@ -210,11 +239,12 @@ class _Inbox:
             return
         if name == "clientSpeaking":                         # the caller is speaking: activity (D2)
             self._activity = now
-        elif name == "agentSpeaking" and self._spoke:
+            self._client_on = value == "on"
+        elif name == "agentSpeaking":
             if value == "on":
                 self._agent_on = True
             elif self._agent_on:                             # only an "off" after an "on" since the send
-                self._started = now
+                self._stopped_at = now
 
     async def next_event(self, clock: Clock) -> policy.Event:
         loop = asyncio.get_running_loop()
@@ -224,12 +254,12 @@ class _Inbox:
                 msg = await self._receive(max(0.0, deadline - loop.time()))
             except Exception:  # noqa: BLE001  any receive failure is a dead socket, never a live call
                 return policy.Hangup(clock())
-            if msg is None:
+            if msg is _TIMED_OUT:
                 if self._digits:                             # no key in time: the entry goes in as typed
                     return self._submit(clock)
                 return policy.Silence(clock())               # the quiet lasted: step checks in or ends
             if not isinstance(msg, dict):
-                continue                                     # not a message at all: ignored
+                continue                                     # not a message at all, a null included: ignored
             now = loop.time()
             kind = msg.get("type")
             if kind == "info":
@@ -254,13 +284,14 @@ class _Inbox:
                 self._digits.clear()                         # a spoken turn ends a partial keypad entry
                 return event
 
-    async def _receive(self, timeout: float) -> dict[str, Any] | None:
-        """The next message, or None when `timeout` seconds pass first. Raises what the socket raises."""
+    async def _receive(self, timeout: float) -> Any:
+        """The next message, or _TIMED_OUT when `timeout` seconds pass first. Raises what the socket
+        raises. A JSON null is a message (None), never the timeout."""
         if self._pending is None:
             self._pending = asyncio.ensure_future(self._ws.receive_json())
         done, _ = await asyncio.wait({self._pending}, timeout=timeout)
         if not done:
-            return None
+            return _TIMED_OUT
         task, self._pending = self._pending, None
         return task.result()
 
