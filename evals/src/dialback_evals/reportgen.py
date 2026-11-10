@@ -19,7 +19,7 @@ import dataclasses
 from dialback_decision.rules import FLAGS
 from hypothesis import strategies as st
 
-from .phrasebank import OTHERS, VENDORS, phrases
+from .phrasebank import CLASSES, OTHERS, VENDORS, phrases_of
 from .reports import CLEAN_CHECKS, FAILING_CHECKS, RELAY_RESULTS, STATUS_CALLS, ReportCase
 
 
@@ -32,7 +32,11 @@ def _honest(draw, domain: str) -> ReportCase:
     legal, trades = draw(st.sampled_from(VENDORS))
     new = f"{draw(st.integers(0, 9999)):04d}"
     old = None if draw(st.booleans()) else f"{(int(new) + draw(st.integers(1, 9999))) % 10000:04d}"   # never == new
-    company = draw(st.sampled_from(phrases("vendor", legal, trades)))
+    # Mostly the vendor's name as said plainly or with filler; now and then a trade name, a singular or a typo,
+    # which production's word-subset check rejects (review fix 5).
+    kinds = ["vendor"] * 4 + ["vendor_filler"] * 2 + ["vendor_trade", "vendor_singular", "vendor_typo"]
+    cls = draw(st.sampled_from([k for k in kinds if phrases_of(k, legal, trades)]))
+    company = draw(st.sampled_from(phrases_of(cls, legal, trades)))
     answers = (_answer("recording_consent", "yes", 1), _answer("company_named", company, 3),
                _answer("department", "Accounts payable", 5), _answer("speaker_name", "Jordan Lee", 7),
                _answer("speaker_role", "AP clerk", 9), _answer("change_requested", "yes", 11),
@@ -42,8 +46,8 @@ def _honest(draw, domain: str) -> ReportCase:
                       dialed_number_is_pick=True if domain == "contract" else None, pick_current=True,
                       new_last4=new, old_last4=old, legal_name=legal, trade_names=trades, earlier=(),
                       speaker_in_change_thread=False, offered_number_from_request=False,
-                      truth={"company": ["vendor"], "speaker_from_thread": False, "offered_from_request": False,
-                             "earlier_concern": False})
+                      truth={"company": ["vendor"], "company_class": [cls], "speaker_from_thread": False,
+                             "offered_from_request": False, "earlier_concern": False})
 
 
 # ---- the changes --------------------------------------------------------------------------------
@@ -54,13 +58,14 @@ def _set(case: ReportCase, slot: str, value: str) -> ReportCase:
 
 
 def _drop(case: ReportCase, slot: str) -> ReportCase:
-    truth = {**case.truth, "company": []} if slot == "company_named" else case.truth
+    truth = {**case.truth, "company": [], "company_class": []} if slot == "company_named" else case.truth
     return dataclasses.replace(case, answers=tuple(a for a in case.answers if a["slot"] != slot), truth=truth)
 
 
 def _add(case: ReportCase, slot: str, value: str, truth: str | None = None) -> ReportCase:
     turn = max((a["turn_id"] for a in case.answers), default=0) + 2
-    changes = {"company": [*case.truth["company"], truth]} if slot == "company_named" else {}
+    changes = ({"company": [*case.truth["company"], truth], "company_class": [*case.truth["company_class"], truth]}
+               if slot == "company_named" else {})
     return dataclasses.replace(case, answers=(*case.answers, _answer(slot, value, turn)),
                                truth={**case.truth, **changes})
 
@@ -74,10 +79,11 @@ def _digits(case: ReportCase, value: str) -> ReportCase:
     return _set(case, "account_last4", value) if case.values("account_last4") else case
 
 
-def _company(draw, case: ReportCase, truth: str) -> ReportCase:
-    said = draw(st.sampled_from(phrases(truth, case.legal_name, case.trade_names, draw(st.sampled_from(OTHERS)))))
+def _company(draw, case: ReportCase, cls: str) -> ReportCase:
+    said = draw(st.sampled_from(phrases_of(cls, case.legal_name, case.trade_names, draw(st.sampled_from(OTHERS)))))
     case = _set(case, "company_named", said)
-    return dataclasses.replace(case, truth={**case.truth, "company": [truth] * len(case.truth["company"])})
+    n = len(case.truth["company"])
+    return dataclasses.replace(case, truth={**case.truth, "company": [CLASSES[cls]] * n, "company_class": [cls] * n})
 
 
 def _matches_old(draw, case: ReportCase) -> ReportCase:
@@ -152,7 +158,8 @@ CHANGES = {
     "digits_twice": lambda d, c: _add(c, "account_last4", _near(c.new_last4)),
     "digits_missing": lambda d, c: _drop(c, "account_last4"),
     **{f"company_{t}": (lambda d, c, t=t: _company(d, c, t))
-       for t in ("other", "negation", "reseller", "correction", "partial")},
+       for t in ("other", "other_containing_vendor", "past_connection", "negation", "reseller", "correction",
+                 "partial")},
     "company_missing": lambda d, c: _drop(c, "company_named"),
     "company_twice": lambda d, c: _add(c, "company_named", d(st.sampled_from(OTHERS)), "other"),
     "name_missing": lambda d, c: _drop(c, "speaker_name"),
@@ -182,7 +189,7 @@ CHANGES = {
 def _consent_refused(d, c: ReportCase) -> ReportCase:
     """Consent refused: the call ends there, so the consent answer is all it records."""
     consent = [{**a, "value": "no"} for a in c.answers if a["slot"] == "recording_consent"]
-    return dataclasses.replace(c, answers=tuple(consent), truth={**c.truth, "company": []})
+    return dataclasses.replace(c, answers=tuple(consent), truth={**c.truth, "company": [], "company_class": []})
 
 
 _ORDER = ("recording_consent", "company_named", "department", "speaker_name", "speaker_role", "change_requested",
@@ -195,7 +202,7 @@ def _ended_early(d, c: ReportCase) -> ReportCase:
     cut = d(st.sampled_from(_ORDER))
     gone = set(_ORDER[_ORDER.index(cut):])
     kept = tuple(a for a in c.answers if a["slot"] not in gone and not (a["slot"] == "flag" and cut == _ORDER[0]))
-    truth = {**c.truth, "company": []} if "company_named" in gone else c.truth
+    truth = {**c.truth, "company": [], "company_class": []} if "company_named" in gone else c.truth
     return dataclasses.replace(c, answers=kept, truth=truth)
 
 
@@ -214,7 +221,8 @@ def _pressure_flag(d, c: ReportCase) -> ReportCase:
 # question's answer, in the script's order, nothing after a refused consent, code's pressure flag and no other,
 # no offered number). Every other change is contract-only.
 RECORDABLE = ("change_no", "change_unsure", "digits_old", "digits_near_miss", "digits_mismatch", "digits_dont_know",
-              "digits_refused", "digits_short", "digits_ambiguous", "company_other", "company_negation",
+              "digits_refused", "digits_short", "digits_ambiguous", "company_other", "company_other_containing_vendor",
+              "company_past_connection", "company_negation",
               "company_reseller", "company_correction", "company_partial", "answerer_machine", "answerer_unknown",
               "direction_unknown", "other_result", "check_fails", "speaker_from_thread", "speaker_unknown",
               "offered_unknown", "pick_stale", "earlier_plain")

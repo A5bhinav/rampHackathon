@@ -227,17 +227,17 @@ def honest(domain: str = "reachable", legal_name: str = "Acme Fasteners LLC") ->
                       dialed_number_is_pick=True if domain == "contract" else None, pick_current=True,
                       new_last4="4821", old_last4="7730", legal_name=legal_name, trade_names=(), earlier=(),
                       speaker_in_change_thread=False, offered_number_from_request=False,
-                      truth={"company": ["vendor"], "speaker_from_thread": False, "offered_from_request": False,
-                             "earlier_concern": False})
+                      truth={"company": ["vendor"], "company_class": ["vendor"], "speaker_from_thread": False,
+                             "offered_from_request": False, "earlier_concern": False})
 
 
 def with_case(case: ReportCase, **changes) -> ReportCase:
     return dataclasses.replace(case, **changes)
 
 
-def with_company(case: ReportCase, said: str, truth: str) -> ReportCase:
-    """The case with every company answer replaced by `said`, whose truth is `truth`."""
-    return _set_values(case, "company_named", said, truth)
+def with_company(case: ReportCase, said: str, truth: str, cls: str | None = None) -> ReportCase:
+    """The case with every company answer replaced by `said`, whose truth is `truth` (class `cls`)."""
+    return _set_values(case, "company_named", said, truth, cls)
 
 
 def recordable(case: ReportCase) -> bool:
@@ -295,7 +295,8 @@ def unconfirmed(case: ReportCase) -> list[str]:
     company = case.truth["company"]
     if not company:
         missing.append("company=missing")
-    missing += [f"company={truth}" for truth in sorted(set(company) - {"vendor"})]
+    missing += sorted({f"company={cls}" for truth, cls in zip(company, company_classes(case), strict=True)
+                       if truth != "vendor"})                       # by phrase class (review fix 5)
     digits = case.values("account_last4")
     if not digits:
         missing.append("digits=missing")
@@ -359,6 +360,7 @@ class Found:
     violations: list[tuple[int, list[str]]] = dataclasses.field(default_factory=list)   # (case index, labels)
     vendor_answers: int = 0                  # F3: answers whose truth names the vendor
     vendor_rejected: int = 0                 # F3: of those, the ones the check rejects (over-blocking)
+    per_class: dict[str, list[int]] = dataclasses.field(default_factory=dict)   # F3: class -> [accepted, total]
 
 
 def check_f1(cases: Iterable[ReportCase], decide=None) -> Found:
@@ -381,12 +383,24 @@ def _with(case: ReportCase, **changes) -> ReportCase:
     return dataclasses.replace(case, **changes)
 
 
-def _set_values(case: ReportCase, slot: str, value: str, truth: str | None = None) -> ReportCase | None:
+def company_classes(case: ReportCase) -> list[str]:
+    """Each company answer's phrase class (spec 0048 review fix 5). Reports frozen before classes existed have
+    only truths, and there each truth is its own class."""
+    return list(case.truth.get("company_class", case.truth["company"]))
+
+
+def _companies(case: ReportCase, truths: list[str], classes: list[str]) -> dict:
+    return {**case.truth, "company": truths, "company_class": classes}
+
+
+def _set_values(case: ReportCase, slot: str, value: str, truth: str | None = None,
+                cls: str | None = None) -> ReportCase | None:
     if not case.values(slot):
         return None
     answers = tuple({**a, "value": value} if a["slot"] == slot else a for a in case.answers)
-    truth_changes = {"company": [truth] * len(case.truth["company"])} if slot == "company_named" else {}
-    return _with(case, answers=answers, truth={**case.truth, **truth_changes})
+    n = len(case.truth["company"])
+    truth_after = _companies(case, [truth] * n, [cls or truth] * n) if slot == "company_named" else case.truth
+    return _with(case, answers=answers, truth=truth_after)
 
 
 def _near_miss(digits: str) -> str:
@@ -409,14 +423,15 @@ def _second(case: ReportCase, slot: str) -> ReportCase | None:
     turn = max(a["turn_id"] for a in case.answers) + 2
     extra = {"slot": slot, "value": other, "turn_id": turn, "tool_call_id": f"second_{turn}",
              "captured_at": "2026-11-01T17:05:00Z", "capture_method": "speech"}
-    truth = {**case.truth, "company": [*case.truth["company"], "other"]} if slot == "company_named" else case.truth
+    truth = (_companies(case, [*case.truth["company"], "other"], [*company_classes(case), "other"])
+             if slot == "company_named" else case.truth)
     return _with(case, answers=(*case.answers, extra), truth=truth)
 
 
 def _drop(case: ReportCase, slot: str) -> ReportCase | None:
     if not case.values(slot):
         return None
-    truth = {**case.truth, "company": []} if slot == "company_named" else case.truth
+    truth = _companies(case, [], []) if slot == "company_named" else case.truth
     return _with(case, answers=tuple(a for a in case.answers if a["slot"] != slot), truth=truth)
 
 
@@ -492,21 +507,27 @@ def check_f2(cases: Iterable[ReportCase], decide=None, moves: Iterable[str] = tu
 
 # ---- F3: the company check against the truth --------------------------------------------------------
 
-def f3_label(truth: str) -> str:
-    return f"F3_company_accepted_{truth}"
+def f3_label(cls: str) -> str:
+    """F3's label names the phrase class accepted (A10's three keep their names: there class and truth agree)."""
+    return f"F3_company_accepted_{cls}"
 
 
 def check_f3(cases: Iterable[ReportCase], matcher=every_name_matches) -> Found:
     """Each company answer alone against the vendor's names: never accepted when its truth is another
     company, a negation, a reseller or a correction (gated); the share of names-the-vendor answers it
-    rejects is counted (over-blocking, reported, not gated)."""
+    rejects is counted (over-blocking, reported, not gated). Every phrase class's accepted and total counts
+    are kept in `per_class` (spec 0048 review fix 5)."""
     found = Found()
     for i, case in enumerate(cases):
         labels = []
-        for phrase, truth in zip(case.values("company_named"), case.truth["company"], strict=True):
+        for phrase, truth, cls in zip(case.values("company_named"), case.truth["company"], company_classes(case),
+                                      strict=True):
             accepted = matcher([phrase], case.legal_name, case.trade_names) is True
+            counts = found.per_class.setdefault(cls, [0, 0])
+            counts[0] += accepted
+            counts[1] += 1
             if truth in NOT_THE_VENDOR and accepted:
-                labels.append(f3_label(truth))
+                labels.append(f3_label(cls))
             if truth == "vendor":
                 found.vendor_answers += 1
                 found.vendor_rejected += not accepted
@@ -699,8 +720,10 @@ def rerun(out_dir: Path, decide=None, matcher=every_name_matches) -> list[tuple[
 def _honest_step(case: ReportCase) -> list[ReportCase]:
     """Smaller cases to try while shrinking: one answer fewer, or one field back to its plain value."""
     out = [dataclasses.replace(case, answers=case.answers[:i] + case.answers[i + 1:],
-                               truth={**case.truth, "company": [t for j, t in enumerate(case.truth["company"])
-                                                                if j != _company_index(case, i)]})
+                               truth=_companies(case, [t for j, t in enumerate(case.truth["company"])
+                                                       if j != _company_index(case, i)],
+                                                [c for j, c in enumerate(company_classes(case))
+                                                 if j != _company_index(case, i)]))
            for i in range(len(case.answers))]
     out += [dataclasses.replace(case, earlier=case.earlier[:i] + case.earlier[i + 1:]) for i in range(len(case.earlier))]
     return out
@@ -740,6 +763,7 @@ class Checked:
     vendor_answers: int = 0
     vendor_rejected: int = 0
     reachable_hits: list[list[str]] = dataclasses.field(default_factory=list)   # each violating report's labels
+    per_class: dict[str, dict[str, list[int]]] = dataclasses.field(default_factory=dict)   # domain -> class -> counts
 
     @property
     def gated(self) -> list[str]:
@@ -772,6 +796,7 @@ def run_checks(*, examples: int, seed: int, out_dir: Path | None = None, decide=
         f3 = check_f3(cases, matcher)
         done.vendor_answers += f3.vendor_answers
         done.vendor_rejected += f3.vendor_rejected
+        done.per_class[domain] = f3.per_class
         per_report: dict[int, set[str]] = {}
         for found in (check_f1(cases, decide), check_f2(cases, decide), f3):
             for i, labs in found.violations:

@@ -19,6 +19,8 @@
     {"case": "reports-f3-company-accepted-correction-b13c0c07", "labels": ["F3_company_accepted_correction"], "finding": "A10", "owner": "Abhi"},
     {"case": "reports-f3-company-accepted-reseller-c51eb22f", "labels": ["F3_company_accepted_reseller"], "finding": "A10", "owner": "Abhi"},
     {"case": "reports-f1-company-correction-8b4be5b5", "labels": ["F1:company=correction", "F3_company_accepted_correction"], "finding": "A10", "owner": "Abhi"},
-    {"case": "reports-f1-company-reseller-7a3b073e", "labels": ["F1:company=reseller", "F3_company_accepted_reseller"], "finding": "A10", "owner": "Abhi"}
+    {"case": "reports-f1-company-reseller-7a3b073e", "labels": ["F1:company=reseller", "F3_company_accepted_reseller"], "finding": "A10", "owner": "Abhi"},
+    {"case": "reports-f1-company-other-containing-vendor-806bec8b", "labels": ["F1:company=other_containing_vendor", "F3_company_accepted_other_containing_vendor"], "finding": "A8", "owner": "Abhi"},
+    {"case": "reports-f1-company-past-connection-aefe6e7d", "labels": ["F1:company=past_connection", "F3_company_accepted_past_connection"], "finding": "A10", "owner": "Abhi"}
   ]
 }

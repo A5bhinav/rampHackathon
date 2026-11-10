@@ -177,9 +177,14 @@ def _reports(examples: int, seed: int, out_dir: Path, known_failures: Path | Non
         print(f"lab reports: contract-only future-state findings (not gated): {', '.join(done.future_state)}")
     if done.new_frozen:
         print(f"lab reports: new finding(s) frozen under {out_dir}: {', '.join(done.new_frozen)}")
+    from .phrasebank import CLASSES
+    for cls, truth in CLASSES.items():          # spec 0048 review fix 5: F3 per phrase class, reachable domain
+        accepted, total = done.per_class.get("reachable", {}).get(cls, [0, 0])
+        if total:
+            print(f"lab reports: F3 {cls} (truth {truth}): accepted {accepted} of {total} reachable answers")
     share = done.vendor_rejected / done.vendor_answers if done.vendor_answers else 0.0
     print(f"lab reports: over-blocking (reported, not gated): {done.vendor_rejected} of {done.vendor_answers} "
-          f"names-the-vendor answers rejected ({share:.1%})")
+          f"names-the-vendor answers rejected, both domains ({share:.1%})")
     print(f"lab reports: {len(done.frozen_failing)} frozen report(s) failing, {len(done.gated)} reachable "
           f"label(s) (seed {seed}, {examples} reports per domain)")
     held = _held("lab-reports", known_failures, dict(done.frozen_failing), done.reachable_hits)

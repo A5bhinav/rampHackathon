@@ -196,11 +196,15 @@ def test_f1_labels_name_the_failed_condition():
     assert reports.check_f1([stale]).violations == []                                      # production refuses it (V01)
 
 
-def test_the_known_failures_list_names_only_a10s_three_f1_conditions():
+def test_the_known_failures_list_names_only_company_classes_for_f1():
+    # Review fix 1 lists only A10's three F1 conditions; review fix 5's near-variants add two more company
+    # classes production accepts though they don't name the vendor (A8's longer company name, and a past
+    # connection, A10's root cause). No other F1 condition is ever listed, so any other F1 failure is red.
     from dialback_evals import known
     entries = known.load(ROOT / "evals" / "known-failures.json")["lab-reports"]
-    f1 = {label for e in entries for label in e.labels if label.startswith("F1")}
-    assert f1 == {"F1:company=negation", "F1:company=correction", "F1:company=reseller"}
+    f1 = {(label, e.finding) for e in entries for label in e.labels if label.startswith("F1")}
+    assert f1 == {("F1:company=negation", "A10"), ("F1:company=correction", "A10"), ("F1:company=reseller", "A10"),
+                  ("F1:company=other_containing_vendor", "A8"), ("F1:company=past_connection", "A10")}
 
 
 def _bugged(bug):
@@ -301,3 +305,32 @@ def test_a_planted_flag_dropping_bug_turns_lab_reports_red(tmp_path, monkeypatch
     monkeypatch.setattr(core_facts, "call_facts", no_flags)
     assert main(["reports", "--examples", "2000", "--seed", "0", "--out", str(out),
                  "--known-failures", str(ROOT / "evals" / "known-failures.json")]) == 1
+
+
+# ---- spec 0048 review fix 5: near-variants production's check gets wrong, F3 per phrase class -----------
+
+def test_the_phrase_bank_has_near_variants_with_known_truths():
+    from dialback_evals import phrasebank
+    acme = ("Acme Fasteners LLC", ("Acme Supply",))
+    expect = {"other_containing_vendor": ("Acme Fasteners Supply Co", "other"),
+              "past_connection": ("I used to work at Acme Fasteners", "other"),
+              "vendor_singular": ("Acme Fastener", "vendor"), "vendor_typo": ("Ackme Fasteners", "vendor")}
+    for cls, (said, truth) in expect.items():
+        assert said in phrasebank.phrases_of(cls, *acme), cls
+        assert phrasebank.CLASSES[cls] == truth
+    assert {phrasebank.CLASSES[c] for c in phrasebank.CLASSES} == set(reports.COMPANY_TRUTHS)
+
+
+def test_f3_counts_are_reported_per_phrase_class():
+    found = reports.check_f3(_sample("reachable") + _sample("contract"))
+    per = found.per_class
+    assert {"vendor", "vendor_typo", "vendor_singular", "other", "other_containing_vendor", "past_connection",
+            "negation", "reseller", "correction", "partial"} <= set(per)
+    assert all(0 <= acc <= total and total > 0 for acc, total in per.values())
+    # Production's word-subset check gets these wrong, so F3 now measures something: it rejects a vendor's
+    # name with a typo or in the singular, and accepts another company whose name holds the vendor's.
+    assert per["vendor_typo"][0] == 0 and per["vendor_singular"][0] == 0
+    assert per["other_containing_vendor"][0] == per["other_containing_vendor"][1]
+    assert per["other"][0] == 0                               # a plain other company is still refused
+    labels = {lab for _, labs in found.violations for lab in labs}
+    assert "F3_company_accepted_other_containing_vendor" in labels    # the bar is unchanged: other is never accepted

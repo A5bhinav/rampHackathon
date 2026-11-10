@@ -7,8 +7,9 @@ frozen; never rewritten) and `why`. `lab reports` re-runs every one on every run
 found until the product changes. A finding is never tuned away: it is triaged as a product defect or as a
 check that is too strong (spec 0048, B6).
 
-Frozen at seed 0 on Nov 10 from the reachable domain; all of them are FINDINGS A10 (the company check
-accepts a negated name, a reseller or a correction), owned by `company.py`'s owner, Abhi. F1's labels name
+Frozen at seed 0 on Nov 10 from the reachable domain, all owned by `company.py`'s owner, Abhi: FINDINGS A10
+(the company check accepts a negated name, a reseller, a correction or a past connection) and A8 (it accepts
+another company whose name contains the vendor's). F1's labels name
 the condition that failed (spec 0048 review fix 1): the first F1 case was frozen under the older, bare F1
 label, which its `labels` field keeps as history.
 
