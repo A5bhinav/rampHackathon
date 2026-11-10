@@ -1010,8 +1010,10 @@ F1 to F9 hold as built (verified). But the lab still claims more than it shows:
     goes to review ("Sorry, I didn't catch that, this is Acme"; pinned in `test_company.py`), as do "No,
     you don't have the wrong number, this is Acme" and a colleague's "Jim's no longer here". All fail
     closed.
-  - **Still missed:** "ain't", "haven't", "hasn't", "hadn't" and their no-apostrophe spellings. Not
-    added without Sami's call; "haven't" would need the phrase form, since "Haven" is a name.
+  - **Then added (Sami, Nov 10):** "ain't", "haven't", "hasn't", "hadn't" and their no-apostrophe
+    spellings. "Ain't" and "haven't" are phrases, since "Ain" and "Haven" are names and "New Haven" is
+    a place. Not measured here either, and they add to the cost above ("I haven't got that invoice,
+    this is Acme" goes to review).
 
 ## D. Red teaming
 

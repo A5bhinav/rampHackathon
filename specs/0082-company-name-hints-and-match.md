@@ -149,6 +149,12 @@ say (Part B), and keeps the clear-mismatch signal.
      - **Phrases:** "don t" (from "don't"), "no longer", "wrong number", "different company".
        "Don't" is a phrase and not the word `don`, because "Don" is a first name ("Hi, this is Don
        at Acme" must not flag).
+     - **Then, after the extension's review (Sami, Nov 10):**
+       - words `hasn` and `hadn` (from "hasn't", "hadn't");
+       - the no-apostrophe spellings `aint`, `havent`, `hasnt`, `hadnt`;
+       - the phrases "ain t" and "haven t" (from "ain't", "haven't"). These are phrases for the same
+         reason as "don t": "Haven" is a first name and part of place names ("New Haven"), and "Ain"
+         is a first name.
      - **Not added:** an outsourced AP firm ("We handle AP for Acme"). Its words ("handle", "for") are
        everyday words, so flagging them would send honest answers to review.
      - **Not measured.** The lab's phrase bank has none of these phrases, so only unit tests pin
@@ -338,8 +344,10 @@ the vendor unless stated:
     everything else clean, is verified.
 - [ ] B11. D7a's extension. The refusal lists are exactly D7a's, extension included. Each added
   word and phrase flags on its own ("I don't work for Acme", "We're no longer Acme", "Sorry, wrong
-  number", "This is a different company", and each apostrophe-free spelling). "Hi, this is Don at
-  Acme" names the vendor (`True`).
+  number", "This is a different company", "This ain't Acme", "I haven't worked at Acme in years",
+  "Acme hasn't been here", "We hadn't heard of Acme", and each apostrophe-free spelling). Names stay
+  names: "Hi, this is Don at Acme", "This is Haven at Acme", "Acme, New Haven office" and "This is Ain
+  at Acme" name the vendor (`True`).
 
 ## Tests (written first)
 

@@ -43,10 +43,13 @@ REFUSAL_WORDS = frozenset({"not", "isn", "aren", "wasn", "weren", "never", "form
                            "distributor", "behalf",
                            # D7a's extension (Sami, Nov 10): more contractions, and the spellings speech-to-text
                            # may write with no apostrophe
-                           "doesn", "didn", "isnt", "arent", "wasnt", "werent", "dont", "doesnt", "didnt"})
-# "don't" reads as "don t": a phrase, since "Don" alone is a first name ("Hi, this is Don at Acme").
+                           "doesn", "didn", "isnt", "arent", "wasnt", "werent", "dont", "doesnt", "didnt",
+                           "hasn", "hadn", "aint", "havent", "hasnt", "hadnt"})
+# "don't", "ain't" and "haven't" read as "don t", "ain t" and "haven t": phrases, since "Don", "Ain" and
+# "Haven" alone are first names, and "New Haven" is a place ("Hi, this is Don at Acme").
 REFUSAL_PHRASES = (("used", "to"), ("i", "mean"),
-                   ("don", "t"), ("no", "longer"), ("wrong", "number"), ("different", "company"))
+                   ("don", "t"), ("no", "longer"), ("wrong", "number"), ("different", "company"),
+                   ("ain", "t"), ("haven", "t"))
 
 
 def _refuses(named: str, names: tuple[str, ...]) -> bool:
