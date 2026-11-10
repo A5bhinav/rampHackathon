@@ -10,6 +10,7 @@ import hashlib
 import json
 import logging
 import re
+import unicodedata
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -23,6 +24,7 @@ from .reader import ReaderFailed
 from .text import Line
 
 MODEL = "claude-haiku-5-5"   # pinned here and nowhere else
+API_BASE_URL = "https://api.anthropic.com"   # pinned: no host setting can send document text elsewhere
 EFFORT = "low"               # no `thinking` setting: Haiku 5.5 thinks adaptively, within max_tokens
 MAX_TOKENS = 8192
 TIMEOUT_S = 30.0             # per attempt; the SDK's default retries apply
@@ -89,9 +91,9 @@ def quiet_sdk_logs() -> None:
 
 
 def anthropic_client(api_key: str, http_client: httpx2.Client | None = None) -> anthropic.Anthropic:
-    """The SDK client: the given key only (no other credential source), a 30-second timeout and the
-    SDK's default retries."""
-    return anthropic.Anthropic(api_key=api_key, timeout=TIMEOUT_S, http_client=http_client)
+    """The SDK client: the given key only (no other credential source), the pinned API base URL (not
+    ANTHROPIC_BASE_URL, review G16), a 30-second timeout and the SDK's default retries."""
+    return anthropic.Anthropic(api_key=api_key, base_url=API_BASE_URL, timeout=TIMEOUT_S, http_client=http_client)
 
 
 def user_turn(text: str) -> str:
@@ -104,20 +106,23 @@ _LONG_RUN = re.compile(r"\d{7,}")
 def for_the_model(visible_text: str) -> tuple[str, int]:
     """The text the model is sent, and how many phone candidates it holds. Every run of 7 or more
     digits that isn't inside a phone candidate (an account or routing number, say) is replaced with
-    PLACEHOLDER, in the text sent only (spec 0049, decision 5, Q110). Grounding checks quotes against
-    the original lines, so a quote that holds a placeholder is dropped. Candidates are found line by
-    line, exactly as ingestion finds them."""
+    PLACEHOLDER, in the text sent only (spec 0049, decision 5, Q110). A run is kept only if it lies in
+    a candidate and its digits are part of that candidate's number, so a long extension is redacted
+    too (review G15). Grounding checks quotes against the original lines, so a quote that holds a
+    placeholder is dropped. Candidates are found line by line, exactly as ingestion finds them."""
     out, count = [], 0
     for i, text in enumerate(visible_text.split("\n")):
-        spans = [(c.start, c.end) for c in find_phones([Line(text, "visible", 0, i)])]
-        count += len(spans)
-        out.append(_redact(text, spans))
+        phones = [(c.start, c.end, c.e164[1:]) for c in find_phones([Line(text, "visible", 0, i)])]
+        count += len(phones)
+        out.append(_redact(text, phones))
     return "\n".join(out), count
 
 
-def _redact(text: str, phones: list[tuple[int, int]]) -> str:
+def _redact(text: str, phones: list[tuple[int, int, str]]) -> str:
     def keep_phones(m: re.Match) -> str:
-        return m.group(0) if any(s <= m.start() and m.end() <= e for s, e in phones) else PLACEHOLDER
+        digits = "".join(str(unicodedata.decimal(ch)) for ch in m.group(0))   # fullwidth digits too
+        inside = any(s <= m.start() and m.end() <= e and digits in number for s, e, number in phones)
+        return m.group(0) if inside else PLACEHOLDER
     return _LONG_RUN.sub(keep_phones, text)
 
 

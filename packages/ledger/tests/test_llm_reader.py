@@ -17,6 +17,7 @@ from dialback_ledger.custody import custody_for
 from dialback_ledger.flags import ReaderMode, reader_mode
 from dialback_ledger.ingest import ingest, ingest_all
 from dialback_ledger.llm_reader import (
+    API_BASE_URL,
     EFFORT,
     MAX_TOKENS,
     MODEL,
@@ -268,6 +269,30 @@ def test_long_digit_runs_never_reach_the_model():
     assert sent_text(request) == ("Remit to account [digits removed], routing [digits removed]\n"
                                   "Invoice [digits removed]-A, PO [digits removed], ref 123456\n"
                                   "Call 2065550117 or (206) 555-0142")
+
+
+def test_long_digit_runs_in_an_extension_never_reach_the_model():
+    # Review G15: a candidate's span covers its extension, so a long run there was kept.
+    calls = []
+    doc = page(span("Call (206) 555-0142 ext. 000123456789"), span("Phone 206-555-0117 x123456789"),
+               span("Main 2065550124"))
+    ingest_all([doc], extractor_version="test", reader=llm_reader(like_the_stub, calls))
+    (request,) = calls
+    assert re.findall(r"\d{7,}", request.content.decode()) == ["2065550124"]    # the phone's own digits stay
+    assert sent_text(request) == ("Call (206) 555-0142 ext. [digits removed]\n"
+                                  "Phone 206-555-0117 x[digits removed]\n"
+                                  "Main 2065550124")
+
+
+def test_the_api_base_url_is_pinned(monkeypatch):
+    # Review G16: a host's ANTHROPIC_BASE_URL could choose where document text goes.
+    monkeypatch.setenv("ANTHROPIC_BASE_URL", "http://attacker.invalid")
+    calls = []
+    reader = llm_reader(like_the_stub, calls)
+    ingest_all([BAD], extractor_version="test", reader=reader)
+    (request,) = calls
+    assert (request.url.scheme, request.url.host) == ("https", "api.anthropic.com")
+    assert str(reader.model.client.base_url).rstrip("/") == API_BASE_URL == "https://api.anthropic.com"
 
 
 def test_a_quote_with_a_placeholder_is_dropped():
