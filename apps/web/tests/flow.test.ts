@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { HoldStatus } from "../src/lib/api-types.ts";
-import { STATIONS, dayWindow, heldLanes, holdGate, place, stationCounts } from "../src/lib/flow.ts";
+import { STATIONS, dayWindow, heldLanes, holdGate, miniRail, place, stationCounts } from "../src/lib/flow.ts";
 
 type Lane = { id: string; hold_status: HoldStatus | null; next_payment_date: string | null };
 
@@ -69,4 +69,13 @@ test("the held-payments chart shows only changes whose hold is in place, soonest
   assert.equal(capped.shown.length, 12);
   assert.equal(capped.more, 3);
   assert.equal(capped.shown[0].id, "x0");
+});
+
+test("the queue's mini rail comes from the station alone", () => {
+  assert.deepEqual(miniRail("calling"), ["done", "current", "todo", "todo", "todo"]);
+  assert.deepEqual(miniRail("needs_review"), ["done", "done", "done", "review", "todo"]);
+  assert.deepEqual(miniRail("blocked"), ["done", "done", "done", "failed", "todo"]);
+  assert.deepEqual(miniRail("awaiting_release"), ["done", "done", "done", "current", "todo"]);
+  assert.deepEqual(miniRail("released"), ["done", "done", "done", "done", "done"]);
+  assert.deepEqual(miniRail("on_ice" as never), ["done", "done", "done", "review", "todo"]);  // unknown: a person looks
 });

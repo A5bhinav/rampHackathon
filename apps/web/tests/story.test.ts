@@ -47,3 +47,10 @@ test("after sign-in, only a known demo link is followed; anything else opens the
   for (const bad of [null, "", "/demo/nope", "/demo/acme/../../x", "//evil.example", "https://evil.example/demo/acme",
     "/demo/acme?x=1", "/d/123/cases", "/demo/constructor"]) assert.equal(safeNext(bad), "/app", String(bad));
 });
+
+test("a dataset page is a safe place to come back to after switching demo accounts", () => {
+  const ds = "/d/0c9e8d7f-6a5b-4c3d-8e2f-1a0b9c8d7e6f";
+  for (const ok of [ds, `${ds}/cases`, `${ds}/cases/3f6a9d2e-8b14-4c7a-a5e0-1d2c3b4a5f60/lineage`, `${ds}/evidence`]) assert.equal(safeNext(ok), ok, ok);
+  for (const bad of [`${ds}//evil.example`, `${ds}/../x`, `${ds}/cases?x=1`, `${ds}/cases#x`, `/d/0c9e8d7f/cases`, `${ds}\\x`])
+    assert.equal(safeNext(bad), "/app", bad);
+});

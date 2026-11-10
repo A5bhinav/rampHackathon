@@ -85,3 +85,16 @@ export function place(date: string | null | undefined, w: DayWindow): { pct: num
   if (d > end) return { pct: 100, off: "after" };
   return { pct: Math.round(((d - start) / (end - start)) * 1000) / 10, off: null };
 }
+
+export type Segment = "done" | "current" | "review" | "failed" | "todo";
+
+/** The queue row's mini rail: one segment per station, from the case's station alone. */
+export function miniRail(state: CaseState): Segment[] {
+  const at = stationOf(state);
+  return STATIONS.map((_, i): Segment => {
+    if (i < at.index) return "done";
+    if (i > at.index) return "todo";
+    if (state === "blocked") return "failed";
+    return at.tone === "warn" ? "review" : "current";
+  });
+}
