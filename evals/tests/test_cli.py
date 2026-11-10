@@ -3,7 +3,9 @@ scorecard.json, and exit non-zero when any hard gate fails."""
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
+import pytest
 from dialback_evals.cli import main
 from dialback_evals.frontier import NOISE
 
@@ -97,6 +99,19 @@ def test_lab_fuzz_fails_on_a_frozen_finding_and_passes_the_seed_through(tmp_path
     monkeypatch.setattr("dialback_evals.cli.fuzz", lambda **k: seen.update(k) or [])
     assert main(["fuzz", "--examples", "7", "--seed", "3", "--out", str(tmp_path)]) == 1
     assert seen["examples"] == 7 and seen["seed"] == 3 and str(seen["out_dir"]) == str(tmp_path)
+
+
+def test_fuzz_default_search_is_today(tmp_path, monkeypatch):
+    # Spec 0046: with no --search, or --search first, lab fuzz makes exactly today's call and nothing else.
+    monkeypatch.chdir(tmp_path)
+    seen = []
+    monkeypatch.setattr("dialback_evals.cli.rerun", lambda d: [])
+    monkeypatch.setattr("dialback_evals.cli.fuzz", lambda **k: seen.append(k) or [])
+    monkeypatch.setattr("dialback_evals.cli.archive_fuzz", lambda *a, **k: pytest.fail("the archive search ran"))
+    for extra in ([], ["--search", "first"]):
+        assert main(["fuzz", "--examples", "7", "--seed", "3", "--out", "cg", *extra]) == 0
+    assert seen == [{"examples": 7, "seed": 3, "out_dir": Path("cg")}] * 2
+    assert not (tmp_path / "evals").exists()                 # no near-miss file, nothing else written
 
 
 def test_lab_frontier_writes_table(tmp_path):

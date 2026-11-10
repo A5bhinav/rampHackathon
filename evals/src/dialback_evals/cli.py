@@ -8,7 +8,12 @@ and needs no key. `--max-usd` is accepted for forward compatibility; the scripte
 `lab fuzz` re-runs every frozen finding under `--out`, then searches `--examples` generated worlds at
 `--seed`, freezing the first shrunk violation there; it exits non-zero on any frozen case that still
 fails or any new finding. `lab frontier` and `lab overblock` write the two measurement tables and exit
-non-zero only when their stated asserts fail."""
+non-zero only when their stated asserts fail.
+
+Spec 0046: `lab fuzz --search archive|guided|guided-new` runs the whole budget instead, freezes a
+1-minimal world for every label no frozen case records yet, and writes near misses to `--near-misses`,
+which never changes the exit code; `--search first` (the default) is the search above, unchanged.
+`lab redteam-bench` runs the planted-break measurement and refuses held-out seeds without `--held-out`."""
 from __future__ import annotations
 
 import argparse
@@ -31,7 +36,9 @@ from .frontier import (
     threshold_holds,
 )
 from .gencorpus import fuzz, load_all, rerun
+from .guided import ALL_MOVES, KINDS, archive_fuzz
 from .oracle import required
+from .redteam import Refused, bench, parse_seeds, result_seeds
 from .runner import build_facts, run_scenario
 from .scenario import Scenario, expected_hash, load_scenarios
 from .scorers import ScenarioResult, score, scorecard
@@ -52,6 +59,14 @@ def main(argv: list[str] | None = None) -> int:
     fz.add_argument("--examples", type=int, default=2000)
     fz.add_argument("--seed", type=int, default=0)
     fz.add_argument("--out", default="evals/corpus-generated")
+    fz.add_argument("--search", choices=["first", *KINDS], default="first",
+                    help="first: stop at the first violation (today's search); the others run the whole budget")
+    fz.add_argument("--near-misses", default="evals/out/near-misses.json")
+    rb = sub.add_parser("redteam-bench", help="measure whether steering finds planted breaks (spec 0046)")
+    rb.add_argument("--seeds", default="0-9", help="dev seeds 0-9; any other seed needs --held-out")
+    rb.add_argument("--held-out", action="store_true", help="run result seeds (1000-1009), once, for the result")
+    rb.add_argument("--out", default="evals/out/redteam-bench.json")
+    rb.add_argument("--jobs", type=int, default=min(8, os.cpu_count() or 1))
     fr = sub.add_parser("frontier", help="sweep the known-limit frontier (spec 0033)")
     fr.add_argument("--out", default="evals/out/frontier.json")
     ob = sub.add_parser("overblock", help="sweep single pieces of attacker noise (spec 0033)")
@@ -70,7 +85,11 @@ def main(argv: list[str] | None = None) -> int:
             return 2
         return _run(Path(args.scenarios_root) / args.split, Path(args.out))
     if args.command == "fuzz":
-        return _fuzz(args.examples, args.seed, Path(args.out))
+        if args.search == "first":
+            return _fuzz(args.examples, args.seed, Path(args.out))
+        return _search(args.search, args.examples, args.seed, Path(args.out), Path(args.near_misses))
+    if args.command == "redteam-bench":
+        return _redteam(args.seeds, args.held_out, Path(args.out), args.jobs)
     if args.command == "frontier":
         return _frontier(Path(args.out))
     if args.command == "overblock":
@@ -92,6 +111,44 @@ def _fuzz(examples: int, seed: int, out_dir: Path) -> int:
     print(f"lab fuzz: {len(failing)} frozen case(s) failing, {len(fresh)} new finding(s) "
           f"(seed {seed}, {examples} examples)")
     return 1 if failing or new else 0
+
+
+def _search(kind: str, examples: int, seed: int, out_dir: Path, near_misses: Path) -> int:
+    failing = rerun(out_dir)
+    for label, found in failing:
+        print(f"lab fuzz: frozen case {label} still fails: {', '.join(found)}")
+    result = archive_fuzz(kind, examples=examples, seed=seed, out_dir=out_dir, near_misses=near_misses,
+                          failing=failing)
+    arc = result.archive
+    for label, hit in arc.first.items():
+        where = (f"frozen as {result.frozen[label]} under {out_dir}" if label in result.frozen
+                 else "counted, not frozen again: a frozen case already records it")
+        print(f"lab fuzz: {label}, first at world {hit.index}: {where}")
+    print(f"lab fuzz: {sum(m in arc.near for m in ALL_MOVES)} near miss(es) written to {result.near_misses} "
+          "(they never change the exit code)")
+    print(f"lab fuzz: {len(failing)} frozen case(s) failing, {len(arc.first)} label(s) found, "
+          f"{len(result.frozen)} new case(s) (--search {kind}, seed {seed}, {examples} examples, "
+          f"{len(arc.worlds)} distinct worlds)")
+    return 1 if failing or arc.first else 0
+
+
+def _redteam(seeds_text: str, held_out: bool, out: Path, jobs: int) -> int:
+    try:
+        seeds = parse_seeds(seeds_text)
+    except ValueError as error:
+        print(f"lab redteam-bench: bad --seeds {seeds_text!r}: {error}")
+        return 2
+    if (outside := result_seeds(seeds)) and not held_out:
+        print(f"lab redteam-bench: refusing seeds {outside}: held-out seeds run once, deliberately, with "
+              "--held-out; debug the bench on dev seeds 0 to 9")
+        return 2
+    try:
+        report = bench(seeds, held_out=held_out, out=out, jobs=jobs)
+    except Refused as why:
+        print(f"lab redteam-bench: refused: {why}")
+        return 2
+    print(f"lab redteam-bench: wrote {out}; arm kept: {report.get('kept')}")
+    return 0
 
 
 def _write(path: Path, body: dict) -> None:
