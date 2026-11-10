@@ -17,6 +17,16 @@ async def case_of(world):
     return await one(world.pool, "select * from app.cases where dataset_id = %s order by opened_at desc limit 1", world.dataset.id)
 
 
+async def add_vendor(world, ref, name, accounts=(), bills=()) -> str:
+    """Add a vendor to this test's mock business (the mock's seed only adds). Returns its Ramp id.
+    With no accounts it is a vendor paid by check: no bank account on file (spec 0048)."""
+    body = {"vendors": [{"ref": ref, "name": name, "accounts": list(accounts), "bills": list(bills)}]}
+    r = await world.mock.post("/_mock/seed", json=body, headers=world.auth)
+    assert r.status_code == 200, r.text
+    world.refs |= r.json()["refs"]
+    return world.refs[ref]
+
+
 async def change_and_detect(world, account_number="000055556666", actor="clerk"):
     await world.bank_change(account_number=account_number, actor=actor)
     await world.deliver_webhooks()
