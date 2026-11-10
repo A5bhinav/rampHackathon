@@ -287,6 +287,7 @@ RISK = "/api/datasets/{dataset_id}/vendor-risk"
 
 async def test_the_vendor_risk_list_reads_the_ledger(world):
     from dialback_ledger.ingest import ingest_all
+    from dialback_ledger.reader import StubReader
     from dialback_ledger.store import add_vendor_domain, write_ingest
     await import_all(world.pool, world.ramp, world.keys, world.dataset.id)
     truth = json.loads((Path(__file__).resolve().parents[3] / "corpus/truth/C01.json").read_text())
@@ -294,7 +295,8 @@ async def test_the_vendor_risk_list_reads_the_ledger(world):
     async with world.pool.connection() as conn, conn.transaction():
         vendor = (await (await conn.execute("select id from app.vendors where dataset_id = %s order by legal_name limit 1",
                                             (world.dataset.id,))).fetchone())["id"]
-        await write_ingest(conn, dataset_id=world.dataset.id, vendor_id=vendor, result=ingest_all(docs, extractor_version="t"))
+        result = ingest_all(docs, extractor_version="t", reader=StubReader())   # spec 0049, decision 8
+        await write_ingest(conn, dataset_id=world.dataset.id, vendor_id=vendor, result=result)
         await add_vendor_domain(conn, dataset_id=world.dataset.id, vendor_id=vendor, domain=truth["vendor"]["domain"])
     body = await get(world, f"/api/datasets/{world.dataset.id}/vendor-risk", "clerk", RISK)
     (row,) = body["vendors"]                      # only vendors the ledger has documents for
