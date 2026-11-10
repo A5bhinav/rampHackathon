@@ -32,6 +32,8 @@ Specs: 0017 (voice slice lab), 0033 (generative selection pressure), 0021 (the s
   - It works in production today.
   - It removes K01's hardest condition: the planted number no longer has to be older than the real one.
   - Without a planted number it fails safe: no call, and the case goes to manual review.
+- **Spec:** 0079 (`sami/refuse-dont-redirect`, approved Nov 10): when the change context would
+  change who is called, nobody is called and a person reviews the case (`withheld`).
 
 ### A2. Honest change requests that mention the vendor's number are refused
 
@@ -50,6 +52,8 @@ Specs: 0017 (voice slice lab), 0033 (generative selection pressure), 0021 (the s
   2. Rule R2 (never call a number first seen in the change context) refuses it.
   3. A planted number gets the call.
 - **Gap:** I12 gates labels only, so this path is measured, not gated.
+- **Spec:** 0079 (`sami/refuse-dont-redirect`, approved Nov 10): when the change context would
+  change who is called, nobody is called and a person reviews the case (`withheld`).
 
 ### A4. Labels from non-counting documents outside the change context also refuse a number
 
