@@ -21,6 +21,25 @@ from xml.sax.saxutils import quoteattr
 
 import httpx
 
+# Twilio's answering-machine detection settings, sent on every dial (spec 0080, Part A). Detection
+# stays synchronous: Twilio labels the call before it fetches our TwiML, so the disclosure starts
+# only after the person stops talking, or after silence (R8). The errors are lopsided: a false
+# "machine" sends a good call to review, while a false "human" on a voicemail costs almost nothing,
+# because a voicemail cannot key the four digits. So the threshold leans toward "human". The
+# values are educated guesses until the first live calls (docs/live-call.md, section 5).
+
+# Talking for longer than this is labeled a machine. Twilio's default is 2400 ms and its guide
+# suggests 1800 to 3000 ms for businesses; 4500 ms lets a business greeting of up to about 4 s
+# finish and be labeled human, at the cost of some voicemails of 3 to 4.5 s labeled human too.
+AMD_SPEECH_THRESHOLD_MS = 4500
+# Quiet after talking that counts as "they finished": the dead air after "Hello?". Twilio's default,
+# sent explicitly. Lower would save a little dead air but end a greeting at a natural pause, so
+# the disclosure would start while the person is still talking, on a call that can verify.
+AMD_SPEECH_END_THRESHOLD_MS = 1200
+# Silence after pickup before Twilio gives up with "unknown". Twilio's default, sent explicitly;
+# Part C of spec 0080 lowers it once an "unknown" label stops blocking verification (Part B).
+AMD_SILENCE_TIMEOUT_MS = 5000
+
 
 class Originator(Protocol):
     """The seam that actually dials. `run_relay` and the routes are pure of Twilio's REST API; the
@@ -48,7 +67,10 @@ class TwilioOriginator:
             f"{self._API}/Accounts/{self._sid}/Calls.json",
             data={"To": to, "From": from_, "Url": twiml_url,
                   "StatusCallback": status_url, "StatusCallbackEvent": "completed",
-                  "MachineDetection": "Enable"},
+                  "MachineDetection": "Enable",
+                  "MachineDetectionSpeechThreshold": str(AMD_SPEECH_THRESHOLD_MS),
+                  "MachineDetectionSpeechEndThreshold": str(AMD_SPEECH_END_THRESHOLD_MS),
+                  "MachineDetectionSilenceTimeout": str(AMD_SILENCE_TIMEOUT_MS)},
             auth=self._auth)
         resp.raise_for_status()
         return resp.json()["sid"]
