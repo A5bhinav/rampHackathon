@@ -181,6 +181,38 @@ async def reset(env: DemoEnv, seed: dict[str, Any], links: dict[str, str], today
     return ResetResult(dataset, refs, accounts, warnings)
 
 
+@dataclass(frozen=True)
+class PrepareResult:
+    reset: ResetResult
+    ledger: dict[str, Any]          # dialback_ledger.demo.load's summary: per vendor, sightings and "team"/"fictional" AR line
+    requests: dict[str, bool]       # per vendor, whether its change-request email went in
+
+
+async def prepare(env: DemoEnv, seed: dict[str, Any], links: dict[str, str], *, phones: dict[str, str],
+                  requests: list[str], today: dt.date | None = None) -> PrepareResult:
+    """One command before the dashboard's clerk makes a change (spec 0077): a fresh demo with the clerk
+    linked, then the Trust Ledger's history (with any team phones), then each vendor's change-request
+    email. The order matters: the selection rule trusts only what was recorded before the case opened,
+    so the ledger and the email must be in before the bank change. Every check runs before the reset."""
+    from dialback_ledger import demo as ledger_demo  # the ledger's own demo commands
+
+    _guard(env.settings)
+    if "clerk" not in links:
+        raise DemoError("prepare needs --link clerk=<email>: the dashboard's Ramp (mock) portal sends changes as that account")
+    try:
+        e164 = ledger_demo.check(phones, requests)
+    except ledger_demo.DemoError as exc:
+        raise DemoError(str(exc)) from None
+    result = await reset(env, seed, links, today=today)
+    try:
+        loaded = await ledger_demo.load(env.owner_url, phones=e164, dataset_id=result.dataset.id)
+        sent = {ref: await ledger_demo.request(env.owner_url, vendor=ref, dataset_id=result.dataset.id) for ref in requests}
+    except ledger_demo.DemoError as exc:
+        raise DemoError(f"the demo was reset ({result.dataset.id}) but the Trust Ledger refused: {exc}. "
+                        "Run `dialback-ledger demo load` and `dialback-ledger demo request` by hand, before any bank change.") from None
+    return PrepareResult(result, loaded, sent)
+
+
 async def change(env: DemoEnv, seed: dict[str, Any], vendor_ref: str, by: str = "clerk", unknown: bool = False) -> str:
     """Beat 2: the vendor's seeded bank change, made in the mock as the seeded user `by` (the linked
     clerk), or with no known author. The mock's webhook follows; the core opens the case."""

@@ -58,6 +58,16 @@ Never
 | Routing checksum and account format | `apps/web/tests/ramp-portal.test.ts`, and the core test above |
 | The portal's view: can change or not, the case it watches for | `apps/web/tests/ramp-portal.test.ts` |
 
+## Follow-up: one command before the demo
+
+The selection rule trusts only what was recorded before the case opened, so the Trust Ledger and
+the change-request email must be in before the clerk saves a change; a change saved first can never
+get a number ("The change request isn't in the ledger"). `dialback-core demo prepare --link
+clerk=<email> [--phone acme=+1...] [--request acme]` does it in that order: reset, ledger load, request
+email. Every check (the link, the phones, the vendor refs, the sandbox) runs before the reset.
+`scripts/demo/prepare_hosted.sh <email>` runs it on Railway with the team phone read from the voice
+service's dial allowlist, never printed. Tests: `apps/core/tests/test_demo.py::test_prepare_*`.
+
 ## Out of scope
 
 - The vendor's change-request email in the portal (it needs a Trust Ledger write; for now the team runs `dialback-ledger demo request --vendor <ref>` before the change).
