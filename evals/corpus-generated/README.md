@@ -31,6 +31,11 @@ minimum age); the same move happens at default settings, as the planted case sho
 (no label may make a number ineligible) and has one eligible number, so refusing is allowed. It
 stays as a regression for that boundary.
 
+A `crash_<Name>` label (spec 0046) means select() or one of the lab's checks raised `<Name>` on the
+case: a crash is a finding of its own, and `lab fuzz` reports it instead of stopping. Cases frozen by
+`lab fuzz --search archive|guided|guided-new` are shrunk by the lab to a 1-minimal world: removing any
+one number, document or sighting other than the change request and its document makes the label go.
+
 A case's `labels` field is never rewritten: it records the check that failed when the case was
 frozen, under that check's name at the time. `why` carries what changed since, and `lab fuzz`
 prints what fails today.

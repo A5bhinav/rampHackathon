@@ -120,6 +120,25 @@ evals/
   out/              results.jsonl, scorecard.json (gitignored)
 ```
 
+## Selection fuzz and the red-team bench (specs 0033, 0046)
+
+```bash
+uv run lab fuzz --examples 2000 --seed 0 --out evals/corpus-generated            # stop at the first violation (the lab-fuzz CI job)
+uv run lab fuzz --search guided --examples 1000 --seed 0 --out evals/corpus-generated
+uv run lab redteam-bench --seeds 0-9                                              # dev seeds, to debug the bench
+```
+
+- `--search first` (the default) is spec 0033's search. `archive`, `guided` and `guided-new` run the
+  whole budget, keep the first world for every label, shrink each new one to a 1-minimal world and
+  freeze it, and write near misses to `evals/out/near-misses.json`, which never changes the exit code.
+  The two guided kinds steer Hypothesis with `target()` by `gain`: how many reasons a must-not-help
+  attacker move took off a refused number (`guided.py`).
+- `lab redteam-bench` measures whether that steering finds the planted breaks in `evals/redteam/` that
+  the unsteered archive misses (`redteam.py`). Held-out seeds run once, with `--held-out`, by Sami.
+- The new searches draw with `guided.pinned_draws()`: without it Hypothesis mixes in literals mined from
+  whatever first-party modules are loaded, so one seed would draw different worlds in pytest, the CLI
+  and a bench worker. `--search first` and the property tests still draw the old way.
+
 ## Your days
 
 Oct 31 scenario format and oracle rules. Nov 1 text line with a scripted vendor; the runner
