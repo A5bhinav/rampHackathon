@@ -170,6 +170,13 @@ These are not reachable today, but each is frozen as a regression.
     the vendor's name (103 of 103) and every past connection (61 of 61), and rejected every singular
     (0 of 95) and every typo (0 of 144). Over-blocking is 18.3% (533 of 2,920 answers that do name the
     vendor), all from the singular and the typo.
+- **What it's worth (Nov 10).** Every verified report the lab counts here also has the new account's
+  last four typed on the keypad, so A10 lets a call verify only when the person on the line knows the
+  new digits: the real vendor, or a fraudster who holds the line. A fraudster knows the vendor's name
+  anyway. So A10 weakens the "clearly a different company" signal, not the protection of money.
+- **Spec 0082** (`sami/company-name-match`, draft, Nov 10) goes the other way on purpose: it accepts
+  short names ("Acme") and speech hints, and lists negated short names as an accepted cost. Its D10
+  measures over-blocking and other-company acceptance with spec 0048's fuzzer.
 
 ### A11. The scripted agent's yes/no reading disagrees with the policy's
 
