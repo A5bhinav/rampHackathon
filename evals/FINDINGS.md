@@ -447,10 +447,42 @@ These are not reachable today, but each is frozen as a regression.
   - **The ledger's own property tests:** spec 0021's random worlds gave today's rule a pick in 0 of
     3000 draws. So those properties almost never test a pick. The new prefix test uses its own
     targeted generator.
+- **Fresh review of the code (Nov 10; ran the suites with Postgres in Docker, re-ran the
+  measurement):**
+  - **Nothing critical.** The prefix property holds by the code's construction, a withheld case is
+    never treated as picked, and the measurement re-ran byte for byte.
+  - **Important:**
+    - the web was not changed, so the lineage page shows a withheld case's planted number as
+      "alternate 0" to the person who must verify;
+    - `risk.py` reports `provable` with no number when withheld, and needs a contract status;
+    - the prefix test can't see drift in a fourth call;
+    - the edited validity property never draws a pick.
+  - **Minor:**
+    - nothing pins "keep today's cutoff" or the frozen copy to main;
+    - refusals report v3 with the flag off;
+    - spec 0047's flag-off wording is now stale.
 - **Coordination with the lab:** when spec 0079 merges, A1's four known-failure entries start
   passing, so `lab-fuzz` turns red until they come off the list. The lab's schema check also needs
   the `withheld` outcome, and its selection invariants need to learn it. Whichever of the two
   lands second makes those changes.
+
+### A26. An attacker's label can mark the vendor's real line opted out on every case
+
+- **Status:** reported by the fresh review of spec 0079's code (Nov 10), read in
+  `packages/ledger/src/dialback_ledger/store.py` (`_store`) and
+  `apps/voice/src/dialback_voice/pg_store.py:101`. Present on main, not introduced by spec 0079.
+- **What happens:**
+  1. A label in the change context (A1's "Bank verification line: <real>") makes the rule refuse
+     the real line.
+  2. `_store` writes that contact point's status, vendor-wide, as `excluded`.
+  3. The voice service reads `excluded` as opted out and refuses the call. That applies to any
+     other case of that vendor whose pick is that line.
+- **Why it matters:** one attacker email blocks the vendor's real line on other cases too. It fails
+  safe (a person reviews), but it is cross-case denial of service. Spec 0079's decision 4 avoids
+  this only for `withheld`, and the change context's own vetoes still write `excluded`.
+- **Where to fix:** store a case's refusal reasons with the selection, not on the vendor-wide
+  contact point, or never let change-context reasons set the vendor-wide status. That's in
+  `packages/ledger` (Inesh).
 
 ## B. The fuzz lab (spec 0033)
 
