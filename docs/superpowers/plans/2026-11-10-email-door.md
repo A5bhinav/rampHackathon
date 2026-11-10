@@ -59,7 +59,7 @@
 
 **Files:**
 - Create: `supabase/migrations/app/0013_email_door.sql`
-- Create: `supabase/tests/011_email_door.sql`
+- Create: `supabase/tests/016_email_door.sql`
 
 **Interfaces:**
 - Produces: `app.datasets.email_door_vendors uuid[] not null default '{}'`.
@@ -73,7 +73,7 @@
   - `unique (dataset_id, resend_email_id)`
 - Grants and RLS copy `app.alerts`: an authenticated person reads rows of their dataset; only `service_role` writes.
 
-- [ ] **Step 1: Write the failing SQL test** `supabase/tests/011_email_door.sql`, which asserts:
+- [ ] **Step 1: Write the failing SQL test** `supabase/tests/016_email_door.sql`, which asserts:
   - an authenticated person can select their dataset's rows and not another dataset's;
   - `authenticated` cannot insert;
   - `outcome = 'nonsense'` is rejected;
@@ -385,7 +385,7 @@ The worker for this task must not read `email_door/rules.py` or `match.py`, and 
 ### Task 13: SQL: two guards, two transitions, `release_case` from `blocked` (plan mode, Abhi reviews)
 
 **Files:**
-- Create: `supabase/migrations/app/0014_email_dismiss.sql`, `supabase/tests/012_email_dismiss.sql`
+- Create: `supabase/migrations/app/0014_email_dismiss.sql`, `supabase/tests/017_email_dismiss.sql`
 - Regenerate: `docs/state-machine.md` (`scripts/db/render_state_machine.py`)
 
 **Interfaces:**
