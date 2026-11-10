@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 from dialback_evals.cli import main
+from dialback_evals.frontier import NOISE
 
 _LEGIT = """\
 id: legit-01
@@ -77,7 +78,7 @@ def test_lab_run_records_the_frozen_scenario_hashes(tmp_path):
     assert len(line["scenario_hash"]) == 64
 
 
-# Spec 0083, Task 5: lab fuzz. The fuzz tests check the command's
+# Spec 0083, Task 5: lab fuzz, lab frontier and lab overblock. The fuzz tests check the command's
 # contract (exit codes, frozen cases re-run, the seed passed through) with the search and the re-run
 # substituted; the rule's own status is carried by the two selection_gate tests and the lab-fuzz job.
 
@@ -113,6 +114,18 @@ def test_fuzz_default_search_is_today(tmp_path, monkeypatch):
     assert [{k: v for k, v in call.items() if k != "keep"} for call in seen] == [
         {"examples": 7, "seed": 3, "out_dir": Path("cg")}] * 2
     assert not (tmp_path / "evals").exists()                 # no near-miss file, nothing else written
+
+
+def test_lab_frontier_writes_table(tmp_path):
+    out = tmp_path / "out" / "frontier.json"          # the parent directory does not exist yet
+    assert main(["frontier", "--out", str(out)]) == 0
+    assert "summary" in json.loads(out.read_text())["min_effort"]
+
+
+def test_lab_overblock_writes_table(tmp_path):
+    out = tmp_path / "overblock.json"
+    assert main(["overblock", "--out", str(out)]) == 0
+    assert set(json.loads(out.read_text())["summary"]) == set(NOISE)
 
 
 # Review fix F7: a run that would test nothing, or spend money, is refused.
@@ -190,6 +203,20 @@ def test_lab_run_works_without_hypothesis(tmp_path):
     done = _without_hypothesis(["run", "--split", "voice", "--out", str(tmp_path)])
     assert done.returncode == 0, done.stdout + done.stderr
     assert "passed" in done.stdout
+
+
+def test_lab_frontier_prints_its_grid(tmp_path, capsys):
+    # B7, M4: the frontier prints its grid, not one sentence: a row per channel count, a column per lead.
+    from dialback_evals.frontier import DEFAULT_GRID
+    assert main(["frontier", "--out", str(tmp_path / "frontier.json")]) == 0
+    lines = capsys.readouterr().out.splitlines()
+    header = next(line for line in lines if line.split()[:1] == ["channels"])
+    assert [int(x) for x in header.split()[1:]] == DEFAULT_GRID["lead_days"]
+    rows = {int(line.split()[0]): line.split()[1:] for line in lines if line.split()[:1] in
+            [[str(c)] for c in DEFAULT_GRID["channels"]]}
+    assert sorted(rows) == DEFAULT_GRID["channels"]
+    assert all(len(cells) == len(DEFAULT_GRID["lead_days"]) and set(cells) <= {"P", "."} for cells in rows.values())
+    assert "P" in "".join(c for cells in rows.values() for c in cells)      # the grid shows where the pick moves
 
 
 # Spec 0048, D3: each command holds itself to its job's strict known-failures list.

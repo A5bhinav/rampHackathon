@@ -14,6 +14,8 @@ nothing.
 uv run lab run --split voice                  # the voice scenarios, scripted callers, no spend
 uv run lab freeze --split voice               # re-freeze scenario hashes and required outcomes
 uv run lab fuzz --search archive --examples 2000 --seed 0 --out evals/corpus-generated   # selection: frozen cases, then every world
+uv run lab frontier                           # measurement: what an attack costs (prints its grid)
+uv run lab overblock                          # measurement: what a defense costs
 cd evals && uv run pytest -q -m "not selection_gate"   # the checks that must stay green
 ```
 

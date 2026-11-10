@@ -7,7 +7,8 @@ and needs no key. `--max-usd` is accepted for forward compatibility; the scripte
 
 `lab fuzz` re-runs every frozen finding under `--out`, then searches `--examples` generated worlds at
 `--seed`, freezing the first shrunk violation there; it exits non-zero on any frozen case that still
-fails or any new finding.
+fails or any new finding. `lab frontier` and `lab overblock` write the two measurement tables and exit
+non-zero only when their stated asserts fail.
 
 Spec 0046: `lab fuzz --search archive` runs the whole budget instead, freezes a 1-minimal world for
 every label no frozen case records yet, and writes near misses to `--near-misses`, which never changes
@@ -80,6 +81,10 @@ def main(argv: list[str] | None = None) -> int:
                     help="first: stop at the first violation; archive: run the whole budget (spec 0046)")
     fz.add_argument("--near-misses", default="evals/out/near-misses.json",
                     help="where --search archive writes its near misses (never gated)")
+    fr = sub.add_parser("frontier", help="sweep the known-limit frontier (spec 0083)")
+    fr.add_argument("--out", default="evals/out/frontier.json")
+    ob = sub.add_parser("overblock", help="sweep single pieces of attacker noise (spec 0083)")
+    ob.add_argument("--out", default="evals/out/overblock.json")
     freeze = sub.add_parser("freeze", help="record each scenario's hash and required outcome (expected.lock.json)")
     freeze.add_argument("--split", default="voice")
     freeze.add_argument("--scenarios-root", default=str(_REPO / "evals" / "scenarios"))
@@ -100,6 +105,10 @@ def main(argv: list[str] | None = None) -> int:
         if args.search == "first":
             return _fuzz(args.examples, args.seed, Path(args.out), listed)
         return _search(args.examples, args.seed, Path(args.out), Path(args.near_misses), listed)
+    if args.command == "frontier":
+        return _frontier(Path(args.out))
+    if args.command == "overblock":
+        return _overblock(Path(args.out))
     return 2
 
 
@@ -151,6 +160,34 @@ def _search(examples: int, seed: int, out_dir: Path, near_misses: Path, known_fa
           f"{len(arc.worlds)} distinct worlds)")
     held = _held("lab-fuzz", known_failures, dict(failing), [labels for labels in arc.labels if labels])
     return (1 if failing or arc.first else 0) if held is None else held
+
+
+def _write(path: Path, body: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(body, indent=2) + "\n", encoding="utf-8")
+
+
+def _frontier(out: Path) -> int:
+    from .frontier import frontier_grid, frontier_table, sweep, threshold_holds
+    from .worldgen import DEFAULT
+    cells = sweep()
+    table = frontier_table(cells)
+    _write(out, table)
+    print("lab frontier: is the poison number picked (P) or not (.), by counting channels and days of lead")
+    for line in frontier_grid(cells):
+        print(line)
+    print(f"lab frontier: {table['min_effort']['summary']}")
+    return 0 if threshold_holds(cells, DEFAULT) else 1
+
+
+def _overblock(out: Path) -> int:
+    from .frontier import overblock_holds, overblock_sweep, overblock_table
+    cells = overblock_sweep()
+    table = overblock_table(cells)
+    _write(out, table)
+    for entry in table["summary"].values():
+        print(f"lab overblock: {entry['line']}")
+    return 0 if overblock_holds(cells) else 1
 
 
 def _run(scenarios_dir: Path, out_dir: Path, known_failures: Path | None = None) -> int:
