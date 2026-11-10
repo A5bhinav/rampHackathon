@@ -13,6 +13,11 @@ another company whose name contains the vendor's). F1's labels name
 the condition that failed (spec 0048 review fix 1): the first F1 case was frozen under the older, bare F1
 label, which its `labels` field keeps as history.
 
+**Since spec 0082 (Nov 10) every report here passes.** D7a flags a negation, a reseller, a past connection
+and the "I mean" correction (NR03), and D7b stops asking the company answer to name the vendor, so F1 asks
+only for no refusal in it and F3 gates only the refusal classes. Their known-failures entries came off;
+the folders stay and re-run as regressions, so a refusal that stops being flagged fails here again.
+
 `reports-f2-company-negation-helped-1151901e` was frozen under the first reachable domain, which let a
 report skip a question. Production records every question in turn (spec 0048 review fix 4), so the move it
 showed is no longer checked on it and it passes; its known-failures entry was taken off, the folder stays as

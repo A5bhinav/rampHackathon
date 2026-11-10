@@ -134,23 +134,18 @@ def _added(found_broken, found_production) -> list:
                   - {(i, lab) for i, labs in found_production.violations for lab in labs})
 
 
-# Spec 0082, D7b: no rule holds back a partial name, another company or a missing company answer (V05 is retired,
-# and NR03 reads only refusals), so no double can let those through.
-_UNREAD_COMPANY_MOVES = ("company_partial", "company_other", "drop_company")
-
-
 def test_each_check_catches_its_broken_double():
     reach, contract = _sample("reachable"), _sample("contract")
     # F1: a decide() whose V07 accepts "unsure" and whose NR09 is turned off.
     assert _added(reports.check_f1(reach, decide=reports.doubles.v07_accepts_unsure_nr09_off), reports.check_f1(reach))
     # F2: one double per move, each letting that move's less certain value through. A move production can't
     # record from a reachable report (a second answer, answers after a refused consent; review fix 4) is shown
-    # on the contract-only domain, where it applies. The company moves no rule reads (D7b) are shown on a
-    # decide() whose NR03 also fires on a match, as a company check that read the vendor's own name as a
-    # refusal would: replacing or dropping that answer then verifies.
+    # on the contract-only domain, where it applies. No rule holds back another company since spec 0082 D7b (it
+    # is unknown, and NR03 reads only refusals), so company_other is shown on a decide() whose NR03 also fires
+    # on a match, as a company check that read the vendor's own name as a refusal would.
     missed, on_production = [], []
     for move in reports.MOVES:
-        double = (reports.doubles.nr03_fires_on_a_match if move in _UNREAD_COMPANY_MOVES
+        double = (reports.doubles.nr03_fires_on_a_match if move == "company_other"
                   else reports.doubles.lets_through(move))
         for cases in ((contract,) if move in reports.CONTRACT_MOVES else (reach, contract)):
             production = reports.check_f2(cases, moves=(move,))
@@ -161,9 +156,7 @@ def test_each_check_catches_its_broken_double():
                 break
         else:
             missed.append(move)
-    # A partial name is a match (spec 0082, D6), so that double reads it as it reads the vendor's full name, and
-    # no rule is left for another double to break: it is the one move no double shows.
-    assert missed == ["company_partial"], missed
+    assert missed == [], missed
     # Production used to fail company_negation (FINDINGS A10); it flags a negation now (spec 0082, D7a).
     assert on_production == [], on_production                          # anything here is a new finding
     # F3: a company check that accepts any answer containing the vendor's name fails it (it accepts a negation
@@ -233,9 +226,14 @@ def test_f1_asks_for_no_refusal_word_in_the_company_answer(said, cls, condition)
     assert reports.check_f1([case]).violations == []
 
 
+def _without_company(case):
+    return reports.with_case(case, answers=tuple(a for a in case.answers if a["slot"] != "company_named"),
+                             truth={**case.truth, "company": [], "company_class": []})
+
+
 def test_f1_no_longer_asks_for_a_company_answer():
     # D7b: a missing company answer does not block, so it is not a condition of an honest confirmation either.
-    dropped = reports.MOVES["drop_company"](reports.honest())
+    dropped = _without_company(reports.honest())
     assert reports.unconfirmed(dropped) == [] and reports.run(dropped).decision.outcome == "verified"
 
 
@@ -408,19 +406,34 @@ def test_over_blocking_counts_only_false():
     assert (unknown.vendor_rejected, unknown.vendor_unknown) == (0, unknown.vendor_answers)
     assert (false.vendor_rejected, false.vendor_unknown) == (false.vendor_answers, 0)
     assert true.other_accepted == true.other_answers > 0 and unknown.other_accepted == false.other_accepted == 0
+    assert unknown.other_unknown == unknown.other_answers and true.other_unknown == false.other_unknown == 0
     production = reports.check_f3(cases)
     assert production.vendor_rejected == 0                              # no answer naming the vendor is flagged
 
 
-def test_f2_does_not_replace_or_drop_a_refusal():
-    # Spec 0082, D7b: a company answer that refuses is evidence against the change (NR03), and replacing it with a
-    # partial name or another company, or dropping it, may help, as dropping a flag may (spec 0048, B4). Those moves
-    # don't apply to it; moving to a negation still does, and every company move applies to the vendor's name.
+def test_f2_never_replaces_a_refusal():
+    # Spec 0082, D7b: a company answer that refuses is evidence against the change (NR03), and replacing it with
+    # another company may help, as dropping a flag may (spec 0048, B4). The move doesn't apply to it; moving to a
+    # negation still does, and both apply to the vendor's name.
     from dialback_evals.phrasebank import CLASSES
     base = reports.honest()
     for said, cls in (("We're a reseller for Acme Fasteners", "reseller"),
                       ("Acme Fasteners, sorry, I mean Globex Logistics", "correction")):
         refusing = reports.with_company(base, said, CLASSES[cls], cls)
-        assert [m for m in _UNREAD_COMPANY_MOVES if reports.MOVES[m](refusing) is not None] == [], cls
+        assert reports.MOVES["company_other"](refusing) is None, cls
+        assert reports.run(reports.with_company(refusing, "Globex Logistics", "other")).decision.outcome == "verified"
         assert reports.MOVES["company_negation"](refusing) is not None
-    assert all(reports.MOVES[m](base) is not None for m in (*_UNREAD_COMPANY_MOVES, "company_negation"))
+    assert reports.MOVES["company_other"](base) is not None and reports.MOVES["company_negation"](base) is not None
+
+
+def test_f2_retires_the_company_moves_spec_0082_makes_moot():
+    # A short name is a match (D6), and the oracle expects a legit caller who gives one to verify, so moving to it
+    # is not less certainty. The company answer is no longer a confirming answer (D7b), so dropping it is not
+    # dropping one: with everything else clean the call verifies without it, and where it was out of order (before
+    # consent, NR02) dropping it helps, as dropping evidence against may (spec 0048, B4).
+    assert set(reports.RETIRED_MOVES) == {"company_partial", "drop_company"}
+    assert not set(reports.RETIRED_MOVES) & set(reports.MOVES)
+    early = reports.with_case(reports.honest(), answers=tuple({**a, "turn_id": 0} if a["slot"] == "company_named" else a
+                                                              for a in reports.honest().answers))
+    assert reports.run(early).decision.rules_fired == ("NR02_no_recording_consent",)
+    assert reports.run(_without_company(early)).decision.outcome == "verified"

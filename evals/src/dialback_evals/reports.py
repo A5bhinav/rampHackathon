@@ -22,6 +22,11 @@ The checks: F1 (verified only on an honest, full confirmation, judged by the gen
 certainty never helps: no move in `MOVES` turns an outcome that isn't verified into verified) and F3
 (the company check against the phrase bank's truth). `doubles` holds the broken stand-ins each check
 is first shown failing on.
+
+Since spec 0082 D7b (Sami, Nov 10) the company answer no longer has to name the vendor: only a refusal
+(D7a: "Not Acme", "a reseller for Acme", "I used to work at Acme") is False and flags the call (NR03). So
+F1 asks for no refusal in the company answer, F3 gates only the refusal classes (each must be False), F2's
+company_other never replaces a refusal, and two company moves are retired (`RETIRED_MOVES`).
 """
 from __future__ import annotations
 
@@ -51,6 +56,8 @@ from dialback_voice.store import CallDial
 from dialback_voice.transport import CallResult
 from dialback_voice.twilio.origination import status_result
 
+from .phrasebank import REFUSAL_CLASSES, refuses
+
 CASE_ID, CALL_ID = UUID(int=0x0048_B001), UUID(int=0x0048_B002)
 PICK, NEWER_PICK = UUID(int=0x0048_B003), UUID(int=0x0048_B004)
 RETRY_AT = dt.datetime(2026, 11, 2, 16, 0, tzinfo=dt.UTC)
@@ -65,7 +72,7 @@ CLEAN_CHECKS = {"disclosure_first": True, "answers_grounded": True, "agent_spoke
 FAILING_CHECKS = {"disclosure_first": False, "answers_grounded": False, "agent_spoke_account_digits": True,
                   "new_number_accepted": True, "policy_violations": 1, "speech_guard_trips": 1}
 COMPANY_TRUTHS = ("vendor", "other", "negation", "reseller", "correction", "partial")
-NOT_THE_VENDOR = ("other", "negation", "reseller", "correction")    # F3: never accepted
+NAMES_SOMEONE_ELSE = ("other", "negation", "reseller", "correction")    # other-company acceptance (spec 0082, D10)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -292,11 +299,9 @@ def unconfirmed(case: ReportCase) -> list[str]:
         values = case.values(slot)
         if set(values) != {"yes"}:
             missing.append(f"{name}={'+'.join(sorted(set(values))) or 'missing'}")
-    company = case.truth["company"]
-    if not company:
-        missing.append("company=missing")
-    missing += sorted({f"company={cls}" for truth, cls in zip(company, company_classes(case), strict=True)
-                       if truth != "vendor"})                       # by phrase class (review fix 5)
+    # Spec 0082, D7b (Sami, Nov 10): no refusal word in the company answer. Naming the vendor, or answering at
+    # all, is no longer asked. Named by phrase class (review fix 5).
+    missing += sorted({f"company={cls}" for said, cls in _company_answers(case) if refuses(cls, said)})
     digits = case.values("account_last4")
     if not digits:
         missing.append("digits=missing")
@@ -359,8 +364,12 @@ def f1_label(condition: str) -> str:
 class Found:
     violations: list[tuple[int, list[str]]] = dataclasses.field(default_factory=list)   # (case index, labels)
     vendor_answers: int = 0                  # F3: answers whose truth names the vendor
-    vendor_rejected: int = 0                 # F3: of those, the ones the check rejects (over-blocking)
-    per_class: dict[str, list[int]] = dataclasses.field(default_factory=dict)   # F3: class -> [accepted, total]
+    vendor_rejected: int = 0                 # F3: of those, the ones the check flags False (over-blocking, D7b)
+    vendor_unknown: int = 0                  # F3: of those, the ones it can't read (None: blocks nothing)
+    other_answers: int = 0                   # F3: answers naming someone else (spec 0082, D10)
+    other_accepted: int = 0                  # F3: of those, the ones it reads as the vendor (True)
+    other_unknown: int = 0                   # F3: of those, the ones it can't read (None: they pass too, D7b)
+    per_class: dict[str, dict[str, int]] = dataclasses.field(default_factory=dict)   # F3: class -> reading -> count
 
 
 def check_f1(cases: Iterable[ReportCase], decide=None) -> Found:
@@ -387,6 +396,15 @@ def company_classes(case: ReportCase) -> list[str]:
     """Each company answer's phrase class (spec 0048 review fix 5). Reports frozen before classes existed have
     only truths, and there each truth is its own class."""
     return list(case.truth.get("company_class", case.truth["company"]))
+
+
+def _company_answers(case: ReportCase) -> list[tuple[str, str]]:
+    """Each company answer as said, with its phrase class."""
+    return list(zip(case.values("company_named"), company_classes(case), strict=True))
+
+
+def _holds_refusal(case: ReportCase) -> bool:
+    return any(refuses(cls, said) for said, cls in _company_answers(case))
 
 
 def _companies(case: ReportCase, truths: list[str], classes: list[str]) -> dict:
@@ -454,8 +472,21 @@ def _check_failing(case: ReportCase, name: str) -> ReportCase | None:
 def _company(truth: str) -> Callable[[ReportCase], ReportCase | None]:
     def move(case: ReportCase) -> ReportCase | None:
         from .phrasebank import phrase
+        if truth not in REFUSAL_CLASSES and _holds_refusal(case):
+            return None             # replacing a refusal drops evidence against the change (see RETIRED_MOVES)
         return _set_values(case, "company_named", phrase(truth, case.legal_name, case.trade_names), truth)
     return move
+
+
+# Spec 0082 (Sami, Nov 10) changes three of spec 0048 B4's company moves:
+# - company_other stays, but never replaces a refusal: since D7b a refusal is the company answer's only evidence
+#   against the change (NR03), and dropping evidence against may help, as dropping a flag may (B4).
+# - company_partial and drop_company are retired. A short name is a match (D6), and the oracle expects a legit
+#   caller who gives one to verify, so it is no less certain than the full name. The company answer is no longer
+#   one of the confirming answers (D7b), so dropping it is not dropping one; it helps only where that answer was
+#   evidence against (a refusal, or an answer recorded before consent, NR02), which B4 lets help.
+RETIRED_MOVES = {"company_partial": "a short name is a match (spec 0082, D6)",
+                 "drop_company": "the company answer is no longer a confirming answer (spec 0082, D7b)"}
 
 
 MOVES: dict[str, Callable[[ReportCase], ReportCase | None]] = {
@@ -465,13 +496,12 @@ MOVES: dict[str, Callable[[ReportCase], ReportCase | None]] = {
     "digits_refused": lambda c: _set_values(c, "account_last4", "refused"),
     "digits_near_miss": lambda c: _set_values(c, "account_last4", _near_miss(c.new_last4)),
     "consent_no": lambda c: _set_values(c, "recording_consent", "no"),
-    "company_partial": _company("partial"),
     "company_other": _company("other"),
     "company_negation": _company("negation"),
     "answerer_machine": lambda c: _with(c, answered_by="machine") if c.answered_by != "machine" else None,
     "answerer_unknown": lambda c: _with(c, answered_by=None) if c.answered_by is not None else None,
     **{f"second_{k}": (lambda c, s=s: _second(c, s)) for k, s in _SLOT.items()},
-    **{f"drop_{k}": (lambda c, s=s: _drop(c, s)) for k, s in _SLOT.items()},
+    **{f"drop_{k}": (lambda c, s=s: _drop(c, s)) for k, s in _SLOT.items() if f"drop_{k}" not in RETIRED_MOVES},
     "earlier_concern": _earlier_concern,
     **{f"check_fails_{k}": (lambda c, k=k: _check_failing(c, k)) for k in CLEAN_CHECKS},
     "speaker_from_thread": lambda c: (_with(c, speaker_in_change_thread=True,
@@ -508,29 +538,37 @@ def check_f2(cases: Iterable[ReportCase], decide=None, moves: Iterable[str] = tu
 # ---- F3: the company check against the truth --------------------------------------------------------
 
 def f3_label(cls: str) -> str:
-    """F3's label names the phrase class accepted (A10's three keep their names: there class and truth agree)."""
-    return f"F3_company_accepted_{cls}"
+    """F3's label names the refusal class the company check let through (spec 0082, D7b)."""
+    return f"F3_company_refusal_missed_{cls}"
+
+
+_READING = {True: "true", None: "unknown", False: "false"}
 
 
 def check_f3(cases: Iterable[ReportCase], matcher=every_name_matches) -> Found:
-    """Each company answer alone against the vendor's names: never accepted when its truth is another
-    company, a negation, a reseller or a correction (gated); the share of names-the-vendor answers it
-    rejects is counted (over-blocking, reported, not gated). Every phrase class's accepted and total counts
-    are kept in `per_class` (spec 0048 review fix 5)."""
+    """Each company answer alone against the vendor's names (Sami, Nov 10; spec 0082, D7b): an answer whose
+    phrase class refuses (negation, reseller, past connection) must be False, since only False flags it (gated).
+    Every other class is reported, not gated: each class's True, unknown and False counts are kept in
+    `per_class` (spec 0048 review fix 5), with over-blocking (names-the-vendor answers that come out False) and
+    other-company acceptance (answers naming someone else that come out True; spec 0082, D10)."""
     found = Found()
     for i, case in enumerate(cases):
         labels = []
         for phrase, truth, cls in zip(case.values("company_named"), case.truth["company"], company_classes(case),
                                       strict=True):
-            accepted = matcher([phrase], case.legal_name, case.trade_names) is True
-            counts = found.per_class.setdefault(cls, [0, 0])
-            counts[0] += accepted
-            counts[1] += 1
-            if truth in NOT_THE_VENDOR and accepted:
+            reading = matcher([phrase], case.legal_name, case.trade_names)
+            counts = found.per_class.setdefault(cls, {"true": 0, "unknown": 0, "false": 0})
+            counts[_READING[reading]] += 1
+            if cls in REFUSAL_CLASSES and reading is not False:
                 labels.append(f3_label(cls))
             if truth == "vendor":
                 found.vendor_answers += 1
-                found.vendor_rejected += not accepted
+                found.vendor_rejected += reading is False
+                found.vendor_unknown += reading is None
+            elif truth in NAMES_SOMEONE_ELSE:
+                found.other_answers += 1
+                found.other_accepted += reading is True
+                found.other_unknown += reading is None
         if labels:
             found.violations.append((i, sorted(set(labels))))
     return found
@@ -604,11 +642,9 @@ _LETS_THROUGH: dict[str, tuple[str, Callable[[CaseFacts], bool]]] = {
     "consent_no": ("recording_consent", lambda f: "no" in f.recording_consent),
     "second_consent": ("recording_consent", lambda f: len(set(f.recording_consent)) > 1),
     "drop_consent": ("recording_consent", lambda f: not f.recording_consent),
-    "company_partial": ("company_named", lambda f: _phrases_all(f, "partial")),
     "company_other": ("company_named", lambda f: _phrases_all(f, "other")),
     "company_negation": ("company_named", lambda f: _phrases_all(f, "negation")),
     "second_company": ("company_named", lambda f: len(set(f.company_named)) > 1),
-    "drop_company": ("company_named", lambda f: not f.company_named),
     "second_name": ("speaker_name", lambda f: f.same_person_yes_and_digits is False),
     "drop_name": ("speaker_name", lambda f: not f.speaker_named),
     "second_role": ("speaker_role", lambda f: SECOND_TEXT["speaker_role"] in f.speaker_role),
@@ -647,6 +683,14 @@ class doubles:  # a namespace of broken stand-ins, each the double its check mus
             with _table(skip=_RULES_READING[reads]):
                 return dialback_decision.decide(facts)
         return decide
+
+    @staticmethod
+    def nr03_fires_on_a_match(facts: CaseFacts) -> Decision:
+        """F2's double for company_other, which no rule reads since spec 0082 D7b (another company is unknown, and
+        NR03 reads only refusals), so no double can let it through: NR03 also fires on a match, as a company check
+        that read the vendor's own name as a refusal would. Replacing that answer with another company verifies."""
+        with _table(replace={"NR03_wrong_company": lambda f, m: f.company_matches is not None}):
+            return dialback_decision.decide(facts)
 
     @staticmethod
     def contains_vendor_name(named: Iterable[str], legal_name: str, trade_names: Iterable[str] = ()) -> bool | None:
@@ -762,8 +806,12 @@ class Checked:
     new_frozen: list[str] = dataclasses.field(default_factory=list)
     vendor_answers: int = 0
     vendor_rejected: int = 0
+    vendor_unknown: int = 0
+    other_answers: int = 0
+    other_accepted: int = 0
+    other_unknown: int = 0
     reachable_hits: list[list[str]] = dataclasses.field(default_factory=list)   # each violating report's labels
-    per_class: dict[str, dict[str, list[int]]] = dataclasses.field(default_factory=dict)   # domain -> class -> counts
+    per_class: dict[str, dict[str, dict[str, int]]] = dataclasses.field(default_factory=dict)   # domain -> class -> counts
 
     @property
     def gated(self) -> list[str]:
@@ -779,7 +827,7 @@ class Checked:
         share = self.vendor_rejected / self.vendor_answers if self.vendor_answers else 0.0
         return (f"reachable {self.hits.get('reachable', {})}; contract-only future-state {self.future_state}; "
                 f"frozen still failing {len(self.frozen_failing)}; over-blocking {self.vendor_rejected} of "
-                f"{self.vendor_answers} names-the-vendor answers rejected ({share:.1%})")
+                f"{self.vendor_answers} names-the-vendor answers flagged False ({share:.1%})")
 
 
 def run_checks(*, examples: int, seed: int, out_dir: Path | None = None, decide=None,
@@ -794,8 +842,9 @@ def run_checks(*, examples: int, seed: int, out_dir: Path | None = None, decide=
     for domain in ("reachable", "contract"):
         cases = sample(report_cases(domain), examples=examples, seed=seed)
         f3 = check_f3(cases, matcher)
-        done.vendor_answers += f3.vendor_answers
-        done.vendor_rejected += f3.vendor_rejected
+        for count in ("vendor_answers", "vendor_rejected", "vendor_unknown", "other_answers", "other_accepted",
+                      "other_unknown"):
+            setattr(done, count, getattr(done, count) + getattr(f3, count))
         done.per_class[domain] = f3.per_class
         per_report: dict[int, set[str]] = {}
         for found in (check_f1(cases, decide), check_f2(cases, decide), f3):
