@@ -257,8 +257,9 @@ def test_frozen_world_is_one_minimal(tmp_path):
     today = _pinned()
     result = archive_fuzz("archive", examples=SEED0_BUDGET, seed=0, out_dir=tmp_path / "cg",
                           near_misses=tmp_path / "out" / "near-misses.json", rule=today)
-    assert len(result.frozen) >= 2 and len(load_all(tmp_path / "cg")) == len(result.frozen)
+    assert len(result.frozen) >= 2 and len(load_all(tmp_path / "cg")) == len(set(result.frozen.values()))
     for label, case in result.frozen.items():
+        assert label in json.loads((tmp_path / "cg" / case / "world.json").read_text(encoding="utf-8"))["labels"]
         world = load_world(tmp_path / "cg" / case)
         assert label in all_violations(world, rule=today), case
         found = result.archive.first[label].world
@@ -268,6 +269,17 @@ def test_frozen_world_is_one_minimal(tmp_path):
             assert any(d.id == request.document_id for d in world.kwargs["documents"])
         for what, smaller in _single_removals(world):
             assert label not in all_violations(smaller, rule=today), (case, what)
+
+
+def test_labels_that_shrink_alike_share_a_case(tmp_path, monkeypatch):
+    # Two new labels whose worlds shrink to the same world are frozen once, as one case recording both.
+    world = make_world(numbers=[NumberSpec(REAL, ["contract", "listing"], 500), NumberSpec(NUM, ["contract"], 400)])
+    monkeypatch.setattr("dialback_evals.guided.evaluate", lambda w, **k: Evaluation(labels=["M_a", "M_b"]))
+    result = archive_fuzz("archive", examples=1, seed=0, out_dir=tmp_path, near_misses=tmp_path / "nm.json",
+                          strategy=st.just(world))
+    [(case, frozen)] = load_all(tmp_path)
+    assert result.frozen == {"M_a": case, "M_b": case}
+    assert json.loads((tmp_path / case / "world.json").read_text(encoding="utf-8"))["labels"] == ["M_a", "M_b"]
 
 
 # ---- 7: a crash is a finding ----------------------------------------------------------------------

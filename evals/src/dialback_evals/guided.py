@@ -319,23 +319,27 @@ def write_near_misses(arc: Archive, path: Path) -> Path:
 
 def archive_fuzz(kind: str, *, examples: int, seed: int, out_dir: Path, near_misses: Path, rule=None,
                  failing: list[tuple[str, list[str]]] | None = None, strategy=None) -> FuzzResult:
-    """Run `search`, shrink and freeze the first world of every label no frozen case records yet, and
-    write the near misses. `failing` is the frozen cases' re-run (`rerun(out_dir)`), which `guided-new`
+    """Run `search`, shrink and freeze the first world of every label no frozen case records yet (two
+    labels that shrink to the same world share one case, which records both), and write the near misses. `failing` is the frozen cases' re-run (`rerun(out_dir)`), which `guided-new`
     reads for its moves; it is re-run here when not given."""
     moves = ALL_MOVES
     if kind == "guided-new":
         moves = open_moves(rerun(out_dir, rule=rule) if failing is None else failing)
     arc = search(kind, budget=examples, seed=seed, rule=rule, new_moves=moves, strategy=strategy)
     known = frozen_labels(out_dir)
-    frozen, counted = {}, []
+    frozen, counted, by_world = {}, [], {}
     for label, hit in arc.first.items():
         if label in known:
             counted.append(label)
             continue
         small = shrink(hit.world, label, rule=rule)
-        case = f"fuzz-seed{seed}-{_slug(label)}-{world_digest(small)[:8]}"
+        digest = world_digest(small)
+        if digest in by_world:                 # already frozen in this run, under an earlier label
+            frozen[label] = by_world[digest]
+            continue
+        case = f"fuzz-seed{seed}-{_slug(label)}-{digest[:8]}"
         freeze(small, case, out_dir, labels=evaluate(small, rule=rule).labels,
                why=(f"found by lab fuzz --search {kind} at seed {seed} within {examples} examples (world {hit.index}), "
                     f"shrunk by the lab to a 1-minimal world for {label}"))
-        frozen[label] = case
+        frozen[label] = by_world[digest] = case
     return FuzzResult(arc, frozen, counted, write_near_misses(arc, near_misses))
