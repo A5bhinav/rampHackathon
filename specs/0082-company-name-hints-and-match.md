@@ -167,10 +167,9 @@ say (Part B), and keeps the clear-mismatch signal.
 
    - **"This is Globex" passes.** Code can't tell another company's name from a garbled vendor
      name. The person who releases sees the answer on the call record.
-   - **Why.** The Goal shows the answer gives no protection against a fraudster on the line, who
-     knows the vendor's name. Requiring it only sent honest calls to review ("acne" on the first
-     real call). The one signal worth keeping, a person saying they are not with the vendor, stays
-     as NR03.
+   - **Why.** Requiring a match sent honest calls to review ("acne" on the first real call), and the
+     Goal shows it gives no protection against a fraudster on the line, who knows the vendor's
+     name. The signal kept, a person saying they are not with the vendor, stays as NR03.
    - **What it gives up.** A clearly different company named with no refusal word, on a call that
      otherwise passes, is no longer flagged; only the releaser sees it. Conflicting companies across
      answers are not flagged either (D9).
