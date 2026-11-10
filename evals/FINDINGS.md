@@ -304,6 +304,31 @@ These are not reachable today, but each is frozen as a regression.
 - **Where to fix:** take the vendor's time zone from the vendor record (the voice side already
   carries a `vendor_tz`, default `America/Los_Angeles`). `apps/core` (Abhi).
 
+### A19. The stub labels another party's line as the vendor's
+
+- **Status:** confirmed (ran, Nov 10), by spec 0052's builder check and again here.
+- **Where:** `packages/ledger/src/dialback_ledger/reader.py`, `StubReader.label`. The party is the
+  vendor whenever a role word comes before the colon, unless the line says "bank". Spec 0022 asks
+  for exactly that.
+- **What happens:** `Customer main line: (415) 555-0177` comes back as the vendor's main line.
+  `Customer billing: ...` does the same. `Fax:` and `Main office:` in a bank's or the customer's
+  document are also labeled the vendor's.
+- **Why it matters:** that is the unsafe direction, a number that isn't the vendor's counted for
+  the vendor. The other selection tests (R2, channels, age) still apply, so on its own it can't
+  make a number callable.
+- **Spec:** 0052 (`sami/docgen-spec`) lists it as a known failure of the stub. Spec 0049 says what
+  the right label is: the customer's main line.
+
+### A20. A clock time can create a label
+
+- **Status:** confirmed (ran, Nov 10).
+- **What happens:** the stub reads the words before the first colon on the line, wherever it is.
+  `Office hours 9:00-5:00, call (415) 555-0142` comes back as the vendor's main line, because
+  "Office hours 9" contains "office".
+- **Why it matters:** filler text decides the label. Here it happens to be right; with other words
+  before a time it won't be.
+- **Spec:** 0052 draws a placement for it and lists it as a known failure of the stub.
+
 ## B. The fuzz lab (spec 0033)
 
 ### B1. I12 never probes the change-request email itself
