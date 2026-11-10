@@ -218,10 +218,16 @@ This tests the step after the call, the way the fuzz lab tests `select()`. No ca
    0), with one test per change.
 3. **The coverage floor.**
    - `context_label_on_provable` counts a label on the pick only.
-   - The eligible-number floor leaves out the planted real number, and keeps its 50% bar. Counted
-     that way it was 27% (B11), so the generator changes until it reaches 50%. If it can't without
-     distorting the worlds, the build stops and reports. The bar is never lowered to fit (decided
-     Nov 10).
+   - **The eligible-number floor keeps its original count**: any eligible number, the planted real
+     line included, against the 50% bar. Its purpose (spec 0033) is that the "never eligible"
+     checks aren't trivially true, which happens when a rule refuses everything. Any eligible
+     number shows the rule doesn't. The share of worlds with an eligible number **other than** the
+     real line is reported next to it, with no bar.
+     - **History (Nov 10).** B7's M9 asked to leave the real line out, and this spec first said so,
+       keeping the 50% bar. Counted that way it read 27.2%. Of 16 generator variants, only 3
+       reached 50%, each by distorting the worlds and losing coverage (B11). The build stopped
+       instead of lowering the bar. Sami then restored the original count, for the reason above.
+       Both numbers are reported, and nothing was lowered to fit.
    - A test shows the first-cut generator fails the coverage check, as 0033's acceptance says.
 4. **B7's minors.**
    - `lab run` works without the dev-only `hypothesis`.
