@@ -342,7 +342,7 @@ These are not reachable today, but each is frozen as a regression.
 - **Status:** confirmed (read).
 - **What happens:** while I12 fails (about 18% of worlds), `lab fuzz` and the property test stop at
   the first failure. Until `select()` is fixed, the search cannot report any other new defect.
-- **Spec:** 0046 on `sami/guided-search` (draft): a search that runs its whole budget and keeps the
+- **Spec:** 0046 on `sami/guided-search` (approved Nov 9): a search that runs its whole budget and keeps the
   first world for every label.
 - **Anomaly (not reconciled):** the I12 failure rate differs by source: about 18% here, 454 of 2000
   (23%) in A6, and 82 of 300 (27%) at seed 0 in spec 0046's census. These are probably different
@@ -575,7 +575,7 @@ F1 to F9 hold as built (verified). But the lab still claims more than it shows:
 ## D. Red teaming
 
 - **Started (Nov 9):** Sami chose number selection as the first target. Spec 0046
-  (`sami/guided-search`, draft) is a guided search on `select()` with no model: it scores each
+  (`sami/guided-search`, approved Nov 9) is a guided search on `select()` with no model: it scores each
   world by how much a must-not-help attacker move helped, steers toward higher scores, and fixes
   the measurement that decides whether the steering stays. The model-driven targets below remain.
 - **Targets:** the two model-driven parts.
