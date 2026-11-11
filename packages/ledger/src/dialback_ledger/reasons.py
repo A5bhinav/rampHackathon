@@ -11,8 +11,8 @@ REASON_TEXT: dict[str, str] = {
     "too_few_source_types": "Not provable: it wasn't seen as the vendor's number in at least two independent channels "
                             "before the request (all email counts as one channel, and the old number on file never "
                             "counts).",
-    "younger_than_minimum_age": "Not provable: it was first seen too recently before the request; the rule needs a "
-                                "number the vendor has used for months.",
+    "younger_than_minimum_age": "Not provable: it was first seen as the vendor's number too recently before the "
+                                "request; the rule needs a number the vendor has used for months.",
     "near_miss_of_older_number": "Not provable: it is one digit off, or two swapped digits away from, an older number "
                                  "of this vendor.",
     "hidden_text_only": "Not provable: it appeared only in text a person couldn't see (white, tiny or off the page).",
