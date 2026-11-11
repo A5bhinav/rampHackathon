@@ -265,6 +265,184 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/people": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Everyone in the organisation, with their roles (admins only, spec 0095)
+         * @description Reads `app.admin_people()` as the signed-in user. Anyone without the admin role, a demo
+         *     account, or an admin whose access is off gets 403.
+         */
+        get: operations["listPeople"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/people/{user_id}/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Grant or take away one role (admins only)
+         * @description Calls `app.admin_set_role()`. Refused (409) when it changes nothing, when it would remove
+         *     the last admin, or when it grants admin to a demo account. Logged on the organisation chain.
+         */
+        post: operations["changeRole"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/people/{user_id}/ramp-link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Set or clear which Ramp user this person is (admins only)
+         * @description Calls `app.admin_set_ramp_link()`. An admin cannot change their own link, and a Ramp user
+         *     can be linked to one person only (R5). Who entered a change is fixed when the change is
+         *     detected, so a new link never changes an open case.
+         */
+        post: operations["changeRampLink"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/people/{user_id}/access": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Turn a person's access off or back on (admins only)
+         * @description Calls `app.admin_set_access()`. A person whose access is off gets 403 on every request;
+         *     their roles are kept. An admin cannot turn off their own access or the last admin's.
+         */
+        post: operations["changeAccess"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The organisation chain of admin actions, newest first, and whether it verifies (admins only) */
+        get: operations["getAdminLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/demo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The current demo dataset, its cases, chain, open alerts and chaos switch (admins only) */
+        get: operations["getDemoState"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/demo/reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Make a fresh demo dataset; with a clerk chosen, also load the Trust Ledger and Acme's request email (admins only)
+         * @description Runs `demo prepare` when `link_clerk_user_id` is given, else `demo reset` (spec 0011,
+         *     spec 0077). The team phone is never accepted here; it stays a shell option.
+         */
+        post: operations["resetDemo"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/demo/chaos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Turn spec 0008's chaos mode on or off for the current demo (admins only) */
+        post: operations["setDemoChaos"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/demo/tamper": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Rewrite one row of the current demo's evidence chain, to show the chain catching it (admins only)
+         * @description Acts only on the current demo dataset. Needs the typed confirmation `break the chain`;
+         *     it cannot be undone.
+         */
+        post: operations["tamperDemo"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -273,8 +451,11 @@ export interface components {
         Uuid: string;
         /** Format: date-time */
         Timestamp: string;
-        /** @enum {string} */
-        Role: "clerk" | "approver" | "auditor";
+        /**
+         * @description An admin also holds every power of the other three roles; R5 still applies (spec 0095).
+         * @enum {string}
+         */
+        Role: "clerk" | "approver" | "auditor" | "admin";
         Me: {
             user_id: components["schemas"]["Uuid"];
             display_name: string;
@@ -616,6 +797,93 @@ export interface components {
             vendor_id: components["schemas"]["Uuid"];
             account: components["schemas"]["AccountRef"];
         };
+        /** @description One person as an admin sees them (spec 0095). */
+        PersonAdminView: {
+            id: components["schemas"]["Uuid"];
+            display_name: string;
+            email: string | null;
+            roles: components["schemas"]["Role"][];
+            /** @description The Ramp user this person is; null when not linked. */
+            ramp_user_id: string | null;
+            /** @description A shared demo account (spec 0034); acts on demo data only and never holds admin. */
+            demo_only: boolean;
+            access_enabled: boolean;
+            last_sign_in_at: components["schemas"]["Timestamp"] | null;
+        };
+        People: {
+            people: components["schemas"]["PersonAdminView"][];
+        };
+        RoleChange: {
+            role: components["schemas"]["Role"];
+            /** @description true grants the role */
+            grant: boolean;
+            reason: string;
+        };
+        RampLinkChange: {
+            /** @description null clears the link; blank is refused. */
+            ramp_user_id: string | null;
+            reason: string;
+        };
+        AccessChange: {
+            enabled: boolean;
+            reason: string;
+        };
+        AdminLogEntry: {
+            seq: number;
+            type: components["schemas"]["AdminEventType"];
+            occurred_at: components["schemas"]["Timestamp"];
+            /** @description null when the team granted it with scripts/db/add_user.py. */
+            actor: components["schemas"]["Person"] | null;
+            subject: components["schemas"]["Person"] | null;
+            detail: Record<string, never>;
+            reason: string;
+        };
+        AdminLog: {
+            chain: components["schemas"]["ChainStatus"];
+            events: components["schemas"]["AdminLogEntry"][];
+        };
+        /** @description What `dialback-core demo status` prints, for the current demo dataset. */
+        DemoState: {
+            dataset: {
+                id: components["schemas"]["Uuid"];
+                label: string;
+                created_at: components["schemas"]["Timestamp"];
+            };
+            cases: {
+                id: components["schemas"]["Uuid"];
+                vendor: string;
+                state: components["schemas"]["CaseState"];
+                outcome: components["schemas"]["Outcome"] | null;
+            }[];
+            chain: {
+                ok: boolean;
+                checked: number;
+                first_bad_seq: number | null;
+                detail: string;
+            };
+            alerts: {
+                kind: string;
+                severity: string;
+                message: string;
+            }[];
+            chaos: boolean;
+            /** @description What the last reset warned about, for example a seeded user left unlinked (each release then needs two approvers). Empty otherwise. */
+            warnings: string[];
+        };
+        DemoResetRequest: {
+            /** @description The account the seed's clerk becomes; with one, the Trust Ledger and Acme's request email load too. */
+            link_clerk_user_id?: components["schemas"]["Uuid"] | null;
+            reason: string;
+        };
+        DemoChaosRequest: {
+            enabled: boolean;
+            reason: string;
+        };
+        DemoTamperRequest: {
+            /** @constant */
+            confirm: "break the chain";
+            reason: string;
+        };
         Error: {
             /** @enum {string} */
             code: "unauthenticated" | "forbidden" | "not_found" | "version_conflict" | "transition_refused" | "invalid_request" | "upstream_unavailable";
@@ -821,6 +1089,8 @@ export interface components {
                 };
             };
         } & (unknown & unknown);
+        /** @enum {string} */
+        AdminEventType: "role_granted" | "role_revoked" | "ramp_link_set" | "access_disabled" | "access_enabled" | "demo_reset" | "demo_chaos" | "demo_tamper";
     };
     responses: {
         /** @description Missing, expired or invalid token */
@@ -884,6 +1154,7 @@ export interface components {
     parameters: {
         DatasetId: components["schemas"]["Uuid"];
         CaseId: components["schemas"]["Uuid"];
+        UserId: components["schemas"]["Uuid"];
     };
     requestBodies: never;
     headers: never;
@@ -1275,6 +1546,289 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["InvalidRequest"];
+        };
+    };
+    listPeople: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["People"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    changeRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: components["parameters"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "role": "approver",
+                 *       "grant": true,
+                 *       "reason": "Riley covers releases while the controller is out this week."
+                 *     }
+                 */
+                "application/json": components["schemas"]["RoleChange"];
+            };
+        };
+        responses: {
+            /** @description Applied */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PersonAdminView"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["InvalidRequest"];
+        };
+    };
+    changeRampLink: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: components["parameters"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "ramp_user_id": "7c1d2e3f-0000-4000-8000-00000000c1e7",
+                 *       "reason": "Sam enters vendor changes in Ramp."
+                 *     }
+                 */
+                "application/json": components["schemas"]["RampLinkChange"];
+            };
+        };
+        responses: {
+            /** @description Applied */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PersonAdminView"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["InvalidRequest"];
+        };
+    };
+    changeAccess: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: components["parameters"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "enabled": false,
+                 *       "reason": "Left the company on Nov 10."
+                 *     }
+                 */
+                "application/json": components["schemas"]["AccessChange"];
+            };
+        };
+        responses: {
+            /** @description Applied */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PersonAdminView"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["InvalidRequest"];
+        };
+    };
+    getAdminLog: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminLog"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    getDemoState: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DemoState"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    resetDemo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "link_clerk_user_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+                 *       "reason": "Fresh demo before the judges' run."
+                 *     }
+                 */
+                "application/json": components["schemas"]["DemoResetRequest"];
+            };
+        };
+        responses: {
+            /** @description Applied */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DemoState"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["InvalidRequest"];
+        };
+    };
+    setDemoChaos: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "enabled": true,
+                 *       "reason": "Show that a failed hold keeps the payment stopped."
+                 *     }
+                 */
+                "application/json": components["schemas"]["DemoChaosRequest"];
+            };
+        };
+        responses: {
+            /** @description Applied */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DemoState"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["InvalidRequest"];
+        };
+    };
+    tamperDemo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "confirm": "break the chain",
+                 *       "reason": "Showing the judges that a rewritten row breaks the chain."
+                 *     }
+                 */
+                "application/json": components["schemas"]["DemoTamperRequest"];
+            };
+        };
+        responses: {
+            /** @description Applied */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DemoState"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
             409: components["responses"]["Conflict"];
             422: components["responses"]["InvalidRequest"];
         };
