@@ -1,0 +1,8 @@
+{
+  "subject": "cobalt - new acct before friday run",
+  "sender": "Jen Park <jpark@northgate-mfg.com>",
+  "text": "Karen,\n\nCobalt called while you were out. They said their account changed and gave me the new one over the phone, I did not have time to do the callback. Can you get it set up before Friday's run? Teresa said the open invoices are getting old.\n\nCobalt Freight LLC\nRouting 121000248\nAcct 8830019924\nWells Fargo\n\nJen",
+  "label": "change_request",
+  "vendor": "cobalt",
+  "note": "Internal colleague passing along an unverified phone request; the relay does not change that it asks to redirect the vendor's payments."
+}

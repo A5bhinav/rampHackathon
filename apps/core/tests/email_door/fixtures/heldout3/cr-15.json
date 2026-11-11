@@ -1,0 +1,8 @@
+{
+  "subject": "Notice of change in remittance instructions",
+  "sender": "Acme Fasteners LLC <accounting@acmefasteners.com>",
+  "text": "ACME FASTENERS LLC\n1400 Industrial Parkway, Suite 200\nCleveland, OH 44114\n\nNovember 9, 2026\n\nNorthgate Manufacturing Inc\nAttn: Accounts Payable\n\nNOTICE OF CHANGE IN REMITTANCE INSTRUCTIONS\n\nDear Sir or Madam:\n\nThis letter serves as formal notice that Acme Fasteners LLC has changed its banking relationship. Effective with payments issued on or after November 16, 2026, please direct all electronic payments to the account listed below and discontinue use of any previously provided instructions.\n\nBeneficiary: Acme Fasteners LLC\nBank: PNC Bank, N.A.\nABA Routing Number: 043000096\nAccount Number: 5520091138\nAccount Type: Checking\n\nChecks should continue to be mailed to the address above.\n\nWe kindly request written confirmation that your records have been updated. Should you need to verify this notice, please contact our Controller, James Whitfield, at (216) 555-0142.\n\nSincerely,\n\nJames Whitfield\nController\nAcme Fasteners LLC",
+  "label": "change_request",
+  "vendor": "acme",
+  "note": "Formal letter on letterhead pasted as plain text. Callback number is supplied inside the request itself, which a trained reader should not rely on."
+}

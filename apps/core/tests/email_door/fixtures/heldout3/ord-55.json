@@ -1,0 +1,8 @@
+{
+  "subject": "1099-NEC preparation - vendor TIN review due 12/4",
+  "sender": "Tax <tax@northgate-mfg.com>",
+  "text": "AP,\n\nPlease review the attached list of 1099-eligible vendors and confirm each has a valid W-9 on file. Flag any with a TIN mismatch from last year's IRS notice. Hollis Landscaping and Priya Raman (contractor) are missing forms.\n\nDeadline to have the vendor master clean is December 4.\n\nTax",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Internal tax season request."
+}

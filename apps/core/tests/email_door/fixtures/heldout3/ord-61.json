@@ -1,0 +1,8 @@
+{
+  "subject": "October phishing simulation results",
+  "sender": "IT Security <itsecurity@northgate-mfg.com>",
+  "text": "All,\n\nThe October simulation used a fake \"vendor bank update\" email from a lookalike supplier domain. 11% of Finance recipients clicked the link and 3% entered credentials. Finance scored better than the company average (17%) but there is room to improve.\n\nAnyone who clicked has been enrolled in the refresher module. Remember: report suspicious messages with the Phish Alert button.\n\nIT Security",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Internal security awareness results mentioning a simulated bank-update lure."
+}

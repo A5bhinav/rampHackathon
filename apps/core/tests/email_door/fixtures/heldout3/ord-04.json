@@ -1,0 +1,8 @@
+{
+  "subject": "Remittance advice - Payment 000418827 - Sterling Components",
+  "sender": "ap-noreply@sterlingcomponents.com",
+  "text": "Sterling Components Corp has issued the following payment to Northgate Manufacturing Inc.\n\nPayment number: 000418827\nPayment date: 11/09/2026\nMethod: ACH\nAmount: USD 27,340.00\nSent to your account ending in 0917\n\nInvoices paid:\nNG-10233   10/08/2026   12,100.00\nNG-10251   10/15/2026   15,240.00\n\nPlease direct questions to ap@sterlingcomponents.com. Do not reply to this address.",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "A customer's remittance advice for money coming in; misdirected to AP. Bank reference is our own account."
+}

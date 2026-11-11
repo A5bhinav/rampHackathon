@@ -1,0 +1,8 @@
+{
+  "subject": "Updated remittance information - Acme Fasteners LLC",
+  "sender": "Denise Caruso <dcaruso@acmefasteners.com>",
+  "text": "Hello,\n\nEffective immediately, Acme Fasteners LLC has moved its operating account to Bank of America. Please update your vendor master so that all future ACH and wire payments are directed to:\n\nBank: Bank of America, N.A.\nABA Routing: 026009593\nAccount: 4471002983\nAccount name: Acme Fasteners LLC\n\nOur prior account at JPMorgan will be closed on the 30th. Any payments sent there after that date will be returned and will delay credit to your account.\n\nPlease confirm once the change has been made.\n\nRegards,\nDenise Caruso\nAccounts Receivable\nAcme Fasteners LLC",
+  "label": "change_request",
+  "vendor": "acme",
+  "note": "Straightforward bank change with full new details, formal voice."
+}

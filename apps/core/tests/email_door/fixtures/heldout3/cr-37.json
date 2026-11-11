@@ -1,0 +1,8 @@
+{
+  "subject": "Cobalt Freight - opting out of virtual card payments",
+  "sender": "Teresa Vance <tvance@cobaltfreight.com>",
+  "text": "Hi Karen,\n\nThe card processing fees are eating into our margin, so we are opting out of your virtual card program. Please pay Cobalt Freight LLC by check from now on, made payable to our payment processing partner:\n\nTransPay Receivables Services\nAttn: Cobalt Freight lockbox\nPO Box 98211\nChicago, IL 60693\n\nThey will apply the funds to our account. Thanks for understanding.\n\nTeresa",
+  "label": "change_request",
+  "vendor": "cobalt",
+  "note": "Method switch from virtual card to checks, payable to a third party at a new address. Money lands with the third party."
+}

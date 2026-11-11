@@ -1,0 +1,8 @@
+{
+  "subject": "FYI: customer notification of our new lockbox going out Monday",
+  "sender": "Treasury <treasury@northgate-mfg.com>",
+  "text": "AP team,\n\nHeads up that AR and Treasury are sending the attached letter to all customers on Monday announcing Northgate's new lockbox and ACH details at First Meridian (routing 011000138, account 7700091150). You may get confused replies or callback requests from customers' AP departments; please route those to ar@northgate-mfg.com.\n\nThis does not affect anything on the payables side.\n\nTreasury",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Our own company changing where customers pay us. Contains new bank details but for inbound money, not a vendor."
+}

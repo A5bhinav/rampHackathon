@@ -1,0 +1,8 @@
+{
+  "subject": "direct deposit change",
+  "sender": "Priya Raman <priya.raman.design@gmail.com>",
+  "text": "Hi Jen,\n\nI switched banks so my next contractor payment (invoice 2026-11 for the October design work) needs to go to the new account. Can you update it in Bill.com or wherever you keep it?\n\nChase\nRouting 021000021\nAccount 7731009655\nPriya Raman\n\nLet me know if you need a voided check.\n\nThanks!\nPriya",
+  "label": "change_request",
+  "vendor": null,
+  "note": "Individual contractor asking to redirect her own future payments. No vendor ref. Note the new account uses the same routing number as the on-file vendors; different account."
+}

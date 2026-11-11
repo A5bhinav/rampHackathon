@@ -1,0 +1,8 @@
+{
+  "subject": "PO 44-1203 acknowledged",
+  "sender": "orders@acmefasteners.com",
+  "text": "Thank you for PO 44-1203. Acknowledged as follows:\n\nSO-77118\nLine 1: M10x60 socket cap screw, qty 1,000, ship 11/18\nLine 2: M10 split lock washer, qty 1,000, ship 11/18\n\nShip via UPS Ground, FOB origin. Invoice will follow shipment under our standard terms.\n\nAcme Fasteners Order Desk",
+  "label": "ordinary",
+  "vendor": "acme",
+  "note": "Order acknowledgment without remittance details."
+}

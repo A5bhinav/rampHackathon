@@ -1,0 +1,8 @@
+{
+  "subject": "FYI",
+  "sender": "Karen Liu <kliu@northgate-mfg.com>",
+  "text": "fyi for the vendor file\n\nFrom: Mark Delaney\nSent: Tuesday, November 10, 2026 8:02 AM\nTo: Karen Liu\nSubject: FW: FW: Acme Fasteners account\n\nKaren - see below, came through purchasing.\n\nFrom: Angela Pruitt\nSent: Monday, November 9, 2026 5:41 PM\nTo: Mark Delaney\nSubject: FW: Acme Fasteners account\n\nMark, not sure who handles this. Forwarding.\n\nFrom: Denise Caruso <dcaruso@acmefasteners.com>\nSent: Monday, November 9, 2026 3:12 PM\nTo: purchasing@northgate-mfg.com\nSubject: Acme Fasteners account\n\nHello,\n\nI was not sure of the right contact in accounts payable. Acme Fasteners LLC has new bank details effective this month:\n\nRouting 043000096\nAccount 5520091138\nPNC Bank\n\nPlease pass this along to whoever maintains vendor payment information so our upcoming payments are sent correctly.\n\nThanks,\nDenise Caruso",
+  "label": "change_request",
+  "vendor": "acme",
+  "note": "Three internal forwards with one-word top messages; the request is the bottom-most quoted message."
+}

@@ -1,0 +1,8 @@
+{
+  "subject": "ACH payment confirmation - batch 2026110601",
+  "sender": "Treasury Services <alerts@treasury.firstmeridianbank.com>",
+  "text": "Your ACH batch has been processed.\n\nBatch ID: 2026110601\nEffective date: 11/06/2026\nTotal: $19,862.45 (6 items)\n\nItems:\nAcme Fasteners LLC        4,118.00   acct ****2222\nCobalt Freight LLC        9,204.25   acct ****7888\nBrightline Office Supply  1,240.10   acct ****5555\nPinecrest Janitorial      2,800.00   acct ****0419\nHollis Landscaping        1,100.10   acct ****2893\nKestrel IT Consulting     1,400.00   acct ****3307\n\nLog in to Treasury Online to view details. This is a system-generated alert.",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Our bank's confirmation of outgoing payments. Masked account references match the on-file records."
+}
