@@ -10,7 +10,8 @@ without hiding anything new:
 - anything unlisted that fails turns the job red: a frozen case, a scenario, or a label beyond its entry's;
 - a new search hit is known only when every label it shows belongs to some listed entry, and the job
   counts such hits. That has a cost: a new defect that shows only an already-listed label is hidden until
-  that entry is fixed;
+  that entry is fixed. So an entry can narrow what it holds: with `"only_with": "shared_id"`, its labels make
+  a hit known only when that hit's world has two documents under one id (frozen cases are judged as ever);
 - an entry is added only with its finding written in FINDINGS, and removed only when the job says it now
   passes.
 """
@@ -23,6 +24,7 @@ from collections.abc import Iterable, Mapping
 from pathlib import Path
 
 JOBS = ("lab-smoke", "lab-fuzz", "lab-reports")
+ONLY_WITH = ("shared_id",)
 _HEADING = re.compile(r"(?m)^### ([A-Z][0-9]+)\.")
 
 
@@ -32,6 +34,14 @@ class Entry:
     labels: tuple[str, ...]
     finding: str
     owner: str
+    only_with: str | None = None      # its labels make a search hit known only on such a world
+
+
+@dataclasses.dataclass(frozen=True)
+class Hit:
+    """A search hit: its labels, and the fact about its world an entry's condition reads."""
+    labels: tuple[str, ...]
+    shared_id: bool = False
 
 
 @dataclasses.dataclass
@@ -59,7 +69,10 @@ def load(path: Path) -> dict[str, tuple[Entry, ...]]:
             missing = [k for k in ("case", "labels", "finding", "owner") if not e.get(k)]
             if missing:
                 raise ValueError(f"known-failures: {job} entry {e.get('case')!r} has no {', '.join(missing)}")
-            parsed.append(Entry(e["case"], tuple(e["labels"]), e["finding"], e["owner"]))
+            if e.get("only_with") not in (None, *ONLY_WITH):
+                raise ValueError(f"known-failures: {job} entry {e['case']!r} has only_with {e['only_with']!r}; "
+                                 f"one of {', '.join(ONLY_WITH)}")
+            parsed.append(Entry(e["case"], tuple(e["labels"]), e["finding"], e["owner"], e.get("only_with")))
         jobs[job] = tuple(parsed)
     return jobs
 
@@ -69,9 +82,21 @@ def for_job(path: Path | None, job: str) -> tuple[Entry, ...] | None:
     return None if path is None else load(path).get(job, ())
 
 
-def judge(entries: Iterable[Entry], failing: Mapping[str, Iterable[str]], hits: Iterable[Iterable[str]] = ()) -> Verdict:
+def _covered(entries: Iterable[Entry], hit: Hit) -> set[str]:
+    """The labels the list holds for this hit: every entry's, except one whose condition its world lacks."""
+    return {label for e in entries if e.only_with is None or hit.shared_id for label in e.labels}
+
+
+def holds(entries: Iterable[Entry], hit: Hit) -> bool:
+    """Is every label this hit shows held by the list, for this hit's world?"""
+    return set(hit.labels) <= _covered(entries, hit)
+
+
+def judge(entries: Iterable[Entry], failing: Mapping[str, Iterable[str]],
+          hits: Iterable[Hit | Iterable[str]] = ()) -> Verdict:
     """Hold the job's failures to its list. `failing` maps each failing case or scenario to the labels it
-    shows now; `hits` are the label sets of new search hits."""
+    shows now; `hits` are the new search hits, each a `Hit` or, where no entry's condition applies, just
+    its labels (which claim no shared id)."""
     entries = tuple(entries)
     v = Verdict()
     now = {case: set(labels) for case, labels in failing.items()}
@@ -88,15 +113,17 @@ def judge(entries: Iterable[Entry], failing: Mapping[str, Iterable[str]], hits: 
         extra = sorted(labels - listed.get(case, set()))
         if extra:
             v.problems.append(f"{case} fails with {', '.join(extra)}, which the known-failures list does not hold")
-    every = set().union(*listed.values()) if listed else set()
+    scoped = {label for e in entries if e.only_with for label in e.labels}
     unlisted: dict[tuple[str, ...], int] = {}
-    for hit in hits:
-        extra = tuple(sorted(set(hit) - every))
+    for raw in hits:
+        hit = raw if isinstance(raw, Hit) else Hit(tuple(raw))
+        extra = tuple(sorted(set(hit.labels) - _covered(entries, hit)))
         if extra:
             unlisted[extra] = unlisted.get(extra, 0) + 1
         else:
             v.known_hits += 1
     v.problems += [f"{count} new search hit(s) show {', '.join(extra)}, which no listed entry holds"
+                   + (" on a world with no shared document id" if scoped & set(extra) else "")
                    for extra, count in sorted(unlisted.items())]
     return v
 

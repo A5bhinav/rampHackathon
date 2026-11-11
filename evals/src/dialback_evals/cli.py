@@ -132,6 +132,13 @@ def main(argv: list[str] | None = None) -> int:
     return 2
 
 
+def _search_hit(labels, world):
+    """A search hit for the known-failures list: its labels, and whether two documents share an id."""
+    from . import known
+    ids = [d.id for d in world.kwargs["documents"]]
+    return known.Hit(tuple(labels), shared_id=len(set(ids)) < len(ids))
+
+
 def _fuzz(examples: int, seed: int, out_dir: Path, known_failures: Path | None = None) -> int:
     from . import known
     from .gencorpus import fuzz, load_all, rerun
@@ -140,10 +147,14 @@ def _fuzz(examples: int, seed: int, out_dir: Path, known_failures: Path | None =
     for label, found in failing:
         print(f"lab fuzz: frozen case {label} still fails: {', '.join(found)}")
     entries = known.for_job(known_failures, "lab-fuzz")
-    listed = {label for e in entries or () for label in e.labels}
-    # A hit whose labels are all listed is counted, not frozen: frozen, it would fail as an unlisted case.
-    new = fuzz(examples=examples, seed=seed, out_dir=out_dir,
-               keep=lambda labels: entries is None or not set(labels) <= listed)
+    hits = []
+
+    def keep(labels, world) -> bool:
+        # A hit the list holds is counted, not frozen: frozen, it would fail as an unlisted case.
+        hits.append(_search_hit(labels, world))
+        return entries is None or not known.holds(entries, hits[-1])
+
+    new = fuzz(examples=examples, seed=seed, out_dir=out_dir, keep=keep)
     fresh = sorted({label for label, _ in load_all(out_dir)} - before) if new else []
     if new and fresh:
         print(f"lab fuzz: new finding ({', '.join(new)}) frozen as {', '.join(fresh)} under {out_dir}")
@@ -151,7 +162,7 @@ def _fuzz(examples: int, seed: int, out_dir: Path, known_failures: Path | None =
         print(f"lab fuzz: the search re-found an already-frozen case ({', '.join(new)})")
     print(f"lab fuzz: {len(failing)} frozen case(s) failing, {len(fresh)} new finding(s) "
           f"(seed {seed}, {examples} examples)")
-    held = _held("lab-fuzz", known_failures, dict(failing), [new] if new else [])
+    held = _held("lab-fuzz", known_failures, dict(failing), hits)
     return (1 if failing or new else 0) if held is None else held
 
 
@@ -178,7 +189,8 @@ def _search(examples: int, seed: int, out_dir: Path, near_misses: Path, known_fa
     print(f"lab fuzz: {len(failing)} frozen case(s) failing, {len(arc.first)} label(s) found, "
           f"{len(result.frozen)} new case(s) (--search archive, seed {seed}, {examples} examples, "
           f"{len(arc.worlds)} distinct worlds)")
-    held = _held("lab-fuzz", known_failures, dict(failing), [labels for labels in arc.labels if labels])
+    held = _held("lab-fuzz", known_failures, dict(failing),
+                 [_search_hit(labels, world) for labels, world in zip(arc.labels, arc.worlds, strict=True) if labels])
     return (1 if failing or arc.first else 0) if held is None else held
 
 
