@@ -60,7 +60,7 @@ None. The file is the dashboard's own data, like `corpus-results.json`.
   unknown label reads as red.
 - [ ] L7. `/scorecard` and the assurance page show the results and the commit they ran on. The
   "No lab run" empty state is gone, and the page says the flagged share is not a real-world rate.
-- [ ] L8. Checked in a browser at desktop and phone width, light and dark.
+- [ ] L8. Checked in a browser at desktop and phone width. (The site has no dark theme.)
 
 ## Tests (written first)
 
@@ -68,7 +68,7 @@ None. The file is the dashboard's own data, like `corpus-results.json`.
 |---|---|
 | L1, L2, L3 | `evals/tests/test_snapshot.py` |
 | L4, L5, L6 | `apps/web/tests/lab.test.ts` |
-| L7 | `apps/web/tests/lab.test.ts`, and the browser check |
+| L7 | the browser check, by hand |
 | L8 | the browser check, by hand |
 
 ## Out of scope

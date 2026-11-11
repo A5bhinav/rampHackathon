@@ -25,7 +25,7 @@ def deciding_rule(outcome: str, rules_fired: list[str]) -> str | None:
 
 
 def build(scenarios_dir: Path, *, examples: int, seed: int, commit: str) -> dict[str, Any]:
-    from .cli import _score_one        # imported here because cli imports this module
+    from .cli import _score_one  # imported here because cli imports this module
     results = [_score_one(s) for s in load_scenarios(scenarios_dir)]
     arc = search("archive", budget=examples, seed=seed)
     hits: dict[str, list[int]] = {}
