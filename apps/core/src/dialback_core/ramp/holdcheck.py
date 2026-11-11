@@ -49,12 +49,14 @@ class CheckRefused(RuntimeError):
 
 class WriteGuard:
     """D1: the only writes allowed are a hold or release of one vendor, and a saved payment date for
-    one of its unpaid bills (`dates`, filled once the bills are read). Records Ramp's status for each."""
+    one of its unpaid bills (`dates`, filled once the bills are read). Records Ramp's status for each
+    write, and each bill's `status_summary` from the bill reads the layer makes (D9: no extra request)."""
 
     def __init__(self, vendor_id: str) -> None:
         self.vendor_id = vendor_id
         self.dates: dict[str, str] = {}
         self.writes: list[tuple[str, str, int]] = []
+        self.statuses: dict[str, str | None] = {}
 
     @staticmethod
     def _path(request: httpx.Request) -> str:
@@ -82,6 +84,16 @@ class WriteGuard:
         request = response.request
         if request.method != "GET" and self._path(request) != "/token":
             self.writes.append((request.method, self._path(request), response.status_code))
+        if request.method == "GET" and self._path(request) == "/bills":
+            await response.aread()
+            try:
+                body = response.json()
+            except ValueError:
+                return
+            data = body.get("data") if isinstance(body, dict) else None
+            for b in data if isinstance(data, list) else []:
+                if isinstance(b, dict) and "id" in b:
+                    self.statuses[str(b["id"])] = b.get("status_summary")
 
     def client(self, transport: httpx.AsyncBaseTransport | None = None) -> httpx.AsyncClient:
         return httpx.AsyncClient(transport=transport, timeout=15.0,
@@ -97,6 +109,9 @@ class Report:
     second_hold: str = ""  # "", "accepted", or "refused: ..."
     refused: str = ""
     saved: dict[str, str | None] = dataclasses.field(default_factory=dict)  # unpaid bill: payment date before
+    status_before: dict[str, str | None] = dataclasses.field(default_factory=dict)  # Ramp's status_summary (D9)
+    status_held: dict[str, str | None] = dataclasses.field(default_factory=dict)  # at the last read-back
+    status_after: dict[str, str | None] = dataclasses.field(default_factory=dict)
     hold_error: str = ""
     held_after: float | None = None  # seconds until the read-back passed; None if it never did
     held_reads: int = 0
@@ -154,6 +169,7 @@ async def hold_check(sandbox: RampSandbox, guard: WriteGuard, http: httpx.AsyncC
         return r
     unpaid = [b for b in await layer.list_bills_for_vendor(vendor_id) if not b.paid]
     r.saved = {b.id: b.payment_date.isoformat() if b.payment_date else None for b in unpaid}
+    r.status_before = {b: guard.statuses.get(b) for b in r.saved}
     guard.dates = {b: d for b, d in r.saved.items() if d}
 
     async def held() -> bool:
@@ -170,6 +186,7 @@ async def hold_check(sandbox: RampSandbox, guard: WriteGuard, http: httpx.AsyncC
         try:
             await layer.place_vendor_hold(vendor_id, REASON)
             r.held_after, r.held_reads = await _until(held, clock, sleep, wait)
+            r.status_held = {b: guard.statuses.get(b) for b in r.saved}
         except RampError as exc:
             r.hold_error = str(exc)
         if r.held_after is not None:  # the worker's retry places the hold again on a vendor already held
@@ -193,6 +210,7 @@ async def hold_check(sandbox: RampSandbox, guard: WriteGuard, http: httpx.AsyncC
                         r.restore_errors.append(f"{bill_id}: {exc}")
                 bills = await layer.list_bills_for_vendor(vendor_id)
                 r.after = {b.id: b.payment_date.isoformat() if b.payment_date else None for b in bills if b.id in r.saved}
+                r.status_after = {b: guard.statuses.get(b) for b in r.saved}
         r.writes = list(guard.writes)
     return r
 
@@ -205,8 +223,14 @@ def render(r: Report) -> str:
     if r.refused:
         return "\n".join(lines + [f"Left alone: {r.refused}.",
                                   f"To use it, remove that hold by hand ({BY_HAND}), or pick another vendor (probe --list)."])
-    lines.append("Unpaid bills before, with their payment dates")
-    lines += [f"  {b}  {d or '(none)'}" for b, d in r.saved.items()] or ["  none"]
+    def status(table: dict[str, str | None], b: str) -> str:
+        return table.get(b) or "(status unknown)"
+
+    def last_seen(b: str) -> str:
+        return r.status_after.get(b) or r.status_held.get(b) or r.status_before.get(b) or "unknown"
+
+    lines.append("Unpaid bills before: payment date, Ramp's status")
+    lines += [f"  {b}  {d or '(none)'}  {status(r.status_before, b)}" for b, d in r.saved.items()] or ["  none"]
     lines += ["", "Writes, as Ramp answered"] + [f"  {m} {p}  {s}" for m, p, s in r.writes]
     lines.append("")
     if r.hold_error:
@@ -222,7 +246,8 @@ def render(r: Report) -> str:
         lines.append(f"Hold: showed after {r.held_after:.1f} seconds, on read {r.held_reads} (the worker's first "
                      f"read-back would have seen it: {first}; it reads {WORKER_READS} times, 0.2 and 0.4 seconds "
                      "apart, then retries the step)")
-    lines += [f"  {b}  date {d or '(none)'}  {'held' if h else 'NOT held'}" for b, d, h in r.held_bills]
+    lines += [f"  {b}  date {d or '(none)'}  {'held' if h else 'NOT held'}  {status(r.status_held, b)}"
+              for b, d, h in r.held_bills]
     if r.held_after is not None:
         lines.append("  the worker's read-back would pass")
     if r.second_hold == "accepted":
@@ -233,17 +258,20 @@ def render(r: Report) -> str:
     if r.release_error:
         lines += ["", f"Release FAILED: {r.release_error}",
                   f"The vendor is still on hold. Remove it by hand ({BY_HAND}), then set these payment dates:"]
-        lines += [f"  {b}  {d}" for b, d in r.saved.items() if d] or ["  (no bill had a date)"]
+        lines += [f"  {b}  {d}  (Ramp's status last seen: {last_seen(b)})" for b, d in r.saved.items() if d] \
+            or ["  (no bill had a date)"]
         return "\n".join(lines)
     if r.cleared_after is None:
         lines += ["", (f"Release: Ramp accepted it, but the hold still showed after {r.wait:.0f} seconds. "
                        "Once it is gone, set these payment dates by hand:")]
-        lines += [f"  {b}  {d}" for b, d in r.saved.items() if d] or ["  (no bill had a date)"]
+        lines += [f"  {b}  {d}  (Ramp's status last seen: {last_seen(b)})" for b, d in r.saved.items() if d] \
+            or ["  (no bill had a date)"]
         return "\n".join(lines)
     lines += ["", f"Release: gone after {r.cleared_after:.1f} seconds, on read {r.cleared_reads}"]
     lines += [f"  could not set the date again: {e}" for e in r.restore_errors]
-    lines += ["", "After: payment dates now (before)"]
-    lines += [f"  {b}  {r.after.get(b) or '(none)'}  ({d or '(none)'})" for b, d in r.saved.items()]
+    lines += ["", "After: payment date and Ramp's status now (before)"]
+    lines += [f"  {b}  {r.after.get(b) or '(none)'}  {status(r.status_after, b)}  "
+              f"(before: {d or '(none)'}  {status(r.status_before, b)})" for b, d in r.saved.items()]
     lines.append("  every unpaid bill has its starting date back" if r.dates_back
                  else "  NOT every date came back: set the ones that differ by hand")
     return "\n".join(lines)

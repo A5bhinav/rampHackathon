@@ -12,6 +12,7 @@ import httpx
 import pytest
 from dialback_core.ramp.holdcheck import CheckRefused, WriteGuard, hold_check, render, run
 from dialback_core.ramp.http import TokenBucket
+from dialback_core.ramp.port import RampError
 from test_ramp_sandbox_shapes import BASE, OTHER, SANDBOX, SandboxRamp, V, event, ramp_error
 
 pytestmark = pytest.mark.anyio
@@ -127,6 +128,43 @@ async def test_a_round_trip_holds_releases_and_gives_every_date_back():
     assert "A second hold on the held vendor" in text and "Ramp accepted it" in text
 
 
+async def test_each_bills_ramp_status_is_reported_before_while_held_and_after():
+    # Added after the first sandbox run, where a bill's state (waiting for a transfer match) wasn't
+    # known. The statuses come from the bill reads the check makes anyway: no extra request.
+    fake = SandboxRamp()
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        response = fake.handle(request)
+        path = request.url.path
+        for b in (b for b in fake.bills if b["vendor"]["id"] == V and b["status"] == "OPEN"):
+            if path.endswith("/hold"):
+                b["status_summary"] = "ON_HOLD"
+            elif path.endswith("/release"):  # made up, so "after" differs from "before" for every bill
+                b["status_summary"] = "APPROVAL_PENDING"
+            elif request.method == "PATCH" and path.endswith(b["id"]):
+                b["status_summary"] = "PAYMENT_SCHEDULED"
+        return response
+
+    report = await checked(fake, handle=handle)
+    assert report.status_before == {"bill-1": "PAYMENT_SCHEDULED", "bill-2": "PAYMENT_NOT_INSTRUCTED"}
+    assert report.status_held == {"bill-1": "ON_HOLD", "bill-2": "ON_HOLD"}
+    assert report.status_after == {"bill-1": "PAYMENT_SCHEDULED", "bill-2": "APPROVAL_PENDING"}
+    gets = [r for r in fake.requests if r.method == "GET" and r.url.path.endswith("/bills")]
+    assert len(gets) == 3, "before, one read-back, after: the statuses cost no request of their own"
+    text = render(report)
+    assert "bill-1  2026-11-12  PAYMENT_SCHEDULED" in text
+    assert "bill-1  date (none)  held  ON_HOLD" in text
+    assert "bill-2  (none)  APPROVAL_PENDING  (before: (none)  PAYMENT_NOT_INSTRUCTED)" in text
+
+
+async def test_an_error_answer_to_a_bill_read_stays_ramps_error():
+    fake = SandboxRamp()
+    fake.bills_error = "bills are unavailable"
+    with pytest.raises(RampError, match="bills are unavailable"):
+        await checked(fake)
+    assert writes(fake) == [("POST", "/token")]
+
+
 async def test_a_hold_that_shows_late_is_waited_for_and_timed():
     fake = SandboxRamp()
     fake.lag = 3  # each event shows on the third audit-log read after it
@@ -182,7 +220,7 @@ async def test_a_refused_release_sets_no_date_and_says_how_to_remove_the_hold():
     assert "422" in report.release_error and not report.dates_back
     assert report.cleared_reads == 0, "a refused release isn't waited for"
     text = render(report)
-    assert "Remove hold" in text and "bill-1  2026-11-12" in text
+    assert "Remove hold" in text and "bill-1  2026-11-12  (Ramp's status last seen: PAYMENT_SCHEDULED)" in text
     fake = SandboxRamp()
     fake.release_error = 422
     fake.bills = [b for b in fake.bills if b["id"] != "bill-1"]  # no unpaid bill has a date: still not "back"

@@ -47,6 +47,9 @@ None.
 - **D8. A second hold**, added after the first sandbox run: once the hold shows, the check places it
   again, as the worker does when it retries after a read-back that came too early, and reports
   whether Ramp accepts a hold on a vendor already held (spec 0097, Q206).
+- **D9. Each bill's Ramp status** (`status_summary`) before the hold, at the last read-back, and
+  after, taken from the bill reads the check makes anyway (no extra request, so the timings stay
+  honest). Added after the first run, whose bill turned out to be waiting for a transfer match.
 
 ## Found on the sandbox, 2026-11-10 (first run, one vendor: DocuSign, one unpaid bill)
 
@@ -59,6 +62,9 @@ None.
   the check held and released before it found out. D7 now stops that before the hold, if Ramp's
   login answer lists its scopes (not yet seen). The bill was left with no payment date.
 - The release didn't give the date back by itself, as Ramp's help center says.
+- The bill was waiting for a transfer match (paid by direct debit; `status` OPEN until matched), not
+  a scheduled Ramp payment; matched by hand afterwards, it was paid. Salesforce's unpaid bill is the
+  same kind, so the only scheduled bills in this sandbox are AWS's two, under a hold placed by hand.
 
 ## Acceptance
 
@@ -79,12 +85,14 @@ None.
 - [x] Once the hold shows, a second hold is sent and Ramp's answer reported; a refusal doesn't stop
       the release or the dates; no second hold when the first never showed (D8).
 - [x] The first read-back is "yes" on read 1, "maybe" on reads 2 and 3, "no" after (D4).
+- [x] Each unpaid bill's Ramp status is reported before, while held and after, with no extra bill
+      read; an error answer to a bill read stays Ramp's error (D9).
 
 ## Tests (written first)
 
 | Acceptance item | Test |
 |---|---|
-| 1-10 | `apps/core/tests/test_ramp_hold_check.py::test_*` |
+| 1-11 | `apps/core/tests/test_ramp_hold_check.py::test_*` |
 
 ## Out of scope
 
