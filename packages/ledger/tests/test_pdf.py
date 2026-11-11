@@ -3,8 +3,18 @@ character, so ingest() and everything after it is unchanged."""
 from __future__ import annotations
 
 import pytest
-from _pdfs import classes, document_of, pdf_of, read_spans, span, text_width, unmapped_glyphs_pdf
+from _pdfs import (
+    classes,
+    document_of,
+    pdf_of,
+    read_spans,
+    refused_pdfs,
+    span,
+    text_width,
+    unmapped_glyphs_pdf,
+)
 from dialback_ledger.candidates import find_phones
+from dialback_ledger.pdf import PdfRefused, read_pdf
 from dialback_ledger.text import lines
 from dialback_ledger.visibility import classify
 
@@ -198,3 +208,53 @@ def test_spaces_keep_a_no_ink_span_whole():
 
 def test_light_but_visible_text_has_ink():
     assert only(pdf_of([span(AR, color="#e6e6e6")])) == (AR, "visible")
+
+
+# --- What the reader refuses (D4) ----------------------------------------------------------------------
+
+REFUSED = refused_pdfs()
+
+
+@pytest.mark.parametrize("reason, data", [(r, d) for _, r, d in REFUSED], ids=[c for c, _, _ in REFUSED])
+def test_refuses(reason, data):
+    with pytest.raises(PdfRefused) as e:
+        read_pdf(data)
+    assert e.value.reason == reason
+    assert "415" not in str(e.value), "a refusal never shows document text"
+
+
+def test_refuses_unparseable():
+    assert {r for c, r, _ in REFUSED if c in ("garbage", "truncated")} == {"unparseable"}
+
+
+def test_refuses_encrypted():
+    assert {r for c, r, _ in REFUSED if c.startswith("encrypted")} == {"encrypted"}
+
+
+def test_refuses_too_big_before_parsing(monkeypatch):
+    from dialback_ledger import pdf
+    monkeypatch.setattr(pdf.pdfium, "PdfDocument", lambda *a, **k: pytest.fail("parsed a file over the size limit"))
+    with pytest.raises(PdfRefused) as e:
+        read_pdf(b"%" * (pdf.MAX_BYTES + 1))
+    assert e.value.reason == "too_big"
+
+
+def test_refuses_too_slow(monkeypatch):
+    from dialback_ledger import pdf
+    monkeypatch.setattr(pdf, "TIME_LIMIT_SECONDS", 0.0)
+    with pytest.raises(PdfRefused) as e:
+        read_pdf(pdf_of([span(AR)]))
+    assert e.value.reason == "too_slow"
+
+
+def test_twenty_pages_are_read():
+    assert len(read_pdf(pdf_of([span(AR)], pages=20))) == 20
+
+
+def test_a_link_is_read():
+    assert only(pdf_of([span(AR)], annotations=["link"])) == (AR, "visible")
+
+
+def test_the_limits_are_the_specs():
+    from dialback_ledger import pdf
+    assert (pdf.MAX_PAGES, pdf.MAX_BYTES, pdf.TIME_LIMIT_SECONDS) == (20, 10 * 1024 * 1024, 20.0)

@@ -36,7 +36,9 @@ READER_VERSION = "1"            # extractor_version is "pdf-<this>/<labeler>" (D
 BASELINE_TOLERANCE = 0.5        # points: characters this close in baseline share a line
 WORD_GAP = 1.0                  # a gap wider than this many of the left character's size splits a span (D2)
 NARROW_POINTS = 0.8             # a non-whitespace character narrower than this can't be read: no_ink
-TIME_LIMIT_SECONDS = 20.0       # D4: reading that takes longer is refused
+MAX_PAGES = 20                  # D4: a longer document is refused
+MAX_BYTES = 10 * 1024 * 1024    # D4: so is a bigger file (10 MB)
+TIME_LIMIT_SECONDS = 20.0       # D4: and reading that takes longer
 INK_SCALE = 3                   # the ink check renders at 216 dpi, so small glyphs still cover whole pixels
 INK_DIFF = 16                   # a pixel has ink when a channel moves by this much: the white rule's own margin
 INK_MARGIN = 2.0                # points rendered around an object's characters
@@ -251,12 +253,76 @@ def _page(plumber_page, pdfium_page, deadline: float) -> dict:
     return {"width": round(width, 3), "height": round(height, 3), "spans": spans}
 
 
-def read_pdf(data: bytes) -> list[dict]:
-    """The PDF's pages in the page model (D1)."""
-    deadline = time.monotonic() + TIME_LIMIT_SECONDS
-    document = pdfium.PdfDocument(data)
+def _refuse_page(plumber_page, pdfium_page) -> None:
+    """D4, per page: a rotated page (pdfminer and PDFium would disagree on its frame), an annotation or form
+    field a person may read that the text layer lacks (a Link shows no text), or no characters at all, which is
+    a scan (Part B; scans are off)."""
+    if pdfium_page.get_rotation() != 0:
+        raise PdfRefused("rotated")
+    for i in range(pdfium_c.FPDFPage_GetAnnotCount(pdfium_page.raw)):
+        annot = pdfium_c.FPDFPage_GetAnnot(pdfium_page.raw, i)
+        try:
+            subtype = pdfium_c.FPDFAnnot_GetSubtype(annot)
+        finally:
+            pdfium_c.FPDFPage_CloseAnnot(annot)
+        if subtype == pdfium_c.FPDF_ANNOT_WIDGET:
+            raise PdfRefused("form_field")
+        if subtype != pdfium_c.FPDF_ANNOT_LINK:
+            raise PdfRefused("annotation")
+    if not plumber_page.chars:
+        raise PdfRefused("scan")
+
+
+def _why_unloadable(data: bytes) -> str:
+    """PDFium won't load the file: encrypted, or unparseable. Asked of pdfminer, because PDFium's last error can
+    be left over from an earlier file."""
+    from pdfminer.pdfdocument import PDFDocument, PDFPasswordIncorrect
+    from pdfminer.pdfparser import PDFParser
     try:
-        with pdfplumber.open(io.BytesIO(data)) as pdf:
-            return [_page(p, document[n], deadline) for n, p in enumerate(pdf.pages)]
+        return "encrypted" if PDFDocument(PDFParser(io.BytesIO(data))).encryption else "unparseable"
+    except PDFPasswordIncorrect:
+        return "encrypted"
+    except Exception:  # noqa: BLE001  any other parse failure: unparseable (R7)
+        return "unparseable"
+
+
+def read_pdf(data: bytes) -> list[dict]:
+    """The PDF's pages in the page model (D1), or `PdfRefused` (D4): an encrypted or unparseable file, over
+    MAX_PAGES pages or MAX_BYTES bytes, reading that takes over TIME_LIMIT_SECONDS, a page with annotations or
+    form fields, a rotated page, or a page with no characters (a scan)."""
+    if not isinstance(data, (bytes, bytearray)):
+        raise PdfRefused("unparseable")
+    if len(data) > MAX_BYTES:
+        raise PdfRefused("too_big")
+    deadline = time.monotonic() + TIME_LIMIT_SECONDS
+    try:
+        document = pdfium.PdfDocument(bytes(data))
+    except Exception:  # noqa: BLE001  PDFium can't load it: refused, never read (R7)
+        raise PdfRefused(_why_unloadable(bytes(data))) from None
+    try:
+        if pdfium_c.FPDF_GetSecurityHandlerRevision(document.raw) != -1:
+            raise PdfRefused("encrypted")                # encrypted, even with an empty user password
+        count = len(document)
+        if count == 0:
+            raise PdfRefused("unparseable")              # PDFium itself won't load one; this is the backstop
+        if count > MAX_PAGES:
+            raise PdfRefused("too_many_pages")
+        if pdfium_c.FPDF_GetFormType(document.raw) != pdfium_c.FORMTYPE_NONE:
+            raise PdfRefused("form_field")
+        with pdfplumber.open(io.BytesIO(bytes(data))) as pdf:
+            if len(pdf.pages) != count:
+                raise PdfRefused("unparseable")          # the two readers disagree on the document itself
+            pages = []
+            for n, plumber_page in enumerate(pdf.pages):
+                pdfium_page = document[n]
+                _refuse_page(plumber_page, pdfium_page)
+                pages.append(_page(plumber_page, pdfium_page, deadline))
+                if time.monotonic() > deadline:
+                    raise PdfRefused("too_slow")
+            return pages
+    except PdfRefused:
+        raise
+    except Exception:  # noqa: BLE001  anything else the reader can't account for is refused (R7)
+        raise PdfRefused("unparseable") from None
     finally:
         document.close()

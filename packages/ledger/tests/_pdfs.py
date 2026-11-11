@@ -67,3 +67,29 @@ def unmapped_glyphs_pdf() -> bytes:
         b"<< /Type /FontDescriptor /FontName /DialbackUnmapped /Flags 4 /FontBBox [0 -200 1000 800] /ItalicAngle 0 "
         b"/Ascent 800 /Descent -200 /CapHeight 700 /StemV 80 >>",
     )
+
+
+def no_pages_pdf() -> bytes:
+    return raw_pdf(b"<< /Type /Catalog /Pages 2 0 R >>", b"<< /Type /Pages /Kids [] /Count 0 >>")
+
+
+def refused_pdfs() -> list[tuple[str, str, bytes]]:
+    """Every file D4 refuses, as (case, reason, bytes). `too_slow` isn't here: any file is too slow once the
+    time limit is patched to zero."""
+    from dialback_ledger.pdf import MAX_BYTES
+    ar = [span("AR direct: (415) 555-0142")]
+    good = pdf_of(ar)
+    return [
+        ("garbage", "unparseable", b"this is not a PDF"),
+        ("truncated", "unparseable", good[: len(good) // 2]),
+        ("encrypted", "encrypted", pdf_of(ar, encrypt="secret")),
+        ("encrypted_owner_only", "encrypted", pdf_of(ar, encrypt="")),
+        ("no_pages", "unparseable", no_pages_pdf()),      # PDFium won't load a document with no pages
+        ("too_many_pages", "too_many_pages", pdf_of(ar, pages=21)),
+        ("too_big", "too_big", good + b"%" * (MAX_BYTES + 1 - len(good))),
+        ("text_annotation", "annotation", pdf_of(ar, annotations=["text"])),
+        ("freetext_annotation", "annotation", pdf_of(ar, annotations=["freetext"])),
+        ("form_field", "form_field", pdf_of(ar, form_field=True)),
+        ("rotated", "rotated", pdf_of(ar, rotate=90)),
+        ("scan", "scan", pdf_of([])),
+    ]
