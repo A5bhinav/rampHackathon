@@ -578,6 +578,12 @@ def test_i3_flags_an_established_label():
 OLD_LABEL = SightingSpec("contract", 200, **BANK)
 
 
+def _bare(world):
+    """`world` with no thread or subject on any document: nothing to match a bare request by."""
+    docs = [dataclasses.replace(d, thread_id=None, subject=None) for d in world.kwargs["documents"]]
+    return dataclasses.replace(world, kwargs={**world.kwargs, "documents": docs})
+
+
 @pytest.mark.parametrize("world", [
     pytest.param(_labels(OLD_LABEL, SightingSpec("contract", 100, **BANK)), id="one-channel"),
     pytest.param(_labels(SightingSpec("contract", 89, **BANK), SightingSpec("listing", 89, **BANK)), id="a-day-too-young"),
@@ -585,6 +591,8 @@ OLD_LABEL = SightingSpec("contract", 200, **BANK)
     pytest.param(_labels(OLD_LABEL, SightingSpec("email", 200, sender="other", **BANK)), id="another-domains-email"),
     pytest.param(_labels(OLD_LABEL, SightingSpec("listing", 200, sender="lookalike", **BANK)), id="lookalike-sender"),
     pytest.param(_labels(OLD_LABEL, SightingSpec("email", 0, on_request=True, **BANK)), id="the-request"),
+    pytest.param(_labels(OLD_LABEL, SightingSpec("email", 0, on_request=True, **BANK), request_thread=False,
+                         request_subject=False), id="the-request-by-its-id-alone"),
     pytest.param(_labels(OLD_LABEL, SightingSpec("listing", 200, in_thread=True, **BANK)), id="its-thread"),
     pytest.param(_labels(OLD_LABEL, SightingSpec("listing", 30, subject="same", **BANK)), id="its-subject-at-the-window"),
     pytest.param(_labels(OLD_LABEL, SightingSpec("listing", 30, subject="re", **BANK)), id="a-reply-to-its-subject"),
@@ -604,6 +612,8 @@ def test_i3_stays_quiet_on_a_label_that_is_not_established(world):
 @pytest.mark.parametrize("world", [
     pytest.param(_labels(SightingSpec("contract", 90, **BANK), SightingSpec("listing", 90, **BANK)), id="at-the-age-bar"),
     pytest.param(_labels(OLD_LABEL, SightingSpec("listing", 1, **BANK)), id="only-the-earliest-is-old"),
+    pytest.param(_bare(_labels(OLD_LABEL, SightingSpec("listing", 20, **BANK), request_thread=False, request_subject=False)),
+                 id="a-bare-request-matches-no-bare-document"),
     pytest.param(_labels(OLD_LABEL, SightingSpec("listing", 31, subject="same", **BANK)), id="its-subject-past-the-window"),
     pytest.param(_labels(OLD_LABEL, SightingSpec("email", 200, **BANK)), id="the-vendors-own-email"),
     pytest.param(_labels(OLD_LABEL, SightingSpec("email", 200, sender="subdomain", **BANK)), id="a-vendor-subdomains-email"),

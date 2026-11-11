@@ -243,9 +243,9 @@ def violations(world: World, out: dict) -> list[str]:
             found.append("I1_first_seen_in_context_eligible")
         if not n.visible:
             found.append("I2_hidden_only_eligible")
-        # Only an established label refuses a number (spec 0091, rule 3). The attacker writes the
-        # context, so its labels can't establish anything; I12 judges what they may do (I1 still refuses
-        # a number first seen in the context).
+        # Only an established label refuses a number (spec 0091, rule 3). A label in the request, its
+        # thread or under its subject can't establish anything, so I12 judges what those may do (I1
+        # still refuses a number first seen in the context).
         if _established_against(f, n, world):
             found.append("I3_nonvendor_or_fax_eligible")
         if len(n.channels) < s.min_source_types:
