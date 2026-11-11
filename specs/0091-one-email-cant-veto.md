@@ -88,9 +88,11 @@ addendum written before its run) have the three earlier versions and why each ch
 ## Contract touched
 
 None (my call): the same outcomes and reasons, and the schema's reason descriptions stay true.
-`reasons.py`'s text changes: `not_vendor_party` and `fax_line` say the labels are established, and
-`too_few_source_types` says "seen as the vendor's" (a number seen in two channels, one calling it a
-bank's, now gets that reason). The web copy that repeats them follows.
+`reasons.py`'s text changes in one place: `too_few_source_types` says "seen as the vendor's" (a number
+seen in two channels, one calling it a bank's, now gets that reason). `not_vendor_party` and
+`fax_line` keep today's sentences: the dashboard serves the current text for every stored selection,
+whatever its rule version, and those sentences stay true for all of them. The web data that repeats
+them follows.
 
 ## Acceptance
 
