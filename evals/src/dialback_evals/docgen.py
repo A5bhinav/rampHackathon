@@ -418,16 +418,18 @@ def _normal(value) -> object:
     return json.loads(json.dumps(value))
 
 
-def freeze_case(plan: Plan, name: str, out_dir: Path, *, patterns: Iterable[str] = (), why: str = "") -> Path:
-    """Write the plan and its rendered documents as `<out_dir>/<name>/case.json`. Refuses a real-looking
+def freeze_case(plan: Plan, name: str, out_dir: Path, *, patterns: Iterable[str] = (), why: str = "",
+                violations: Iterable[dict] = ()) -> Path:
+    """Write the plan and its rendered documents as `<out_dir>/<name>/case.json`, with what failed when it
+    was frozen: its patterns, and each violation's pattern, number and detail. Refuses a real-looking
     number, and never replaces a frozen case with a different plan; freezing the same plan again leaves
-    the case as it is (its patterns record what failed when it was frozen)."""
+    the case as it is."""
     texts = [span["text"] for d in rendered(plan) for page in d["pages"] for span in page["spans"]]
     if bad := sorted({n for n in all_numbers(plan) if not fictional(n)} | set(real_looking(texts))):
         raise ValueError(f"refusing to freeze real-looking numbers {bad}: the lab writes only NPA-555-0100 to 0199")
     case = Path(out_dir) / name
-    body = {"name": name, "patterns": list(patterns), "why": why, "plan": plan_to_json(plan),
-            "documents": rendered(plan)}
+    body = {"name": name, "patterns": list(patterns), "why": why, "violations": list(violations),
+            "plan": plan_to_json(plan), "documents": rendered(plan)}
     if (case / FILE).is_file():
         existing = json.loads((case / FILE).read_text(encoding="utf-8"))
         if existing.get("plan") != _normal(body["plan"]):
@@ -814,10 +816,14 @@ def run(*, examples: int, seed: int, reader, rule=None) -> Run:
     return Run(examples, seed, result, found, {p.id: p for p in [*docs, *worlds]})
 
 
-def patterns_of(plan: Plan, *, reader, rule=None, checks: Iterable[str] | None = None) -> set[str]:
+def violations_of(plan: Plan, *, reader, rule=None, checks: Iterable[str] | None = None) -> list[Violation]:
     if isinstance(plan, WorldPlan):
-        return {v.pattern for v in check_world(plan, reader=reader, rule=rule)}
-    return {v.pattern for v in check_doc(plan, reader=reader, checks=DOC_CHECKS if checks is None else checks).violations}
+        return check_world(plan, reader=reader, rule=rule)
+    return check_doc(plan, reader=reader, checks=DOC_CHECKS if checks is None else checks).violations
+
+
+def patterns_of(plan: Plan, *, reader, rule=None, checks: Iterable[str] | None = None) -> set[str]:
+    return {v.pattern for v in violations_of(plan, reader=reader, rule=rule, checks=checks)}
 
 
 def _without(numbers: tuple[NumberPlan, ...], gone: NumberPlan) -> tuple[NumberPlan, ...]:
@@ -916,11 +922,13 @@ def freeze_new(found: Run, out_dir: Path, shown: set[str], *, reader, rule=None)
         if pattern in shown:
             continue
         small = shrink(found.plans[plan_id], pattern, reader=reader, rule=rule)
-        patterns = sorted(patterns_of(small, reader=reader, rule=rule))
+        seen = violations_of(small, reader=reader, rule=rule)
+        patterns = sorted({v.pattern for v in seen})
         name = case_name(pattern, small)
         freeze_case(small, name, out_dir, patterns=patterns,
                     why=f"{pattern}: shrunk from {plan_id}, found by lab docs at seed {found.seed} in {found.examples} "
-                        "documents")
+                        "documents",
+                    violations=[{"pattern": v.pattern, "number": v.number, "detail": v.detail} for v in seen])
         shown |= set(patterns)
         frozen.append((name, pattern))
     return frozen

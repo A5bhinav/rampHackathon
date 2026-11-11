@@ -97,6 +97,20 @@ def test_draws_are_pinned_by_the_seed():
     assert docgen.draw_docs(examples=50, seed=1) != list(_docs()[:50])
 
 
+
+def test_a_frozen_case_says_what_each_violation_was(tmp_path):
+    # The fresh review: a G5 case is keyed by its variant's phrasing, which its plan need not contain. A frozen
+    # case records each violation's number and detail, so its pattern can be read from the file.
+    found = docgen.run(examples=EXAMPLES, seed=SEED, reader=StubReader())
+    g5 = next(v for v in found.violations if v.check == "G5")
+    shown = {v.pattern for v in found.violations} - {g5.pattern}
+    [(name, pattern)] = docgen.freeze_new(found, tmp_path, shown, reader=StubReader())
+    assert pattern == g5.pattern
+    record = docgen.load_case(tmp_path / name)[2]
+    assert sorted({e["pattern"] for e in record["violations"]}) == record["patterns"]
+    entry = next(e for e in record["violations"] if e["pattern"] == pattern)
+    assert entry["number"] and pattern.split("/")[1] in entry["detail"]
+
 # --- Fictional numbers -------------------------------------------------------------------------------
 
 def test_rendered_text_holds_only_fictional_numbers(tmp_path):
