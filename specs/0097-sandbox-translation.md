@@ -117,6 +117,13 @@ None.
   it sets the dates back: the hold is put back and the case goes to a person (fail closed, but
   found late). Should the core check the scopes Ramp's login answer lists at start-up? Not yet
   known whether Ramp lists them; the hold check's next run shows it.
+- **Q208:** a vendor hold restarts its bills' approvals. After the hold check held and released
+  DocuSign, its bill showed "0 of 1 approvals" in Ramp's dashboard (Ramp's help center: approvals
+  for payments affected by a hold "start again from the first step"). So after a release, a person
+  must approve each bill again before it can be paid. Does Ramp let the worker set a payment date on
+  a bill waiting for approval? If it refuses, `release_hold` fails, puts the hold back and retries,
+  and every release ends with the case sent to a person (fail closed, but no release would
+  complete). The hold check's next run, with `bills:write`, shows it.
 
 ## Commands
 
