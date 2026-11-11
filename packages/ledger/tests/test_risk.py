@@ -1,25 +1,27 @@
-"""Spec 0026: the vendor risk list, read under a signed-in person's connection."""
+"""Spec 0026: the vendor risk list, and spec 0104: one vendor's history, read under a signed-in
+person's connection."""
 import asyncio
+import datetime as dt
 import json
 import uuid
 
 import psycopg
 from dialback_ledger.demo import load, load_seed
-from dialback_ledger.risk import STATUS_TEXT, risk_list
+from dialback_ledger.risk import STATUS_TEXT, risk_list, vendor_ledger
 from psycopg.rows import dict_row
 from test_demo import demo_dataset
 from test_store import load as load_truth
 from test_store import new_vendor, truth_of
 
 
-def as_person(url: str, dataset_id) -> list[dict]:
+def as_person(url: str, dataset_id, read=risk_list, **kw):
     """Read the way the core's person_tx does: role authenticated, with a user's claims."""
     async def go():
         async with await psycopg.AsyncConnection.connect(url, row_factory=dict_row) as conn, conn.transaction():
             await conn.execute("set local role authenticated")
             await conn.execute("select set_config('request.jwt.claims', %s, true)",
                                (json.dumps({"sub": str(uuid.uuid4()), "role": "authenticated"}),))
-            return await risk_list(conn, dataset_id)
+            return await read(conn, dataset_id, **kw)
     return asyncio.run(go())
 
 
@@ -73,3 +75,93 @@ def test_status_edge_cases():
     assert _status([_c(ar, True, False)], ar) == ("missing", None)
     # Two numbers on file: the worse one shows, so a near miss is never hidden behind a provable line.
     assert _status([_c(main, True, True), _c(ar, True, False), _c(near, False, True)], ar) == ("near_miss", near)
+
+
+# Spec 0104: one vendor's history ------------------------------------------------------------------
+
+DOC_KEYS = {"document_id", "kind", "custody_channel", "received_at", "claimed_date", "sender", "subject", "thread_id",
+            "parent_document_id", "observations"}
+
+
+def ledger_of(url, dataset_id, vendor_id, now):
+    return as_person(url, dataset_id, vendor_ledger, vendor_id=uuid.UUID(str(vendor_id)), now=now)
+
+
+def test_vendor_ledger_agrees_with_the_risk_list_and_stores_nothing(database_url):
+    d = demo_dataset(database_url)
+    asyncio.run(load(database_url, phones={}))
+    now = dt.datetime.now(dt.UTC)
+    count = "select (select count(*) from ledger.contact_points) + (select count(*) from ledger.number_selections) as n"
+    with psycopg.connect(database_url, row_factory=dict_row) as c:
+        before = c.execute(count).fetchone()["n"]
+    rows = as_person(database_url, d["dataset_id"], now=now)
+    assert len(rows) == 3
+    for row in rows:
+        v = ledger_of(database_url, d["dataset_id"], row["vendor_id"], now)
+        assert v["risk"] == row                                   # the same run, the same now
+        rule = v["rule"]
+        assert set(rule) <= {"rule_version", "rule_settings", "as_of", "cutoff", "outcome", "contact_point_id",
+                             "alternates", "candidates"}           # no case, selection id or inputs hash
+        assert rule["rule_version"] == "ledger-select-v1" and rule["as_of"].startswith(now.strftime("%Y-%m-%dT%H:%M"))
+        pick = [c for c in rule["candidates"] if c.get("rank") == 1]
+        if row["provable_number"]:
+            assert rule["outcome"] == "picked" and pick[0]["e164"] == row["provable_number"]
+            assert rule["contact_point_id"] == pick[0]["contact_point_id"]
+        else:
+            assert rule["outcome"] == "no_provable_number" and not pick and "contact_point_id" not in rule
+        assert {c["e164"] for c in rule["candidates"] if c["on_file"]} >= ({row["number_on_file"]} - {None})
+    with psycopg.connect(database_url, row_factory=dict_row) as c:
+        assert c.execute(count).fetchone()["n"] == before          # reading stores nothing
+
+
+def test_vendor_ledger_lists_every_document_with_its_phone_numbers(database_url):
+    d = demo_dataset(database_url)
+    asyncio.run(load(database_url, phones={}))
+    acme = next(r for r in as_person(database_url, d["dataset_id"]) if r["legal_name"] == load_seed()["vendors"]["acme"]["name"])
+    v = ledger_of(database_url, d["dataset_id"], acme["vendor_id"], None)
+    with psycopg.connect(database_url, row_factory=dict_row) as c:
+        phones = {str(r["document_id"]): r["n"] for r in c.execute(
+            "select d.id as document_id, count(o.id) filter (where o.kind = 'phone') as n from ledger.documents d "
+            "left join ledger.observations o on o.document_id = d.id where d.dataset_id = %s and d.vendor_id = %s group by d.id",
+            (d["dataset_id"], acme["vendor_id"])).fetchall()}
+    docs = v["documents"]
+    assert v["document_count"] == len(docs) == len(phones) == len(load_seed()["vendors"]["acme"]["documents"])
+    assert {x["document_id"]: len(x["observations"]) for x in docs} == phones
+    assert all(set(x) == DOC_KEYS for x in docs)
+    assert [x["received_at"] for x in docs] == sorted((x["received_at"] for x in docs), reverse=True)  # newest first
+    at = {x["document_id"]: i for i, x in enumerate(docs)}
+    children = [x for x in docs if x["parent_document_id"]]
+    assert children and all(at[x["parent_document_id"]] < at[x["document_id"]] for x in children)       # email, then attachments
+    seen = [o for x in docs for o in x["observations"]]
+    assert {o["e164"] for o in seen} == {c["e164"] for c in v["rule"]["candidates"]}
+    assert all(set(o) == {"e164", "role", "party", "visibility", "quote"} for o in seen)
+    assert all(o["quote"] is None for o in seen if o["visibility"] != "visible")
+
+
+def test_vendor_ledger_shows_no_bank_account_and_redacts_long_digit_runs(database_url):
+    v = new_vendor(database_url, "Quoted account")
+    fingerprint = "ab" * 32
+    with psycopg.connect(database_url, autocommit=True, row_factory=dict_row) as c:
+        doc = c.execute("insert into ledger.documents (dataset_id, vendor_id, kind, sha256, custody_channel, received_at) "
+                        "values (%s, %s, 'invoice', %s, 'email', now() - interval '200 days') returning id",
+                        (v["dataset_id"], v["vendor_id"], "0" * 64)).fetchone()["id"]
+        for kind, value, quote in (("phone", "+14155550142", "AR line +14155550142, remit to account 000123456789"),
+                                   ("bank_account", f"026009593:6789:{fingerprint}", None)):
+            c.execute("insert into ledger.observations (dataset_id, document_id, vendor_id, kind, value_normalized, role, party, "
+                      "quote, visibility, extractor_version) values (%s, %s, %s, %s, %s, 'ar', 'vendor', %s, 'visible', 't')",
+                      (v["dataset_id"], doc, v["vendor_id"], kind, value, quote))
+    out = ledger_of(database_url, v["dataset_id"], v["vendor_id"], None)
+    (only,) = out["documents"][0]["observations"]
+    assert only == {"e164": "+14155550142", "role": "ar", "party": "vendor", "visibility": "visible",
+                    "quote": "AR line +14155550142, remit to account [digits removed]"}
+    raw = json.dumps(out)
+    assert "000123456789" not in raw and fingerprint not in raw and "026009593" not in raw
+
+
+def test_vendor_ledger_of_a_vendor_on_another_dataset_is_none(database_url):
+    a, b = new_vendor(database_url, "Here"), new_vendor(database_url, "Elsewhere")
+    assert ledger_of(database_url, a["dataset_id"], b["vendor_id"], None) is None
+    assert ledger_of(database_url, a["dataset_id"], uuid.uuid4(), None) is None
+    empty = ledger_of(database_url, a["dataset_id"], a["vendor_id"], None)   # a vendor with no documents yet
+    assert empty["documents"] == [] and empty["document_count"] == 0 and empty["rule"]["candidates"] == []
+    assert empty["risk"]["status"] == "missing" and empty["rule"]["outcome"] == "no_provable_number"
