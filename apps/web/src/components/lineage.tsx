@@ -46,13 +46,13 @@ export function CandidatesTable({ candidates, chosen, cutoff, reasonText, what =
 const KIND_WORD = { pick: "chosen", alternate: "alternate", refused: "refused" } as const;
 
 /** First seen, by source: display only, one dot per number per source at its first sighting. */
-export function LaneFigure({ chart, cutoff, what = "the request", cutoffLabel = "Request received" }: {
-  chart: LaneChart; cutoff: string; what?: string; cutoffLabel?: string;
+export function LaneFigure({ chart, cutoff, what = "the request", cutoffName = "the request cutoff", cutoffLabel = "Request received" }: {
+  chart: LaneChart; cutoff: string; what?: string; cutoffName?: string; cutoffLabel?: string;
 }) {
   const pick = chart.points.find((p) => p.kind === "pick");
   const n = (k: keyof typeof KIND_WORD) => new Set(chart.points.filter((p) => p.kind === k).map((p) => p.e164)).size;
   const label = `${pick ? `The chosen number ${phone(pick.e164)} was first seen in ${chart.points.filter((p) => p.kind === "pick").length} source lanes before ${what}. ` : "No number was chosen. "}`
-    + `${n("alternate")} alternate and ${n("refused")} refused numbers are also drawn, against the ${chart.minAge.days}-day minimum age and ${what}.`;
+    + `${n("alternate")} alternate and ${n("refused")} refused numbers are also drawn, against the ${chart.minAge.days}-day minimum age and ${cutoffName}.`;
   return (
     <figure className="card lineage-chart" aria-labelledby="lanes-title">
       <div className="card-head">

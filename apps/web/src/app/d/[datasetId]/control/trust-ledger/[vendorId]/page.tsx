@@ -14,7 +14,7 @@ import { hiddenLabel, kindLabel, numberKinds, type NumberKind } from "@/lib/vend
 export default async function VendorLedgerPage({ params }: { params: Promise<{ datasetId: string; vendorId: string }> }) {
   const { datasetId, vendorId } = await params;
   const v = await core.vendorLedger(datasetId, vendorId).catch((e) => {
-    if (e instanceof CoreError && e.status === 404) notFound();
+    if (e instanceof CoreError && (e.status === 404 || e.status === 422)) notFound();  // 422: not a vendor id
     throw e;
   });
   const { risk, rule } = v;
@@ -35,7 +35,7 @@ export default async function VendorLedgerPage({ params }: { params: Promise<{ d
           </dl>
         </div>
       </section>
-      {chart ? <LaneFigure chart={chart} cutoff={rule.cutoff} what="the cutoff" cutoffLabel="Cutoff" /> : null}
+      {chart ? <LaneFigure chart={chart} cutoff={rule.cutoff} what="the cutoff" cutoffName="the cutoff" cutoffLabel="Cutoff" /> : null}
       {rule.candidates.length ? (
         <CandidatesTable candidates={rule.candidates} chosen={rule.contact_point_id} cutoff={rule.cutoff}
           reasonText={v.reason_text} what="the cutoff" />
@@ -79,11 +79,12 @@ function Documents({ documents, total, kinds }: { documents: LedgerDocument[]; t
                   </td>
                   <td>
                     {d.observations.length === 0 ? <span className="muted">none</span> : d.observations.map((o, i) => {
-                      const [word, tone] = KIND[kinds.get(o.e164) ?? "refused"];
+                      const kind = kinds.get(o.e164);  // every listed row was read by the rule; no badge if not
                       const hidden = hiddenLabel(o.visibility);
                       return (
                         <div key={i} className="cell-note">
-                          <span className="mono nowrap">{phone(o.e164)}</span> <span className={`badge ${tone}`}>{word}</span>
+                          <span className="mono nowrap">{phone(o.e164)}</span>{" "}
+                          {kind ? <span className={`badge ${KIND[kind][1]}`}>{KIND[kind][0]}</span> : null}
                           <span className="muted sub"> role {o.role}, party {o.party}{hidden ? `, ${hidden}` : ""}</span>
                           {o.quote ? <blockquote>{o.quote}</blockquote> : null}
                         </div>
