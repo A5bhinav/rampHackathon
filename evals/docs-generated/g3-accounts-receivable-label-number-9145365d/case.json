@@ -4,6 +4,13 @@
     "G3/accounts_receivable/label_number"
   ],
   "why": "G3/accounts_receivable/label_number: shrunk from doc-s0-00017, found by lab docs at seed 0 in 1000 documents",
+  "violations": [
+    {
+      "pattern": "G3/accounts_receivable/label_number",
+      "number": "+14695550179",
+      "detail": "claim ar, None labeled ar, vendor"
+    }
+  ],
   "plan": {
     "type": "doc",
     "id": "doc-s0-00017",

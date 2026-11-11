@@ -6,6 +6,23 @@
     "G5/verified_callback/clock_time"
   ],
   "why": "G5/verified_callback/clock_time: shrunk from doc-s0-00175, found by lab docs at seed 0 in 1000 documents",
+  "violations": [
+    {
+      "pattern": "G3/verified_callback/clock_time",
+      "number": "+12015550102",
+      "detail": "claim None, bank labeled main, vendor"
+    },
+    {
+      "pattern": "G4/verified_callback/clock_time",
+      "number": "+12015550102",
+      "detail": "claim None, bank labeled main, vendor"
+    },
+    {
+      "pattern": "G5/verified_callback/clock_time",
+      "number": "+12015550102",
+      "detail": "verified_callback/clock_time/paren labeled vendor, bank_verification_line/clock_time/paren labeled bank"
+    }
+  ],
   "plan": {
     "type": "doc",
     "id": "doc-s0-00175",

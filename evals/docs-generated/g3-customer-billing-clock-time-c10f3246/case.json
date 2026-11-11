@@ -5,6 +5,18 @@
     "G4/customer_billing/clock_time"
   ],
   "why": "G3/customer_billing/clock_time: shrunk from doc-s0-00179, found by lab docs at seed 0 in 1000 documents",
+  "violations": [
+    {
+      "pattern": "G3/customer_billing/clock_time",
+      "number": "+13125550116",
+      "detail": "claim billing, customer labeled main, vendor"
+    },
+    {
+      "pattern": "G4/customer_billing/clock_time",
+      "number": "+13125550116",
+      "detail": "claim billing, customer labeled main, vendor"
+    }
+  ],
   "plan": {
     "type": "doc",
     "id": "doc-s0-00179",

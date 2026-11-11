@@ -5,6 +5,18 @@
     "G4/customer_billing/label_number"
   ],
   "why": "G3/customer_billing/label_number: shrunk from doc-s0-00068, found by lab docs at seed 0 in 1000 documents",
+  "violations": [
+    {
+      "pattern": "G3/customer_billing/label_number",
+      "number": "+16455550124",
+      "detail": "claim billing, customer labeled billing, vendor"
+    },
+    {
+      "pattern": "G4/customer_billing/label_number",
+      "number": "+16455550124",
+      "detail": "claim billing, customer labeled billing, vendor"
+    }
+  ],
   "plan": {
     "type": "doc",
     "id": "doc-s0-00068",

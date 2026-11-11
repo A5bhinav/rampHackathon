@@ -4,6 +4,13 @@
     "G3/remittance_questions/clock_time"
   ],
   "why": "G3/remittance_questions/clock_time: shrunk from doc-s0-00276, found by lab docs at seed 0 in 1000 documents",
+  "violations": [
+    {
+      "pattern": "G3/remittance_questions/clock_time",
+      "number": "+18675550179",
+      "detail": "claim ar, None labeled main, vendor"
+    }
+  ],
   "plan": {
     "type": "doc",
     "id": "doc-s0-00276",

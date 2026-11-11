@@ -4,6 +4,13 @@
     "G3/fax/label_number"
   ],
   "why": "G3/fax/label_number: shrunk from doc-s0-00087, found by lab docs at seed 0 in 1000 documents",
+  "violations": [
+    {
+      "pattern": "G3/fax/label_number",
+      "number": "+14695550161",
+      "detail": "claim fax, None labeled fax, vendor"
+    }
+  ],
   "plan": {
     "type": "doc",
     "id": "doc-s0-00087",

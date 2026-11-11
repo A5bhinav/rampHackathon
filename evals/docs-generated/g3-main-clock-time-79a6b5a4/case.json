@@ -4,6 +4,13 @@
     "G3/main/clock_time"
   ],
   "why": "G3/main/clock_time: shrunk from doc-s0-00224, found by lab docs at seed 0 in 1000 documents",
+  "violations": [
+    {
+      "pattern": "G3/main/clock_time",
+      "number": "+16455550182",
+      "detail": "claim main, None labeled main, vendor"
+    }
+  ],
   "plan": {
     "type": "doc",
     "id": "doc-s0-00224",

@@ -5,6 +5,18 @@
     "G4/customer_main_line/clock_time"
   ],
   "why": "G3/customer_main_line/clock_time: shrunk from doc-s0-00121, found by lab docs at seed 0 in 1000 documents",
+  "violations": [
+    {
+      "pattern": "G3/customer_main_line/clock_time",
+      "number": "+18675550151",
+      "detail": "claim main, customer labeled main, vendor"
+    },
+    {
+      "pattern": "G4/customer_main_line/clock_time",
+      "number": "+18675550151",
+      "detail": "claim main, customer labeled main, vendor"
+    }
+  ],
   "plan": {
     "type": "doc",
     "id": "doc-s0-00121",

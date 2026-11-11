@@ -1,0 +1,414 @@
+{
+  "name": "g7-fax-forms-label-above-d65e3dca",
+  "patterns": [
+    "G7/fax_forms/label_above"
+  ],
+  "why": "G7/fax_forms/label_above: shrunk from world-s0-0134, found by lab docs at seed 0 in 1000 documents",
+  "violations": [
+    {
+      "pattern": "G7/fax_forms/label_above",
+      "number": "+12015550128",
+      "detail": "I12_context_label_moved_call: world-s0-0134-f0 labels it unknown, unknown; calls ['+14235550173']"
+    }
+  ],
+  "plan": {
+    "type": "world",
+    "id": "world-s0-0134",
+    "planted": true,
+    "real": "+12015550128",
+    "request": "world-s0-0134-req",
+    "vendor_domains": [
+      "acme.example"
+    ],
+    "requested_cutoff": "2026-10-01T16:00:00+00:00",
+    "case_opened_at": "2026-10-01T17:00:00+00:00",
+    "documents": [
+      {
+        "id": "world-s0-0134-rec2",
+        "kind": "contract_page",
+        "author": "vendor",
+        "channel": "contract",
+        "sender": null,
+        "thread": null,
+        "subject": null,
+        "received_at": "2025-05-30T16:00:00+00:00",
+        "filler": [],
+        "numbers": [
+          {
+            "e164": "+12015550128",
+            "owner": "vendor",
+            "role": "main",
+            "party": "vendor",
+            "phrasing": "main",
+            "placement": "label_number",
+            "format": "paren",
+            "visibility": "visible",
+            "shares_line": false
+          }
+        ],
+        "quote": null
+      },
+      {
+        "id": "world-s0-0134-rec3",
+        "kind": "vendor_form",
+        "author": "vendor",
+        "channel": "vendor_portal",
+        "sender": null,
+        "thread": null,
+        "subject": null,
+        "received_at": "2025-07-24T16:00:00+00:00",
+        "filler": [],
+        "numbers": [
+          {
+            "e164": "+12015550128",
+            "owner": "vendor",
+            "role": "ar",
+            "party": "vendor",
+            "phrasing": "accounts_receivable",
+            "placement": "label_number",
+            "format": "paren",
+            "visibility": "visible",
+            "shares_line": false
+          }
+        ],
+        "quote": null
+      },
+      {
+        "id": "world-s0-0134-plant0",
+        "kind": "contract_page",
+        "author": "attacker",
+        "channel": "contract",
+        "sender": null,
+        "thread": null,
+        "subject": null,
+        "received_at": "2026-04-12T16:00:00+00:00",
+        "filler": [],
+        "numbers": [
+          {
+            "e164": "+14235550173",
+            "owner": "attacker",
+            "role": "ar",
+            "party": "vendor",
+            "phrasing": "accounts_receivable",
+            "placement": "label_number",
+            "format": "paren",
+            "visibility": "visible",
+            "shares_line": false
+          }
+        ],
+        "quote": null
+      },
+      {
+        "id": "world-s0-0134-plant1",
+        "kind": "listing_snapshot",
+        "author": "attacker",
+        "channel": "listing",
+        "sender": null,
+        "thread": null,
+        "subject": null,
+        "received_at": "2026-04-12T16:00:00+00:00",
+        "filler": [],
+        "numbers": [
+          {
+            "e164": "+14235550173",
+            "owner": "attacker",
+            "role": "ar",
+            "party": "vendor",
+            "phrasing": "accounts_receivable",
+            "placement": "label_number",
+            "format": "paren",
+            "visibility": "visible",
+            "shares_line": false
+          }
+        ],
+        "quote": null
+      },
+      {
+        "id": "world-s0-0134-req",
+        "kind": "change_request_email",
+        "author": "attacker",
+        "channel": "email",
+        "sender": "ar@acrne.example",
+        "thread": "req",
+        "subject": "Updated banking details",
+        "received_at": "2026-10-01T16:00:00+00:00",
+        "filler": [],
+        "numbers": [],
+        "quote": null
+      },
+      {
+        "id": "world-s0-0134-f0",
+        "kind": "email_body",
+        "author": "attacker",
+        "channel": "email",
+        "sender": "ar@acrne.example",
+        "thread": "world-s0-0134-t0",
+        "subject": "Payment contact",
+        "received_at": "2026-09-30T16:00:00+00:00",
+        "filler": [],
+        "numbers": [
+          {
+            "e164": "+12015550128",
+            "owner": "vendor",
+            "role": "fax",
+            "party": "vendor",
+            "phrasing": "fax_forms",
+            "placement": "label_above",
+            "format": "paren",
+            "visibility": "visible",
+            "shares_line": false
+          }
+        ],
+        "quote": null
+      }
+    ]
+  },
+  "documents": [
+    {
+      "id": "world-s0-0134-rec2",
+      "kind": "contract_page",
+      "custody": {
+        "channel": "contract",
+        "received_at": "2025-05-30T16:00:00+00:00",
+        "sender": null,
+        "thread_id": null,
+        "subject": null,
+        "parent_document_id": null
+      },
+      "pages": [
+        {
+          "width": 612,
+          "height": 792,
+          "spans": [
+            {
+              "text": "Master supply agreement",
+              "x": 72,
+              "y": 72,
+              "size": 10,
+              "color": "#000000"
+            },
+            {
+              "text": "Acme Fasteners",
+              "x": 72,
+              "y": 86,
+              "size": 10,
+              "color": "#000000"
+            },
+            {
+              "text": "Main: (201) 555-0128",
+              "x": 72,
+              "y": 100,
+              "size": 10,
+              "color": "#000000"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "world-s0-0134-rec3",
+      "kind": "vendor_form",
+      "custody": {
+        "channel": "vendor_portal",
+        "received_at": "2025-07-24T16:00:00+00:00",
+        "sender": null,
+        "thread_id": null,
+        "subject": null,
+        "parent_document_id": null
+      },
+      "pages": [
+        {
+          "width": 612,
+          "height": 792,
+          "spans": [
+            {
+              "text": "Vendor information form",
+              "x": 72,
+              "y": 72,
+              "size": 10,
+              "color": "#000000"
+            },
+            {
+              "text": "Acme Fasteners",
+              "x": 72,
+              "y": 86,
+              "size": 10,
+              "color": "#000000"
+            },
+            {
+              "text": "Accounts receivable: (201) 555-0128",
+              "x": 72,
+              "y": 100,
+              "size": 10,
+              "color": "#000000"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "world-s0-0134-plant0",
+      "kind": "contract_page",
+      "custody": {
+        "channel": "contract",
+        "received_at": "2026-04-12T16:00:00+00:00",
+        "sender": null,
+        "thread_id": null,
+        "subject": null,
+        "parent_document_id": null
+      },
+      "pages": [
+        {
+          "width": 612,
+          "height": 792,
+          "spans": [
+            {
+              "text": "Master supply agreement",
+              "x": 72,
+              "y": 72,
+              "size": 10,
+              "color": "#000000"
+            },
+            {
+              "text": "Acme Fasteners",
+              "x": 72,
+              "y": 86,
+              "size": 10,
+              "color": "#000000"
+            },
+            {
+              "text": "Accounts receivable: (423) 555-0173",
+              "x": 72,
+              "y": 100,
+              "size": 10,
+              "color": "#000000"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "world-s0-0134-plant1",
+      "kind": "listing_snapshot",
+      "custody": {
+        "channel": "listing",
+        "received_at": "2026-04-12T16:00:00+00:00",
+        "sender": null,
+        "thread_id": null,
+        "subject": null,
+        "parent_document_id": null
+      },
+      "pages": [
+        {
+          "width": 612,
+          "height": 792,
+          "spans": [
+            {
+              "text": "Business listing",
+              "x": 72,
+              "y": 72,
+              "size": 10,
+              "color": "#000000"
+            },
+            {
+              "text": "Acme Fasteners",
+              "x": 72,
+              "y": 86,
+              "size": 10,
+              "color": "#000000"
+            },
+            {
+              "text": "Accounts receivable: (423) 555-0173",
+              "x": 72,
+              "y": 100,
+              "size": 10,
+              "color": "#000000"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "world-s0-0134-req",
+      "kind": "change_request_email",
+      "custody": {
+        "channel": "email",
+        "received_at": "2026-10-01T16:00:00+00:00",
+        "sender": "ar@acrne.example",
+        "thread_id": "req",
+        "subject": "Updated banking details",
+        "parent_document_id": null
+      },
+      "pages": [
+        {
+          "width": 612,
+          "height": 792,
+          "spans": [
+            {
+              "text": "Message",
+              "x": 72,
+              "y": 72,
+              "size": 10,
+              "color": "#000000"
+            },
+            {
+              "text": "Acme Fasteners",
+              "x": 72,
+              "y": 86,
+              "size": 10,
+              "color": "#000000"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "world-s0-0134-f0",
+      "kind": "email_body",
+      "custody": {
+        "channel": "email",
+        "received_at": "2026-09-30T16:00:00+00:00",
+        "sender": "ar@acrne.example",
+        "thread_id": "world-s0-0134-t0",
+        "subject": "Payment contact",
+        "parent_document_id": null
+      },
+      "pages": [
+        {
+          "width": 612,
+          "height": 792,
+          "spans": [
+            {
+              "text": "Message",
+              "x": 72,
+              "y": 72,
+              "size": 10,
+              "color": "#000000"
+            },
+            {
+              "text": "Acme Fasteners",
+              "x": 72,
+              "y": 86,
+              "size": 10,
+              "color": "#000000"
+            },
+            {
+              "text": "Send forms by fax to:",
+              "x": 72,
+              "y": 100,
+              "size": 10,
+              "color": "#000000"
+            },
+            {
+              "text": "(201) 555-0128",
+              "x": 72,
+              "y": 114,
+              "size": 10,
+              "color": "#000000"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

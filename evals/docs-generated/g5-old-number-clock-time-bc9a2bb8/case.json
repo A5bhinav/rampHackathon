@@ -4,6 +4,13 @@
     "G5/old_number/clock_time"
   ],
   "why": "G5/old_number/clock_time: shrunk from doc-s0-00378, found by lab docs at seed 0 in 1000 documents",
+  "violations": [
+    {
+      "pattern": "G5/old_number/clock_time",
+      "number": "+14235550127",
+      "detail": "verify_with_bank/clock_time/paren labeled bank, old_number/clock_time/paren labeled vendor"
+    }
+  ],
   "plan": {
     "type": "doc",
     "id": "doc-s0-00378",

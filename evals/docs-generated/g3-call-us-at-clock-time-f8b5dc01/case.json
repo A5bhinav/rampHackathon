@@ -5,6 +5,18 @@
     "G4/call_us_at/clock_time"
   ],
   "why": "G3/call_us_at/clock_time: shrunk from doc-s0-00019, found by lab docs at seed 0 in 1000 documents",
+  "violations": [
+    {
+      "pattern": "G3/call_us_at/clock_time",
+      "number": "+14235550185",
+      "detail": "claim main, bank labeled main, vendor"
+    },
+    {
+      "pattern": "G4/call_us_at/clock_time",
+      "number": "+14235550185",
+      "detail": "claim main, bank labeled main, vendor"
+    }
+  ],
   "plan": {
     "type": "doc",
     "id": "doc-s0-00019",

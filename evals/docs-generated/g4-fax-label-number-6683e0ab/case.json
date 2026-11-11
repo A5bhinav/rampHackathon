@@ -5,6 +5,18 @@
     "G4/fax/label_number"
   ],
   "why": "G4/fax/label_number: shrunk from doc-s0-00166, found by lab docs at seed 0 in 1000 documents",
+  "violations": [
+    {
+      "pattern": "G3/fax/label_number",
+      "number": "+16455550101",
+      "detail": "claim fax, customer labeled fax, vendor"
+    },
+    {
+      "pattern": "G4/fax/label_number",
+      "number": "+16455550101",
+      "detail": "claim fax, customer labeled fax, vendor"
+    }
+  ],
   "plan": {
     "type": "doc",
     "id": "doc-s0-00166",

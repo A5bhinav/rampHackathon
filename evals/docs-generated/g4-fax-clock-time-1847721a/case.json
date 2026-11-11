@@ -5,6 +5,18 @@
     "G4/fax/clock_time"
   ],
   "why": "G4/fax/clock_time: shrunk from doc-s0-00047, found by lab docs at seed 0 in 1000 documents",
+  "violations": [
+    {
+      "pattern": "G3/fax/clock_time",
+      "number": "+14695550141",
+      "detail": "claim fax, bank labeled main, vendor"
+    },
+    {
+      "pattern": "G4/fax/clock_time",
+      "number": "+14695550141",
+      "detail": "claim fax, bank labeled main, vendor"
+    }
+  ],
   "plan": {
     "type": "doc",
     "id": "doc-s0-00047",

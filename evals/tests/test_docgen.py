@@ -374,6 +374,17 @@ def test_checks_on_the_stub():
     assert tally.visible_numbers > 1000 and tally.g5_compared > 1000 and tally.g6_compared > 100
 
 
+
+@pytest.mark.docs_gate
+def test_the_list_is_not_fitted_to_seed_0():
+    # At other seeds the sample alone, with no frozen case, fails exactly the listed patterns. The fresh review
+    # found 14 to 16 unlisted G7 patterns at seeds 1 to 3 when G7's worlds were sampled; the gate runs seed 0.
+    from dialback_evals import known
+    listed = {e.case for e in known.load(ROOT / "evals" / "known-failures.json")["lab-docs"]}
+    for seed in (1, 2):
+        found = {v.pattern for v in docgen.run(examples=EXAMPLES, seed=seed, reader=StubReader()).violations}
+        assert (sorted(found - listed), sorted(listed - found)) == ([], []), seed
+
 # --- Known failures by pattern (decision 6) ----------------------------------------------------------
 
 SMALL = 40   # a small run for the known-failures tests; the gate runs 1000

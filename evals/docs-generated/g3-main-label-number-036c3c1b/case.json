@@ -5,6 +5,18 @@
     "G4/main/label_number"
   ],
   "why": "G3/main/label_number: shrunk from doc-s0-00081, found by lab docs at seed 0 in 1000 documents",
+  "violations": [
+    {
+      "pattern": "G3/main/label_number",
+      "number": "+14235550101",
+      "detail": "claim main, bank labeled main, vendor"
+    },
+    {
+      "pattern": "G4/main/label_number",
+      "number": "+14235550101",
+      "detail": "claim main, bank labeled main, vendor"
+    }
+  ],
   "plan": {
     "type": "doc",
     "id": "doc-s0-00081",

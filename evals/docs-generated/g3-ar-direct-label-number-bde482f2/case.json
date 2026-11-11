@@ -5,6 +5,18 @@
     "G4/ar_direct/label_number"
   ],
   "why": "G3/ar_direct/label_number: shrunk from doc-s0-00349, found by lab docs at seed 0 in 1000 documents",
+  "violations": [
+    {
+      "pattern": "G3/ar_direct/label_number",
+      "number": "+12015550155",
+      "detail": "claim ar, customer labeled ar, vendor"
+    },
+    {
+      "pattern": "G4/ar_direct/label_number",
+      "number": "+12015550155",
+      "detail": "claim ar, customer labeled ar, vendor"
+    }
+  ],
   "plan": {
     "type": "doc",
     "id": "doc-s0-00349",

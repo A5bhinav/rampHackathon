@@ -5,6 +5,18 @@
     "G4/remittance_questions/clock_time"
   ],
   "why": "G4/remittance_questions/clock_time: shrunk from doc-s0-00527, found by lab docs at seed 0 in 1000 documents",
+  "violations": [
+    {
+      "pattern": "G3/remittance_questions/clock_time",
+      "number": "+14155550126",
+      "detail": "claim ar, customer labeled main, vendor"
+    },
+    {
+      "pattern": "G4/remittance_questions/clock_time",
+      "number": "+14155550126",
+      "detail": "claim ar, customer labeled main, vendor"
+    }
+  ],
   "plan": {
     "type": "doc",
     "id": "doc-s0-00527",

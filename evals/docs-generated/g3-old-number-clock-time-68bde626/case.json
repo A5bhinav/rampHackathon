@@ -5,6 +5,18 @@
     "G4/old_number/clock_time"
   ],
   "why": "G3/old_number/clock_time: shrunk from doc-s0-00042, found by lab docs at seed 0 in 1000 documents",
+  "violations": [
+    {
+      "pattern": "G3/old_number/clock_time",
+      "number": "+15345550173",
+      "detail": "claim None, customer labeled main, vendor"
+    },
+    {
+      "pattern": "G4/old_number/clock_time",
+      "number": "+15345550173",
+      "detail": "claim None, customer labeled main, vendor"
+    }
+  ],
   "plan": {
     "type": "doc",
     "id": "doc-s0-00042",

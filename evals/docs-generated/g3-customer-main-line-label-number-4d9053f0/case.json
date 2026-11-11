@@ -5,6 +5,18 @@
     "G4/customer_main_line/label_number"
   ],
   "why": "G3/customer_main_line/label_number: shrunk from doc-s0-00231, found by lab docs at seed 0 in 1000 documents",
+  "violations": [
+    {
+      "pattern": "G3/customer_main_line/label_number",
+      "number": "+12015550138",
+      "detail": "claim main, customer labeled main, vendor"
+    },
+    {
+      "pattern": "G4/customer_main_line/label_number",
+      "number": "+12015550138",
+      "detail": "claim main, customer labeled main, vendor"
+    }
+  ],
   "plan": {
     "type": "doc",
     "id": "doc-s0-00231",

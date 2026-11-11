@@ -10,7 +10,7 @@ and needs no key. `--max-usd` is accepted for forward compatibility; the scripte
 label; it exits non-zero on a frozen report that still fails or any reachable-domain violation.
 
 `lab docs` (spec 0052) re-runs the frozen document cases under `--out`, then checks `--examples` generated
-documents (and one world for every ten) at `--seed` through real ingestion with the stub reader, freezes a
+documents (and G7's sweep of worlds) at `--seed` through real ingestion with the stub reader, freezes a
 shrunk case for each new failing pattern, and holds the failing patterns to lab-docs' known-failures list.
 
 `lab fuzz` re-runs every frozen finding under `--out`, then searches `--examples` generated worlds at

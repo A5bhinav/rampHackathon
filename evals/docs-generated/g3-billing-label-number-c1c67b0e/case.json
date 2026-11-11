@@ -4,6 +4,13 @@
     "G3/billing/label_number"
   ],
   "why": "G3/billing/label_number: shrunk from doc-s0-00143, found by lab docs at seed 0 in 1000 documents",
+  "violations": [
+    {
+      "pattern": "G3/billing/label_number",
+      "number": "+18675550141",
+      "detail": "claim billing, None labeled billing, vendor"
+    }
+  ],
   "plan": {
     "type": "doc",
     "id": "doc-s0-00143",
