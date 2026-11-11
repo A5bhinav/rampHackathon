@@ -86,3 +86,20 @@ test("seenBefore names what the cutoff is", () => {
   assert.equal(seenBefore(cutoff, cutoff, "the cutoff"), "with the cutoff");
   assert.equal(seenBefore("2026-11-04T00:00:00Z", cutoff, "the cutoff"), "after the cutoff");
 });
+
+// Two numbers first seen in one source on the same day used to share one spot, and the later dot
+// hid the chosen one (Acme's Contract and Email rows on the vendor page).
+test("lanePoints spreads dots that would cover each other, and draws the chosen dot last", () => {
+  const s = example("picked");
+  const pick = s.candidates[0];
+  s.candidates[1] = { ...s.candidates[1], first_seen_at: pick.first_seen_at, source_types: ["contract", "email"] };
+  const chart = lanePoints(s)!;
+  for (const lane of ["contract", "email"]) {
+    const here = chart.points.filter((p) => p.lane === lane);
+    assert.deepEqual(here.map((p) => p.kind), ["alternate", "pick"], lane);   // drawn in this order: the pick on top
+    assert.equal(here[0].pct, here[1].pct);
+    assert.notEqual(here[0].lift, here[1].lift, `${lane}: the two dots sit at different heights`);
+  }
+  const alone = chart.points.filter((p) => p.lane === "listing");
+  assert.deepEqual(alone.map((p) => p.lift), [0]);                             // a dot on its own stays centered
+});
