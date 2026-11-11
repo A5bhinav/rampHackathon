@@ -16,6 +16,7 @@ import asyncio
 import datetime as dt
 import hmac
 import logging
+import re
 import urllib.parse
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
@@ -127,6 +128,28 @@ def _answered_by(detected: str) -> str | None:
     if detected.startswith("machine") or detected == "fax":
         return "machine"
     return None  # unknown or absent: nothing is claimed, so decide() can't count a live person (V03)
+
+
+# Twilio's documented AnsweredBy values (spec 0080, D3). Only these are logged as they are.
+_DOCUMENTED_ANSWERED_BY = frozenset({"human", "machine_start", "machine_end_beep", "machine_end_silence",
+                                     "machine_end_other", "fax", "unknown"})
+
+
+def _loggable_answered_by(value: str | None) -> str:
+    """The AnsweredBy value for the TwiML fetch's log line: a documented value as it is, "absent"
+    when missing or blank, else "other". The field is data (R9), so only a value from the fixed list
+    or one of the two fixed words reaches the log."""
+    if not value:
+        return "absent"
+    return value if value in _DOCUMENTED_ANSWERED_BY else "other"
+
+
+def _loggable_duration(value: str | None) -> str:
+    """The MachineDetectionDuration value for the same line: one to six ASCII digits as they are,
+    "absent" when missing or blank, else "other"."""
+    if not value:
+        return "absent"
+    return value if re.fullmatch(r"[0-9]{1,6}", value) else "other"
 
 
 def with_connect_facts(body: dict[str, Any], setup: dict[str, Any], result: CallResult) -> None:
@@ -282,6 +305,12 @@ def create_app(*, store: CallStore, internal_api_token: bytes, agent_version: st
             params = await _verified_twilio_params(twilio, request)
             if params is None:
                 return _error(401, "unauthorized", "A valid Twilio signature is required.")
+            # One line per signed fetch, unknown calls included, to tune detection from real calls
+            # (spec 0080, D3). Our path call id and the two detection fields only: never the number,
+            # the token, the CallSid or any other parameter.
+            log.info("twiml fetch for call %s: AnsweredBy=%s MachineDetectionDuration=%s", call_id,
+                     _loggable_answered_by(params.get("AnsweredBy")),
+                     _loggable_duration(params.get("MachineDetectionDuration")))
             dial = await asyncio.to_thread(twilio.lookup_call, call_id)  # a DB read: off the event loop
             if dial is None:
                 return _error(404, "unknown_call", "No such call.")
