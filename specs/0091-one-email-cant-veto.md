@@ -130,6 +130,18 @@ bank's, now gets that reason). The web copy that repeats them follows.
   the plant, the accepted cost above. The test asserts that and cites this spec.
 - 0079's prefix property becomes "a prefix of the new rule".
 - The lab: `I3_nonvendor_or_fax_eligible` follows rule 3; A1's known-failure entries come off.
+- Found while building (this list was short):
+  - **Worlds that no longer withhold:** tests of how `withheld` is handled move to a world that still
+    withholds with both flags on, with their assertions kept: `test_risk.py::test_a_vendor_the_rule_withholds_needs_a_person`,
+    core's `test_api.py::test_the_vendor_risk_list_says_when_a_person_is_needed` and
+    `test_worker.py::test_withheld_selection_goes_to_review`, and 0079's
+    `test_withheld_keeps_contact_point_status` and `test_flag_default_and_unknown_values_give_the_new_rule`.
+  - **Tests that mean spec 0079 alone:** `test_backups_are_cut_to_the_agreed_prefix`,
+    `test_no_pick_today_stays_no_provable_number` and `test_context_that_moves_nothing_changes_nothing`
+    run with the label bar off, and each gains a check with it on.
+  - **The version name:** `test_store.py`'s gate and `corpus-results.json` read `ledger-select-v4`.
+  - **Planted breaks:** two entries in `evals/tests/test_breaks_selection.py` patch the near-miss
+    loop's new key, and are still caught at the same worlds.
 
 ## Out of scope
 
