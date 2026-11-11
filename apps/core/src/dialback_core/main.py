@@ -67,6 +67,51 @@ async def _email_door(settings: Settings, dataset_id: UUID, ramp_vendors: list[s
         await pool.close()
 
 
+async def _copy_vendors(settings: Settings, source: UUID, target: UUID) -> None:
+    """Spec 0103, D5: a fast reset. The new dataset starts from what the old one knew (its vendors, their
+    Ramp accounts, and its poll watermark and sweep time) instead of reading every vendor from Ramp again.
+    Anything Ramp changed since the old dataset last looked is new to the copy too, so it opens a case:
+    the copy can over-report a change, never hide one (R1). An email door's requested accounts have no
+    Ramp id and stay with the old dataset."""
+    pool = await open_pool(settings.database_url, max_size=2)
+    try:
+        async with system_tx(pool) as conn:
+            sets = {r["id"]: r for r in await (await conn.execute(
+                "select id, ramp::text as ramp, retired_at from app.datasets where id = any(%s)", ([source, target],))).fetchall()}
+            if source == target or source not in sets or target not in sets:
+                raise SystemExit("refused: name two different datasets that exist")
+            if sets[target]["retired_at"] is not None:
+                raise SystemExit(f"refused: {target} is retired")
+            if sets[source]["ramp"] != sets[target]["ramp"]:
+                raise SystemExit("refused: the two datasets use different Ramps")
+            if await (await conn.execute("select 1 from app.vendors where dataset_id = %s limit 1", (target,))).fetchone():
+                raise SystemExit(f"refused: {target} already has vendors")
+            vendors = (await conn.execute(
+                """insert into app.vendors (dataset_id, ramp_vendor_id, legal_name, trade_names, tin_hash, ramp_status,
+                          ramp_updated_at, synced_at)
+                   select %s, ramp_vendor_id, legal_name, trade_names, tin_hash, ramp_status, ramp_updated_at, synced_at
+                     from app.vendors where dataset_id = %s""", (target, source))).rowcount
+            accounts = (await conn.execute(
+                """insert into app.bank_accounts (dataset_id, vendor_id, ramp_account_id, routing_number, account_last4,
+                          account_fingerprint, fingerprint_key_version, bank_name, account_type, first_seen_at, last_seen_at,
+                          is_current, ramp_pending)
+                   select %s, nv.id, b.ramp_account_id, b.routing_number, b.account_last4, b.account_fingerprint,
+                          b.fingerprint_key_version, b.bank_name, b.account_type, b.first_seen_at, b.last_seen_at,
+                          b.is_current, b.ramp_pending
+                     from app.bank_accounts b
+                     join app.vendors ov on ov.id = b.vendor_id
+                     join app.vendors nv on nv.dataset_id = %s and nv.ramp_vendor_id = ov.ramp_vendor_id
+                    where b.dataset_id = %s and b.ramp_account_id is not null""", (target, target, source))).rowcount
+            await conn.execute(
+                """insert into app.job_runs (dataset_id, job, last_started_at, last_finished_at, last_ok, last_result, watermark)
+                   select %s, job, last_started_at, last_finished_at, last_ok, last_result, watermark
+                     from app.job_runs where dataset_id = %s and job in ('poll', 'full_sweep')
+                   on conflict (dataset_id, job) do nothing""", (target, source))
+        print(f"copied {vendors} vendors and {accounts} bank accounts")
+    finally:
+        await pool.close()
+
+
 async def _import(settings: Settings, dataset_id: UUID) -> None:
     pool = await open_pool(settings.database_url, max_size=3)
     async with httpx.AsyncClient(timeout=10.0) as http:
@@ -180,6 +225,9 @@ def run() -> None:
                     help="the Ramp this dataset uses, for good (default: the mock, or the sandbox with DIALBACK_RAMP=sandbox)")
     for name in ("import-vendors", "retire-dataset"):
         sub.add_parser(name).add_argument("--dataset", type=UUID, required=True)
+    cv = sub.add_parser("copy-vendors", help="start an empty dataset from another's vendors, without reading Ramp (fast reset)")
+    cv.add_argument("--from", dest="source", type=UUID, required=True)
+    cv.add_argument("--to", dest="target", type=UUID, required=True)
     ed = sub.add_parser("email-door", help="turn the email door on for these vendors of a current demo dataset")
     ed.add_argument("--dataset", type=UUID, required=True)
     ed.add_argument("--ramp-vendor", action="append", required=True, metavar="RAMP_VENDOR_ID")
@@ -225,6 +273,8 @@ def run() -> None:
         asyncio.run(_import(settings, args.dataset))
     elif args.cmd == "retire-dataset":
         asyncio.run(_retire(settings, args.dataset))
+    elif args.cmd == "copy-vendors":
+        asyncio.run(_copy_vendors(settings, args.source, args.target))
     elif args.cmd == "email-door":
         asyncio.run(_email_door(settings, args.dataset, args.ramp_vendor))
     elif args.cmd == "run-job":

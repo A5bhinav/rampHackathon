@@ -30,6 +30,13 @@ None.
   Ramp change (R1), so one vendor takes emails and others take Ramp changes: the setup script gives
   Salesforce the door, and `demo load --no-request salesforce` skips its preloaded request, since
   the live email is the request.
+- **D5. A fast reset.** `dialback-core copy-vendors --from OLD --to NEW` starts an empty, current
+  dataset from what the old one knew: its vendors, their accounts with a Ramp id, and its poll
+  watermark and sweep time. Nothing is read from Ramp, so a reset takes seconds and can't collide with
+  the worker's own read (the first setup's import hit Ramp's rate limit that way). Ramp changes since
+  the old dataset last looked are new to the copy too, so they open cases: the copy can over-report a
+  change, never hide one (R1). An email door's requested accounts have no Ramp id and aren't copied.
+  `setup_sandbox_demo.sh <old id>` uses it.
 
 ## Acceptance
 
@@ -41,6 +48,10 @@ None.
 - [x] The email door turns on only for named, imported vendors of a current demo dataset, and a
       refusal turns nothing on.
 - [x] A vendor can skip its preloaded request.
+- [x] A reset copies the old dataset's vendors and Ramp accounts, not an email door's requested
+      account; what the old dataset knew opens no case, and a new account still does.
+- [x] It copies the poll watermark and sweep time, and refuses the same dataset, a dataset with
+      vendors, a retired one and one on a different Ramp.
 
 ## Tests
 
@@ -49,6 +60,8 @@ None.
 | 1 | `supabase/tests/016_dataset_ramp.sql`, `apps/core/tests/test_ramp_sandbox.py` |
 | 2-4, 6 | `packages/ledger/tests/test_demo.py::test_a_real_vendor_*`, `::test_real_vendors_*`, `::test_a_vendor_can_skip_its_request` |
 | 5 | `apps/core/tests/test_ramp_sandbox.py::test_email_door_*` |
+| 7 | `apps/core/tests/test_pending_bank_change.py::test_a_reset_copies_what_the_old_dataset_knew` |
+| 8 | `apps/core/tests/test_ramp_sandbox.py::test_copy_vendors_*` |
 
 ## Commands
 
