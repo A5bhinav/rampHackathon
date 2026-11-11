@@ -39,7 +39,8 @@ def build(scenarios_dir: Path, *, examples: int, seed: int, commit: str) -> dict
             "total": len(results),
             "passed": sum(r.passed for r in results),
             "scenarios": [{"id": r.scenario_id, "class": r.scenario_class, "attack": r.is_attack, "outcome": r.outcome,
-                           "passed": r.passed, "rule": deciding_rule(r.outcome, r.rules_fired)} for r in results],
+                           "passed": r.passed, "rule": deciding_rule(r.outcome, r.rules_fired),
+                           "declared": list(r.declared)} for r in results],
         },
         "fuzz": {"seed": seed, "budget": examples, "worlds": len(arc.worlds), "hits": hits},
     }

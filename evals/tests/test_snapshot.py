@@ -28,7 +28,10 @@ def test_the_voice_results_match_a_real_run():  # L1
     assert len(voice["scenarios"]) == card["total"]
     assert sorted(s["id"] for s in voice["scenarios"] if not s["passed"]) == sorted(card["hard_gate_failures"])
     assert {s["outcome"] for s in voice["scenarios"]} <= {"verified", "not_verified", "needs_review"}
-    assert set(voice["scenarios"][0]) == {"id", "class", "attack", "outcome", "passed", "rule"}
+    assert set(voice["scenarios"][0]) == {"id", "class", "attack", "outcome", "passed", "rule", "declared"}
+    # A verdict resting on a fact production never computes measures a stand-in (spec 0048, A3), so the page marks it.
+    assert {s["id"]: s["declared"] for s in voice["scenarios"] if s["declared"]} == \
+        {d["scenario"]: d["declared"] for d in card["declared"]}
 
 
 def test_the_deciding_rule_skips_the_not_met_marker():  # L1
@@ -54,6 +57,12 @@ def test_the_fuzz_results_match_the_archive_search():  # L1
 def test_the_file_holds_no_number_digits_or_transcript():  # L2
     text = json.dumps(_doc())
     assert re.search(r"\+?\d{7,}", text) is None, "nothing long enough to be a phone or account number"
+    assert "transcript" not in text and "account_last4" not in text
+
+
+def test_the_committed_file_holds_no_number_digits_or_transcript():  # L2 (review fix)
+    text = (ROOT / "apps" / "web" / "src" / "data" / "lab-results.json").read_text()
+    assert re.search(r"\+?\d[\d\-.() ]{5,}\d", text) is None, "nothing shaped like a phone or account number"
     assert "transcript" not in text and "account_last4" not in text
 
 
