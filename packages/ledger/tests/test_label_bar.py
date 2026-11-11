@@ -9,10 +9,16 @@ Weaker labels are ignored: they neither veto nor support.
 Most of these tests run the rule alone, `_select_rule(label_bar=True)`, without spec 0079's guard
 around it. The last sections run `select()`, the guard around it, under the two flags (rules 5 to 7).
 """
+import asyncio
 import datetime as dt
+import uuid
 
+import psycopg
 import pytest
-from _world import REQUEST, T0, at, calls, corpus_world, flags, frozen, in_thread, provable, run, world
+from _world import REQUEST, T0, at, calls, corpus_world, flags, frozen, in_thread, provable, run, source_doc, world
+from dialback_ledger import select_number
+from dialback_ledger.ingest import ingest_all
+from dialback_ledger.reader import StubReader
 from dialback_ledger.select import (
     NO_REQUEST,
     RULE_VERSION,
@@ -25,10 +31,13 @@ from dialback_ledger.select import (
     active_rule_version,
     change_context_documents,
 )
+from dialback_ledger.store import add_vendor_domain, mark_change_request, write_ingest
 from hypothesis import example, given, settings
+from psycopg.rows import dict_row
 from test_demo_picks import STORIES, demo_world
 from test_select_corpus import TRUTHS
 from test_select_properties import any_rows
+from test_store import new_vendor, open_case
 
 REAL, PLANTED = "+14155550142", "+16455550177"   # the vendor's line; a provable number someone planted
 P = "+14155550143"                               # one digit off REAL
@@ -447,3 +456,45 @@ def test_corpus_and_demo_worlds_are_todays(build):
                if s.visibility == "visible" and (s.party != "vendor" or s.role.strip().lower() == "fax")]
     assert against == [], "the premise: no visible label against any number"
     assert without(inner(w), VERSION_FIELDS) == without(frozen(w), VERSION_FIELDS)
+
+
+# Storage: a weak label doesn't opt the real line out (FINDINGS A26) ------------------------------------
+
+def a1_documents(now: dt.datetime) -> list[dict]:
+    """FINDINGS A1 as source documents: REAL and PLANTED are each provable, and the request labels REAL a bank's line."""
+    days = lambda n: now - dt.timedelta(days=n)
+    return [
+        source_doc("real-contract", "contract", days(200), ["Master supply agreement: Acme", "Accounts receivable: (415) 555-0142"]),
+        source_doc("real-listing", "listing", days(200), ["Acme Fasteners", "Accounts receivable: (415) 555-0142"]),
+        source_doc("planted-contract", "contract", days(150), ["Supply agreement: Acme", "Accounts receivable: (645) 555-0177"]),
+        source_doc("planted-listing", "listing", days(150), ["Acme Fasteners, west office", "Accounts receivable: (645) 555-0177"]),
+        source_doc("request", "email", now - dt.timedelta(hours=1),
+                   ["Please update our bank details for future payments.", "Bank verification line: (415) 555-0142"],
+                   sender="ar@acme.example", thread="thr-request", subject="Updated banking details"),
+    ]
+
+
+def test_weak_label_keeps_contact_point_eligible(database_url):
+    # DIALBACK_LABEL_BAR is left as the environment has it, so running this with it set to off shows it failing.
+    v = new_vendor(database_url, "Acme Fasteners")
+    now = dt.datetime.now(dt.UTC)
+
+    async def load():
+        async with await psycopg.AsyncConnection.connect(database_url) as conn, conn.transaction():
+            await write_ingest(conn, dataset_id=v["dataset_id"], vendor_id=v["vendor_id"],
+                               result=ingest_all(a1_documents(now), extractor_version="test", reader=StubReader()))
+            await add_vendor_domain(conn, dataset_id=v["dataset_id"], vendor_id=v["vendor_id"], domain="acme.example")
+            await mark_change_request(conn, dataset_id=v["dataset_id"], vendor_id=v["vendor_id"], document_id="request")
+    asyncio.run(load())
+    case = open_case(database_url, v)
+    got = asyncio.run(select_number(case_id=case, dataset_id=v["dataset_id"], vendor_id=v["vendor_id"],
+                                    cutoff=dt.datetime.now(dt.UTC), database_url=database_url))
+    with psycopg.connect(database_url, row_factory=dict_row) as c:
+        points = {r["e164"]: r for r in c.execute("select * from ledger.contact_points where dataset_id = %s and vendor_id = %s",
+                                                  (v["dataset_id"], v["vendor_id"])).fetchall()}
+        parties = [r["party"] for r in c.execute("select party from ledger.observations where dataset_id = %s and value_normalized = %s",
+                                                 (v["dataset_id"], REAL)).fetchall()]
+    assert "bank" in parties, "the label has to reach the rule, or this test proves nothing"
+    assert (points[REAL]["status"], points[REAL]["exclusion_reason"]) == ("eligible", None), "FINDINGS A26"
+    assert uuid.UUID(str(points[REAL]["id"])) == uuid.UUID(got["contact_point_id"])   # and the call goes to it
+    assert got["rule_version"] == RULE_VERSION
