@@ -162,8 +162,10 @@ None.
   missing), and treat `BILL_PAY_7284` as the hold being on; then the worker's quick read-backs
   would pass at once, with no change to the worker. Built as D5: the worker's own read-back
   (`Worker._read_back_hold`) now passes on its first read against a fake whose audit log is ten
-  reads behind, and misses without the status (`test_the_workers_own_read_back_*`). Still to see
-  on the sandbox: run the hold check again.
+  reads behind, and misses without the status (`test_the_workers_own_read_back_*`). **Seen on the
+  sandbox, 2026-11-10 (fourth hold-check run):** the hold and the release each read back on the
+  first read (2.4 and 2.9 seconds, the length of that read), while the audit log showed neither yet;
+  the second hold's 400 read as on; the date came back. One vendor, one run: confirmed, not general.
 - **Q207:** Ramp issued a token for a scope the app isn't allowed (`bills:write`) and refused only
   the call (HTTP 403). The core's login doesn't compare what Ramp granted with what it needs, so a
   sandbox dataset missing `bills:write` would hold and call normally, then fail every release when
