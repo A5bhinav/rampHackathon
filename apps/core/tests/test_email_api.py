@@ -108,14 +108,22 @@ async def test_no_mail_response_holds_a_body_or_full_number(world):
     await change_and_detect(world)
     case = await case_of(world)
     planted = f"{BODY_MARKER} {ACCOUNT}"
-    await put(world.pool, world.dataset.id, 1, outcome="case_opened", flagged=True, vendor_id=v["id"], last4=ACCOUNT[-4:],
-              routing_number="026009593", subject="new details", case_id=case["id"], change_event_id=case["change_event_id"],
-              message_id=planted, thread_id=planted, sender_domain=planted, raw_sha256=planted, error=planted)
-    stored = await one(world.pool, "select count(*) as n from app.inbound_emails e where e::text like %s", f"%{planted}%")
-    assert stored["n"] == 1, "the planted values are there to leak"
-    mail = await world.core.get(MAIL.format(dataset_id=world.dataset.id), headers=token(world.users["clerk"]))
-    detail = await world.core.get(CASE.format(case_id=case["id"]), headers=token(world.users["clerk"]))
-    assert detail.json()["change"]["email"]["subject"] == "new details", "the case shows this row's email"
-    for r in (mail, detail):
-        assert r.status_code == 200 and BODY_MARKER not in r.text and ACCOUNT not in r.text
-    assert all("body" not in i and "text" not in i for i in mail.json()["items"])
+    row_id = await put(world.pool, world.dataset.id, 1, outcome="case_opened", flagged=True, vendor_id=v["id"],
+                       last4=ACCOUNT[-4:], routing_number="026009593", subject="new details", case_id=case["id"],
+                       change_event_id=case["change_event_id"], message_id=planted, thread_id=planted,
+                       sender_domain=planted, raw_sha256=planted, error=planted)
+    try:
+        stored = await one(world.pool, "select count(*) as n from app.inbound_emails e where e::text like %s", f"%{planted}%")
+        assert stored["n"] == 1, "the planted values are there to leak"
+        mail = await world.core.get(MAIL.format(dataset_id=world.dataset.id), headers=token(world.users["clerk"]))
+        detail = await world.core.get(CASE.format(case_id=case["id"]), headers=token(world.users["clerk"]))
+        assert detail.json()["change"]["email"]["subject"] == "new details", "the case shows this row's email"
+        for r in (mail, detail):
+            assert r.status_code == 200 and BODY_MARKER not in r.text and ACCOUNT not in r.text
+        assert all("body" not in i and "text" not in i for i in mail.json()["items"])
+    finally:
+        # The tests share one database, and every door test's assert_nowhere scans all of it for this full number:
+        # the planted values must not outlive this test. The service role may not delete mail rows, so blank them.
+        async with system_tx(world.pool) as conn:
+            await conn.execute("update app.inbound_emails set message_id = null, thread_id = null, sender_domain = null, "
+                               "raw_sha256 = null, error = null where id = %s", (row_id,))
