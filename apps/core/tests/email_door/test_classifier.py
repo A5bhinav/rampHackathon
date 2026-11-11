@@ -224,7 +224,7 @@ def test_the_schema_and_the_system_prompt_are_fixed_constants():
     assert "Every digit in the email was replaced with #" in prompt
     assert "a short exact quote from the email that shows the request" in prompt
     assert "empty when change_request is false" in prompt
-    assert MODEL == "claude-haiku-5-5"
+    assert MODEL == "claude-opus-5-5"   # Sami's choice after the heldout4 re-test (spec 0086)
 
 
 def test_the_prompt_says_the_sender_may_be_anyone():
@@ -310,10 +310,10 @@ FAILURES = [
 ]
 
 
-SHIPPED_AND_OPUS = ["claude-haiku-5-5", "claude-opus-5-5"]   # the shipped default, and the explicit option
+BOTH_MODELS = ["claude-opus-5-5", "claude-haiku-5-5"]   # the shipped default, and the explicit option
 
 
-@pytest.mark.parametrize("model", SHIPPED_AND_OPUS)
+@pytest.mark.parametrize("model", BOTH_MODELS)
 @pytest.mark.parametrize("what, outcome, reason", FAILURES, ids=[f[0] for f in FAILURES])
 def test_every_failure_is_one_typed_error_without_email_text(what, outcome, reason, model, caplog):
     caplog.set_level(logging.DEBUG)
@@ -365,7 +365,7 @@ def api_body(text: str) -> dict:
             "stop_reason": "end_turn", "stop_sequence": None, "usage": {"input_tokens": 10, "output_tokens": 5}}
 
 
-@pytest.mark.parametrize("model", SHIPPED_AND_OPUS)
+@pytest.mark.parametrize("model", BOTH_MODELS)
 def test_the_real_sdk_sends_the_pinned_request_to_the_pinned_host(monkeypatch, model):
     monkeypatch.setenv("ANTHROPIC_BASE_URL", "https://elsewhere.example")
     monkeypatch.setenv("ANTHROPIC_AUTH_TOKEN", "token-from-the-environment")
@@ -566,10 +566,10 @@ def test_haiku_uses_the_plain_endpoint_without_betas_or_fallbacks():
     assert sent["output_config"] == {"effort": "medium", "format": {"type": "json_schema", "schema": SCHEMA}}
 
 
-def test_the_default_model_is_haiku_on_the_plain_endpoint_and_opus_keeps_the_beta_request():
+def test_the_default_model_is_opus_on_the_beta_request():
     client = FakeBothEndpoints(message(reply(False, "")))
     AnthropicClassifier(client).classify("S", "T")
-    assert client.calls == [] and client.plain_calls[0]["model"] == MODEL == "claude-haiku-5-5"
+    assert client.plain_calls == [] and client.calls[0]["model"] == MODEL == "claude-opus-5-5"
     client = FakeBothEndpoints(message(reply(False, "")))
     AnthropicClassifier(client, model="claude-opus-5-5").classify("S", "T")
     assert client.plain_calls == []

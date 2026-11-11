@@ -24,7 +24,7 @@ import httpx2
 from anthropic.types import Message
 from anthropic.types.beta import BetaMessage
 
-MODEL = "claude-haiku-5-5"   # pinned here and nowhere else (the production default; Opus is an explicit option)
+MODEL = "claude-opus-5-5"   # pinned here and nowhere else (Sami's choice: it met the heldout4 bar, Haiku missed by one; spec 0086)
 API_BASE_URL = "https://api.anthropic.com"   # pinned: no host setting can send email text elsewhere
 EFFORT = "medium"            # set explicitly; no `thinking` setting: thinking tokens count against max_tokens
 MAX_TOKENS = 8192            # thinking tokens count against it
