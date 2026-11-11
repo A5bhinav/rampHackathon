@@ -145,7 +145,15 @@ Specs: 0017 (voice slice lab), 0083 (generative selection pressure; 0033 before 
       rule applies; no third fix tried. Otherwise W3 matches W2's results, gives today's output on
       all 441 label-free worlds, and fails only the three spec 0021 tests that encode the old veto
       (on the reason; the number is still refused).
-  - **Spec 0090** (`sami/label-bar-spec`) writes up W3 inside spec 0079's guard (WG3).
+    - **W4** (Sami's go-ahead, after a builder check of the spec): W3's vendor-only support had also
+      fed the near-miss check, so a real line whose oldest sightings carry a label (the stub
+      reader's party `unknown` on a plain "Tel:" line) stopped anchoring a planted number one digit
+      off it, which got called (reproduced; spec 0021's properties 5 and 6 broke). W4 keeps today's
+      first sighting for the near-miss check and the displayed date. Those worlds call nobody again;
+      K1 37 of 2000 (28 distinct); calls nobody 743; on the guarded rule that would ship, the label
+      probe 0, `M_lookalike_helped` 0, `M_shared_id_helped` 271 (today 230), all 41 extra worlds
+      from duplicate ids (A5).
+  - **Spec 0091** (`sami/label-bar-spec`) writes up W4 inside spec 0079's guard.
 - **Open question:** whether such documents reach `select()` depends on how ingestion attaches
   documents to a vendor (`ledger.documents.vendor_id`), which nobody has traced.
 
