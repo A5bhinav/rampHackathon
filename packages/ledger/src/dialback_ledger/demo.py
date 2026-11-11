@@ -1,8 +1,14 @@
 """`dialback-ledger demo`: the demo's Trust Ledger (spec 0025, Q36 and Q37).
 
-    dialback-ledger demo load [--dataset ID] [--phone REF=+1...]... [--with-requests]
+    dialback-ledger demo load [--dataset ID] [--phone REF=+1...]... [--with-requests] [--pdf [DIR]]
     dialback-ledger demo request --vendor REF [--dataset ID]
     dialback-ledger read-pdf FILE
+
+`--pdf` (spec 0092) reads each vendor's history from real PDFs instead of the JSON: the committed ones, or the
+ones in DIR. It writes the same observations, apart from each document's hash and `extractor_version`. A team
+phone is rendered into the PDFs (`lab pdf render --demo --phone REF=+1... --out DIR`), so `--pdf` with `--phone`
+is refused, and so is a DIR under `DIALBACK_READER=llm`: a team phone never reaches a model (spec 0049). The
+change request stays JSON: it's an email.
 
 `read-pdf FILE` (spec 0092) prints each line of a real PDF with its visibility, then the phone numbers code
 found in it. It labels and stores nothing.
@@ -37,7 +43,7 @@ import psycopg
 from psycopg.rows import dict_row
 
 from .custody import document_sha256
-from .flags import reader_mode
+from .flags import ReaderMode, reader_mode
 from .ingest import IngestResult, ingest_all
 from .reader import Reader, ReaderFailed, ReaderUnavailable, reader_for
 from .store import add_vendor_domain, mark_change_request, stored_id, write_ingest
@@ -49,6 +55,11 @@ class DemoError(Exception):
 
 def load_seed() -> dict:
     return json.loads(files(__package__).joinpath("demo_seed.json").read_text(encoding="utf-8"))
+
+
+def committed_pdfs() -> Path:
+    """The demo seed's history as PDFs, fictional numbers only (spec 0092); `lab pdf render --check` keeps them current."""
+    return Path(str(files(__package__).joinpath("demo_pdfs")))
 
 
 def _when(s: str) -> dt.datetime:
@@ -77,7 +88,7 @@ def _swap_text(text: str, swap: tuple[str, str]) -> str:
     return text
 
 
-def _with_phone(doc: dict, swap: tuple[str, str]) -> dict:
+def with_phone(doc: dict, swap: tuple[str, str]) -> dict:
     """A copy of `doc` with the team phone in its text: what the stored rows describe."""
     d = copy.deepcopy(doc)
     for page in d["pages"]:
@@ -86,22 +97,29 @@ def _with_phone(doc: dict, swap: tuple[str, str]) -> dict:
     return d
 
 
-def labeled(documents: list[dict], reader: Reader, swap: tuple[str, str] | None = None) -> IngestResult:
+def labeled(documents: list[dict], reader: Reader, swap: tuple[str, str] | None = None,
+            pdfs: dict[str, bytes] | None = None) -> IngestResult:
     """Ingest documents with `reader`, storing its version as `extractor_version`. The reader sees
     the documents as the seed wrote them, so a team phone never reaches a model (spec 0049, decision
     5). With `swap` = (fictional AR line, team phone), the team phone then goes into the rows: the
     numbers, the quotes and the documents' hashes, exactly as if it had been in the text.
 
-    A document the reader can't label stops everything (spec 0049, decision 4): the DemoError rolls
-    back the caller's transaction, so nothing is written."""
+    With `pdfs` (by document id) each document is read from its PDF (spec 0092).
+
+    A document the reader can't label, or a PDF it refuses, stops everything (spec 0049, decision 4):
+    the DemoError rolls back the caller's transaction, so nothing is written."""
+    failures: tuple[type[Exception], ...] = (ReaderFailed,)
+    if pdfs is not None:
+        from .pdf import PdfRefused
+        failures += (PdfRefused,)
     try:
-        result = ingest_all(documents, extractor_version=reader.version, reader=reader)
-    except ReaderFailed as exc:
+        result = ingest_all(documents, extractor_version=reader.version, reader=reader, pdfs=pdfs)
+    except failures as exc:
         raise DemoError(f"{exc}; nothing was written") from None
     if swap is None:
         return result
     old, new = swap
-    hashes = {d["id"]: document_sha256(_with_phone(d, swap)) for d in documents}
+    hashes = {d["id"]: document_sha256(with_phone(d, swap)) for d in documents}
     for row in result.documents:
         row["sha256"] = hashes[row["id"]]
     for o in result.observations:
@@ -122,7 +140,7 @@ def _reader(reader: Reader | None) -> Reader:
         raise DemoError(str(exc)) from None
 
 
-def _phones(given: dict[str, str], seed: dict) -> dict[str, str]:
+def team_phones(given: dict[str, str], seed: dict) -> dict[str, str]:
     out = {}
     for ref, raw in given.items():
         if ref not in seed["vendors"]:
@@ -137,15 +155,35 @@ def _phones(given: dict[str, str], seed: dict) -> dict[str, str]:
     return out
 
 
-def check(phones: dict[str, str], requests: list[str]) -> dict[str, str]:
-    """Every check `load --phone` and `request --vendor` make, without touching a database, so a caller
-    (`dialback-core demo prepare`) can refuse before it resets anything. Returns the phones in E.164."""
+def _is_committed(pdf: Path) -> bool:
+    return pdf.resolve() == committed_pdfs().resolve()
+
+
+def _check_pdf(pdf: Path, phones: dict[str, str], seed: dict) -> None:
+    """Every check `--pdf` makes (spec 0092, D9), before anything is written."""
+    if phones:
+        raise DemoError("--pdf with --phone: the phone is already in the PDFs "
+                        "(render them with `lab pdf render --demo --phone REF=+1... --out DIR`)")
+    if reader_mode() is ReaderMode.LLM and not _is_committed(pdf):
+        raise DemoError("--pdf DIR under DIALBACK_READER=llm: a folder given at run time may hold a team phone, and a "
+                        "team phone never reaches a model (spec 0049); use the stub reader, or the committed PDFs")
+    for v in seed["vendors"].values():
+        for d in v["documents"]:
+            if not (pdf / f"{d['id']}.pdf").is_file():
+                raise DemoError(f"--pdf {pdf}: no PDF for document {d['id']}")
+
+
+def check(phones: dict[str, str], requests: list[str], pdf: Path | None = None) -> dict[str, str]:
+    """Every check `load --phone`, `load --pdf` and `request --vendor` make, without touching a database, so a
+    caller (`dialback-core demo prepare`) can refuse before it resets anything. Returns the phones in E.164."""
     _reader(None)                    # DIALBACK_READER=llm without its key refuses here too (spec 0049)
     seed = load_seed()
     for ref in requests:
         if ref not in seed["vendors"]:
             raise DemoError(f"the demo seed has no vendor {ref!r} (it has {', '.join(seed['vendors'])})")
-    return _phones(phones, seed)
+    if pdf is not None:
+        _check_pdf(pdf, phones, seed)
+    return team_phones(phones, seed)
 
 
 async def _dataset(conn: psycopg.AsyncConnection, dataset_id: UUID | None, seed: dict) -> tuple[UUID, dict[str, UUID]]:
@@ -196,12 +234,16 @@ def _url(database_url: str | None) -> str:
 
 
 async def load(database_url: str | None = None, *, phones: dict[str, str], dataset_id: UUID | None = None,
-               with_requests: bool = False, now: dt.datetime | None = None, reader: Reader | None = None) -> dict:
+               with_requests: bool = False, now: dt.datetime | None = None, reader: Reader | None = None,
+               pdf: Path | None = None) -> dict:
     """Write each seeded vendor's history and domain (and, with `with_requests`, its request).
-    `reader` defaults to the one DIALBACK_READER names."""
+    `reader` defaults to the one DIALBACK_READER names. With `pdf`, the history is read from the PDFs in
+    that folder (spec 0092)."""
     reader = _reader(reader)
     seed = load_seed()
-    swaps = _phones(phones, seed)
+    if pdf is not None:
+        _check_pdf(pdf, phones, seed)
+    swaps = team_phones(phones, seed)
     now = now or dt.datetime.now(dt.UTC)
     delta = now - _when(seed["anchor"])
     summary = {}
@@ -213,11 +255,14 @@ async def load(database_url: str | None = None, *, phones: dict[str, str], datas
             loaded = await (await conn.execute("select 1 from ledger.documents where id = %s",
                                                (stored_id(ds, v["documents"][0]["id"]),))).fetchone()
             docs = [_prepare(d, delta) for d in v["documents"]]
-            n = await write_ingest(conn, dataset_id=ds, vendor_id=vendor_id, result=labeled(docs, reader, swap))
+            pdfs = {d["id"]: (pdf / f"{d['id']}.pdf").read_bytes() for d in docs} if pdf is not None else None
+            n = await write_ingest(conn, dataset_id=ds, vendor_id=vendor_id, result=labeled(docs, reader, swap, pdfs))
             await add_vendor_domain(conn, dataset_id=ds, vendor_id=vendor_id, domain=v["domain"])
             requested = with_requests and await _request(conn, seed, ds, ref, vendor_id, now, reader)
             # A reload adds nothing, so a different --phone can't take effect: say so (reset to change it).
             phone = "already loaded: unchanged" if loaded else ("team" if swap else "fictional")
+            if not loaded and pdf is not None and not _is_committed(pdf):
+                phone = "from the PDFs"
             summary[ref] = {"observations": n, "request": requested, "phone": phone}
     return {"dataset_id": str(ds), "vendors": summary}
 
@@ -278,6 +323,8 @@ def main(argv: list[str] | None = None) -> int:
     ld.add_argument("--dataset", type=UUID)
     ld.add_argument("--phone", type=_pair, action="append", default=[], metavar="REF=+1...")
     ld.add_argument("--with-requests", action="store_true", help="also load every change request (rehearsals)")
+    ld.add_argument("--pdf", nargs="?", const="", default=None, metavar="DIR",
+                    help="read the history from real PDFs: the committed ones, or those in DIR (spec 0092)")
     rq = demo.add_parser("request", help="the change-request email for one vendor (beat 2)")
     rq.add_argument("--vendor", required=True)
     rq.add_argument("--dataset", type=UUID)
@@ -286,7 +333,8 @@ def main(argv: list[str] | None = None) -> int:
         return read_pdf_command(args.file)
     try:
         if args.action == "load":
-            out = asyncio.run(load(phones=dict(args.phone), dataset_id=args.dataset, with_requests=args.with_requests))
+            pdf = None if args.pdf is None else (Path(args.pdf) if args.pdf else committed_pdfs())
+            out = asyncio.run(load(phones=dict(args.phone), dataset_id=args.dataset, with_requests=args.with_requests, pdf=pdf))
             print(f"loaded the demo ledger into {out['dataset_id']}")
             for ref, s in out["vendors"].items():
                 print(f"  {ref:<11} {s['observations']:>3} new sightings, AR line: {s['phone']}"

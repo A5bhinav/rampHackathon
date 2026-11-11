@@ -34,6 +34,8 @@ jobs:
         run: uv run --no-project --with ruff ruff check apps packages scripts corpus evals
       - name: Corpus (frozen truth, spec 0020)
         run: python3 corpus/generator/build.py --check && uv run --no-project --with pytest pytest -q corpus/generator
+      - name: The demo's PDFs (committed files match the renderer, spec 0092)
+        run: uv run lab pdf render --check
       - name: Decision engine
         run: cd packages/decision && uv run pytest -q
       - name: Trust Ledger (selection rule against the frozen corpus)

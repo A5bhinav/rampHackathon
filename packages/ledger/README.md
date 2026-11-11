@@ -22,6 +22,7 @@ including the decision of which number to call.
 | Vendor risk list | `risk.py`, `apps/web/…/risk` | 0026 |
 | The LLM reader (`DIALBACK_READER=llm`, default `stub`) and its evaluation script | `llm_reader.py`, `scripts/reader_eval.py` | 0049 |
 | Real digital PDFs: read into the page model with visibility per character (`no_ink` included), `ingest_pdf`, `dialback-ledger read-pdf FILE` | `pdf.py`, `ingest.py` | 0092 (Part A) |
+| The demo's ledger from real PDFs: `dialback-ledger demo load --pdf [DIR]` | `demo.py`, `demo_pdfs/` | 0092 (Part A) |
 
 Not built yet: the LLM reader's prompt work against real documents and its scored run (the
 100-document labeled set, spec 0049; the reader is built and tested on a faked API only), scans

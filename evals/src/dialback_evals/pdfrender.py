@@ -27,6 +27,7 @@ import math
 import re
 from pathlib import Path
 
+import dialback_ledger
 import reportlab
 from PIL import Image
 from reportlab.lib.colors import PCMYKColorSep
@@ -38,6 +39,7 @@ from reportlab.pdfgen import canvas
 
 FONT_PATH = Path(reportlab.__file__).resolve().parent / "fonts" / "Vera.ttf"
 TRICKS = ("cover_rect", "cover_image", "invisible", "clipped")
+DEMO_PDFS = Path(dialback_ledger.__file__).resolve().parent / "demo_pdfs"   # the committed demo PDFs (D9)
 ANNOTATIONS = ("text", "link", "freetext")
 PAD = 1.0          # points around a span's box that a cover or a shape under it reaches
 _COLOR = re.compile(r"#([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})")
@@ -202,3 +204,16 @@ def render_pdf(document: dict, *, font_path: Path = FONT_PATH, compress: bool = 
         c.showPage()
     c.save()
     return buf.getvalue()
+
+
+def render_demo(swaps: dict[str, str] | None = None) -> dict[str, bytes]:
+    """The demo seed's history documents as PDFs, by file name (D9); `swaps` puts a team phone in place of a
+    vendor's fictional AR line (ref to E.164). The change requests stay JSON: they're emails. Uncompressed, so
+    the bytes don't depend on the machine's zlib and `lab pdf render --check` holds everywhere."""
+    from dialback_ledger.demo import load_seed, with_phone
+    out = {}
+    for ref, vendor in load_seed()["vendors"].items():
+        swap = (vendor["phones"]["ar"], swaps[ref]) if swaps and ref in swaps else None
+        for doc in vendor["documents"]:
+            out[f"{doc['id']}.pdf"] = render_pdf(with_phone(doc, swap) if swap else doc, compress=False)
+    return out

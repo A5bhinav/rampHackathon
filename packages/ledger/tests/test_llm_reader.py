@@ -354,7 +354,7 @@ def test_swapping_the_rows_matches_swapping_the_text():
     # Swapping it into the rows afterward must store exactly the same rows.
     for ref, v in demo.load_seed()["vendors"].items():
         swap = (v["phones"]["ar"], TEAM)
-        before = ingest_all([demo._with_phone(d, swap) for d in v["documents"]], extractor_version="stub",
+        before = ingest_all([demo.with_phone(d, swap) for d in v["documents"]], extractor_version="stub",
                             reader=StubReader())
         after = demo.labeled(v["documents"], StubReader(), swap)
         assert (after.documents, after.observations) == (before.documents, before.observations), ref
