@@ -534,3 +534,116 @@ def test_schema_is_found_from_the_package(tmp_path):
     assert schema_path(deeper) == schema_path()
     with pytest.raises(FileNotFoundError, match="selection.schema.json"):
         schema_path(tmp_path)
+
+
+# Spec 0091, rule 3: a label against a number refuses it only when established, so I3 fires only then.
+# The facts belong to the labeling document, and "the request" is the earlier of the requested cutoff
+# and the request's receipt.
+
+I3 = "I3_nonvendor_or_fax_eligible"
+BANK = {"party": "bank"}
+
+
+def _i3_if_eligible(world) -> bool:
+    """Does I3 fire when `NUM` is made to read eligible, whatever the rule found?"""
+    return I3 in violations(world, _rewrite(run(world), NUM, eligible=True, reasons=[]))
+
+
+def _labels(*sightings: SightingSpec, **knobs):
+    return make_world(numbers=[NumberSpec(NUM, [], 0, sightings=sightings)], **knobs)
+
+
+def test_i3_ignores_a_weak_label():
+    num = NumberSpec(NUM, [], 0, sightings=(SightingSpec("contract", 400), SightingSpec("listing", 400),
+                                            SightingSpec("listing", 20, party="bank")))
+    world = make_world(numbers=[num])
+    out = run(world)
+    assert out["e164"] == NUM                       # the rule calls it, and the fresh label may not stop that
+    assert I3 not in violations(world, out)
+
+
+def test_i3_flags_an_established_label():
+    num = NumberSpec(NUM, [], 0, sightings=(SightingSpec("contract", 400), SightingSpec("listing", 400),
+                                            SightingSpec("contract", 200, party="bank"),
+                                            SightingSpec("listing", 100, role="fax")))
+    world = make_world(numbers=[num])
+    honest = run(world)
+    assert honest.get("e164") is None and I3 not in violations(world, honest)
+    assert I3 in violations(world, _rewrite(honest, NUM, eligible=True, reasons=[]))
+
+
+OLD_LABEL = SightingSpec("contract", 200, **BANK)
+
+
+@pytest.mark.parametrize("world", [
+    pytest.param(_labels(OLD_LABEL, SightingSpec("contract", 100, **BANK)), id="one-channel"),
+    pytest.param(_labels(SightingSpec("contract", 89, **BANK), SightingSpec("listing", 89, **BANK)), id="a-day-too-young"),
+    pytest.param(_labels(OLD_LABEL, SightingSpec("vendor_master", 200, **BANK)), id="non-counting-channel"),
+    pytest.param(_labels(OLD_LABEL, SightingSpec("email", 200, sender="other", **BANK)), id="another-domains-email"),
+    pytest.param(_labels(OLD_LABEL, SightingSpec("listing", 200, sender="lookalike", **BANK)), id="lookalike-sender"),
+    pytest.param(_labels(OLD_LABEL, SightingSpec("email", 0, on_request=True, **BANK)), id="the-request"),
+    pytest.param(_labels(OLD_LABEL, SightingSpec("listing", 200, in_thread=True, **BANK)), id="its-thread"),
+    pytest.param(_labels(OLD_LABEL, SightingSpec("listing", 30, subject="same", **BANK)), id="its-subject-at-the-window"),
+    pytest.param(_labels(OLD_LABEL, SightingSpec("listing", 30, subject="re", **BANK)), id="a-reply-to-its-subject"),
+    pytest.param(_labels(OLD_LABEL, SightingSpec("listing", 0, after_request=True, **BANK)), id="after-the-request"),
+    pytest.param(_labels(OLD_LABEL, SightingSpec("listing", 10, **BANK), cutoff_lead_days=30), id="after-the-cutoff"),
+    pytest.param(_labels(SightingSpec("contract", 119, **BANK), SightingSpec("listing", 119, **BANK), cutoff_lead_days=30),
+                 id="too-young-from-the-cutoff"),
+    pytest.param(_labels(OLD_LABEL, SightingSpec("listing", 200, visibility="white", **BANK)), id="hidden-text"),
+    pytest.param(_labels(OLD_LABEL, SightingSpec("listing", 200, recorded_late=True, **BANK)), id="recorded-late"),
+    pytest.param(_labels(OLD_LABEL, SightingSpec("listing", 200), SightingSpec("email", 200)), id="the-rest-are-the-vendors"),
+    pytest.param(_labels(OLD_LABEL, SightingSpec("listing", 200, **BANK), request_present=False), id="no-request"),
+])
+def test_i3_stays_quiet_on_a_label_that_is_not_established(world):
+    assert not _i3_if_eligible(world)
+
+
+@pytest.mark.parametrize("world", [
+    pytest.param(_labels(SightingSpec("contract", 90, **BANK), SightingSpec("listing", 90, **BANK)), id="at-the-age-bar"),
+    pytest.param(_labels(OLD_LABEL, SightingSpec("listing", 1, **BANK)), id="only-the-earliest-is-old"),
+    pytest.param(_labels(OLD_LABEL, SightingSpec("listing", 31, subject="same", **BANK)), id="its-subject-past-the-window"),
+    pytest.param(_labels(OLD_LABEL, SightingSpec("email", 200, **BANK)), id="the-vendors-own-email"),
+    pytest.param(_labels(OLD_LABEL, SightingSpec("email", 200, sender="subdomain", **BANK)), id="a-vendor-subdomains-email"),
+    pytest.param(_labels(OLD_LABEL, SightingSpec("listing", 200, role="fax")), id="a-fax-and-a-bank"),
+    pytest.param(_labels(SightingSpec("contract", 200, role="FAX"), SightingSpec("listing", 200, role=" Fax ")),
+                 id="fax-in-any-case"),
+    pytest.param(_labels(SightingSpec("contract", 120, **BANK), SightingSpec("listing", 120, **BANK), cutoff_lead_days=30),
+                 id="at-the-age-bar-from-the-cutoff"),
+])
+def test_i3_flags_a_label_at_the_bar(world):
+    assert _i3_if_eligible(world)
+
+
+def test_a_lookalikes_pull_cannot_undo_an_honest_label():
+    # An old lookalike email pulls both labeling documents into the change context. Those facts are not
+    # the documents' own, so the labels still stand: a rule that drops them for it trips I3.
+    world = make_world(numbers=[NumberSpec(NUM, [], 0, sightings=(OLD_LABEL, SightingSpec("listing", 100, **BANK))),
+                                NumberSpec("+18675550120", [], 0, sightings=(SightingSpec("email", 300, sender="lookalike"),))])
+    in_context = {d.id for d in change_context_documents(**world.kwargs)}
+    assert {"d0-0", "d0-1"} <= in_context
+    assert _i3_if_eligible(world)
+
+
+def test_i3_agrees_with_the_rule_on_what_is_established():
+    # Both directions, so the oracle's copy of rule 3 can't drift from the rule's unnoticed. Shared ids
+    # are left out: there the oracle reads a different copy on purpose (the module docstring).
+    from dialback_evals.invariants import _established_against, _frame
+    seen = [0, 0]
+
+    def compare(world):
+        kw = world.kwargs
+        if len({d.id for d in kw["documents"]}) < len(kw["documents"]):
+            return
+        f, out = _frame(world), run(world)
+        for c in out["candidates"]:
+            vetoed = bool({"not_vendor_party", "fax_line"} & set(c["reasons"]))
+            assert _established_against(f, f.numbers[c["e164"]], world) == vetoed, c["e164"]
+            seen[0] += 1
+            seen[1] += vetoed
+
+    @given(worlds())
+    @settings(max_examples=500, deadline=None, derandomize=True, database=None)
+    def check(world):
+        compare(world)
+    check()
+    assert seen[0] > 0 and seen[1] > 0, seen       # the veto side really ran

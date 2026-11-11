@@ -82,6 +82,11 @@ def _own(sd: str | None, domains: tuple[str, ...]) -> bool:
     return sd is not None and any(sd == v or sd.endswith("." + v) for v in domains)
 
 
+def _counts(d: DocumentRef, domains: tuple[str, ...]) -> bool:
+    """A channel that counts: a known one, and for email only the vendor's own domains."""
+    return d.channel in COUNTING and (d.channel != "email" or _own(sender_domain(d.sender), domains))
+
+
 @dataclasses.dataclass
 class Probes:
     """What metamorphic() saw on a world (spec 0046): the base output, and each must-not-help probe it
@@ -147,9 +152,6 @@ def _frame(world: World) -> _Frame:
             return True
         return _norm(d.subject) == _norm(request.subject) != "" and cutoff - d.received_at <= window
 
-    def counts(d: DocumentRef) -> bool:
-        return d.channel in COUNTING and (d.channel != "email" or _own(sender_domain(d.sender), domains))
-
     ctx = frozenset(i for i, d in docs.items() if in_context(d))
     rows = [r for r in kw["sightings"] if r.recorded_at < opened and r.document_id in docs]
     numbers: dict[str, _Number] = {}
@@ -160,7 +162,7 @@ def _frame(world: World) -> _Frame:
         ctx_times = [when[id(r)] for r in visible if r.document_id in ctx]
         out_times = [when[id(r)] for r in visible if r.document_id not in ctx]
         first_seen_ctx = bool(ctx_times) and (not out_times or min(ctx_times) <= min(out_times))
-        clean = tuple(r for r in visible if counts(docs[r.document_id]) and r.document_id not in ctx)
+        clean = tuple(r for r in visible if _counts(docs[r.document_id], domains) and r.document_id not in ctx)
         first_clean = min((when[id(r)] for r in clean), default=None)
         shown = first_clean or min((when[id(r)] for r in visible), default=None) or min(when.values())
         numbers[e164] = _Number(visible, first_seen_ctx, clean, first_clean, shown,
@@ -188,6 +190,38 @@ def _fax(r: Sighting) -> bool:
     return str(r.role).strip().lower() == "fax"
 
 
+def _established_against(f: _Frame, n: _Number, world: World) -> bool:
+    """Spec 0091, rule 3, re-derived from the lab's own frame so the oracle stays independent of the
+    ledger's: are the labels against this number established? A label against is a visible sighting
+    that isn't the vendor's, or is a fax. Its document counts only by its own facts: a counting channel,
+    at or before the request (the earlier of the requested cutoff and its receipt), and not the request,
+    its thread, its subject within the window, or a lookalike's. So the cutoff a lookalike pulls back,
+    and an id shared with another document, play no part. Established means those documents span
+    `min_source_types` channels and the earliest is `min_age_days` before the request. With no request
+    there is nothing to measure from, so no label is established."""
+    kw, s = world.kwargs, world.settings
+    request = kw["request"]
+    if request is None:
+        return False
+    domains = tuple(v.strip().lower().rstrip(".") for v in kw["vendor_domains"])
+    asked = min(kw["requested_cutoff"], request.received_at)
+    window = dt.timedelta(days=s.same_subject_window_days)
+
+    def stands(d: DocumentRef) -> bool:
+        if d.received_at > asked or not _counts(d, domains):
+            return False
+        if (sd := sender_domain(d.sender)) and is_lookalike(sd, domains):
+            return False
+        if d.id == request.document_id or (request.thread_id is not None and d.thread_id == request.thread_id):
+            return False
+        return not (_norm(d.subject) == _norm(request.subject) != "" and asked - d.received_at <= window)
+
+    labeling = [f.docs[r.document_id] for r in n.visible if r.party != "vendor" or _fax(r)]
+    against = [d for d in labeling if stands(d)]
+    return (bool(against) and len({d.channel for d in against}) >= s.min_source_types
+            and asked - min(d.received_at for d in against) >= dt.timedelta(days=s.min_age_days))
+
+
 def violations(world: World, out: dict) -> list[str]:
     """The structural invariants (I1-I7, I9) on one select() output."""
     s, found = world.settings, []
@@ -209,10 +243,10 @@ def violations(world: World, out: dict) -> list[str]:
             found.append("I1_first_seen_in_context_eligible")
         if not n.visible:
             found.append("I2_hidden_only_eligible")
-        # Labels from outside the change context only: the attacker writes the context, so the oracle
-        # stays neutral on context labels and lets I12 judge what they may do (I1 still refuses a
-        # number first seen in the context).
-        if any((r.party != "vendor" or _fax(r)) and r.document_id not in f.in_context_ids for r in n.visible):
+        # Only an established label refuses a number (spec 0091, rule 3). The attacker writes the
+        # context, so its labels can't establish anything; I12 judges what they may do (I1 still refuses
+        # a number first seen in the context).
+        if _established_against(f, n, world):
             found.append("I3_nonvendor_or_fax_eligible")
         if len(n.channels) < s.min_source_types:
             found.append("I4_too_few_channels_eligible")
