@@ -127,7 +127,7 @@ def _answered_by(detected: str) -> str | None:
         return "human"
     if detected.startswith("machine") or detected == "fax":
         return "machine"
-    return None  # unknown or absent: nothing is claimed, so decide() can't count a live person (V03)
+    return None  # unknown or absent: nothing is claimed; V03 then needs the digits typed (spec 0080, Part B)
 
 
 # Twilio's documented AnsweredBy values (spec 0080, D3). Only these are logged as they are.

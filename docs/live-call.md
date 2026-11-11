@@ -122,16 +122,18 @@ dialback-core demo change --vendor acme
 ## 5. Answering the call (for the teammate on the phone)
 
 Before the agent speaks, Twilio's answering-machine detection listens to how you answer and labels
-the call. Only a call labeled `human` can reach Verified on its own (V03). With an `unknown` label,
-even a perfect call goes to review. With a `machine` label it goes to review, or is called again
-if Twilio's own report of the call reaches the core first.
+the call. A call labeled `human` can reach Verified on its own (V03). So can one labeled `unknown`
+(silence at pickup), as long as the digits were typed on the keypad: a machine can't type them
+(spec 0080, Part B). With a `machine` label it goes to review, or is called again if Twilio's own
+report of the call reaches the core first.
 
 - **A greeting of up to about 4 seconds is fine**, from one short "Hello?" to "Acme accounts
   payable, this is Jane, how can I help you?". Then stay quiet: after about 1.2 seconds of quiet,
   detection decides and the disclosure starts a moment later. Talking for more than 4.5 seconds is
   labeled a machine.
 - **Say something.** If you pick up and wait in silence, detection gives up after about 5 seconds
-  with the label `unknown`, and only then does the disclosure start.
+  with the label `unknown`, and only then does the disclosure start. The call can still verify,
+  since the digits go in on the keypad.
 - **On a trial account,** Twilio first plays its trial message and waits for a key. Press any key,
   then answer.
 
@@ -274,7 +276,7 @@ on the dashboard says "The voice service checked the call and did not place it (
 | "We won't continue" right after consent | Consent was read as a clear no | Voice log |
 | "Sorry, are you still there?", then "Thanks for your time. Goodbye." | Nothing was said or pressed for about 10 seconds after the check-in. The call ends `failed`, and the core calls again after its wait (2 hours) while the case has attempts left | Voice log |
 | "Sorry, let me ask that again", then "Thanks for your time. Goodbye." | Two answers to the consent question, or to the change question, could not be made out, or the model call failed twice (an invalid key, an API error, or a reply slower than 8 seconds). A missing key does not cause this. The call ends `failed`, and the core calls again after its wait (2 hours) while the case has attempts left | Voice log |
-| The call finishes, but the case goes to review or is blocked | One rule decided it | The decision page names the rule. Common ones: NR01 or V03 (not detected as a person), NR03 (the company answer had a refusal word such as "not", "never" or "reseller"), NV02 or NV03 (wrong digits, blocked), NR10 (a pressure word), NR14 (an answer not found in the turn it cites) |
+| The call finishes, but the case goes to review or is blocked | One rule decided it | The decision page names the rule. Common ones: NR01 (labeled a machine), NR03 (the company answer had a refusal word such as "not", "never" or "reseller"), NV02 or NV03 (wrong digits, blocked), NR10 (a pressure word), NR14 (an answer not found in the turn it cites) |
 
 Not checked yet: a call on a real line. The steps above come from the code on main (Nov 8), not
 from a completed call. Fix this page after the first one.

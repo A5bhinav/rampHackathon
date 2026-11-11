@@ -1,4 +1,4 @@
-# 0006: The decision rules (engine `decision-1.0.0`; `decision-1.1.0` since spec 0082 D7b)
+# 0006: The decision rules (engine `decision-1.0.0`; `decision-1.1.0` since spec 0082 D7b; `decision-1.2.0` since spec 0080 Part B)
 
 **Owner:** Abhi  **Partner:** Inesh  **Slice:** money path  **Target day:** Wed Nov 4 (the checkpoint)
 
@@ -55,7 +55,7 @@ The skeleton verified with three facts unchecked (U01–U03). This engine sends 
 | 2 | `NR21_line_risk` | A line-risk signal (call forwarding, a SIM swap) is `True`. |
 | 3 | `V01_number_eligible` | We dialed the ledger's pick for this version. |
 | 3 | `V02_outbound_dial` | The call was outbound, and the adapter confirmed the dialed number. |
-| 3 | `V03_live_person` | A person answered and gave answers. |
+| 3 | `V03_live_person` | A person answered and gave answers: the result is `answers_recorded`, and the call is labeled `human`, or (since `decision-1.2.0`, spec 0080 Part B) it has no label and every `account_last4` answer was typed on the keypad (`digits_typed`), with a last-four result other than `not_provided`. |
 | 3 | `V04_recording_consent` | Consent was `yes`, and it was the first answer. |
 | 3 | `V05_company_matches` | Retired by spec 0082 D7b (`decision-1.1.0`): the company answer is no longer required. Its sentences stay in `engine.RETIRED`. It was: the person named this vendor. |
 | 3 | `V06_speaker_identified` | The person gave a name and a role. |

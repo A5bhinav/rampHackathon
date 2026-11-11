@@ -1015,6 +1015,40 @@ F1 to F9 hold as built (verified). But the lab still claims more than it shows:
     a place. Not measured here either, and they add to the cost above ("I haven't got that invoice,
     this is Acme" goes to review).
 
+### C15. The lab after spec 0080 Part B (an unknown label verifies with typed digits; Nov 10)
+
+- **Status:** built on `sami/amd-unknown-typed` and reviewed by a fresh session (no blocking
+  findings).
+- **What followed from what:** the F1 change follows from the decision (Sami, Nov 10). The F2
+  narrowing and the V03 listing below were both made **after** the first run's results, each with
+  its reason (corrected after the review: this line first said every change followed from the
+  decision).
+- **F1** restates V03: no label (`unknown`) is no longer a missing condition when every
+  `account_last4` answer was typed on the keypad. A `machine` label, or no label with spoken digits,
+  still is.
+- **F2, found by the first run after the rule change:**
+  - **What showed:** 58 reachable reports at seed 0 (2000 reports) flagged `F2_answerer_unknown_helped`.
+    Every one started from a `machine` label, with keypad digits (counted by a scratch probe, not
+    committed).
+  - **Why it isn't a defect:** `answerer_unknown` used to apply to any label, but from `machine` it
+    could never help, because V03 needed `human`. With Part B, replacing `machine` with no label
+    removes NR01's evidence against the change, and typed digits can then verify. Spec 0048 B4 allows
+    dropping evidence against the change to help.
+  - **The fix:** the move now starts only from `human`, where going to no label is a step to a less
+    certain value and still must never help. This has the same form as C14's `company_other`
+    narrowing. It is a departure from B4's wording, which doesn't qualify the move. It is pinned by
+    `test_f2_unknown_never_replaces_a_machine_label`.
+  - The 58 are the original result. After the fix, `answerer_unknown` flags nothing.
+- **The sweep, also found by the first run:** removing V03 no longer changed any outcome (4031
+  subjects, seed 0), so `lab sweep` failed.
+  - **Why:** the reports that used to show V03 had no label and typed digits, and they now verify
+    with V03 in place. A `machine` label fires NR01 first. V03 fails alone only for spoken digits,
+    which production never records (spec 0043).
+  - **The fix:** V03 is listed in `UNREACHABLE.md` with that reason. Its spoken-digits case stays
+    covered by the engine's unit test.
+- **Not exercised:** the voice lab's personas never produce `unknown` (spec 0080), so only the
+  call-report checks and the engine's unit tests cover Part B.
+
 ## D. Red teaming
 
 - **Started (Nov 9):** Sami chose number selection as the first target. Spec 0046

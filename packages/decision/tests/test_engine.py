@@ -14,7 +14,7 @@ from hypothesis import strategies as st
 
 def test_a_clean_confirmation_is_verified_with_every_condition_named():
     d = decide(GOOD)
-    assert d.outcome == "verified" and d.engine_version == ENGINE_VERSION == "decision-1.1.0"
+    assert d.outcome == "verified" and d.engine_version == ENGINE_VERSION == "decision-1.2.0"   # spec 0080, B5
     assert d.rules_fired == tuple(r.id for r in rules.VERIFIED)
     assert all("safe" not in s.lower() for s in d.explanation)
 

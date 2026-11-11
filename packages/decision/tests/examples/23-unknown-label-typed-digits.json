@@ -1,0 +1,60 @@
+{
+ "call": "Machine detection gave up with 'unknown' (silence at pickup), so the label is absent. The person answered everything and typed the digits on the keypad, and they match. Spec 0080, Part B: typed digits show a live person, so V03 holds and the call verifies.",
+ "answers": [
+  [
+   "recording_consent",
+   "yes",
+   1,
+   "speech"
+  ],
+  [
+   "company_named",
+   "Acme Fasteners",
+   3,
+   "speech"
+  ],
+  [
+   "speaker_name",
+   "Jordan Lee",
+   5,
+   "speech"
+  ],
+  [
+   "speaker_role",
+   "AR manager",
+   5,
+   "speech"
+  ],
+  [
+   "change_requested",
+   "yes",
+   7,
+   "speech"
+  ],
+  [
+   "account_last4",
+   "6666",
+   9,
+   "keypad"
+  ]
+ ],
+ "known": {
+  "answered_by": null
+ },
+ "expect": {
+  "outcome": "verified",
+  "rules_fired": [
+   "V01_number_eligible",
+   "V02_outbound_dial",
+   "V03_live_person",
+   "V04_recording_consent",
+   "V06_speaker_identified",
+   "V07_right_person_confirmed",
+   "V08_digits_match",
+   "V09_same_person",
+   "V10_answers_grounded",
+   "V11_script_clean",
+   "V12_no_flags"
+  ]
+ }
+}

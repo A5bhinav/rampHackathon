@@ -11,7 +11,8 @@ from . import rules
 from .facts import CaseFacts
 from .last_four import LAST_FOUR_RESULTS
 
-ENGINE_VERSION = "decision-1.1.0"  # 1.1.0: V05 retired, NR03 only for refusal words (spec 0082, D7b)
+ENGINE_VERSION = "decision-1.2.0"  # 1.1.0: V05 retired, NR03 only for refusal words (spec 0082, D7b)
+#                                    1.2.0: V03 holds for an absent label with typed digits (spec 0080, Part B)
 
 # Sentences for ids earlier engine versions recorded, so their decisions still render.
 RETIRED = {

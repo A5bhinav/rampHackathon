@@ -21,6 +21,23 @@ CALL = [a("recording_consent", "yes", 1), a("company_named", "Acme Fasteners", 3
         a("speaker_role", "AR manager", 5), a("change_requested", "yes", 7), a("account_last4", "6666", 9)]
 
 
+def test_digits_typed_needs_every_digit_answer_on_the_keypad():  # spec 0080, Part B, B1
+    def by(method, value="6666", turn=9):
+        return {**a("account_last4", value, turn), "capture_method": method}
+
+    def typed(answers):
+        return facts_from_answers(answers, call_result="answers_recorded", dialed_eligible_number=True).digits_typed
+
+    rest = [x for x in CALL if x["slot"] != "account_last4"]
+    assert typed([*rest, by("keypad")]) is True
+    assert typed([*rest, by("keypad"), by("keypad", "6667", 11)]) is True       # two typed entries: still typed
+    assert typed([*rest, by("speech"), by("keypad", turn=11)]) is False         # any spoken entry: not typed
+    assert typed([*rest, by("speech")]) is False
+    assert typed([*rest, by("dtmf")]) is False                                  # only "keypad" counts
+    assert typed(CALL) is False                                                 # no capture method recorded
+    assert typed(rest) is False                                                 # no digits at all
+
+
 def test_consent_must_be_the_first_answer():
     assert consent_first(CALL) is True
     greeting = [a("speaker_name", "Jordan Lee", 0), *CALL]  # a voicemail greeting before consent
