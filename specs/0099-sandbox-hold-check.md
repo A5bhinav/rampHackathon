@@ -69,6 +69,14 @@ None.
   Ramp pays (ACH) is added. A direct debit is pulled by the vendor, so a bank change doesn't
   redirect it; what a vendor hold does to one isn't known.
 
+## Found on the sandbox, 2026-11-10 (second run: DocuSign, one ACH bill added by hand)
+
+- Ramp's login answer listed all five scopes. Hold 204; it showed after 9.9 seconds, on the third
+  read, with the bill `ON_HOLD` and no date. A second hold: HTTP 400, `BILL_PAY_7284` "Vendor is
+  already on hold" (spec 0097, Q206 and Q209). Release 204; gone after 8.6 seconds, on the fourth
+  read. The date set again: PATCH 200, and the bill ended with its starting date and status
+  (`2026-11-13`, `APPROVAL_PENDING`). So spec 0097's payment-date call works on Ramp.
+
 ## Acceptance
 
 - [x] Without `--yes`, or without a needed scope, nothing reaches Ramp.

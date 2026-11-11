@@ -125,12 +125,29 @@ None.
   refuses it, every slow read-back ends with the case sent to a person after five tries (fail
   closed, but no case would get through). The hold check now sends that second hold (spec 0099, D8);
   its next run answers this. If Ramp refuses, the retry should read before placing again.
+  **Answered, 2026-11-10 (second hold-check run): Ramp refuses it**, HTTP 400, `BILL_PAY_7284`
+  "Vendor is already on hold". The worker retries any `RampError` (`_run`), so after a read-back
+  that came too early every retry fails the same way and, after five, the case goes to a person
+  with the vendor held. Two runs: the hold showed after 9.9 and 10.4 seconds, the release after 8.6,
+  each read taking 2 to 3 seconds, so the worker's three quick reads may miss either (likely for a
+  release, whose read-back failure puts the hold back: `release_hold` retries, and the release
+  would rarely complete). The reconcile job can hit the same 400 if it runs within those seconds of
+  a hold, and would raise a false "could not be put back" alert. See Q209.
+- **Q209:** what should the worker do about Ramp's delay? Candidates: the layer treats
+  `BILL_PAY_7284` as the hold being on (it is, by Ramp's own word), so a retry goes on to read back;
+  and the worker's read-backs wait as long as Ramp takes (tens of seconds, not under one), or defer
+  the step instead of failing it. Which part lags isn't known: the layer reads the hold from the
+  audit log; the vendor's own (undocumented) `status` field, or the bills' `ON_HOLD`, may show it
+  sooner. Measuring each read-back's parts would tell. The worker is the money path's; this needs
+  its own spec.
 - **Q207:** Ramp issued a token for a scope the app isn't allowed (`bills:write`) and refused only
   the call (HTTP 403). The core's login doesn't compare what Ramp granted with what it needs, so a
   sandbox dataset missing `bills:write` would hold and call normally, then fail every release when
   it sets the dates back: the hold is put back and the case goes to a person (fail closed, but
   found late). Should the core check the scopes Ramp's login answer lists at start-up? Not yet
-  known whether Ramp lists them; the hold check's next run shows it.
+  known whether Ramp lists them; the hold check's next run shows it. Second run: Ramp's answer does
+  list them (all five, once `bills:write` was allowed). Whether it leaves out a scope the app isn't
+  allowed is still not seen; if it only echoes the request, a start-up check wouldn't catch this.
 - **Q208:** does a vendor hold restart its bills' approvals, and can the worker set a payment date
   on a bill waiting for approval? Ramp's help center says approvals for payments affected by a hold
   "start again from the first step". If Ramp refuses the date, `release_hold` fails, puts the hold
@@ -141,7 +158,11 @@ None.
   version of this question said the hold restarted its approval; that wasn't shown). A bill like
   that (paid by direct debit; `status` OPEN until matched; `status_summary`
   WAITING_FOR_TRANSFER_MATCH) counts as unpaid in the layer, so the worker would save its date and
-  set it again after a release; what Ramp does with that date is unknown.
+  set it again after a release; what Ramp does with that date is unknown. Partly answered by the
+  second hold-check run: an ACH bill waiting for approval (`APPROVAL_PENDING`) lost its date to the
+  hold, showed `ON_HOLD`, and after the release Ramp accepted its date again (PATCH 200) and it was
+  `APPROVAL_PENDING` as before. Whether a hold restarts the approval of a bill already approved is
+  still not seen.
 
 ## Commands
 
