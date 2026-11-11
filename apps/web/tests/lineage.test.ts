@@ -66,3 +66,12 @@ test("lanePoints with no candidates has nothing to draw", () => {
   assert.equal(lanePoints({ ...example("picked"), candidates: [] }), null);
   assert.equal(lanePoints(null), null);
 });
+
+// Spec 0104, Q224 (Sami: "Yes, fix the caption"). The chart draws each number's dots at the date the
+// number was first seen, in every source it appeared in, not at each source's own first sighting,
+// so the caption must not say that each dot is a first sighting in that source.
+test("the case lineage chart's caption says what it draws", () => {
+  const page = readFileSync(new URL("../src/app/d/[datasetId]/(ap)/cases/[caseId]/lineage/page.tsx", import.meta.url), "utf8");
+  assert.ok(!page.includes("first sighting in that source"), "the old caption claimed per-source dates");
+  assert.ok(page.includes("repeated in every source it appeared in, not that source&apos;s own date"));
+});
