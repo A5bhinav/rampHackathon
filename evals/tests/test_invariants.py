@@ -376,6 +376,7 @@ def test_a_rule_that_refuses_the_case_passes_i12():
     assert _labels_under(_fail_closed, planted) == set()
 
 
+@pytest.mark.usefixtures("_today_rule")
 def test_fail_closed_fix_adds_no_violation_today_lacks():
     # The whole oracle, not only I3 and I12: the fail-closed shape must never trip I12, and must add no
     # label today's rule does not already have in the same world (review 2, B2).
@@ -404,6 +405,7 @@ def test_context_blind_fix_opens_the_lookalike_hole():
     assert "M_lookalike_helped" not in _labels_under(_fail_closed, world)
 
 
+@pytest.mark.usefixtures("_today_rule")
 def test_context_blind_rule_passes_the_planted_bank_label_world(monkeypatch):
     # The attacker's in-thread email names the real number as a bank line, and a planted provable
     # number ranks below the real one. Ignoring change-context labels keeps the call on the real
