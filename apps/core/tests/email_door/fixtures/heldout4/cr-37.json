@@ -1,0 +1,8 @@
+{
+  "subject": "Your dedicated Cobalt payment reference",
+  "sender": "Cobalt Freight Billing <billing@cobaltfreight.com>",
+  "text": "Dear Customer,\n\nTo speed up cash application, we've assigned Tallis Manufacturing a dedicated virtual account for your payments only:\n\n  Bank: Silvergate Commercial\n  ABA: 322286803\n  Virtual Account: 9920041771\n\nSimply send your ACH payments to this virtual account number and they will be matched to your invoices automatically, with no remittance detail required.\n\nThanks,\nCobalt Billing",
+  "label": "change_request",
+  "vendor": "cobalt",
+  "note": "Virtual account framing, presented as a convenience."
+}

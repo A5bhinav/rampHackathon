@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import logging
 import uuid
 from types import SimpleNamespace
 from urllib.parse import parse_qs, urlencode
@@ -24,7 +25,7 @@ from dialback_core.ramp.http import TokenBucket
 from dialback_core.ramp.login import RampLogin
 from dialback_core.ramp.port import RampAccount, RampAuditEvent, RampBill, RampError, RampHold, RampVendor
 from dialback_core.ramp.sandbox import RampSandboxAdapter
-from dialback_core.settings import RampSandbox
+from dialback_core.settings import RampSandbox, _ramp_sandbox
 from dialback_core.worker import Worker
 
 pytestmark = pytest.mark.anyio
@@ -95,6 +96,7 @@ class SandboxRamp:
         self.lists_scope = True
         self.ungranted: set[str] = set()  # scopes this app isn't allowed in Ramp: left out of the login's answer
         self.bills_error: str | None = None
+        self.vendor_errors: dict[str, int] = {}  # a vendor id, and the status reading it answers
         self.clock = 0
 
     def _now(self) -> str:
@@ -118,6 +120,8 @@ class SandboxRamp:
             return httpx.Response(200, json={"data": data, "page": {"next": nxt}})
         parts = path.strip("/").split("/")
         if parts[0] == "vendors" and len(parts) == 2:
+            if parts[1] in self.vendor_errors:
+                return ramp_error(self.vendor_errors[parts[1]], "The vendor could not be read.")
             if parts[1] not in self.vendors:
                 return ramp_error(404, "Vendor not found.")
             return httpx.Response(200, json=self.vendors[parts[1]])
@@ -262,6 +266,69 @@ async def test_a_full_read_lists_every_vendor_without_the_audit_log(ramp):
     assert ramp.api("/audit-logs/events") == []
 
 
+# Spec 0102: the demo watch list ---------------------------------------------------------------------
+
+SINCE = dt.datetime(2026, 11, 10, 11, tzinfo=UTC)
+
+
+def watching(ramp, *vendor_ids: str) -> RampSandboxAdapter:
+    return RampSandboxAdapter(BASE, RampLogin(SANDBOX, ramp.http), ramp.http, TokenBucket(100_000), sleep=_no_sleep,
+                              watch_vendors=vendor_ids)
+
+
+@pytest.mark.parametrize("raw, expected", [(None, ()), ("", ()), ("a,b", ("a", "b")), (" a  b, c ", ("a", "b", "c"))])
+def test_watch_setting_parses_commas_and_spaces(raw, expected):
+    env = {"RAMP_SANDBOX_CLIENT_ID": "id", "RAMP_SANDBOX_CLIENT_SECRET": "secret"}
+    if raw is not None:
+        env["RAMP_SANDBOX_WATCH_VENDORS"] = raw
+    assert _ramp_sandbox(env).watch_vendors == expected
+
+
+async def test_watch_lists_a_vendor_nothing_says_changed(ramp):
+    assert await ramp.adapter.list_vendors_updated_since(SINCE) == [], "without the list: nothing"
+    vendors = await watching(ramp, V, V).list_vendors_updated_since(SINCE)  # listed twice by mistake: read once
+    assert [v.id for v in vendors] == [V] and vendors[0].name == "Acme Fasteners LLC"
+    assert len(ramp.api(f"/vendors/{V}")) == 1
+
+
+async def test_watch_reads_nothing_extra_for_a_vendor_already_listed_or_on_a_full_read(ramp):
+    ramp.vendors[V]["updated_at"] = "2026-11-10T11:10:00+00:00"
+    assert [v.id for v in await watching(ramp, V).list_vendors_updated_since(SINCE)] == [V]
+    assert ramp.api(f"/vendors/{V}") == []
+    # An id the full list doesn't have: only stopping at the full read keeps it from being read.
+    full = await watching(ramp, V, "not-in-the-list").list_vendors_updated_since(None)
+    assert [v.id for v in full] == [V, OTHER]
+    assert ramp.api(f"/vendors/{V}") == [] and ramp.api("/vendors/not-in-the-list") == []
+
+
+async def test_watch_lists_a_vendor_with_a_bank_event_once(ramp):
+    ramp.events.append(event("ev-a", "Bank account updated", "2026-11-10T11:30:00+00:00"))
+    assert [v.id for v in await watching(ramp, V).list_vendors_updated_since(SINCE)] == [V]
+    assert len(ramp.api(f"/vendors/{V}")) == 1
+
+
+async def test_watch_skips_an_id_ramp_doesnt_know_with_a_warning(ramp, caplog):
+    with caplog.at_level(logging.WARNING):
+        vendors = await watching(ramp, "vendor-typo", V).list_vendors_updated_since(SINCE)
+    assert [v.id for v in vendors] == [V] and "vendor-typo" in caplog.text
+
+
+@pytest.mark.parametrize("status", [400, 403, 422, 500])
+async def test_watch_skips_a_vendor_it_cant_read_and_lists_the_rest(ramp, caplog, status):
+    ramp.vendor_errors["vendor-bad"] = status
+    with caplog.at_level(logging.WARNING):
+        vendors = await watching(ramp, "vendor-bad", V).list_vendors_updated_since(SINCE)
+    assert [v.id for v in vendors] == [V] and "vendor-bad" in caplog.text
+
+
+async def test_a_bank_event_vendor_that_cant_be_read_still_fails_the_poll(ramp):
+    """Unlike a watched read: skipping this one would lose its event, since the watermark moves on."""
+    ramp.vendor_errors[V] = 500
+    ramp.events.append(event("ev-a", "Bank account updated", "2026-11-10T11:30:00+00:00"))
+    with pytest.raises(RampError):
+        await watching(ramp, V).list_vendors_updated_since(SINCE)
+
+
 # Bank accounts ------------------------------------------------------------------------------------
 
 async def test_accounts_are_mapped_without_inventing_a_routing_number(ramp):
@@ -272,7 +339,15 @@ async def test_accounts_are_mapped_without_inventing_a_routing_number(ramp):
         RampAccount(id="acct-cur", vendor_id=V, routing_number="", last4="4444", account_type=None, bank_name=None,
                     is_active=True, created_at=None)]
     [r] = ramp.api("/accounts")
-    assert r.url.path == f"/developer/v1/vendors/{V}/accounts" and query(r) == {"page_size": ["100"]}
+    assert r.url.path == f"/developer/v1/vendors/{V}/accounts"
+    assert query(r) == {"page_size": ["100"], "include_pending": ["true"]}  # spec 0093, D1
+
+
+async def test_pending_accounts_are_asked_for_and_marked_pending(ramp):
+    # Spec 0093, D1: a change entered in Ramp's dashboard waits for review as a pending account.
+    ramp.accounts[V].append(account("acct-p", "4321", "pending_approval") | {"proposal_id": "prop-1"})
+    accounts = {a.id: (a.is_active, a.pending) for a in await ramp.adapter.list_vendor_accounts(V)}
+    assert accounts == {"acct-old": (False, False), "acct-cur": (True, False), "acct-p": (False, True)}
 
 
 @pytest.mark.parametrize("last_four", [None, "123", "12345", "12a4"])

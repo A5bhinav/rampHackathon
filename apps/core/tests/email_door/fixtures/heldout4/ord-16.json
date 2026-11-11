@@ -1,0 +1,8 @@
+{
+  "subject": "Shipment reroute - PRO 021000089",
+  "sender": "Dispatch <dispatch@cobaltfreight.com>",
+  "text": "Please be advised PRO 021000089 has been rerouted through our Indianapolis terminal because of the I-65 closure. New ETA to your Dayton dock is Thursday 10:00.\n\nPlease send future pickups for this lane to the Indy terminal, account 000088123456 in our routing guide, until further notice.\n\nDispatch\nCobalt Freight",
+  "label": "ordinary",
+  "vendor": "cobalt",
+  "note": "Freight routing and shipper account numbers that look like bank data."
+}

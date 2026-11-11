@@ -1,0 +1,8 @@
+{
+  "subject": "Sales tax exemption certificate needed",
+  "sender": "Acme Fasteners Billing <billing@acmefasteners.com>",
+  "text": "Hi, our tax software flagged that we don't have a current Ohio sales tax exemption certificate (Form STEC B) for Larkspur on file. Could you send one over? Until we receive it we'll need to charge sales tax on new invoices.\n\nThanks,\nAcme Billing",
+  "label": "ordinary",
+  "vendor": "acme",
+  "note": "Tax-document request."
+}

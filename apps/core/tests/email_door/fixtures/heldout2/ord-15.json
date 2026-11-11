@@ -1,0 +1,8 @@
+{
+  "subject": "Past Due Notice - Larkspur Industries - Account LARK-7731",
+  "sender": "Brightline Office Supply Collections <collections@brightlineoffice.com>",
+  "text": "Dear Accounts Payable,\n\nOur records show the following invoices are past due:\n\nInvoice 54980   09/28/2026   $612.40     13 days past due\nInvoice 55012   10/03/2026   $1,977.15   8 days past due\n\nTotal past due: $2,589.55\n\nPlease remit payment at your earliest convenience using the payment instructions on file:\n\nBrightline Office Supply Inc\nRouting: 021000021\nAccount: 000044445555\n\nIf payment has already been sent, please reply with the payment date and amount so we can apply it. Thank you.\n\nBrightline Office Supply Inc\nCredit & Collections",
+  "label": "ordinary",
+  "vendor": "brightline",
+  "note": "Dunning notice with 'please remit payment' plus full numbers, but the numbers are the on-file ones and it says 'instructions on file'."
+}

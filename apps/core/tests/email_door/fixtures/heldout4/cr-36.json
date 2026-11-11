@@ -1,0 +1,8 @@
+{
+  "subject": "Re: Bank details update",
+  "sender": "Accounting <accounting.acmefasteners@outlook.example>",
+  "text": "Hi, just bumping this. Did you get a chance to action the below? Our finance director is asking.\n\nThanks\n\n________________________________\nFrom: Accounting\nSent: Monday, November 2, 2026 8:03 AM\nTo: AP\nSubject: Bank details update\n\nHello,\n\nPlease note Acme Fasteners LLC will be receiving payments at our Bank of the West account starting this month. Routing 121100782, account 633018827. Please confirm when your records are amended.\n\nThank you,\nAccounting",
+  "label": "change_request",
+  "vendor": "acme",
+  "note": "Top note is only a nudge; the request is in the quoted part."
+}

@@ -1,0 +1,8 @@
+{
+  "subject": "Important: our bank account was compromised",
+  "sender": "Sam Okafor <s.okafor@brightlineoffice.com>",
+  "text": "Dear Customer,\n\nLast week Brightline Office Supply Inc was the target of a fraud attempt and our bank has closed the account you have on file as a precaution. Please do not send any further payments to the old account ending in 5555. Our replacement account is:\n\nBank: M&T Bank\nRouting: 022000046\nAccount: 8891003374\nName: Brightline Office Supply Inc\n\nWe apologise for the inconvenience and will send a signed letter on request.\n\nSam Okafor\nAccounts Receivable",
+  "label": "change_request",
+  "vendor": "brightline",
+  "note": "Uses a fraud story as the reason for the change; still a redirect request."
+}

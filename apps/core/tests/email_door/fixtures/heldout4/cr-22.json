@@ -1,0 +1,8 @@
+{
+  "subject": "Quick call?",
+  "sender": "Sheila Novak <snovak@brightlineoffice.com>",
+  "text": "Hi Renee, I'd rather not put account numbers in an email for obvious reasons. Could you give me a ring at 404-555-0187 today so I can read you the details for where our payments need to go now? Ask for Sheila. Thanks!",
+  "label": "change_request",
+  "vendor": "brightline",
+  "note": "No details; supplies its own callback number for delivering new payment details."
+}

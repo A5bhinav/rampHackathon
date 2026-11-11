@@ -1,0 +1,8 @@
+{
+  "subject": "Going paperless - ACH for Tri-County Janitorial",
+  "sender": "Office <office@tricountyjanitorial.example>",
+  "text": "Good morning,\n\nWe would like to stop receiving paper checks. Please pay us electronically from now on. Our information:\n\nTri-County Janitorial Inc\nFifth Third Bank\nRouting 042000314\nChecking 7301188245\n\nAuthorization form attached. Thanks so much.\n\nMarlene",
+  "label": "change_request",
+  "vendor": null,
+  "note": "Check to ACH: payment method change."
+}

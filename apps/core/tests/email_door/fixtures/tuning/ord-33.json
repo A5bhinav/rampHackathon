@@ -1,0 +1,8 @@
+{
+  "subject": "Password reset for the AP mailbox",
+  "sender": "Finance IT <it@ourco.example>",
+  "text": "Your AP shared mailbox password expires in 3 days. Reset it here.",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "IT notice."
+}

@@ -1,0 +1,8 @@
+{
+  "subject": "W-9 for your records - Acme Fasteners LLC",
+  "sender": "accounting@acmefasteners.com",
+  "text": "Hi,\n\nPer your request for 1099 preparation, our current W-9 is attached. Summary:\n\nName: Acme Fasteners LLC\nFederal tax classification: Limited liability company, S corporation\nEIN: 34-1198820\nAddress: 1400 Industrial Parkway, Suite 200, Cleveland OH 44114\n\nNothing has changed from the form we provided last year. Let us know if you need a wet-signed copy.\n\nAcme Fasteners Accounting",
+  "label": "ordinary",
+  "vendor": "acme",
+  "note": "Tax paperwork with no payment details."
+}

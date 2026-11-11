@@ -1,0 +1,8 @@
+{
+  "subject": "Please verify any Cobalt bank change requests by phone",
+  "sender": "Teresa Vance <tvance@cobaltfreight.com>",
+  "text": "Hi Karen,\n\nWe have had reports of emails impersonating our AR team and asking customers to pay a different account. To be clear: Cobalt Freight LLC's remittance has not changed. Continue to use the account on your file. If you ever receive a request to change it, please call me at the number on our invoices before doing anything.\n\nThanks,\nTeresa",
+  "label": "ordinary",
+  "vendor": "cobalt",
+  "note": "Vendor confirming no change and asking for callback verification of any future request."
+}

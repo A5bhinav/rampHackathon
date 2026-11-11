@@ -1,0 +1,8 @@
+{
+  "subject": "Subpoena received",
+  "sender": "Legal <notices@ourco.example>",
+  "text": "We received a records request. Do not delete anything in the AP archive until legal clears it.",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Internal."
+}

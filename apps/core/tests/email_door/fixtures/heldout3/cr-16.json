@@ -1,0 +1,8 @@
+{
+  "subject": "Brightline - new parent company remittance (wire)",
+  "sender": "Finance <finance@brightline-holdings.co.uk>",
+  "text": "Dear Accounts Payable,\n\nBrightline Office Supply Inc has been reorganised under Brightline Holdings Ltd. From 1 December, please settle all Brightline Office Supply invoices by international wire to our group treasury account rather than by domestic ACH:\n\nBeneficiary: Brightline Holdings Ltd\nBank: Barclays Bank UK PLC, London\nIBAN: GB29 BARC 2000 0055 7799 02\nSWIFT/BIC: BARCGB22\nIntermediary (USD): Citibank N.A. New York, ABA 021000089\n\nKindly acknowledge receipt.\n\nKind regards,\nGroup Finance\nBrightline Holdings Ltd",
+  "label": "change_request",
+  "vendor": "brightline",
+  "note": "Switch from domestic ACH to an international wire for a newly named parent entity; money lands in a different account."
+}

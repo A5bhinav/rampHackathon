@@ -1,0 +1,8 @@
+{
+  "subject": "Brightline Office Supply - transition to Meridian Office Group",
+  "sender": "transition@meridianofficegroup.com",
+  "text": "Dear Northgate Manufacturing,\n\nBrightline Office Supply Inc has sold its commercial supply business to Meridian Office Group LLC. Meridian assumed the customer contracts and open receivables as of November 1, 2026.\n\nPlease update your vendor file as follows:\n- Payee name: Meridian Office Group LLC\n- Remit-to: PO Box 5120, Carol Stream, IL 60197\n- ACH: Routing 071000013, Account 6612009045, JPMorgan Chase\n\nAny payment of a Brightline invoice made to Brightline's former account after November 1 will need to be recovered from them, so please apply these details before your next run.\n\nSincerely,\nMeridian Office Group LLC\nCustomer Transition Team",
+  "label": "change_request",
+  "vendor": "brightline",
+  "note": "Sale of business: a successor entity directs payment of the vendor's invoices to its own account."
+}

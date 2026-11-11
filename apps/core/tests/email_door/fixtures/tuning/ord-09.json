@@ -1,0 +1,8 @@
+{
+  "subject": "Your receipt from Datastream Inc [#1928-4471]",
+  "sender": "noreply@stripe-receipts.example",
+  "text": "Receipt from Datastream Inc\nAmount paid: $249.00\nDate paid: Nov 3, 2026\nPayment method: Visa ending 4242",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Card receipt, not vendor bank info."
+}

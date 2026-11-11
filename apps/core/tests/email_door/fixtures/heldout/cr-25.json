@@ -1,0 +1,8 @@
+{
+  "subject": "Please acknowledge: vendor bank update",
+  "sender": "ar@acme.example",
+  "text": "Please acknowledge the below.\n\nVendor: Acme Fasteners LLC\nField changed: bank account\nNew value: ending 3047\nReason: bank migration",
+  "label": "change_request",
+  "vendor": "acme",
+  "note": "Structured form-like message; partial digits."
+}

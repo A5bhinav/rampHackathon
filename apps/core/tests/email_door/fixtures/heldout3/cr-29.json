@@ -1,0 +1,8 @@
+{
+  "subject": "Invitation: Acme Fasteners / Northgate - new remittance setup (Thu Nov 12, 10:00 AM ET)",
+  "sender": "Denise Caruso <dcaruso@acmefasteners.com>",
+  "text": "You have been invited to the following event.\n\nAcme Fasteners / Northgate - new remittance setup\nWhen: Thursday, November 12, 2026, 10:00 AM - 10:30 AM Eastern\nWhere: Teams (link below)\n\nAgenda:\n1. We switched to Chase effective 11/1 and need your AP system updated before the 11/20 run.\n2. I will read the new routing and account numbers over the call; please have your vendor change form open.\n3. Confirm timing of payment for invoices 88213 / 88240.\n\nJoin: https://teams.microsoft.com/l/meetup-join/19%3ameeting_example\n\nAccept | Tentative | Decline",
+  "label": "change_request",
+  "vendor": "acme",
+  "note": "Meeting invite rather than a letter; the agenda is the bank change itself with numbers to be delivered on the call."
+}

@@ -1,0 +1,8 @@
+{
+  "subject": "Brightline monthly summary invoice - October 2026",
+  "sender": "Brightline Office Supply Inc <invoices@brightlineoffice.com>",
+  "text": "Brightline Office Supply Inc - Monthly Summary Invoice\n\nCustomer account: LARK-7731\nBilling period: 10/01/2026 to 10/31/2026\nInvoice #: 55240\nDeliveries in period: 9\nTotal: $4,118.27\nDue date: 12/01/2026\n\nPayment options:\nACH: Brightline Office Supply Inc, routing 021000021, account 000044445555\nCheck: Brightline Office Supply Inc, PO Box 22841, Columbus, OH 43222\n\nDetail by delivery is attached as a PDF.",
+  "label": "ordinary",
+  "vendor": "brightline",
+  "note": "Summary invoice with the on-file ACH details in full and a check address; nothing new."
+}

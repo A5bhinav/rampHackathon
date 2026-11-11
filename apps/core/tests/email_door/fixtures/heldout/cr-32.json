@@ -1,0 +1,8 @@
+{
+  "subject": "Cambio de datos bancarios - Acme Fasteners",
+  "sender": "Dana Whitfield <ar@acme.example>",
+  "text": "Estimados,\n\nLes escribimos para informar que Acme Fasteners LLC cambio de banco. A partir de hoy,\npor favor realicen todos los pagos a la siguiente cuenta:\n\nBanco: Primera Union\nRuta (ABA): 026009593\nCuenta: 0008 4412 7765\n\nPlease confirm receipt / confirmen recibo. Gracias.",
+  "label": "change_request",
+  "vendor": "acme",
+  "note": "Mixed Spanish/English change request with new bank details."
+}

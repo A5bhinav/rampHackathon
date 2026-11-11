@@ -1,0 +1,8 @@
+{
+  "subject": "URGENT - Acme payment today",
+  "sender": "Priya Raman <priya.raman@tallismfg.com>",
+  "text": "Renee, please rush the Acme payment today, it has to land before they'll release the December shipment. Same account we always use. Keep this quiet until the plant announcement on Friday.\n\nPriya",
+  "label": "ordinary",
+  "vendor": "acme",
+  "note": "Urgent and secretive, but to the existing account."
+}

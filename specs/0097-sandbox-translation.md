@@ -152,6 +152,9 @@ None.
   and a payment Ramp schedules between that approval and the core's next sync isn't held (R1).
   Should a sandbox dataset open the case while the change is pending, and how does the case follow
   the account across the new id (the last four and `proposal_id` are the candidates)?
+  **Decided (Sami, 2026-11-10): yes, so the approver sees Dialback's verdict.** Built as spec 0093:
+  the layer reads pending accounts, detection opens the case on one, and follows it by the last four,
+  since Ramp drops `proposal_id` on approval (Q204).
 - **Q206:** Ramp showed a hold about 7 to 10 seconds after answering 204 (the hold check, one run;
   each read took about 3 seconds). The worker's read-back reads three times, 0.2 and 0.4 seconds
   apart, so it may miss a hold that is on; it then retries the step, which places the hold again.
@@ -195,7 +198,7 @@ None.
   Dialback notices (R1). Candidates, sandbox side: the layer's updated-since list also returns
   vendors with a `Bank account updated` event since then (the audit log, seconds behind, is fine
   for a one-minute poll); and, for a change still pending (no event, no `updated_at`), a sweep
-  every minute (95 vendors, one accounts read each, within Ramp's 100 requests per 10 seconds).
+  every minute (the sandbox has about 430 vendors, one accounts read each; spec 0100).
   Built for approved changes as D6: the core's poll now finds a new account on a vendor whose
   `updated_at` didn't move (`test_the_poll_finds_a_bank_change_*`). Not yet seen on the sandbox; a
   change still pending is Q205's.

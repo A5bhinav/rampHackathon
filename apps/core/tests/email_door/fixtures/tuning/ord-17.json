@@ -1,0 +1,8 @@
+{
+  "subject": "Annual 1099 info",
+  "sender": "Tax Compliance <tax@brightline.example>",
+  "text": "We are preparing 1099 forms. Please confirm your legal name and tax ID as they appear on\nthe W-9 we hold, no changes needed if correct.",
+  "label": "ordinary",
+  "vendor": "brightline",
+  "note": "1099 confirmation; no bank item."
+}

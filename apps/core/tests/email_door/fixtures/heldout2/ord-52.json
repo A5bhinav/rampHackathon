@@ -1,0 +1,8 @@
+{
+  "subject": "Payment status - invoices 88301 and 88315",
+  "sender": "Acme Fasteners LLC <ar@acmefasteners.com>",
+  "text": "Hello,\n\nWe have not yet received payment for invoices 88301 ($1,284.60) and 88315 ($956.20), which were due 11/08. Could you let us know when these are scheduled?\n\nFor reference, we show the following remit-to on your vendor setup form, which is still correct:\nJPMorgan Chase Bank, routing 021000021, account 000011112222.\n\nThank you,\nAcme Fasteners Accounts Receivable",
+  "label": "ordinary",
+  "vendor": "acme",
+  "note": "Payment-status inquiry that restates the on-file remit-to in full and says it is still correct."
+}

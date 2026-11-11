@@ -1,0 +1,8 @@
+{
+  "subject": "Statement - Cobalt Freight - November",
+  "sender": "Accounts Receivable <ar@cobaltfreight.com>",
+  "text": "Good afternoon,\n\nBelow is your statement as of 11/06/2026.\n\n  CF-20931   10/08/2026   $4,410.00\n  CF-21077   10/22/2026   $3,985.50\n  CF-21188   11/02/2026   $5,120.25\n  Balance                $13,515.75\n\nWire or ACH:\n  Cobalt Freight LLC\n  ABA: 121000248\n  A/C: 7731-0098-4412\n\nRegards,\nAccounts Receivable\nCobalt Freight LLC",
+  "label": "change_request",
+  "vendor": "cobalt",
+  "note": "ON-FILE-ONLY: routing and account both differ from on-file; statement has no wording about a change."
+}

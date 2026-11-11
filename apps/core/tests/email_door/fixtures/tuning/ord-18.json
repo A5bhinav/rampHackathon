@@ -1,0 +1,8 @@
+{
+  "subject": "Annual certificate of insurance request",
+  "sender": "Compliance <compliance@tidewater-bank.example>",
+  "text": "Please send a current COI naming Tidewater as additional insured.",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "COI request."
+}

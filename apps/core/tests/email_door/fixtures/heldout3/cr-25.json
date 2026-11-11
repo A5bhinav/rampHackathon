@@ -1,0 +1,8 @@
+{
+  "subject": "Invoice 88301 - Acme Fasteners LLC",
+  "sender": "invoices@acmefasteners.com",
+  "text": "ACME FASTENERS LLC\nInvoice 88301\nDate: 11/09/2026\nDue: 12/09/2026\nCustomer: Northgate Manufacturing Inc, PO 44-1189\n\nQty   Item                         Unit     Total\n2000  M8x40 hex bolt, zinc         0.21     420.00\n2000  M8 flange nut                0.09     180.00\n   5  Shipping                             62.50\n                                   Total  662.50\n\n*** PLEASE NOTE: our bank details have changed. Remit to: ***\nBank: Fifth Third Bank\nRouting 042000314\nAccount 7719003342\nAcme Fasteners LLC\n\nThank you for your business.",
+  "label": "change_request",
+  "vendor": "acme",
+  "note": "Invoice that explicitly says the bank changed, with new details in the remittance block."
+}

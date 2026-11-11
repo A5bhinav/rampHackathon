@@ -1,0 +1,8 @@
+{
+  "subject": "Question on updating our contact info",
+  "sender": "Dana Whitfield <ar@acme.example>",
+  "text": "Hi, can you point me to where we edit our contacts and shipping address in your supplier\nportal? Banking stays as is.",
+  "label": "ordinary",
+  "vendor": "acme",
+  "note": "Near miss, address/contact only."
+}

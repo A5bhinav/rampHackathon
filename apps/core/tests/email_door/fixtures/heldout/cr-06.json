@@ -1,0 +1,8 @@
+{
+  "subject": "Banking info on file is wrong",
+  "sender": "Sam Ortiz <ar@brightline.example>",
+  "text": "When I audited our customer files I noticed the bank info you have for Brightline is\nwrong, it points to a closed account. The correct account is at Summit Bank, number\n00-4455-1209. Please correct this and pay us there.",
+  "label": "change_request",
+  "vendor": "brightline",
+  "note": "Frames as correction of wrong info; still new destination."
+}

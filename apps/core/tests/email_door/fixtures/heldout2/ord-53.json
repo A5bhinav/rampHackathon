@@ -1,0 +1,8 @@
+{
+  "subject": "Payment notification from Larkspur Industries",
+  "sender": "Larkspur Industries AP <ap-noreply@larkspur-ind.com>",
+  "text": "Brightline Office Supply Inc,\n\nLarkspur Industries has sent you a payment.\n\nPayment ID: ACH-100517\nPayment date: 11/10/2026\nAmount: $5,021.85\nDeposited to: account ending 5555 at JPMorgan Chase Bank (routing 021000021)\n\nInvoices paid:\n54980      612.40\n55012    1,977.15\n55120    2,656.30\nCM-55004  (224.00)\n\nTotal: 5,021.85",
+  "label": "ordinary",
+  "vendor": "brightline",
+  "note": "Outgoing payment notification listing several invoices and the on-file account."
+}

@@ -1,0 +1,8 @@
+{
+  "subject": "Cobalt - new banking",
+  "sender": "Dana Okafor <dokafor@cobalt-freight.example>",
+  "text": "Hello AP,\n\nOur bank merged with another institution last month and our account number changed as part of\nthat. New number below, routing is unchanged.\nAcct no.: 0007 7778 9901\n\nPlease use it for all payments going forward.",
+  "label": "change_request",
+  "vendor": "cobalt",
+  "note": "Routing unchanged and not stated; account number change only; still a destination change."
+}

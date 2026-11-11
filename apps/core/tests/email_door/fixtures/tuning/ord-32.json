@@ -1,0 +1,8 @@
+{
+  "subject": "Vendor onboarding backlog",
+  "sender": "Ops <ops@ourco.example>",
+  "text": "We have 14 vendors waiting on setup. Procurement says three need tax forms. I will update\nthe tracker tomorrow.",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Internal."
+}

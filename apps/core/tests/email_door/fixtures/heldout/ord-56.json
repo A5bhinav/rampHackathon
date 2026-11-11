@@ -1,0 +1,8 @@
+{
+  "subject": "Meeting notes",
+  "sender": "Assistant <assistant@ourco.example>",
+  "text": "Notes from today are attached. Action items: Ben to send aging, Nina to review accruals.",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Internal."
+}

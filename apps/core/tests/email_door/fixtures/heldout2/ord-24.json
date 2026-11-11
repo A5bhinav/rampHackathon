@@ -1,0 +1,8 @@
+{
+  "subject": "Payment received - thank you",
+  "sender": "Greg Hollis <ghollis@acmefasteners.com>",
+  "text": "Hi Priya, confirming we received your ACH of $4,260.75 into our account ending 2222 on 11/6. Applied to 88214 and 88250. Thanks!\n\nGreg",
+  "label": "ordinary",
+  "vendor": "acme",
+  "note": "Vendor payment-receipt confirmation quoting the on-file account's last four."
+}

@@ -1,0 +1,8 @@
+{
+  "subject": "TIN mismatch - Cobalt Freight LLC (action needed for 1099)",
+  "sender": "Larkspur Tax <tax@larkspur-ind.com>",
+  "text": "Hi AP,\n\nThe IRS TIN matching check came back with a name/TIN mismatch for Cobalt Freight LLC. Their W-9 on file lists the name as \"Cobalt Freight LLC\" but the IRS has the TIN under \"Cobalt Freight Holdings LLC\". Can you reach out to Cobalt and request a corrected W-9 before we file 1099s? Please do not change anything else in their vendor record.\n\nThanks,\nTax",
+  "label": "ordinary",
+  "vendor": "cobalt",
+  "note": "Internal tax mail asking for a corrected W-9; no payment change."
+}

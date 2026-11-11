@@ -1,0 +1,8 @@
+{
+  "subject": "Introduction - new AR contact",
+  "sender": "Brandon Ellis <bellis@cobaltfreight.com>",
+  "text": "Hi Renee,\n\nI've taken over from Patty, who retired at the end of October. Looking forward to working with you. I'll be your go-to for statements and disputes.\n\nWith the finance system migration Patty started, our deposit information is different now, so I'll get you the replacement ACH form this week. Please start using it as soon as you have it.\n\nBest,\nBrandon Ellis\nAccounts Receivable, Cobalt Freight LLC",
+  "label": "change_request",
+  "vendor": "cobalt",
+  "note": "Friendly intro, redirect is one clause, details to follow."
+}

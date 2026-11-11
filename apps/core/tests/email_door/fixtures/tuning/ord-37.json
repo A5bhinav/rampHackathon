@@ -1,0 +1,8 @@
+{
+  "subject": "Confirming our bank details",
+  "sender": "Morgan Pryce <ar@cobalt.example>",
+  "text": "Our auditors asked us to confirm with customers that you have the right bank info for us.\nCould you read back what you have on file? We believe it is correct and no change is needed.",
+  "label": "ordinary",
+  "vendor": "cobalt",
+  "note": "Near miss: confirmation of existing details, no change."
+}

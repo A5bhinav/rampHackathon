@@ -1,0 +1,8 @@
+{
+  "subject": "Invoice INV-30418 approved for payment",
+  "sender": "SupplierHub Notifications <no-reply@supplierhub-portal.com>",
+  "text": "SupplierHub\n\nInvoice INV-30418 from Harbor Safety Supply has been approved by all approvers and is scheduled for payment on 11/20/2026.\n\nAmount: $2,115.00\nPayment method: ACH to the account on file\n\nNo further action is required.",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Portal approval notice for an unknown vendor."
+}

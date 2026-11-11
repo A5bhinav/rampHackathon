@@ -1,0 +1,8 @@
+{
+  "subject": "Demande de remboursement - avoir AV-2026-118",
+  "sender": "Claire Dubois <c.dubois@dubois-equipements.fr>",
+  "text": "Bonjour,\n\nSuite a l'avoir AV-2026-118 que vous nous avez emis pour la marchandise retournee, merci de proceder au remboursement de 1 240,00 USD par virement sur notre compte :\n\nTitulaire : Dubois Equipements SAS\nIBAN : FR76 3000 6000 0112 3456 7890 189\nBIC : AGRIFRPP\n\nCordialement,\nClaire Dubois\nService Comptabilite\nDubois Equipements SAS",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "French-language customer refund request with the customer's own IBAN. Not a vendor redirect. Accents dropped."
+}

@@ -7,6 +7,7 @@ a wrong one sends a case to a person, never a payment to a new account (R1, R7).
 from __future__ import annotations
 
 import datetime as dt
+import logging
 import re
 from typing import Any
 
@@ -14,6 +15,8 @@ import httpx
 
 from .http import API, RampHttpAdapter
 from .port import RampAccount, RampAuditEvent, RampBill, RampError, RampHold, RampNotFound, RampVendor
+
+log = logging.getLogger(__name__)
 
 PAGE = 100  # Ramp's largest page
 PLACED, RELEASED = "Vendor placed on hold", "Vendor hold released"
@@ -49,7 +52,8 @@ def account_from(j: dict[str, Any], vendor_id: str) -> RampAccount:
     if not isinstance(last4, str) or not FOUR_DIGITS.match(last4):
         raise RampError(f"Ramp's account {j.get('id')} has no four last digits, so a change to it can't be checked")
     return RampAccount(id=j["id"], vendor_id=vendor_id, routing_number="", last4=last4, account_type=None,
-                       bank_name=None, is_active=j.get("status") == "active", created_at=None)
+                       bank_name=None, is_active=j.get("status") == "active", created_at=None,
+                       pending=j.get("status") == "pending_approval")  # spec 0093, D1
 
 
 def bill_from(j: dict[str, Any]) -> RampBill:
@@ -71,6 +75,10 @@ def audit_from(j: dict[str, Any], event_type: str) -> RampAuditEvent:
 
 
 class RampSandboxAdapter(RampHttpAdapter):
+    def __init__(self, *args: Any, watch_vendors: tuple[str, ...] = (), **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self._watch_vendors = watch_vendors
+
     def _error_detail(self, response: httpx.Response) -> str:
         """Ramp's error_v2: its code, id and explanation, so a refusal says what was wrong."""
         try:
@@ -119,10 +127,19 @@ class RampSandboxAdapter(RampHttpAdapter):
                 vendors.append(vendor_from(await self._request("GET", f"{API}/vendors/{vendor_id}")))
             except RampNotFound:  # merged or deleted: Ramp can't pay it
                 continue
+        for vendor_id in self._watch_vendors:  # spec 0102: the demo's vendors, whatever Ramp says changed
+            if vendor_id in listed:
+                continue
+            listed.add(vendor_id)
+            try:
+                vendors.append(vendor_from(await self._request("GET", f"{API}/vendors/{vendor_id}")))
+            except RampError as exc:  # the next poll reads it again; the bank events above can't be skipped like this
+                log.warning("RAMP_SANDBOX_WATCH_VENDORS names %s, which couldn't be read: %s", vendor_id, exc)
         return vendors
 
     async def list_vendor_accounts(self, vendor_id: str) -> list[RampAccount]:
-        return [account_from(a, vendor_id) for a in await self._all_pages(f"/vendors/{vendor_id}/accounts", {"page_size": PAGE})]
+        params = {"page_size": PAGE, "include_pending": "true"}  # spec 0093, D1: changes waiting for review too
+        return [account_from(a, vendor_id) for a in await self._all_pages(f"/vendors/{vendor_id}/accounts", params)]
 
     async def list_bills_for_vendor(self, vendor_id: str) -> list[RampBill]:
         bills = [bill_from(b) for b in await self._all_pages("/bills", {"vendor_id": vendor_id, "page_size": PAGE})]

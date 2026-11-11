@@ -1,0 +1,8 @@
+{
+  "subject": "Cobalt Freight - remittance update (office email is down)",
+  "sender": "Teresa Vance <teresa.vance.cobaltfreight@gmail.com>",
+  "text": "Hi Karen,\n\nOur email server has been down since this morning so I am writing from my personal account. Please note that from this week Cobalt Freight LLC receives payments at:\n\nRegions Bank\nRouting 062000019\nAccount 2200398811\n\nThis applies to invoices CF-20931, CF-20955 and anything after. I will resend from my work email once it is back.\n\nThanks,\nTeresa",
+  "label": "change_request",
+  "vendor": "cobalt",
+  "note": "Request from a free-mail address that imitates a known vendor contact."
+}

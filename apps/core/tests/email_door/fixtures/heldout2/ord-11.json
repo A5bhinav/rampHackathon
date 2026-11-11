@@ -1,0 +1,8 @@
+{
+  "subject": "Price adjustment notice - effective January 1, 2027",
+  "sender": "Acme Fasteners Sales <sales@acmefasteners.com>",
+  "text": "Dear Valued Customer,\n\nDue to continued increases in steel wire rod and zinc plating costs, Acme Fasteners will implement a price adjustment of 6.5 percent on carbon steel fasteners and 4 percent on stainless products, effective for orders placed on or after January 1, 2027.\n\nOrders placed before that date will be honored at current pricing, including blanket orders with releases scheduled through March 31, 2027.\n\nYour account manager will reach out with an updated price sheet. We appreciate your understanding and continued partnership.\n\nSincerely,\nAcme Fasteners Sales Team",
+  "label": "ordinary",
+  "vendor": "acme",
+  "note": "Price-change notice with formal 'effective date' wording similar to bank-change letters."
+}

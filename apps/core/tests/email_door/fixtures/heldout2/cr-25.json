@@ -1,0 +1,8 @@
+{
+  "subject": "Updated Vendor Banking Details",
+  "sender": "Acme Fasteners Accounts <accounts@acme-fastener.com>",
+  "text": "Dear Accounts Payable,\n\nKindly be informed that we have changed our bank account due to the ongoing annual audit, and all payments of outstanding and future invoices should be made to our new bank account. Kindly update your records with the below details:\n\nAccount Name: Acme Fasteners LLC\nBank Name: TD Bank, N.A.\nRouting Number: 031101266\nAccount Number: 4392018847\n\nKindly confirm the outstanding invoices and when payment will be made so that we can update our ledger.\n\nBest Regards,\nAccounts Department\nAcme Fasteners LLC",
+  "label": "change_request",
+  "vendor": "acme",
+  "note": "Classic BEC template from a lookalike domain (acme-fastener.com, hyphenated, no s)."
+}

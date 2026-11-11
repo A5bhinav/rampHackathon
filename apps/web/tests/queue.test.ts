@@ -4,7 +4,7 @@ import { test } from "node:test";
 import { canAct, needsYou, readPermissions, rowAction } from "../src/lib/queue.ts";
 import { stationCounts } from "../src/lib/stations.ts";
 
-const perms = (o: Partial<{ can_approve: boolean; can_reject: boolean; can_review: boolean }> = {}) =>
+const perms = (o: Partial<{ can_approve: boolean; can_reject: boolean; can_review: boolean; can_dismiss: boolean }> = {}) =>
   ({ can_approve: false, can_reject: false, can_review: false, reasons: [], ...o });
 
 test("canAct is the lock card's rule: any console the core offers", () => {
@@ -12,6 +12,7 @@ test("canAct is the lock card's rule: any console the core offers", () => {
   assert.equal(canAct(perms({ can_approve: true })), true);
   assert.equal(canAct(perms({ can_reject: true })), true);
   assert.equal(canAct(perms({ can_review: true })), true);
+  assert.equal(canAct(perms({ can_dismiss: true })), true, "the email door's dismiss console (spec 0090)");
   assert.equal(canAct(null), false, "permissions that couldn't be read: fail closed");
 });
 

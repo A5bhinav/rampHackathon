@@ -1,0 +1,8 @@
+{
+  "subject": "Your account number has changed",
+  "sender": "Customer Care <customercare@midstateenergy.example>",
+  "text": "Dear Customer,\n\nWe have completed an upgrade to our billing system. Your service account number has changed from 4471-2209 to 900173344102. Please use your new account number on all future correspondence and when paying your bill.\n\nOur payment address and online payment options remain the same.\n\nMidstate Energy Customer Care",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Customer account number at a utility, not a bank account."
+}

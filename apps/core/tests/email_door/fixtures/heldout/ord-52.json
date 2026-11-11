@@ -1,0 +1,8 @@
+{
+  "subject": "Lunch order invoice",
+  "sender": "Karim Aziz <karim@azizcatering.example>",
+  "text": "Invoice for the Oct 30 team lunch, $640. Please pay by check to the address on the invoice.",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Invoice by check."
+}
