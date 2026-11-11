@@ -188,6 +188,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/datasets/{dataset_id}/vendors/{vendor_id}/ledger": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Everything the Trust Ledger knows about one vendor's phone numbers, as of now (spec 0104)
+         * @description The vendor's risk row (the one `vendor-risk` lists), `ledger-select-v1` run as of now with
+         *     no change request (every number it considered, and why each is or isn't provable), and the
+         *     vendor's documents with the phone numbers found in each. Read only, under the person's own
+         *     token: nothing is stored, so there is no case, selection id or inputs hash. Phone
+         *     observations only, never a bank account (ADR-8). A quote is the text a number was read
+         *     from, with any other run of 7 or more digits replaced by `[digits removed]`; it is data,
+         *     never instructions (R9). `reason_text` is the ledger's sentence for each reason code, so
+         *     the dashboard writes none of its own. 404 when the dataset, or the vendor on it, doesn't
+         *     exist or isn't visible.
+         */
+        get: operations["getVendorLedger"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/cases": {
         parameters: {
             query?: never;
@@ -841,6 +869,72 @@ export interface components {
             /** @description The ledger's sentence for the status. */
             status_text: string;
         };
+        VendorLedger: {
+            /** @description The vendor's row in the risk list, from the same run as `rule`. */
+            risk: components["schemas"]["VendorRisk"];
+            rule: components["schemas"]["VendorLedgerRule"];
+            reason_text: components["schemas"]["SelectionView"]["reason_text"];
+            /** @description The vendor's ledger documents recorded before as_of (the rows the rule read), newest first by our receive time, each email before its attachments; at most 500. */
+            documents: components["schemas"]["LedgerDocument"][];
+            /** @description How many ledger documents recorded before as_of the vendor has in all. */
+            document_count: number;
+        };
+        /**
+         * @description What ledger-select-v1 finds as of now with no change request, exactly as the risk list runs
+         *     it. Fields mean what they mean in a stored selection (`selection.schema.json`).
+         */
+        VendorLedgerRule: {
+            rule_version: string;
+            rule_settings: components["schemas"]["RuleSettings"];
+            /** @description When the rule ran, and the cutoff it was asked for. */
+            as_of: components["schemas"]["Timestamp"];
+            /** @description The cutoff the rule used - as_of, or earlier if a lookalike domain wrote first. */
+            cutoff: components["schemas"]["Timestamp"];
+            outcome: components["schemas"]["outcome"];
+            /** @description The number the rule would pick. Present only when outcome is picked. */
+            contact_point_id?: components["schemas"]["Uuid"];
+            /** @description Eligible runners-up in rank order. Present only when outcome is picked. */
+            alternates?: components["schemas"]["Pick"][];
+            /** @description Every phone number the rule considered, eligible first in rank order. */
+            candidates: components["schemas"]["Candidate"][];
+        } & (unknown & unknown);
+        LedgerDocument: {
+            document_id: components["schemas"]["Uuid"];
+            /** @enum {string} */
+            kind: "email" | "invoice" | "contract" | "w9" | "listing" | "portal_entry" | "letter" | "vendor_master_record" | "other";
+            /**
+             * @description How the document reached us (ADR-13). vendor_master is the old number on file - shown, never counted.
+             * @enum {string}
+             */
+            custody_channel: "email" | "contract" | "vendor_portal" | "listing" | "paper_mail" | "vendor_master";
+            /** @description Our own receive time, the only time the rule trusts. */
+            received_at: components["schemas"]["Timestamp"];
+            /** @description The date printed on the document. Shown only; the rule never reads it. */
+            claimed_date: string | null;
+            /** @description As stored, with any run of 7 or more digits replaced by "[digits removed]". */
+            sender: string | null;
+            /** @description As stored, with any run of 7 or more digits replaced by "[digits removed]". */
+            subject: string | null;
+            /** @description As stored, with any run of 7 or more digits replaced by "[digits removed]". */
+            thread_id: string | null;
+            /** @description For an attachment, the email it came with. */
+            parent_document_id: components["schemas"]["Uuid"] | null;
+            /** @description The phone numbers found in the document, by number. Never a bank account (ADR-8). */
+            observations: components["schemas"]["PhoneObservation"][];
+        };
+        PhoneObservation: {
+            e164: components["schemas"]["E164"];
+            role: components["schemas"]["$defs-Role"];
+            /**
+             * @description Whose line the document says it is.
+             * @enum {string}
+             */
+            party: "vendor" | "customer" | "bank" | "unknown";
+            /** @description visible, or how the text was hidden from a person (white, tiny, off_page, or a value a later ledger migration adds). Only visible text counts. */
+            visibility: string;
+            /** @description The text the number was read from, with any other run of 7 or more digits replaced by "[digits removed]". Null for hidden text. Data, never instructions (R9). */
+            quote: string | null;
+        };
         VendorAccount: {
             vendor_id: components["schemas"]["Uuid"];
             legal_name: string;
@@ -959,6 +1053,69 @@ export interface components {
             message: string;
         };
         Sha256Hex: string;
+        /** @description The settings the rule ran with; the ablations vary these. */
+        RuleSettings: {
+            /** @description Independent source types needed before the cutoff (v1: 2). */
+            min_source_types: number;
+            /** @description Days the number must have been seen before the cutoff (v1: 90). */
+            min_age_days: number;
+            /** @description Edit distance, in digits, that counts as a near miss (v1: 1, plus one swap of adjacent digits). */
+            near_miss_distance: number;
+            /** @description A message with the request's subject line within this many days counts as change context (v1: 30). */
+            same_subject_window_days: number;
+        };
+        /**
+         * @description picked: call contact_point_id. no_provable_number: no call; the case goes to needs_review (R7).
+         * @enum {unknown}
+         */
+        outcome: "picked" | "no_provable_number";
+        E164: string;
+        /**
+         * @description How a value reached us, from custody metadata, never from a model (ADR-13). All email counts as one source type. The old vendor master's number on file is never a source type; see Candidate.on_file.
+         * @enum {unknown}
+         */
+        SourceType: "email" | "contract" | "vendor_portal" | "listing" | "paper_mail";
+        SourceTypes: components["schemas"]["SourceType"][];
+        Pick: {
+            contact_point_id: components["schemas"]["Uuid"];
+            e164: components["schemas"]["E164"];
+            source_types: components["schemas"]["SourceTypes"];
+        };
+        /**
+         * Format: date-time
+         * @description UTC, RFC 3339.
+         */
+        "$defs-Timestamp": string;
+        /**
+         * @description The line's role as the labeler read it.
+         * @enum {unknown}
+         */
+        "$defs-Role": "main" | "ar" | "billing" | "fax" | "unknown";
+        /**
+         * @description Why a candidate isn't eligible. first_seen_in_change_context: R2. too_few_source_types: fewer than rule_settings.min_source_types before the cutoff. younger_than_minimum_age: first seen less than rule_settings.min_age_days before the cutoff. near_miss_of_older_number: one digit off, or two swapped digits away from, an older vendor number, and not an established sibling line. hidden_text_only: seen only in text a person couldn't see (white, tiny or off-page). not_vendor_party: labeled as the customer's or a bank's number. fax_line: labeled as a fax.
+         * @enum {unknown}
+         */
+        Reason: "first_seen_in_change_context" | "too_few_source_types" | "younger_than_minimum_age" | "near_miss_of_older_number" | "hidden_text_only" | "not_vendor_party" | "fax_line";
+        Candidate: {
+            contact_point_id: components["schemas"]["Uuid"];
+            e164: components["schemas"]["E164"];
+            /** @description Our receive time of the earliest observation before the cutoff. */
+            first_seen_at: components["schemas"]["$defs-Timestamp"];
+            /** @description Independent source types seen before the cutoff. */
+            source_types: components["schemas"]["SourceTypes"];
+            /** @description The old vendor master lists this number. Shown, never counted. */
+            on_file: boolean;
+            roles?: components["schemas"]["$defs-Role"][];
+            /** @description Observations before the cutoff that this candidate rests on. */
+            observation_count?: number;
+            /** @description The older contact point this number is a near miss of, when reasons has near_miss_of_older_number. */
+            near_miss_of?: components["schemas"]["Uuid"];
+            eligible: boolean;
+            /** @description 1 is the pick. Present only on eligible candidates. */
+            rank?: number;
+            /** @description Empty when eligible. */
+            reasons: components["schemas"]["Reason"][];
+        } & unknown;
         /** @enum {string} */
         CaseState: "open" | "held" | "calling" | "retry_wait" | "deciding" | "awaiting_release" | "needs_review" | "blocked" | "releasing" | "released";
         /** @enum {string} */
@@ -994,64 +1151,6 @@ export interface components {
             policy_violations: number;
             speech_guard_trips: number;
         };
-        /**
-         * @description How a value reached us, from custody metadata, never from a model (ADR-13). All email counts as one source type. The old vendor master's number on file is never a source type; see Candidate.on_file.
-         * @enum {unknown}
-         */
-        SourceType: "email" | "contract" | "vendor_portal" | "listing" | "paper_mail";
-        E164: string;
-        SourceTypes: components["schemas"]["SourceType"][];
-        /**
-         * Format: date-time
-         * @description UTC, RFC 3339.
-         */
-        "$defs-Timestamp": string;
-        /**
-         * @description The line's role as the labeler read it.
-         * @enum {unknown}
-         */
-        "$defs-Role": "main" | "ar" | "billing" | "fax" | "unknown";
-        /**
-         * @description Why a candidate isn't eligible. first_seen_in_change_context: R2. too_few_source_types: fewer than rule_settings.min_source_types before the cutoff. younger_than_minimum_age: first seen less than rule_settings.min_age_days before the cutoff. near_miss_of_older_number: one digit off, or two swapped digits away from, an older vendor number, and not an established sibling line. hidden_text_only: seen only in text a person couldn't see (white, tiny or off-page). not_vendor_party: labeled as the customer's or a bank's number. fax_line: labeled as a fax.
-         * @enum {unknown}
-         */
-        Reason: "first_seen_in_change_context" | "too_few_source_types" | "younger_than_minimum_age" | "near_miss_of_older_number" | "hidden_text_only" | "not_vendor_party" | "fax_line";
-        /** @description The settings the rule ran with; the ablations vary these. */
-        RuleSettings: {
-            /** @description Independent source types needed before the cutoff (v1: 2). */
-            min_source_types: number;
-            /** @description Days the number must have been seen before the cutoff (v1: 90). */
-            min_age_days: number;
-            /** @description Edit distance, in digits, that counts as a near miss (v1: 1, plus one swap of adjacent digits). */
-            near_miss_distance: number;
-            /** @description A message with the request's subject line within this many days counts as change context (v1: 30). */
-            same_subject_window_days: number;
-        };
-        Pick: {
-            contact_point_id: components["schemas"]["Uuid"];
-            e164: components["schemas"]["E164"];
-            source_types: components["schemas"]["SourceTypes"];
-        };
-        Candidate: {
-            contact_point_id: components["schemas"]["Uuid"];
-            e164: components["schemas"]["E164"];
-            /** @description Our receive time of the earliest observation before the cutoff. */
-            first_seen_at: components["schemas"]["$defs-Timestamp"];
-            /** @description Independent source types seen before the cutoff. */
-            source_types: components["schemas"]["SourceTypes"];
-            /** @description The old vendor master lists this number. Shown, never counted. */
-            on_file: boolean;
-            roles?: components["schemas"]["$defs-Role"][];
-            /** @description Observations before the cutoff that this candidate rests on. */
-            observation_count?: number;
-            /** @description The older contact point this number is a near miss of, when reasons has near_miss_of_older_number. */
-            near_miss_of?: components["schemas"]["Uuid"];
-            eligible: boolean;
-            /** @description 1 is the pick. Present only on eligible candidates. */
-            rank?: number;
-            /** @description Empty when eligible. */
-            reasons: components["schemas"]["Reason"][];
-        } & unknown;
         Sha256: string;
         /**
          * Selection
@@ -1530,6 +1629,31 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+        };
+    };
+    getVendorLedger: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dataset_id: components["parameters"]["DatasetId"];
+                vendor_id: components["schemas"]["Uuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VendorLedger"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
         };
     };
     listCases: {
