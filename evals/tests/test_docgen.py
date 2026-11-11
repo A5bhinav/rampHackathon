@@ -333,11 +333,12 @@ def test_g7_blames_only_the_labels_that_move_the_call(_today_rule):
     assert found == ["G7/bank_verification_line/label_number", "G7/main/number_label"]
 
 
-def test_g7_sweeps_every_layout_of_the_real_number():
+def test_g7_sweeps_every_layout_of_the_real_number(_today_rule):
     # G7's worlds are a sweep, not a sample: every phrasing and placement the generator renders is the change
     # context's one visible mention of the vendor's real number, once with a planted provable number and once
     # without. So G7's patterns are the same at every seed (the fresh review found 8 of 81 at seed 0 and 14
-    # to 16 unlisted ones at seeds 1 to 3 when the worlds were drawn at random).
+    # to 16 unlisted ones at seeds 1 to 3 when the worlds were drawn at random). Today's rule, since spec 0091's
+    # rule fails none of them, at any seed (the docs gate holds that).
     from collections import Counter
     layouts = [(p, pl) for p in docbank.PHRASINGS for pl in docbank.PLACEMENTS
                if docbank.PHRASINGS[p].form in docbank.PLACEMENT_FORMS[pl]]
@@ -496,7 +497,7 @@ def _recount(plans) -> tuple:
                 fax, fax_right = fax + (n.role == "fax"), fax_right + (n.role == "fax" and right)
     return dict(sorted(by.items())), roles, roles_right, fax, fax_right
 
-def test_stub_report_has_every_count(tmp_path, capsys):
+def test_stub_report_has_every_count(tmp_path, capsys, _today_rule):
     from collections import Counter
 
     from dialback_evals.cli import main
@@ -526,7 +527,7 @@ def test_stub_report_has_every_count(tmp_path, capsys):
                                               body["fax_lines_labeled_another_role"],
                                               body["fax_lines_labeled_another_role_with_the_party_right"])
     # G7 also counts the worlds where change-context text refuses the case and nobody is called (A1's
-    # fail-safe side), which I12 allows.
+    # fail-safe side), which I12 allows. Today's rule here: under spec 0091's rule no such world remains.
     assert body["g7_refused_no_call_worlds"] > 0
     # Stub-readable is computed, not hand-tagged, so both sides of the split hold vendor claims; and by its
     # own definition the stub never leaves a stub-readable vendor claim unlabeled.
