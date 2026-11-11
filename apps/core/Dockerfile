@@ -10,6 +10,8 @@ COPY . .
 RUN uv sync --frozen --no-dev --no-editable --package dialback-core
 
 FROM python:3.13-slim-bookworm
+# Tesseract reads the phone numbers in real PDFs (spec 0092, D10a).
+RUN apt-get update && apt-get install -y --no-install-recommends tesseract-ocr && rm -rf /var/lib/apt/lists/*
 RUN useradd --create-home --uid 10001 dialback
 WORKDIR /app
 COPY --from=build /app/.venv /app/.venv
