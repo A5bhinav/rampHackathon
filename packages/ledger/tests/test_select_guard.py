@@ -250,15 +250,19 @@ def test_flag_default_and_unknown_values_give_the_new_rule(monkeypatch, value):
     assert run(_a3())["outcome"] == "withheld"
 
 
-@pytest.mark.parametrize(("value", "version"), [("off", "ledger-select-v1"), (None, RULE_VERSION), ("on", RULE_VERSION)])
-def test_a_refusal_names_the_rule_the_flag_runs(monkeypatch, value, version):
+@pytest.mark.parametrize(("guard", "bar", "version"), [
+    ("off", None, "ledger-select-v1"), (None, None, RULE_VERSION), ("on", None, RULE_VERSION),
+    ("on", "off", RULE_VERSION_GUARD)])
+def test_a_refusal_names_the_rule_the_flag_runs(monkeypatch, guard, bar, version):
     # A refusal before the rule runs (here, no database) names the rule that would have run: with the
-    # flag off, today's rule (the review's item 6).
+    # guard off, today's rule (the review's item 6); with the label bar off, spec 0079's (v3). Both
+    # flags are set or cleared here, so the environment can't leak in.
     monkeypatch.delenv("DATABASE_URL", raising=False)
-    if value is None:
-        monkeypatch.delenv("DIALBACK_CONTEXT_GUARD", raising=False)
-    else:
-        monkeypatch.setenv("DIALBACK_CONTEXT_GUARD", value)
+    for name, value in (("DIALBACK_CONTEXT_GUARD", guard), ("DIALBACK_LABEL_BAR", bar)):
+        if value is None:
+            monkeypatch.delenv(name, raising=False)
+        else:
+            monkeypatch.setenv(name, value)
     got = asyncio.run(select_number(case_id=uuid.uuid4(), dataset_id=uuid.uuid4(), vendor_id=uuid.uuid4(),
                                     cutoff=dt.datetime.now(dt.UTC)))
     assert got.get("contact_point_id") is None, "a refusal never names a number"
