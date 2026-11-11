@@ -36,12 +36,20 @@ It serves:
 
 ## Contract touched
 
-`supabase/migrations/ledger/`: the enum `ledger.visibility` grows two values. They land in their
-own PR before Part A's code (contracts only grow):
+One contract PR lands before Part A's code (contracts only grow). It holds:
 
-- `no_ink`: a person can't see it, because the rendered page shows nothing where it sits
-  (Part A).
-- `unverified`: its digits couldn't be confirmed (Part B).
+- **`supabase/migrations/ledger/`:** the enum `ledger.visibility` grows two values.
+  - `no_ink`: a person can't see it, because drawing it leaves no mark on the page (Part A).
+  - `unverified`: its digits couldn't be confirmed (Part B).
+- **The selection contract** (`packages/contracts/schemas/selection.schema.json` and
+  `packages/contracts/openapi/dialback.yaml`):
+  - The description of `hidden_text_only` widens to "white, tiny, off the page, or no ink". A
+    number seen only in `no_ink` text gets that reason (Part A).
+  - A new reason, `unconfirmed_digits_only`, covers a number seen where a person could see it,
+    but only in text whose digits couldn't be confirmed (Part B). Its sentence goes in
+    `reasons.py`.
+  - `store.change_context` treats it like `hidden_text_only`: the number was never confirmed
+    where a person could see it.
 
 Observations and documents keep their columns.
 
@@ -73,17 +81,22 @@ Observations and documents keep their columns.
    - `white`: its fill colour, converted from gray, RGB or CMYK to RGB, has every channel at
      `F0` or above. A colour the reader can't convert (a pattern, a separation, an ICC profile it
      can't read) counts as white (R7).
-   - `no_ink`: the page, rendered with PDFium (`pypdfium2`, which pdfplumber already depends
-     on), shows no ink in the character's box. Ink means pixels that differ from the box's
-     surrounding background. Whitespace is exempt.
+   - `no_ink`: drawing the span leaves no mark. The page is rendered with PDFium (`pypdfium2`,
+     which pdfplumber already depends on) twice: as it is, and with only the text objects that
+     draw this span removed. If the two renders don't differ inside the span's box, the span
+     has no ink. Whitespace is exempt. A span the reader can't isolate this way counts as
+     `no_ink` (R7).
 
-   The ink rule catches three things:
+   Comparing with and without the span, rather than the box against its surroundings, is what
+   catches text drawn over other ink. The ink rule catches five things:
    - text under a filled shape or an image drawn after it;
-   - text in invisible render mode (mode 3);
-   - text clipped away.
+   - text in invisible render mode (mode 3), including over a black bar its own size;
+   - text clipped away;
+   - an invisible number set so that it overlaps a visible line's glyphs;
+   - white text over a shape the same white.
 
-   The resolution and contrast threshold are the builder's, pinned by two tests: every visible
-   character in every round-trip document has ink, and every planted hidden one has none.
+   The resolution and pixel threshold are the builder's, pinned by two tests: every visible
+   span in every round-trip document has ink, and every planted hidden one has none.
 4. **What the reader refuses.** The document fails closed with `PdfRefused(reason)`: nothing of
    it is stored, as with spec 0049's `ReaderFailed`. It refuses:
    - an encrypted or unparseable file;
@@ -115,6 +128,18 @@ Observations and documents keep their columns.
      express: `trick: cover_rect | cover_image | invisible | clipped`. The ledger's
      page-model path ignores `trick`, so the PDF reader has to find these from the PDF itself.
    - A trick span's expected visibility is `no_ink`.
+   - A page model's `scan` flag is ignored in Part A: C04's scanned contract is rendered as a
+     digital PDF, so C04 keeps its second source type. Part B renders `scan: true` documents
+     as scans (D11).
+   - **One precondition, and a fix to spec 0052's renderer.** No two spans on a page may
+     overlap. A test checks this for every source and names any page that breaks it.
+     Spec 0052's `docgen.render` breaks it today: `HIDE["off_page"]` moves every span of a
+     hidden row to the same x, so an off-page table row's label and number sit on top of each
+     other.
+     - **The fix:** Part A's first PR changes that rule to move a hidden row's spans by one
+       offset, keeping their relative x.
+     - **Re-run:** `lab docs` runs again at its seeds, and any change to its patterns is
+       reported. The frozen cases hold no hidden spans, so they don't change.
 7. **Round trip is the main check.** Every page model is rendered, then read back:
    - **Sources:** the corpus (20 scenarios), the demo seed, and spec 0052's generator (its frozen
      cases and seeds 0 to 4, once #125 lands).
@@ -132,18 +157,31 @@ Observations and documents keep their columns.
    - **The demo's PDFs:** the lab renders the demo seed into
      `packages/ledger/src/dialback_ledger/demo_pdfs/`, and `lab pdf render --check` keeps them
      current, like the corpus generator's `--check`.
-   - **`dialback-ledger demo load --pdf`:** loads those PDFs instead of the JSON. It writes the
-     same observations as `demo load`, apart from `sha256` and `extractor_version`.
+   - **`dialback-ledger demo load --pdf [DIR]`:** loads those PDFs instead of the JSON, or the
+     PDFs in `DIR` when given. It writes the same observations as `demo load`, apart from
+     `sha256` and `extractor_version`.
+   - **A live run with a team phone.** The product can't re-render a PDF, so the swap moves to
+     render time:
+     - `lab pdf render --demo --phone acme=+1... --out DIR` writes the demo seed's PDFs with
+       the team phone already in them. `DIR` must be outside the repo, because team phones are
+       never committed.
+     - `demo load --pdf DIR` then reads them, so each stored hash is the hash of the file
+       actually read, and its rows match it.
+     - `--pdf` with `--phone` is refused, since the phone is already in the PDFs.
+     - `dialback-core demo prepare` passes `--pdf DIR` through. The change request stays JSON:
+       it's an email, not a PDF.
    - **`dialback-ledger read-pdf FILE`:** prints each line with its visibility, plus the phone
      candidates code found. It labels and stores nothing.
-10. **Known limit until Part B: the pixels say one thing, the text layer another.** In two cases
-    there is ink, but not the digits the text layer holds:
-    - a font whose character map is altered, so it shows one digit and extracts another;
-    - an image drawn over text, showing other digits.
-
-    Part A reads the text layer. So the lab plants one of each, using fontTools on a font whose
-    license allows changes, and lists both as strict known failures, in spec 0048 D3's manner,
-    with their findings. They turn red once Part B's pixel check lands.
+10. **Known limit until Part B: the glyphs say one thing, the text layer another.**
+    - **The case:** a font whose character map is altered shows one digit and extracts another.
+      There is ink, but not the digits the text layer holds.
+    - **Why Part A misses it:** Part A reads the text layer, so it reads what the map says.
+    - **The plant:** the lab plants one, with two digit glyphs swapped using fontTools on a font
+      whose license allows changes.
+    - **Its listing:** it goes on the list as a strict known failure, in spec 0048 D3's manner,
+      with its finding. It turns red once Part B's pixel check lands.
+    - **Not in this limit:** an image drawn over text is caught by the ink rule (D3), because
+      removing the covered text changes nothing on the page.
 
 ### Part B: scans and the pixel check
 
@@ -152,6 +190,10 @@ Observations and documents keep their columns.
     - a PNG, JPEG or TIFF file;
     - a page whose only text is in invisible render mode over a full-page image. That's someone
       else's OCR, and it's ignored.
+
+    The corpus's C04 scanned contract goes through the scan path in Part B's tests. Corpus gate
+    B runs it in CI with real Tesseract and a faked vision call that returns the page's true
+    lines; live vision calls happen only in the scored run.
 12. **Two readings.**
     - **The text layer comes from local OCR.**
       - The engine: Tesseract 5 through `pytesseract`, in English, run locally, with each word's
@@ -167,14 +209,24 @@ Observations and documents keep their columns.
       - Failure: an error or an off-schema reply fails the document closed.
       - Redaction first: before the image is sent, the boxes of OCR words holding 7 or more
         digits that aren't part of a phone candidate are filled black, as spec 0049 redacts text.
+        This is best effort, not a guarantee: a digit run that OCR misses or misreads, likelier
+        on `fax` and `photo`, reaches the API unredacted. The lab measures how often (D17).
+        Every document is fictional today. A real deployment needs a decision on this first
+        (out of scope).
       - Where its output goes: its transcription never reaches the labeler and is never stored.
 13. **The agreement rule.**
     - **Visible:** a phone candidate that code finds in the OCR page model stays `visible` only
       if both hold:
       - every OCR word holding its digits has a confidence of at least `C_MIN`;
-      - code finds the same E.164 number in the vision transcription of the same page.
+      - code finds the same E.164 number on the matching line of the vision transcription. The
+        matching line is the vision line most like the OCR line, by normalized edit similarity,
+        above a floor the builder sets on development data.
+
+      A match anywhere on the page isn't enough: P01 and P08 put near-identical numbers on one
+      page, and change emails say "new X (was Y)". The matching is also count-aware, so a number
+      OCR finds twice needs two matches.
     - **Otherwise unverified:** its span becomes `unverified`. It's kept, it's never eligible,
-      and it has no quote.
+      it has no quote, and a number seen only this way gets `unconfirmed_digits_only`.
     - **Vision only:** a number that only the vision call reads is not a candidate. It's counted
       as dropped, with the reason "vision only".
     - **`C_MIN`:** set on development data, then frozen before the held-out run.
@@ -183,7 +235,7 @@ Observations and documents keep their columns.
       from the rendered page region around it.
     - **The result:** if OCR's digits differ from the text layer's, or its confidence is below
       `C_MIN`, the span is `unverified`.
-    - **What it closes:** decision 10's two cases. It makes no API call.
+    - **What it closes:** decision 10's glyph swap. It makes no API call.
 15. **Flags and installs.**
     - **`DIALBACK_SCANS=off|on`:** the default is `off`. With it off, a scan page fails its
       document closed with `PdfRefused("scan")`. With it on, both Tesseract and
@@ -198,18 +250,37 @@ Observations and documents keep their columns.
     - `photo`: perspective, blur and uneven light.
 
     The truth is the plan's, so every digit can be scored.
-17. **The bars, set now, for Part B's scored run.**
-    - **The run:** held-out seeds 1000 to 1199, never run before (development uses 0 to 99), on
-      each profile, 3 times, because the vision call varies.
-    - **No unsafe digits:** in every run, no `visible` phone number whose digits differ from the
-      truth. Zero of N only bounds the true rate below about 3/N (the rule of three), so the
-      report states N.
-    - **Over-blocks:** a true visible number left `unverified` is an over-block. They must be at
-      most 2% on `clean` and at most 10% on `office`, in every run. `fax` and `photo` are
-      reported only.
+17. **The bars, set now, for Part B's scored run.** These are fixed before any data exists.
+    - **The documents:**
+      - Development: spec 0052's `draw_docs(examples=200, seed=s)` for seeds 0 to 4.
+      - Held out: the same at seed 1000, never run before: 200 documents.
+      - Each document is rendered at every profile, with its damage drawn from the same seed,
+        and the held-out set runs 3 times, because the vision call varies.
+    - **Matching to the truth is by position, not by value.** Each true visible number's span
+      has a box from the plan. A candidate matches the true number whose box overlaps its OCR
+      box. A `visible` candidate with no overlapping true number, or with digits that differ
+      from the one it overlaps, is unsafe. So a misread that happens to give another planted
+      number still counts as unsafe.
+    - **No unsafe digits, on all four profiles:**
+      - in every run, no unsafe `visible` candidate on `clean`, `office`, `fax` or `photo`;
+      - production can't tell which profile a scan is, so one unsafe digit anywhere keeps scans
+        off;
+      - zero of N only bounds the true rate below about 3/N (the rule of three), so the report
+        states N for each profile.
+    - **Over-blocks:** a true visible number that doesn't end up as a `visible` candidate with
+      the right digits is an over-block. That includes numbers OCR never found, so missing
+      numbers can't pass the bar.
+      - At most 2% on `clean` and 10% on `office`, in every run.
+      - `fax` and `photo` are reported only.
+    - **No new wrong-party labels:** through the scan path, the labeler (the stub, and the LLM
+      reader if it's switched on) shows no G3 or G4 pattern (spec 0052) that the same document
+      doesn't show through its digital PDF. OCR garbling a party word must not turn another
+      party's line into the vendor's.
     - **The pixel check:** on Part A's round-trip documents it leaves no visible number
-      `unverified`, and it catches both decision-10 plants.
-    - **Reported, exploratory:** OCR alone and vision alone, per profile.
+      `unverified`, and it catches the decision-10 plant.
+    - **Reported, exploratory:**
+      - OCR alone and vision alone, per profile;
+      - how often a non-phone run of 7 or more digits reached the API unredacted (D12).
 
     If a bar fails, scans stay off. Changing a bar or `C_MIN` after the held-out run needs fresh
     held-out seeds, and the first result is reported next to the new one.
@@ -217,8 +288,13 @@ Observations and documents keep their columns.
 ## Acceptance
 
 Part A:
-- [ ] The contract PR adds `no_ink` and `unverified` to `ledger.visibility`. The migration
-      tests pass, and nothing else in the schema changes.
+- [ ] The contract PR covers both halves:
+  - `no_ink` and `unverified` are added to `ledger.visibility`;
+  - in the selection contract, `hidden_text_only`'s description widens and
+    `unconfirmed_digits_only` is added.
+
+  The migration tests and the contracts validator pass, and nothing else changes.
+- [ ] No two spans overlap in any round-trip source, after the `docgen` off-page fix (D6).
 - [ ] Round trip (D7) is exact for every corpus document, every demo seed document and every
       spec 0052 case and seed listed. Both stand-ins fail it.
 - [ ] Each hiding trick is classed correctly, with one planted test each:
@@ -227,29 +303,40 @@ Part A:
   - tiny;
   - off the page past each edge;
   - covered by a rectangle, and covered by an image;
-  - invisible render mode;
+  - invisible render mode, alone and over a black bar its own size;
   - clipped;
+  - an invisible number overlapping a visible line;
+  - white over a white shape;
   - a hidden digit inside a visible number, which gives no candidate.
+- [ ] A number seen only in `no_ink` text is refused with `hidden_text_only`.
 - [ ] Every refusal reason in D4 has a test, and none stores anything.
-- [ ] Corpus gates A and B pass through the PDF path, and `lab docs` at seed 0 gives the same
-      patterns through it.
-- [ ] `demo load --pdf` writes the same observations as `demo load` (D9), and
-      `lab pdf render --check` fails when a demo PDF is stale.
+- [ ] Corpus gates A and B pass through the PDF path, with C04's scanned contract rendered as
+      a digital PDF. `lab docs` at seed 0 gives the same patterns through it, and any change
+      from the `docgen` fix is reported.
+- [ ] Demo:
+  - `demo load --pdf` writes the same observations as `demo load` (D9);
+  - `--pdf` with `--phone` is refused;
+  - `lab pdf render --check` fails when a committed demo PDF is stale.
 - [ ] Failure path: a corrupt, truncated or zero-page file, or one that is too big or too slow,
       gives `PdfRefused`. No partial document is stored.
-- [ ] D10's two plants are listed as strict known failures, with their findings in
+- [ ] D10's glyph swap is listed as a strict known failure, with its finding in
       `evals/FINDINGS.md`.
 
 Part B:
 - [ ] Scans are detected per D11. With `DIALBACK_SCANS=off`, a scan fails closed.
 - [ ] The agreement rule (D13) holds on a faked vision API:
-  - agreeing digits stay `visible`;
+  - agreeing digits on the matching line stay `visible`;
   - one changed digit, or a low confidence, gives `unverified`;
+  - the right digits on another line give `unverified`, as does a number OCR finds twice that
+    vision finds once;
   - a vision-only number is dropped;
-  - an API error or an off-schema reply fails the document.
-- [ ] The image sent to the API has every non-phone run of 7 or more digits blacked out, and no
-      transcription is stored or logged.
-- [ ] The pixel check (D14) marks both D10 plants `unverified`, and they come off the
+  - an API error or an off-schema reply fails the document;
+  - a number seen only as `unverified` is refused with `unconfirmed_digits_only`.
+- [ ] Corpus gate B passes with C04's contract read as a scan: real Tesseract, faked vision.
+- [ ] Redaction: every non-phone run of 7 or more digits that OCR reads is blacked out before
+      the image is sent. The scored run reports how many runs OCR missed. No transcription is
+      stored or logged.
+- [ ] The pixel check (D14) marks D10's glyph swap `unverified`, and it comes off the
       known-failures list.
 - [ ] The scored run (D17) meets every bar on held-out seeds, or scans stay off. Either result
       is written into this spec.
@@ -265,7 +352,9 @@ Part B:
 | Refusals | `packages/ledger/tests/test_pdf.py::test_refuses_<reason>` |
 | Same results | `packages/ledger/tests/test_store.py` (gates through PDFs), `evals/tests/test_pdf_roundtrip.py::test_lab_docs_patterns_match` |
 | Demo | `packages/ledger/tests/test_demo.py::test_pdf_load_writes_the_same_observations`, `evals/tests/test_pdf_render.py::test_check_fails_on_a_stale_pdf` |
-| Known limits | `evals/tests/test_pdf_tricks.py::test_glyph_swap`, `::test_image_over_text` |
+| Known limit | `evals/tests/test_pdf_tricks.py::test_glyph_swap` |
+| No overlap, and the `docgen` fix | `evals/tests/test_pdf_roundtrip.py::test_no_source_has_overlapping_spans` |
+| Refusal reasons | `packages/ledger/tests/test_select.py::test_no_ink_only_is_hidden_text_only`, `::test_unverified_only_is_unconfirmed_digits_only` |
 | Agreement and redaction | `packages/ledger/tests/test_scan.py` (faked API, real Tesseract) |
 | Pixel check | `packages/ledger/tests/test_scan.py::test_pixel_check_*` |
 | Scored run | `packages/ledger/scripts/scan_eval.py`, with its tests in `packages/ledger/tests/test_scan_eval.py` |
@@ -285,13 +374,19 @@ Part B:
 - **Joining a table row's cells into one line (Q159).** Today the second cell loses an email's
   `> ` quote marker.
 - **Bank and routing candidates from scans.** Q44 stands.
+- **Sending real account numbers in a scan to the API.** Redaction is best effort (D12), and a
+  real deployment must decide this first.
 
 ## Open questions
 
 - **Q156:** the target day. Is this meant for the Nov 19 live final (code freeze was Nov 8)?
-  Part A alone is enough for real PDFs in the demo.
-- **Q157:** API spend for Part B's vision calls. That covers development, plus 4 profiles x 200
-  held-out pages x 3 runs.
+  - **Part A alone is enough for real PDFs in the demo.** D9 already covers the team phone.
+  - **A yes means:** Part A lands after the freeze, the core image gains pdfplumber, and Part B
+    waits until after the final.
+- **Q157:** API spend for Part B's vision calls.
+  - **The held-out run:** 4 profiles x 200 documents x 3 runs = 2,400 page calls.
+  - **Development:** 4 profiles x 1,000 documents x however many tuning passes `C_MIN` and the
+    line-match floor take.
 - **Q158:** amending ADR-14 so that a scan's text comes from local OCR and the vision call only
   confirms phone digits (D12, D13). The two-reading rule is from the Nov 11 conversation. Which
   reading becomes the text layer is this spec's call.
@@ -305,5 +400,28 @@ uv run --no-project --with pytest --with "psycopg[binary]" pytest scripts/db/tes
 cd packages/ledger && uv run pytest -q tests/test_pdf.py tests/test_scan.py && uv run pytest -q
 cd evals && uv run pytest -q tests/test_pdf_roundtrip.py tests/test_pdf_tricks.py tests/test_pdf_render.py
 uv run lab pdf render --check
-uv run python packages/ledger/scripts/scan_eval.py --profile clean --profile office --held-out
+uv run python packages/ledger/scripts/scan_eval.py --profile clean --profile office --profile fax --profile photo --held-out
 ```
+
+## Calls made after the builder check (Nov 11)
+
+These are the spec author's calls, not Sami's, and each can be overruled:
+
+- **D3, the ink test:** compares the page with and without the span, not the box against its
+  surroundings. This is stricter and slower, but it catches invisible text over other ink.
+- **D6, C04:** C04 renders as a digital PDF in Part A and as a scan in Part B.
+- **D6, spec 0052's renderer:** off-page rows keep their spans' relative x, a one-line change to
+  `docgen.render`, with `lab docs` re-run and its changes reported.
+- **D9, the team phone:** it's rendered into the PDFs at run time, outside the repo, so a stored
+  hash always matches the file read.
+- **The contract:** `no_ink` maps to a widened `hidden_text_only`, and `unverified` gets a new
+  reason, `unconfirmed_digits_only`.
+- **D12, redaction:** best effort, measured, with a real deployment's decision left out of scope.
+- **D13, vision matching:** line-aligned and count-aware, not anywhere on the page.
+- **D17, the scored run:**
+  - zero unsafe digits on all four profiles;
+  - matching to the truth by position;
+  - missed numbers count as over-blocks;
+  - development uses 0052 seeds 0 to 4 at 200 documents each, and the held-out set is seed
+    1000;
+  - a G3/G4 gate on OCR'd text.
