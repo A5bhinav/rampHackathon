@@ -42,12 +42,13 @@ seen, by source" chart, and the vendor's documents with the exact text each numb
   at the number's overall first-seen date, in every lane, although its caption says "first sighting
   in that source": so a number's dots stack in one column, and the vendor master dot sits at the
   first counting date. The vendor page places each dot at the number's earliest visible sighting in
-  a document of that channel received by the cutoff (the vendor master channel is the "vendor
-  master" lane), from the documents the endpoint returns: no contract change. Limits: an email from
-  outside the vendor's domains still dates the email dot (the rule doesn't count it); with more
-  than 500 documents the oldest are missing, and a lane with none falls back to the number's
-  first-seen date. Two numbers first seen in one document still share a spot; the chosen dot is
-  drawn last, so it is the one that shows.
+  a document of that channel received by the cutoff, from the documents the endpoint returns: no
+  contract change. The vendor master channel is the "vendor master" lane and takes no cutoff, as
+  the ledger's `on_file` doesn't. On both pages the chosen dot is drawn last, so where two numbers
+  were first seen in one document it is the one that shows. Limits: an email from outside the
+  vendor's domains still dates the email dot (the rule doesn't count it); a vendor with more than
+  500 documents gets no per-source dates (the oldest may be the missing ones), so its chart draws
+  first-seen dates, as the case page does (Q224).
 
 ## Acceptance
 
@@ -107,8 +108,8 @@ counts as change context or doesn't count; paging past 500 documents.
 - **Q224:** The case lineage page draws the same chart with the same caption, which is false there
   too: the selection has no per-source dates, so each number's dots sit at its overall first-seen
   date. Either change that page's caption to say what it shows, or add per-source first-seen dates
-  to the selection contract (`Candidate`) first, then draw them. Not chosen here; the case page is
-  unchanged until this is answered.
+  to the selection contract (`Candidate`) first, then draw them. Not chosen here; the case page's
+  dots stay where they were (only the draw order changed, D7) until this is answered.
 
 ## Commands
 
