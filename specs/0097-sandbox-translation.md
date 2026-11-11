@@ -117,13 +117,17 @@ None.
   it sets the dates back: the hold is put back and the case goes to a person (fail closed, but
   found late). Should the core check the scopes Ramp's login answer lists at start-up? Not yet
   known whether Ramp lists them; the hold check's next run shows it.
-- **Q208:** a vendor hold restarts its bills' approvals. After the hold check held and released
-  DocuSign, its bill showed "0 of 1 approvals" in Ramp's dashboard (Ramp's help center: approvals
-  for payments affected by a hold "start again from the first step"). So after a release, a person
-  must approve each bill again before it can be paid. Does Ramp let the worker set a payment date on
-  a bill waiting for approval? If it refuses, `release_hold` fails, puts the hold back and retries,
-  and every release ends with the case sent to a person (fail closed, but no release would
-  complete). The hold check's next run, with `bills:write`, shows it.
+- **Q208:** does a vendor hold restart its bills' approvals, and can the worker set a payment date
+  on a bill waiting for approval? Ramp's help center says approvals for payments affected by a hold
+  "start again from the first step". If Ramp refuses the date, `release_hold` fails, puts the hold
+  back and retries, and every release ends with the case sent to a person (fail closed, but no
+  release would complete). Not seen yet. After the hold check, DocuSign's only unpaid bill showed
+  "0 of 1 approvals" and was waiting for a transfer match; matched by hand, it was paid. Its state
+  before the check wasn't recorded, so it may have been waiting for that match all along (a first
+  version of this question said the hold restarted its approval; that wasn't shown). A bill like
+  that (paid by direct debit; `status` OPEN until matched; `status_summary`
+  WAITING_FOR_TRANSFER_MATCH) counts as unpaid in the layer, so the worker would save its date and
+  set it again after a release; what Ramp does with that date is unknown.
 
 ## Commands
 
