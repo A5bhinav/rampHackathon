@@ -285,7 +285,9 @@ def unconfirmed(case: ReportCase) -> list[str]:
     missing: list[str] = []
     if case.result != "answers_recorded":
         missing.append(f"result={case.result}")
-    if case.answered_by != "human":
+    # Spec 0080, Part B: no label (Twilio's "unknown") is fine when every digit answer was typed on the keypad.
+    typed = [a.get("capture_method") for a in case.answers if a["slot"] == "account_last4"]
+    if case.answered_by != "human" and not (case.answered_by is None and typed and set(typed) == {"keypad"}):
         missing.append(f"answered_by={case.answered_by or 'unknown'}")
     if case.direction != "outbound":
         missing.append(f"direction={case.direction or 'unknown'}")
@@ -501,7 +503,9 @@ MOVES: dict[str, Callable[[ReportCase], ReportCase | None]] = {
     "company_other": _company("other"),
     "company_negation": _company("negation"),
     "answerer_machine": lambda c: _with(c, answered_by="machine") if c.answered_by != "machine" else None,
-    "answerer_unknown": lambda c: _with(c, answered_by=None) if c.answered_by is not None else None,
+    # From "human" only (spec 0080, Part B; FINDINGS C15): "machine" is evidence against (NR01), and replacing it
+    # with no label may help since typed digits can verify an unlabeled call, as dropping a flag may (B4).
+    "answerer_unknown": lambda c: _with(c, answered_by=None) if c.answered_by == "human" else None,
     **{f"second_{k}": (lambda c, s=s: _second(c, s)) for k, s in _SLOT.items()},
     **{f"drop_{k}": (lambda c, s=s: _drop(c, s)) for k, s in _SLOT.items() if f"drop_{k}" not in RETIRED_MOVES},
     "earlier_concern": _earlier_concern,

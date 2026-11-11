@@ -446,6 +446,17 @@ def test_f2_never_replaces_a_refusal():
     assert reports.MOVES["company_other"](base) is not None and reports.MOVES["company_negation"](base) is not None
 
 
+def test_f2_unknown_never_replaces_a_machine_label():
+    # Spec 0080, Part B: a "machine" label is evidence against the change (NR01). Replacing it with no label may
+    # help, as dropping a flag may (spec 0048, B4): with typed digits the call can now verify. So the move starts
+    # only from "human", where it is a step to a less certain value and still must never help (FINDINGS C15).
+    machine = reports.with_case(reports.honest(), answered_by="machine")
+    assert reports.MOVES["answerer_unknown"](machine) is None
+    assert reports.run(reports.with_case(machine, answered_by=None)).decision.outcome == "verified"
+    assert reports.MOVES["answerer_unknown"](reports.honest()) is not None
+    assert reports.MOVES["answerer_machine"](reports.with_case(reports.honest(), answered_by=None)) is not None
+
+
 def test_f2_retires_the_company_moves_spec_0082_makes_moot():
     # A short name is a match (D6), and the oracle expects a legit caller who gives one to verify, so moving to it
     # is not less certainty. The company answer is no longer a confirming answer (D7b), so dropping it is not
