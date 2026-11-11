@@ -227,10 +227,12 @@ test("an ended call's length; nothing for a call that took no measurable time", 
 test("the phone frame: the call's status, and that the number is the Trust Ledger's pick", () => {
   const v = (over: Record<string, unknown>) => ({ phase: "decided", status: "Decided", dialed: "(415) 555-0142", dialedIsPick: true,
     startedAt: "2026-11-10T09:48:18Z", endedAt: "2026-11-10T09:49:36Z", result: "answers_recorded", ...over }) as never;
-  assert.deepEqual(phoneLines(v({})), { status: "Call ended · answers recorded · 01:18", pick: { tone: "ok", text: "The Trust Ledger's pick" } });
+  assert.deepEqual(phoneLines(v({})), { status: "Call ended · answers recorded · 01:18", number: "(415) 555-0142", pick: { tone: "ok", text: "The Trust Ledger's pick" } });
   assert.deepEqual(phoneLines(v({ endedAt: "2026-11-10T09:48:18Z" })).status, "Call ended · answers recorded");
   assert.deepEqual(phoneLines(v({ dialedIsPick: false })).pick, { tone: "bad", text: "Not the Trust Ledger's pick" });
+  assert.equal(phoneLines(v({ dialedIsPick: false })).number, null, "never the pick's number over a call that didn't dial it");
+  assert.equal(phoneLines(v({})).number, "(415) 555-0142");
   assert.deepEqual(phoneLines(v({ phase: "on_call", status: "On the call", endedAt: null, result: null, dialedIsPick: null })),
-    { status: "On the call", pick: { tone: "ok", text: "The Trust Ledger's pick" } }, "before the report, the number shown is the pick itself");
+    { status: "On the call", number: "(415) 555-0142", pick: { tone: "ok", text: "The Trust Ledger's pick" } }, "before the report, the number shown is the pick itself");
   assert.equal(phoneLines(v({ dialed: null, phase: "choosing", status: "Choosing a number", endedAt: null, result: null })).pick, null);
 });

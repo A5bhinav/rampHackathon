@@ -151,13 +151,14 @@ export function callLength(startedAt: string | null, endedAt: string | null): st
 /** The phone frame's lines: the call's status (with its length once it has ended), and whether the
  *  number is the Trust Ledger's pick. Before the call reports, the number shown is the pick itself. */
 export function phoneLines(view: Pick<LiveCallView, "phase" | "status" | "dialed" | "dialedIsPick" | "startedAt" | "endedAt" | "result">):
-  { status: string; pick: { tone: "ok" | "bad"; text: string } | null } {
+  { status: string; number: string | null; pick: { tone: "ok" | "bad"; text: string } | null } {
   const length = callLength(view.startedAt, view.endedAt);
   const status = view.endedAt && view.result ? ["Call ended", words(view.result), length].filter(Boolean).join(" · ") : view.status;
   const pick = !view.dialed ? null
     : view.dialedIsPick === false ? { tone: "bad" as const, text: "Not the Trust Ledger's pick" }
     : { tone: "ok" as const, text: "The Trust Ledger's pick" };
-  return { status, pick };
+  // The number shown is the pick's; over a call that reports it dialed something else, show none.
+  return { status, number: view.dialedIsPick === false ? null : view.dialed, pick };
 }
 
 /** The AP top bar's Present menu: demo datasets only, for the newest case. */

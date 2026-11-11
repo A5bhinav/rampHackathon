@@ -13,8 +13,9 @@ const CARD_OF: Record<StationKey, CardKey> = {
 };
 
 /** The card for the station the case is at (or stopped at). Once it's past the decision, the decision. */
-export function openCard(steps: readonly StationView[]): CardKey {
-  const at = steps.find((s) => s.status === "current" || s.status === "branched");
+export function openCard(steps: readonly Pick<StationView, "key" | "status">[]): CardKey {
+  // Where the case waits beats an earlier branch (stationIndex's rule).
+  const at = steps.find((s) => s.status === "current") ?? steps.find((s) => s.status === "branched");
   return at ? CARD_OF[at.key] : "decision";
 }
 
@@ -34,18 +35,21 @@ export function decisionLine(decision: DecisionInfo | null, label: string): stri
 
 type Attempt = Pick<CallAttempt, "call_id" | "attempt" | "result" | "started_at" | "answers" | "dialed_number_is_pick">;
 
-/** Every attempt as a line; only the one the decision read (the last with answers, else the newest)
- *  is expanded. */
-export function attemptRows<T extends Attempt>(calls: readonly T[]): { call: T; expanded: boolean; line: string }[] {
-  const answered = calls.findLastIndex((c) => c.answers.length > 0);
-  const shown = answered >= 0 ? answered : calls.length - 1;
+/** Every attempt as a line. Only one of this bank change's calls is expanded: the one the decision
+ *  read (its last with answers), else its newest. A call from an earlier change (started before
+ *  `versionStart`, as the live call view reads it) is never expanded, and its line says so. */
+export function attemptRows<T extends Attempt>(calls: readonly T[], versionStart?: string | null): { call: T; expanded: boolean; line: string }[] {
+  const since = Date.parse(versionStart ?? "");
+  const current = (c: T) => !Number.isFinite(since) || !c.started_at || Date.parse(c.started_at) >= since;
+  const answered = calls.findLastIndex((c) => current(c) && c.answers.length > 0);
+  const shown = answered >= 0 ? answered : calls.findLastIndex(current);
   return calls.map((c, i) => {
     const result = c.result ? words(c.result) : "in progress";
     const line = i === shown
       ? [`Attempt ${c.attempt}`, result,  // no "of N": the list can hold earlier versions' calls, each numbered from 1
          c.dialed_number_is_pick === true ? "the Trust Ledger's pick" : c.dialed_number_is_pick === false ? "not the Trust Ledger's pick" : null]
         .filter(Boolean).join(" · ")
-      : [`Attempt ${c.attempt}`, result, brief(c.started_at) || null].filter(Boolean).join(" · ");
+      : [`Attempt ${c.attempt}`, result, brief(c.started_at) || null, current(c) ? null : "earlier change"].filter(Boolean).join(" · ");
     return { call: c, expanded: i === shown, line };
   });
 }

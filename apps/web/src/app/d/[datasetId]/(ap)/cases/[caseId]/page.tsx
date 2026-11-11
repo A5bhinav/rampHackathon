@@ -5,6 +5,7 @@ import { CallBody } from "@/components/call";
 import { DecisionConsole } from "@/components/console";
 import { DecisionDetail } from "@/components/decision";
 import { AutoRefresh } from "@/components/auto-refresh";
+import { OpenOnHash } from "@/components/open-on-hash";
 import { CaseRail } from "@/components/flow";
 import { Icon } from "@/components/icons";
 import { PaymentPath } from "@/components/path";
@@ -15,7 +16,7 @@ import { alertsForCase } from "@/lib/alerts";
 import { CoreError, core } from "@/lib/core";
 import { brief, datasetNow, date, dueLabel, relative, when, words } from "@/lib/format";
 import { phone, seenBefore, sourceLabel, split } from "@/lib/lineage";
-import { REFRESH_STATES, stations } from "@/lib/stations";
+import { REFRESH_STATES, currentVersion, stations } from "@/lib/stations";
 import { canWatchCall } from "@/lib/live-call";
 import { stateLabel } from "@/lib/states";
 import { attemptRows, changeLine, decisionLine, holdLine, numberLine, openCard, trailLine } from "@/lib/case-cards";
@@ -58,7 +59,8 @@ export default async function CaseDetailPage({ params, searchParams }: {
 
   const steps = stations(detail.timeline, c.state, decision?.outcome ?? null);
   const open = openCard(steps);  // the card for the station the case is at starts open; the rest start closed
-  const attempts = attemptRows(detail.calls ?? []);
+  // Only this bank change's calls can be the one shown; an earlier change's calls stay one line each.
+  const attempts = attemptRows(detail.calls ?? [], currentVersion(detail.timeline)[0]?.occurred_at ?? null);
 
   return (
     <main className="case-page">
@@ -99,6 +101,7 @@ export default async function CaseDetailPage({ params, searchParams }: {
 
       <CaseRail steps={steps} />
       <AutoRefresh active={REFRESH_STATES.has(c.state)} />
+      <OpenOnHash />
 
       <div className="case-grid">
         <div className="case-main">
@@ -136,10 +139,10 @@ export default async function CaseDetailPage({ params, searchParams }: {
           <NumberCard view={view} path={path} open={open === "number"} />
 
           {attempts.length ? (
-            <FoldCard id="call-h" marker="04" title="Call" open={open === "call"} line={attempts.find((a) => a.expanded)?.line}
+            <FoldCard id="call-h" marker="04" title="Call" open={open === "call"} line={attempts.find((a) => a.expanded)?.line ?? "No call for this change yet"}
               meta={<span className="badge tone-muted">AI agent: collects answers only</span>}>
               {attempts.some((a) => !a.expanded) ? (
-                <ul className="attempt-lines" aria-label="Earlier attempts">
+                <ul className="attempt-lines" aria-label="Other attempts">
                   {attempts.filter((a) => !a.expanded).map((a) => <li key={a.call.call_id}>{a.line}{a.call.reason ? <span className="muted"> · {a.call.reason}</span> : null}</li>)}
                 </ul>
               ) : null}

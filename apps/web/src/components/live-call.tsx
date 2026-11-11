@@ -70,7 +70,7 @@ export function LiveCall({ initial, stateUrl, caseHref, flowHref }: { initial: L
           <Rings className="rings phone-rings" />
           <div className="phone">
             <p className="phone-status" aria-live="polite">{status}{running ? ` · ${running}` : ""}</p>
-            {view.dialed ? <p className="phone-number mono">{view.dialed}</p> : null}
+            {lines.number ? <p className="phone-number mono">{lines.number}</p> : null}
             {lines.pick ? <p className={`phone-pick tone-text-${lines.pick.tone}`}>{lines.pick.text}</p> : null}
             <p className="phone-who">{view.vendor}</p>
             {asking ? <p className="phone-bubble">{asking}</p> : null}

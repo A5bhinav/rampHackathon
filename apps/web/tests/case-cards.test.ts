@@ -14,6 +14,8 @@ test("the current station's card starts open; a settled case opens its decision"
   assert.equal(openCard(stations([...base, ev("call_ended", "deciding"), ev("decision_made", "blocked")], "blocked", "not_verified")), "decision");
   assert.equal(openCard(stations([...base, ev("call_timeout", "needs_review")], "needs_review", null)), "call", "no person reached: the call is where it stopped");
   assert.equal(openCard(stations([ev("change_detected", "open"), ev("no_provable_number", "needs_review")], "needs_review", null)), "number");
+  // Where the case waits beats an earlier branch: a failed hold, then a cleared review, now awaiting release.
+  assert.equal(openCard([{ key: "held", status: "branched" }, { key: "approved", status: "current" }] as never), "decision");
 });
 
 const checklist = (statuses: string[]) => statuses.map((status, i) => ({ id: `V${String(i + 1).padStart(2, "0")}_x`, sentence: "s", status }));
@@ -30,6 +32,19 @@ test("the decision's headline: the outcome, then the checklist count, or the rul
 
 const call = (attempt: number, result: string | null, answers = 0, started_at = `2026-11-11T00:5${attempt}:00Z`) =>
   ({ call_id: `c${attempt}`, attempt, result, started_at, ended_at: result ? started_at : null, answers: Array(answers).fill({}), dialed_number_is_pick: true }) as never;
+
+test("a call from an earlier bank change is never expanded as this change's call (spec review H1)", () => {
+  const since = "2026-11-11T00:52:30Z";  // this version began between attempt 1 (v1) and attempt 2 (v2)
+  const v1 = call(1, "answers_recorded", 5, "2026-11-11T00:51:00Z");
+  const v2 = call(1, "no_answer", 0, "2026-11-11T00:53:00Z");
+  const rows = attemptRows([v1, v2], since);
+  assert.deepEqual(rows.map((r) => r.expanded), [false, true], "v2's unanswered call, not v1's answers");
+  assert.match(rows[0].line, /earlier change/);
+  // This version has no call yet: nothing is expanded, and the earlier change's call is one line.
+  const none = attemptRows([v1], since);
+  assert.deepEqual(none.map((r) => r.expanded), [false]);
+  assert.match(none[0].line, /earlier change/);
+});
 
 test("only the attempt the decision read stays expanded; earlier ones are one line each", () => {
   const rows = attemptRows([call(1, "callback_requested"), call(2, "answers_recorded", 5)]);

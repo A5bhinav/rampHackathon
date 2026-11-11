@@ -798,7 +798,8 @@ ul.reason-chips li { font-size: 12px; padding: 1px 8px; border-radius: var(--rad
   .feed li { grid-template-columns: 1fr; gap: 2px; padding: 10px 16px; }
   /* Case: the action rail first, then the stepper as a list; tables stack. */
   .case-page { display: flex; flex-direction: column; }
-  .case-page > .ring-band { order: -3; }
+  .case-page > .banners { order: -5; }  /* the case's own alerts, then its title, then the rail */
+  .case-page > .page-title { order: -4; }
   .case-page > .page-notice { order: -2; }
   .case-grid { display: contents; }
   .case-actions { order: -1; }
