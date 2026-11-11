@@ -80,7 +80,8 @@ export function LaneFigure({ chart, cutoff, what = "the request", cutoffName = "
                 <span className="lgraph-min" style={{ left: `${chart.minAge.pct}%` }} />
                 <span className="lgraph-after" style={{ left: `${chart.cutoffPct}%` }} />
                 {chart.points.filter((p) => p.lane === lane.key).map((p) => (
-                  <span key={`${p.e164}-${p.lane}`} className={`lgraph-dot is-${p.kind}`} style={{ left: `${p.pct}%` }}
+                  <span key={`${p.e164}-${p.lane}`} className={`lgraph-dot is-${p.kind}`}
+                        style={{ left: `${p.pct}%`, top: `calc(50% + ${Math.max(-1.5, Math.min(1.5, p.lift)) * 8}px)` }}
                         title={`${phone(p.e164)}, ${KIND_WORD[p.kind]}: first seen ${when(p.at)}`} />
                 ))}
               </span>

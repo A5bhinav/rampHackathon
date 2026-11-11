@@ -51,7 +51,7 @@ export function sourceLabel(source: string): string {
 const LANE_ORDER: string[] = ["contract", "vendor_portal", "listing", "email", "paper_mail"];
 const LANE_NOTE: Record<string, string> = { email: "counts once", on_file: "never counts" };
 
-export type LanePoint = { lane: string; e164: string; kind: "pick" | "alternate" | "refused"; pct: number; at: string };
+export type LanePoint = { lane: string; e164: string; kind: "pick" | "alternate" | "refused"; pct: number; at: string; lift: number };
 export type LaneChart = {
   start: string; end: string;
   lanes: { key: string; label: string; note?: string }[];
@@ -62,6 +62,21 @@ export type LaneChart = {
 };
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+const DRAW = { refused: 0, alternate: 1, pick: 2 } as const;
+const CLOSE = 2;  // percent of the track: dots nearer than this would cover each other
+
+/** Dots in one lane that would cover each other get different heights, centred on the lane:
+ *  lift is how many steps up (negative) or down from the middle. A lone dot stays at 0. */
+function spread(lane: LanePoint[]): void {
+  const row = [...lane].sort((a, b) => a.pct - b.pct || DRAW[a.kind] - DRAW[b.kind]);
+  for (let i = 0; i < row.length;) {
+    let j = i + 1;
+    while (j < row.length && row[j].pct - row[j - 1].pct < CLOSE) j++;
+    row.slice(i, j).forEach((p, k) => { p.lift = k - (j - i - 1) / 2; });
+    i = j;
+  }
+}
 
 export function lanePoints(selection: RuleRun | null): LaneChart | null {
   if (!selection || selection.candidates.length === 0) return null;
@@ -83,8 +98,9 @@ export function lanePoints(selection: RuleRun | null): LaneChart | null {
   const points = selection.candidates.flatMap((c) => {
     const kind: LanePoint["kind"] = c.contact_point_id === pickId ? "pick" : c.eligible ? "alternate" : "refused";
     const at = pct(Date.parse(c.first_seen_at));
-    return [...c.source_types, ...(c.on_file ? ["on_file"] : [])].map((lane) => ({ lane, e164: c.e164, kind, pct: at, at: c.first_seen_at }));
-  });
+    return [...c.source_types, ...(c.on_file ? ["on_file"] : [])].map((lane) => ({ lane, e164: c.e164, kind, pct: at, at: c.first_seen_at, lift: 0 }));
+  }).sort((a, b) => DRAW[a.kind] - DRAW[b.kind]);  // drawn in this order, so the chosen dot is on top
+  for (const key of keys) spread(points.filter((p) => p.lane === key));
 
   const ticks: LaneChart["ticks"] = [];
   for (let y = firstYear; Date.UTC(y, 0, 1) <= end; y++) ticks.push({ label: String(y), pct: pct(Date.UTC(y, 0, 1)) });
