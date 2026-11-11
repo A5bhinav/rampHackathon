@@ -537,10 +537,17 @@ def _pieces(text: str, also_mask: Iterable[str] = ()) -> tuple[list[tuple[int, i
         digits = _ascii(span)
         return any(digits[i:i + n] in secrets for n in lengths for i in range(len(digits) - n + 1))
 
+    windows: dict[int, set[str]] = {}   # per phone length: every window of that length of every account
+
     def inside_an_account(e164: str) -> bool:
-        """Whether the phone's national digits are part of a found account (the account is longer)."""
+        """Whether the phone's national digits are part of a found account. One set lookup per phone: the
+        windows of each length are built once per call, so the cost is the accounts' total digits per
+        distinct phone length, not phones times accounts (re-review N1)."""
         national = phonenumbers.national_significant_number(phonenumbers.parse(e164))
-        return any(national in d for d in secrets)
+        n = len(national)
+        if n not in windows:
+            windows[n] = {d[i:i + n] for d in secrets for i in range(len(d) - n + 1)}
+        return national in windows[n]
 
     phones, extensions = _phones(text)
     kept = [(s, e, e164) for s, e, e164 in phones if not repeats_an_account(text[s:e]) and not inside_an_account(e164)]

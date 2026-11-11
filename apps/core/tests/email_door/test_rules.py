@@ -566,6 +566,16 @@ def test_ledger_text_is_fast_on_a_long_email():
     assert best_of_five(ledger_text, text) < 1.0   # the fastest of five, like the tests above: one run flaked under load
 
 
+def test_ledger_text_is_fast_with_many_phones_and_many_accounts_to_mask():
+    # Re-review N1: the phone-inside-an-account check (I3) must not compare every phone with every account.
+    # About 3,000 phones in the text part and 50,000 accounts from the HTML part, as the door passes them.
+    text = "".join(f"AR line: 212-555-{1000 + i % 9000:04d}\n" for i in range(2270))           # 50 KB
+    also_mask = [str(7_783_110_000_000 + i) for i in range(50_000)]
+    assert len(text) > 49_000
+    assert best_of_five(lambda t: ledger_text(t, also_mask), text) < 1.0
+    assert ledger_text(text, also_mask).count("\n") == 2269, "no phone sits inside one of these accounts"
+
+
 def test_find_accounts_reads_past_the_cap_only_when_asked():
     text = "x" * rules.MAX_CHARS + " Our other account 7783110245"
     assert find_accounts(text) == []
