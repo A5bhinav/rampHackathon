@@ -511,12 +511,11 @@ async def test_a_repeat_found_inside_the_case_transaction_writes_nothing(door_wo
     async with system_tx(w.pool) as conn:
         await conn.execute("insert into app.inbound_emails (dataset_id, resend_email_id, sender, received_at, has_attachments) "
                            "values (%s, %s, 'Sam Judge', now(), false)", (w.demo_id, email.email_id))
-    old = await one(w.pool, "select id from app.bank_accounts where vendor_id = %s and is_current", w.vendor["cobalt"])
     facts = door._Facts("", flagged=True, vendor_id=w.vendor["cobalt"], routing_number=ROUTING, last4="4821")
     keys = w.worker.keys
     outcome = await door._case_transaction(w.pool, w.demo_id, email, facts, keys,
                                            requested_fingerprint(keys.fingerprint_key, ROUTING, ACCOUNT),
-                                           "email:<race@gmail.example>", old["id"])
+                                           "email:<race@gmail.example>")
     assert outcome == "repeat_request"
     row = await one(w.pool, "select outcome, case_id, change_event_id from app.inbound_emails where resend_email_id = %s", "em_race")
     assert (row["outcome"], row["case_id"], row["change_event_id"]) == ("repeat_request", first["case_id"], None)
@@ -524,16 +523,161 @@ async def test_a_repeat_found_inside_the_case_transaction_writes_nothing(door_wo
     assert case["version"] == 1 and await count(w, "app.bank_change_events where dataset_id = %s") == 1
 
 
-async def test_an_email_joins_a_case_opened_by_a_ramp_change(door_world):
+# An email never joins a case with a Ramp change (review finding C1, R1) ----------------------------
+#
+# A case verifies its current change. Were an email's change to join a case with a Ramp change, the call
+# would verify the email's account while Ramp pays the clerk's, and two approvers could lift the hold for
+# an account nobody verified.
+
+CASE_FIELDS = ("state", "version", "change_event_id", "detected_via", "outcome")
+Y_ROUTING, Y_ACCOUNT = "021000021", "000555557777"   # another account an email asks for
+Y_TEXT = JUDGE_TEXT.replace(ROUTING, Y_ROUTING).replace(ACCOUNT, Y_ACCOUNT)
+
+
+async def written(w) -> dict:
+    """Everything the door writes for a case, counted: changes, requested accounts, ledger rows, evidence."""
+    counts = {t: await count(w, f"{t} where dataset_id = %s") for t in (
+        "app.bank_change_events", "app.bank_accounts", "ledger.documents", "ledger.change_requests", "ledger.observations")}
+    counts["evidence"] = (await one(w.pool, "select count(*) as n from audit.evidence_events e join app.cases c on c.id = e.case_id "
+                                            "where c.dataset_id = %s", w.demo_id))["n"]
+    return counts
+
+
+def same(case: dict) -> dict:
+    return {k: case[k] for k in CASE_FIELDS}
+
+
+async def test_an_email_never_joins_a_case_opened_by_a_ramp_change(door_world):
+    """This test used to assert that the email joins (`joined_case`, version 2, the email's change current).
+    That was the R1 bug the final review found (C1): the case then verifies the email's account while Ramp
+    pays the clerk's. Now the email is listed `ramp_case_open` with the case linked, and nothing is written."""
     w = door_world
     await change(w.env, load_seed(SEED), "cobalt")   # the clerk's change in Ramp, and its webhook
     await w.worker.drain(w.demo_id)
     (case,) = await cases(w)
     assert (case["detected_via"], case["version"]) == ("webhook", 1)
+    before = await written(w)
     row = await arrive(w)
-    assert (row["outcome"], row["case_id"]) == ("joined_case", case["id"])
+    assert (row["outcome"], row["case_id"], row["change_event_id"], row["flagged"]) == ("ramp_case_open", case["id"], None, True)
+    assert (row["routing_number"], row["last4"], row["error"]) == (ROUTING, "4821", None)
     (after,) = await cases(w)
-    assert (after["version"], after["change_event_id"], after["detected_via"]) == (2, row["change_event_id"], "email")
+    assert same(after) == same(case), "the Ramp case is untouched: no version, no new change, no voided decision"
+    assert await written(w) == before, "no change, no requested account, no ledger row, no evidence"
+
+
+async def answer_for(w, case_id, change: str, digits: str) -> dict:
+    """Cobalt, called on the ledger's number, answers for this case; the worker runs until idle. Returns the case."""
+    call_id = w.voice.placed[-1]["call_id"]
+    picked = await selection(w, case_id)
+    r = await report(w, case_id, call_id, answers=transit(call_id, digits=digits, company="Cobalt Freight", change=change),
+                     contact_point=picked["contact_point_id"])
+    assert r.status_code == 204, r.text
+    await w.worker.drain(w.demo_id)
+    return next(c for c in await cases(w) if c["id"] == case_id)
+
+
+async def test_an_email_cannot_change_what_a_ramp_case_verifies(door_world):
+    """The final review's probe (C1), kept as a regression test. Before the fix: the email joined the
+    calling Ramp case, Cobalt confirmed the email's account on its proven number, the case was verified,
+    and two approvers released it while Ramp still paid the clerk's account."""
+    w = door_world
+    ramp, cobalt = w.connector.for_dataset(w.demo_id), w.demo_refs["cobalt"]
+    # 1. An earlier email case, Not verified and dismissed, gives Cobalt a change request in the ledger, so
+    #    the Ramp case below reaches calling (without one it waits in needs_review).
+    first = await arrive(w)
+    ended = await answered(w, first["case_id"], change="no")
+    assert ended["state"] == "blocked"
+    body = {"expected_version": ended["version"], "action": "approve", "reason": "Ramp never changed."}
+    for who in ("approver1", "approver2"):
+        await post(w, RELEASE.format(case_id=ended["id"]), who, RELEASE, body)
+    await w.worker.drain(w.demo_id)
+    # 2. A clerk changes Cobalt's account in Ramp: a Ramp case opens and calls.
+    await change(w.env, load_seed(SEED), "cobalt")
+    await w.worker.drain(w.demo_id)
+    (ramp_case,) = [c for c in await cases(w) if c["state"] != "released"]
+    assert (ramp_case["state"], ramp_case["detected_via"]) == ("calling", "webhook")
+    clerks = [(a.routing_number, a.last4) for a in await ramp.list_vendor_accounts(cobalt) if a.is_active]
+    assert len(clerks) == 1 and clerks[0][1] != Y_ACCOUNT[-4:]
+    before = await written(w)
+    # 3. An email naming Cobalt and another account arrives: listed, linked to the case, and nothing written.
+    row = await arrive(w, email_id="em_probe_y", message_id="<probe-y@gmail.example>", text=Y_TEXT)
+    assert (row["outcome"], row["case_id"], row["change_event_id"]) == ("ramp_case_open", ramp_case["id"], None)
+    now = next(c for c in await cases(w) if c["id"] == ramp_case["id"])
+    assert same(now) == same(ramp_case), "the email did not become what the call verifies, nor restart the calls"
+    assert await written(w) == before
+    # 4. Cobalt, on its proven number, confirms the email's account: that is not the account Ramp pays.
+    after = await answer_for(w, ramp_case["id"], "yes", Y_ACCOUNT[-4:])
+    assert after["outcome"] != "verified" and after["state"] != "awaiting_release", (after["state"], after["outcome"])
+    assert (await ramp.get_vendor(cobalt)).hold_id is not None, "the hold stays on"
+    assert [(a.routing_number, a.last4) for a in await ramp.list_vendor_accounts(cobalt) if a.is_active] == clerks
+
+
+async def test_a_later_email_never_joins_an_email_case_that_a_ramp_change_joined(door_world):
+    """The other order: an email opens a case, the clerk's Ramp change joins it, then an email asking for
+    another account arrives. The case now verifies Ramp's account, and the email must not replace it."""
+    w = door_world
+    first = await arrive(w)
+    assert first["outcome"] == "case_opened"
+    await change(w.env, load_seed(SEED), "cobalt")
+    await w.worker.drain(w.demo_id)
+    (case,) = await cases(w)
+    assert (case["id"], case["version"], case["detected_via"]) == (first["case_id"], 2, "webhook"), "Ramp joined the email case"
+    before = await written(w)
+    row = await arrive(w, email_id="em_after_ramp", message_id="<after-ramp@gmail.example>", text=Y_TEXT)
+    assert (row["outcome"], row["case_id"], row["change_event_id"]) == ("ramp_case_open", case["id"], None)
+    (after,) = await cases(w)
+    assert same(after) == same(case)
+    assert await written(w) == before
+
+
+async def a_pending_row(w, email_id: str):
+    """A fetched judge email with its pending row, for calling the case transaction directly."""
+    email = judge(email_id, message_id=f"<{email_id}@gmail.example>")
+    async with system_tx(w.pool) as conn:
+        await conn.execute("insert into app.inbound_emails (dataset_id, resend_email_id, sender, received_at, has_attachments) "
+                           "values (%s, %s, 'Sam Judge', now(), false)", (w.demo_id, email.email_id))
+    return email
+
+
+async def test_the_case_transaction_checks_for_a_ramp_change_again_under_the_vendor_lock(door_world):
+    """A Ramp change can join after the early check and before the case transaction: the transaction
+    checks again under the vendor's lock and writes nothing."""
+    w = door_world
+    await change(w.env, load_seed(SEED), "cobalt")
+    await w.worker.drain(w.demo_id)
+    (case,) = await cases(w)
+    email = await a_pending_row(w, "em_late")
+    before = await written(w)
+    facts = door._Facts("", flagged=True, vendor_id=w.vendor["cobalt"], routing_number=ROUTING, last4="4821")
+    keys = w.worker.keys
+    outcome = await door._case_transaction(w.pool, w.demo_id, email, facts, keys,
+                                           requested_fingerprint(keys.fingerprint_key, ROUTING, ACCOUNT), "email:<em_late@gmail.example>")
+    assert outcome == "ramp_case_open"
+    row = await one(w.pool, "select outcome, case_id, change_event_id from app.inbound_emails where resend_email_id = %s", "em_late")
+    assert (row["outcome"], row["case_id"], row["change_event_id"]) == ("ramp_case_open", case["id"], None)
+    (after,) = await cases(w)
+    assert same(after) == same(case) and await written(w) == before
+
+
+async def test_the_old_account_is_the_one_on_file_under_the_lock_not_the_early_read(door_world, monkeypatch):
+    """The change's old account is read in the case transaction. Here the account on file changes after the
+    door's early read (a test double, between the ledger write and the case transaction)."""
+    w = door_world
+    cobalt = w.vendor["cobalt"]
+    early = await one(w.pool, "select id from app.bank_accounts where vendor_id = %s and is_current", cobalt)
+    real, moved = door.write_ingest, {}
+
+    async def then_the_account_on_file_moves(conn, **kwargs):
+        await real(conn, **kwargs)
+        await conn.execute("update app.bank_accounts set is_current = false where vendor_id = %s and is_current", (cobalt,))
+        moved["id"] = (await (await conn.execute(
+            "insert into app.bank_accounts (dataset_id, vendor_id, ramp_account_id, routing_number, account_last4, account_fingerprint) "
+            "values (%s, %s, 'ra_moved', '121000248', '5555', %s) returning id", (w.demo_id, cobalt, "b" * 64))).fetchone())["id"]
+    monkeypatch.setattr(door, "write_ingest", then_the_account_on_file_moves)
+    row = await arrive(w)
+    assert row["outcome"] == "case_opened"
+    change_row = await one(w.pool, "select old_account_id from app.bank_change_events where id = %s", row["change_event_id"])
+    assert change_row["old_account_id"] == moved["id"] != early["id"]
 
 
 async def test_an_account_named_in_the_subject_never_reaches_the_ledger_as_a_phone(door_world, caplog):

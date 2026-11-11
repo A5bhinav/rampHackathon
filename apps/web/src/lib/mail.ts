@@ -15,6 +15,7 @@ const OUTCOME: Record<MailOutcome, string> = {
   repeat_request: "The same request was already handled, so nothing new was done.",
   case_opened: "A case was opened for this request.",
   joined_case: "The request was added to a case that was already open.",
+  ramp_case_open: "Not added: this vendor's open case has a change made in Ramp, which the call checks instead.",
   failed: "Dialback could not process this email.",
 };
 

@@ -28,6 +28,6 @@ function check(name: string, count: number, label: (v: never) => string) {
   assert.equal(new Set(values.map((v) => label(v as never))).size, values.length, `${name} labels must differ`);
 }
 
-test("every MailOutcome has a plain label", () => check("MailOutcome", 13, outcomeLabel));
+test("every MailOutcome has a plain label", () => check("MailOutcome", 14, outcomeLabel));
 test("every ReplyStatus has a plain label", () => check("ReplyStatus", 7, replyLabel));
 test("every RedFlag has a plain label", () => check("RedFlag", 5, flagLabel));

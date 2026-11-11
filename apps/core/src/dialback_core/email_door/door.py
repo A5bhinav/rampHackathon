@@ -6,8 +6,10 @@ read, each mail part on its own (pure code, also for an unflagged email: one fro
 names bank details but not the account on file is a silent change, and counts as flagged). Then,
 ledger first, it is filed as the vendor's change request and committed, so the selection rule sees it
 (R2); and in a second transaction, under the vendor's lock, the requested account and the change are
-written and `change_detected` opens or joins the case. Ramp is never written. Every stop is an outcome
-on the email's row, and only a row still `pending` is ever changed, so an email is acted on once.
+written and `change_detected` opens the case or joins the vendor's unfinished one. An email never joins
+a case with a change that did not come by email (R1: the call would verify the email's account while
+Ramp pays another); it is listed `ramp_case_open` and writes nothing. Ramp is never written. Every stop
+is an outcome on the email's row, and only a row still `pending` is ever changed, so an email is acted on once.
 
 ADR-8: the full account number lives only in `handle_email`'s memory, long enough to fingerprint it.
 It is written nowhere and logged nowhere. An email whose Message-ID, thread ID or sender domain holds
@@ -327,6 +329,26 @@ async def _repeat(conn: AsyncConnection, dataset_id: UUID, vendor_id: UUID, sour
     return ("repeat_request", case["id"], None) if case else None
 
 
+async def _ramp_case(conn: AsyncConnection, dataset_id: UUID, vendor_id: UUID) -> UUID | None:
+    """The vendor's unfinished case when any change on it did not come by email (the opening change
+    included), else None. R1 (review finding C1): a case verifies its current change, so an email's change
+    must never become the current change of a case Ramp changed, or the call would verify the email's
+    account while Ramp pays another. The changes on a case are read from its `change_detected` evidence,
+    as app.case_email_only's rule D does: a case with none counts as Ramp, and a body whose change id isn't
+    a UUID fails the query, so the email is retried and then listed `failed`, with nothing written (R7)."""
+    case = await (await conn.execute(
+        """select c.id from app.cases c
+            where c.dataset_id = %s and c.vendor_id = %s and c.state <> 'released'
+              and (not exists (select 1 from audit.evidence_events e where e.case_id = c.id and e.type = 'change_detected')
+                   or exists (select 1 from audit.evidence_events e
+                               where e.case_id = c.id and e.type = 'change_detected'
+                                 and not exists (select 1 from app.bank_change_events ce
+                                                  where ce.id = (e.body_jcs::jsonb #>> '{body,change_event_id}')::uuid
+                                                    and ce.detected_via = 'email')))
+            order by c.opened_at limit 1""", (dataset_id, vendor_id))).fetchone()
+    return case["id"] if case else None
+
+
 # The door ---------------------------------------------------------------------------------------
 
 async def handle_email(pool: AsyncConnectionPool, settings: Settings, keys: Keys, resend: ResendPort, dataset_id: UUID,
@@ -419,12 +441,14 @@ async def _act(pool: AsyncConnectionPool, settings: Settings, keys: Keys, datase
     fingerprint = requested_fingerprint(keys.fingerprint_key, routing, requested[1].digits)   # ADR-8: nothing below uses the full number
     source_event_id = f"email:{_message_key(email)}"
 
-    # 5. The same email again, or the same account while the vendor's case is unfinished: nothing written.
-    # Checked here so a repeat files nothing in the ledger, and again under the vendor's lock below.
+    # 5. Nothing is written for the same email again, the same account while the vendor's case is
+    # unfinished, or a vendor whose unfinished case has a change that did not come by email (R1: the email
+    # never becomes what a case Ramp changed verifies; it is listed `ramp_case_open`, linked to that case).
+    # Checked here so these file nothing in the ledger, and again under the vendor's lock below.
     async with system_tx(pool) as conn:
-        repeat = await _repeat(conn, dataset_id, vendor_id, source_event_id, fingerprint, keys.fingerprint_key_version)
-        if repeat:
-            return await _record(conn, dataset_id, email, replace(facts, outcome=repeat[0], case_id=repeat[1], error=repeat[2]))
+        stop_facts = await _no_change(conn, dataset_id, email, facts, keys, fingerprint, source_event_id)
+        if stop_facts is not None:
+            return await _record(conn, dataset_id, email, stop_facts)
 
     # 6. Ledger first, committed: the rule only uses a change request recorded before the case opened. Then
     # the case. From here any error is `failed` with no case (R7), recorded by its type name only.
@@ -433,28 +457,47 @@ async def _act(pool: AsyncConnectionPool, settings: Settings, keys: Keys, datase
             await write_ingest(conn, dataset_id=dataset_id, vendor_id=vendor_id,
                                result=ingest_all([document], extractor_version=EXTRACTOR))
             await mark_change_request(conn, dataset_id=dataset_id, vendor_id=vendor_id, document_id=document["id"])
-        return await _case_transaction(pool, dataset_id, email, facts, keys, fingerprint, source_event_id,
-                                       current["id"] if current else None)
+        return await _case_transaction(pool, dataset_id, email, facts, keys, fingerprint, source_event_id)
     except Exception as exc:  # noqa: BLE001  fail closed (R7); the message can hold the email's values (ADR-8)
         log.warning("email door: opening a case for inbound email %s failed: %s", email.email_id, type(exc).__name__)
         return await _finish(pool, dataset_id, email, replace(facts, outcome="failed", error=type(exc).__name__))
 
 
+async def _no_change(conn: AsyncConnection, dataset_id: UUID, email: ReceivedEmail, facts: _Facts, keys: Keys,
+                     fingerprint: str, source_event_id: str) -> _Facts | None:
+    """The row's facts when this request must write nothing (a repeat, or a vendor whose unfinished case
+    Ramp changed); None when it may open or join a case."""
+    repeat = await _repeat(conn, dataset_id, facts.vendor_id, source_event_id, fingerprint, keys.fingerprint_key_version)
+    if repeat:
+        return replace(facts, outcome=repeat[0], case_id=repeat[1], error=repeat[2])
+    ramp_case = await _ramp_case(conn, dataset_id, facts.vendor_id)
+    if ramp_case is not None:
+        log.info("email door: inbound email %s not added: the vendor's open case has a change that did not come by email",
+                 email.email_id)
+        return replace(facts, outcome="ramp_case_open", case_id=ramp_case)
+    return None
+
+
 async def _case_transaction(pool: AsyncConnectionPool, dataset_id: UUID, email: ReceivedEmail, facts: _Facts, keys: Keys,
-                            fingerprint: str, source_event_id: str, old_account_id: UUID | None) -> str:
+                            fingerprint: str, source_event_id: str) -> str:
     """One transaction: lock the email's row (one worker acts on it) and the vendor's (the lock
-    apply_case_event takes, so requests for one vendor take turns), check for a repeat again, then write
-    the requested account and the change and open or join the case. The requested account is never
-    `is_current` and has no Ramp id, so neither the Ramp sync nor the clerk portal takes it for the
-    account on file."""
+    apply_case_event takes, so requests for one vendor take turns), check again for a repeat and for an
+    unfinished case with a change that did not come by email (R1), read the vendor's account on file as it
+    is now (the change's old account; the early read may be stale), then write the requested account and
+    the change and open or join the case. The requested account is never `is_current` and has no Ramp id,
+    so neither the Ramp sync nor the clerk portal takes it for the account on file."""
     async with system_tx(pool) as conn:
         outcome = await _settled(conn, dataset_id, email, lock=True)
         if outcome != "pending":
             return outcome
         await conn.execute("select 1 from app.vendors where id = %s for update", (facts.vendor_id,))
-        repeat = await _repeat(conn, dataset_id, facts.vendor_id, source_event_id, fingerprint, keys.fingerprint_key_version)
-        if repeat:
-            return await _record(conn, dataset_id, email, replace(facts, outcome=repeat[0], case_id=repeat[1], error=repeat[2]))
+        stop_facts = await _no_change(conn, dataset_id, email, facts, keys, fingerprint, source_event_id)
+        if stop_facts is not None:
+            return await _record(conn, dataset_id, email, stop_facts)
+        current = await (await conn.execute(
+            "select id from app.bank_accounts where vendor_id = %s and is_current "
+            "order by first_seen_at desc, created_at desc limit 1", (facts.vendor_id,))).fetchone()
+        old_account_id = current["id"] if current else None
         now = await dataset_now(conn, dataset_id)
         account_id = (await (await conn.execute(
             """insert into app.bank_accounts (dataset_id, vendor_id, ramp_account_id, routing_number, account_last4,

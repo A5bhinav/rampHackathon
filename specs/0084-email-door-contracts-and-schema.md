@@ -9,7 +9,7 @@ A bank-change email will open a Dialback case on its own (design: `docs/superpow
 ## Contract touched
 
 `packages/contracts/openapi/dialback.yaml`, additive only, regenerated with `pnpm gen:api`:
-- Schemas `MailItem`, `EmailInfo`, `MailOutcome`, `ReplyStatus`, `RedFlag`.
+- Schemas `MailItem`, `EmailInfo`, `MailOutcome`, `ReplyStatus`, `RedFlag`. `MailOutcome` is `pending`, `not_flagged`, `door_off`, `not_demo_vendor`, `no_vendor`, `several_vendors`, `no_routing_number`, `no_account_number`, `same_as_on_file`, `repeat_request`, `case_opened`, `joined_case`, `ramp_case_open`, `failed`. `ramp_case_open` (added by the final review's C1 fix, while this PR is unmerged): the vendor's unfinished case has a change that did not come by email, so the email changed nothing; its `case_id` names that case.
 - `ChangeInfo.email` (optional, `EmailInfo` or null) and `Permissions.can_dismiss` (optional boolean).
 - `GET /api/datasets/{dataset_id}/mail` (`listMail`): `{ items: MailItem[] }`, newest first, at most 200.
 

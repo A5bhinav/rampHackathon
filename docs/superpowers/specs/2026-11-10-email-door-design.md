@@ -227,7 +227,11 @@ Consequences, all through existing behavior:
   resend, or a second judge, would move a case from `calling` back to `held` and abandon the call in
   progress.
 - A change email asking for a **different** account while the case is open joins that case
-  (version + 1), as any new change does.
+  (version + 1), as any new change does. **Amended after the final review (finding C1):** only when
+  every change on that case came by email. When the case has any change that did not (a clerk's change
+  in Ramp opened or joined it), the email writes nothing and is listed `ramp_case_open`, linked to the
+  case. A case verifies its current change, so otherwise the call would verify the email's account while
+  Ramp pays the clerk's (R1).
 - If a clerk also types the change into Ramp (0077) while the case is open, Ramp detection joins the
   same case the same way.
 - 0077's "one bank change a minute per demo dataset" check counts `bank_change_events`, so an email

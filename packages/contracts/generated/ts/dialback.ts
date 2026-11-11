@@ -382,10 +382,10 @@ export interface components {
             last4: string;
         };
         /**
-         * @description What Dialback did with one inbound email. `pending` until it has been handled.
+         * @description What Dialback did with one inbound email. `pending` until it has been handled. `ramp_case_open`: the vendor's unfinished case has a change that did not come by email, so the email changed nothing (its `case_id` names that case).
          * @enum {string}
          */
-        MailOutcome: "pending" | "not_flagged" | "door_off" | "not_demo_vendor" | "no_vendor" | "several_vendors" | "no_routing_number" | "no_account_number" | "same_as_on_file" | "repeat_request" | "case_opened" | "joined_case" | "failed";
+        MailOutcome: "pending" | "not_flagged" | "door_off" | "not_demo_vendor" | "no_vendor" | "several_vendors" | "no_routing_number" | "no_account_number" | "same_as_on_file" | "repeat_request" | "case_opened" | "joined_case" | "ramp_case_open" | "failed";
         /**
          * @description Whether the reply to the sender went out, and if not, why.
          * @enum {string}
