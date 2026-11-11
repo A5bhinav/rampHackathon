@@ -104,8 +104,14 @@ None.
   account holder name was available), and its verification history reads "Manually verified:
   Confirmed with vendor directly", by the requester: the person's word that Dialback's call
   replaces. Approval is "in progress", by "Any Admin", and the requester, an admin, is offered
-  Approve. What Ramp's API shows for it (the pending account's `proposal_id`, any audit event) is
-  still to be read with the probe.
+  Approve. Through the API (the probe, the same day): `include_pending=true` lists it as account
+  `5d950fa7-36a7-404a-9227-98e19acaa0c4`, last four 4321, `pending_approval`, `proposal_id`
+  `3653632a-f167-41fe-bdb6-1dffe8f1a97c`, which is the id of the dashboard's approval group for the
+  change, not of its proposal page (`d85f2735-...`). The vendor's `updated_at` didn't move, and no
+  audit event that mentions the vendor, the pending account or that id appeared after the hold
+  (22:25 UTC) among the events read (the read stops at 1,000; whether it stopped wasn't printed).
+  So while pending, the change shows only as a pending account. Whether approving it writes an
+  event, and what the account's new id is, is still open: approve it and run the probe again.
 - **Q205:** a bank change can wait for approval in Ramp, and until then the proposed account shows
   only with `include_pending`, under an id Ramp replaces when it approves the change (Ramp's
   document). The layer reads without `include_pending`, so it sees the change only once approved,
