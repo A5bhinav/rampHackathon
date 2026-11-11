@@ -18,7 +18,9 @@ EXAMPLES = sorted(HERE.glob("[0-9]*.json"))
 
 
 def _answers(rows: list[list]) -> list[dict]:
-    return [{"slot": slot, "value": value, "turn_id": turn} for slot, value, turn in rows]
+    """[slot, value, turn] rows, with an optional fourth item: the capture method (spec 0080, B6)."""
+    return [{"slot": row[0], "value": row[1], "turn_id": row[2], **({"capture_method": row[3]} if len(row) > 3 else {})}
+            for row in rows]
 
 
 def _last_four(answers: list[dict]) -> str | None:
@@ -39,7 +41,7 @@ def build(example: dict):
 
 
 def test_there_are_worked_examples_for_the_spec():
-    assert len(EXAMPLES) == 27, "24 examples, three of them in two variants (22 is spec 0082, D7b)"
+    assert len(EXAMPLES) == 28, "25 examples, three of them in two variants (22 is spec 0082, D7b; 23 spec 0080, B6)"
 
 
 @pytest.mark.parametrize("path", EXAMPLES, ids=lambda p: p.stem)

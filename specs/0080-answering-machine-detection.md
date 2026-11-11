@@ -241,7 +241,7 @@ Sami decided to build Part B as proposed above, and answered Q133's first part.
 | B1 | `packages/decision/tests/test_facts.py::test_digits_typed_needs_every_digit_answer_on_the_keypad` |
 | B2, B3 | `packages/decision/tests/test_rules.py::test_an_unknown_label_verifies_only_with_typed_digits` |
 | B4 | `packages/decision/tests/test_rules.py::test_each_rule_fires_in_its_block` (an `ALSO` row) |
-| B5 | `packages/decision/tests/test_engine.py::test_engine_version_is_1_2_0` |
+| B5 | `packages/decision/tests/test_engine.py::test_a_clean_confirmation_is_verified_with_every_condition_named` (its version pin moves from 1.1.0) |
 | B6 | `packages/decision/tests/test_examples.py::test_worked_example[23-unknown-label-typed-digits]` |
 | B7 | `evals/tests/test_reports.py::test_an_unknown_label_with_typed_digits_is_an_honest_confirmation` |
 

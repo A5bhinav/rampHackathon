@@ -59,6 +59,7 @@ ALSO = [
     ("NR97_facts_invalid", {"earlier_calls": (EarlierCall(result="failed", last_four_result="close"),)}),
     ("NR97_facts_invalid", {"earlier_calls": (EarlierCall(result="failed", flags=("approve_now",)),)}),
     ("NR97_facts_invalid", {"extra": ["not", "a", "dict"]}),
+    ("NR97_facts_invalid", {"digits_typed": 1}), ("NR97_facts_invalid", {"digits_typed": None}),   # spec 0080, B4
     ("NV01_vendor_denied_change", {"earlier_calls": (EarlierCall(result="failed", recording_consent=CONSENTED,
                                                                  change_requested=("no",)),)}),
     ("NV02_digits_mismatch", {"earlier_calls": (EarlierCall(result="failed", recording_consent=CONSENTED,
@@ -212,3 +213,26 @@ def test_nr03_has_its_new_sentence_and_is_the_company_answers_only_rule():
     assert TEMPLATES["NR03_wrong_company"] == \
         "The company answer did not name this vendor, or said the person is not with it or only works with it."
     assert rules.SLOT_RULES["company_named"] == ("NR03_wrong_company",)
+
+
+def test_an_unknown_label_verifies_only_with_typed_digits():  # spec 0080, Part B, B2 and B3
+    unknown = replace(GOOD, answered_by=None, digits_typed=True)
+    # Label absent, digits typed and matching, everything else clean: verified, with V03 met.
+    d = decide(unknown)
+    assert (d.outcome, d.rules_fired) == ("verified", ELEVEN)
+    # Typed digits that are wrong still decide as before.
+    assert (decide(replace(unknown, last_four_result="mismatch")).outcome,
+            decide(replace(unknown, last_four_result="mismatch")).rules_fired) == ("not_verified", ("NV02_digits_mismatch",))
+    old = decide(replace(unknown, last_four_result="matches_old_account"))
+    assert (old.outcome, old.rules_fired) == ("not_verified", ("NV03_digits_match_old_account",))
+    # Spoken digits, or none: still a person's review, with V03 unmet.
+    spoken = decide(replace(unknown, digits_typed=False))
+    assert (spoken.outcome, spoken.rules_fired) == ("needs_review", (rules.NOT_MET, "V03_live_person_unmet"))
+    none = decide(replace(unknown, last_four_result=None))
+    assert none.outcome == "needs_review" and "V03_live_person_unmet" in none.rules_fired
+    assert decide(replace(unknown, last_four_result="not_provided")).rules_fired == ("NR06_digits_not_provided",)
+    assert TEMPLATES["V03_live_person_unmet"] == ("We could not confirm a person, not a machine, answered: the call "
+                                                  "was not labeled a person, and the digits were not typed on the keypad.")
+    # A machine label still goes to review, typed digits or not; a human label doesn't need them.
+    assert decide(replace(unknown, answered_by="machine")).rules_fired == ("NR01_no_live_person",)
+    assert GOOD.digits_typed is False and decide(GOOD).outcome == "verified"
