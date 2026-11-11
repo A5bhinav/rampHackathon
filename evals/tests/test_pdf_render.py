@@ -20,7 +20,7 @@ def test_render_is_deterministic():
 
 def test_a_character_the_font_cant_draw_fails_the_render():
     with pytest.raises(RenderError, match="U\\+4E00"):
-        render_pdf(_doc({"text": "Call 一", "x": 72, "y": 72, "size": 10, "color": "#000000"}))
+        render_pdf(_doc({"text": "Call \u4e00", "x": 72, "y": 72, "size": 10, "color": "#000000"}))
 
 
 def test_the_font_covers_every_source_character():
