@@ -119,12 +119,12 @@ def svix_headers(raw: bytes, msg_id: str, ts: int, secret: str = RESEND_SECRET) 
 
 
 async def deliver(w, email_id: str | None = None, sender: str = "Dana <ar@vendor.example>", kind: str = "email.received",
-                  message_id: str | None = None) -> str:
+                  message_id: str | None = None, to: list[str] | None = None) -> str:
     """One signed Resend notice through POST /webhooks/email (the core's settings must use RESEND_SECRET).
     Returns the email id."""
     email_id = email_id or f"em_{uuid.uuid4().hex}"
     raw = json.dumps({"type": kind, "created_at": "2026-11-10T00:00:00Z",
-                      "data": {"email_id": email_id, "from": sender, "to": ["inbox@x.example"],
+                      "data": {"email_id": email_id, "from": sender, "to": to or ["inbox@x.example"],
                                "message_id": message_id or f"<{email_id}@v.example>"}}).encode()
     r = await w.core.post("/webhooks/email", content=raw, headers=svix_headers(raw, f"msg_{uuid.uuid4().hex}", int(time.time())))
     assert r.status_code == 200, r.text

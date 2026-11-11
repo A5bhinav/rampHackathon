@@ -6,7 +6,8 @@ carries no email body; the worker fetches the email later. Check order: off (404
 (413), no current demo dataset (503, so Resend retries), signature (401), store (200).
 
 What is stored (ADR-8: a subject line or a forged body can carry a full account number): a signed
-delivery keeps only the notice's type, created_at and data.email_id, message_id, from and to. A bad
+delivery keeps only the notice's type, created_at and data.email_id, message_id, from and to, with
+digit runs masked in from and to (both chosen by the sender). A bad
 delivery is stored as the hash and length of its body, never the body, and with the names of its
 headers, never their values. This route has no secret in
 its path, so a bad delivery raises at most one alert per dataset per 10 minutes and at most 100
@@ -54,6 +55,17 @@ def _no_nul(value):
     return value
 
 
+def _masked(value):
+    """The same value with digit runs masked in every string (strip NUL first: a NUL can split a number)."""
+    if isinstance(value, str):
+        return mask_digit_runs(strip_nul(value))
+    if isinstance(value, list):
+        return [_masked(v) for v in value]
+    if isinstance(value, dict):
+        return {k: _masked(v) for k, v in value.items()}
+    return value
+
+
 def _kept(raw: bytes) -> str:
     """The parts of a signed notice worth keeping; the subject and attachments are read after the fetch."""
     try:
@@ -64,8 +76,12 @@ def _kept(raw: bytes) -> str:
         return json.dumps({"unreadable": True, "sha256": hashlib.sha256(raw).hexdigest(), "length": len(raw)})
     data = payload.get("data") if isinstance(payload.get("data"), dict) else {}
     kept = {k: data.get(k) for k in ("email_id", "message_id", "from", "to") if k in data}
-    if isinstance(kept.get("from"), str):  # a display name is typed by a person: it can carry an account number (ADR-8)
-        kept["from"] = mask_digit_runs(strip_nul(kept["from"]))  # strip first: a NUL can split a number
+    # ADR-8: a person types `from` (its display name) and chooses `to` (Resend's free address takes any local
+    # part, so mail to 000123454821@<id>.resend.app arrives). Nothing reads `to`; both are kept masked.
+    # message_id stays as sent: the door checks it for a planted account and scrubs it (door.py).
+    for key in ("from", "to"):
+        if key in kept:
+            kept[key] = _masked(kept[key])
     try:  # a non-finite number is not JSON Postgres accepts: keep the hash and length instead
         return json.dumps(_no_nul({"type": payload.get("type"), "created_at": payload.get("created_at"), "data": kept}), allow_nan=False)
     except ValueError:

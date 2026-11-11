@@ -25,10 +25,11 @@ MSG_ID, TS = "msg_2Lh9KRb0pzN3LePmFinf1Vsl8Nh", 1_731_200_000
 ACCOUNT = "000123454821"  # a full account number that must never be stored (ADR-8)
 
 
-def notice(subject: str = "New bank details") -> bytes:
+def notice(subject: str = "New bank details", to: object = ("inbox@x.example",)) -> bytes:
     """A notice with a body unique to the call (unsigned rows are keyed by the body's hash, across the test database)."""
     return json.dumps({"type": "email.received", "created_at": "2026-11-10T00:00:00Z",
-                       "data": {"email_id": f"em_{uuid.uuid4().hex}", "from": "a@b.example", "to": ["inbox@x.example"],
+                       "data": {"email_id": f"em_{uuid.uuid4().hex}", "from": "a@b.example",
+                                "to": list(to) if isinstance(to, tuple) else to,
                                 "subject": subject, "message_id": "<m1@b.example>", "attachments": [{"filename": "x.pdf"}]}}).encode()
 
 
@@ -205,6 +206,21 @@ async def test_an_account_number_in_a_notice_is_stored_nowhere(demo):
     unsigned = next(r for r in await deliveries(demo.pool, demo.dataset.id) if not r["signature_valid"])
     assert json.loads(unsigned["raw_body"]) == {"sha256": hashlib.sha256(body).hexdigest(), "length": len(body)}
     assert unsigned["event_id"] == "unsigned:" + hashlib.sha256(body).hexdigest()
+
+
+@pytest.mark.parametrize("to,stored", [
+    ([f"{ACCOUNT}@abc.resend.app"], ["********4821@abc.resend.app"]),
+    (["Acct 0001 2345 4821 <inbox@x.example>", "inbox@x.example"], ["Acct **** **** 4821 <inbox@x.example>", "inbox@x.example"]),
+    (f"{ACCOUNT}@abc.resend.app", "********4821@abc.resend.app"),
+    ([[f"{ACCOUNT}@abc.resend.app"]], [["********4821@abc.resend.app"]]),
+], ids=["local-part", "display-name", "a-string", "nested"])
+async def test_the_to_list_is_stored_masked(demo, to, stored):
+    """Final review I2a: Resend's free address takes any local part, so the sender chooses `to`, and the
+    door never reads it. Mail to 000123454821@<id>.resend.app must not leave the number in the stored notice."""
+    assert (await post(demo, notice(to=to))).status_code == 200
+    (row,) = await deliveries(demo.pool, demo.dataset.id)
+    assert json.loads(row["raw_body"])["data"]["to"] == stored
+    assert ACCOUNT not in row["raw_body"] and "0001 2345" not in row["raw_body"]
 
 
 async def test_the_ramp_worker_leaves_a_resend_delivery_alone(demo):

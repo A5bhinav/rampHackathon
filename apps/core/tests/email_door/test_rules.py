@@ -222,6 +222,8 @@ def test_a_loosely_labeled_account_is_not_a_routing_number():
     "Acct #: 000123454821",
     "Routing 026009593\nAccount Number\n0001\n2345\n4821\n\nThanks",
     "our new acct no. is 0001\u20112345\u20114821.",                   # non-breaking hyphens
+    "Account 0001\u202a2345\u202c4821",                                 # bidi controls (final review I2b)
+    "Account 0001\u061c2345\u202e4821",
 ])
 def test_accounts_are_found_grouped_or_labeled(text):
     assert find_accounts(text) == [ACCOUNT]

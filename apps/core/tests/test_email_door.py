@@ -98,12 +98,12 @@ async def door_world(pool, database_url, monkeypatch):
 
 
 async def arrive(w, email_id: str | None = None, notice_message_id: str | None = None, notice_sender: str | None = None,
-                 **changes) -> dict:
+                 notice_to: list[str] | None = None, **changes) -> dict:
     """One email through the signed route; the worker runs until idle. Returns the email's row.
     `notice_sender` is the From the notice carries (the row stores it); the default is the tests' usual one."""
     # The notice carries the From of the email, as in production (the row stores it; the reply counts by it).
     notice_sender = notice_sender or changes.get("sender") or "Sam Judge <sam.judge@gmail.example>"
-    email_id = await deliver(w, email_id, sender=notice_sender, message_id=notice_message_id)
+    email_id = await deliver(w, email_id, sender=notice_sender, message_id=notice_message_id, to=notice_to)
     w.worker.resend.emails[email_id] = judge(email_id, **changes)
     await w.worker.drain(w.demo_id)
     return await one(w.pool, "select * from app.inbound_emails where dataset_id = %s and resend_email_id = %s", w.demo_id, email_id)
@@ -360,6 +360,31 @@ async def test_the_full_account_number_is_nowhere(door_world, caplog):
     (case,) = await cases(w)
     assert case["version"] == 1 and await count(w, "ledger.change_requests where dataset_id = %s") == 1
     for needle in (ACCOUNT, grouped, ACCOUNT.lstrip("0")):
+        await assert_nowhere(w.pool, caplog, needle)
+
+
+async def test_an_account_in_the_to_address_is_stored_nowhere(door_world, caplog):
+    """Final review I2a: the sender chooses the inbox address's local part (Resend's free address takes any)."""
+    caplog.set_level(logging.DEBUG)
+    w = door_world
+    to = [f"{ACCOUNT}@abc.resend.app"]
+    row = await arrive(w, notice_to=to, to=tuple(to))
+    assert (row["outcome"], row["last4"]) == ("case_opened", "4821")
+    await assert_nowhere(w.pool, caplog, ACCOUNT)
+
+
+async def test_bidi_controls_cannot_hide_an_account_in_the_subject(door_world, caplog):
+    """Final review I2b: U+202A to U+202E and U+061C are invisible like U+200E, so they group a number too."""
+    caplog.set_level(logging.DEBUG)
+    w = door_world
+    hidden = "0001\u202a2345\u202c4821"
+    row = await arrive(w, subject=f"Cobalt Freight: new account {hidden}", text=JUDGE_TEXT.replace(ACCOUNT, "0001\u061c2345\u202e4821"))
+    assert row["subject"] == "Cobalt Freight: new account ****\u202a****\u202c4821"
+    assert (row["outcome"], row["last4"]) == ("case_opened", "4821")
+    doc = await one(w.pool, "select d.subject from ledger.change_requests r join ledger.documents d on d.id = r.document_id "
+                            "where r.dataset_id = %s", w.demo_id)
+    assert doc["subject"] == row["subject"]
+    for needle in (hidden, "0001\u061c2345", ACCOUNT):
         await assert_nowhere(w.pool, caplog, needle)
 
 

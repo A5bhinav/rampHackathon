@@ -84,6 +84,9 @@ def test_mask_digit_runs():
     ("acct 0001\u00ad2345\u00ad4821", "acct ****\u00ad****\u00ad4821"),
     ("acct 0001\u200e2345\u200f4821", "acct ****\u200e****\u200f4821"),
     ("acct 0001\u20662345\u20694821", "acct ****\u2066****\u20694821"),
+    ("acct 0001\u202a2345\u202b4821", "acct ****\u202a****\u202b4821"),   # final review I2b: bidi embeddings,
+    ("acct 0001\u202c2345\u202d4821", "acct ****\u202c****\u202d4821"),   # the pop and overrides,
+    ("acct 0001\u202e2345\u061c4821", "acct ****\u202e****\u061c4821"),   # and the Arabic letter mark
 ])
 def test_mask_digit_runs_other_separators(subject, masked):
     assert mask_digit_runs(subject) == masked
