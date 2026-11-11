@@ -266,6 +266,35 @@ paths:
               schema: { $ref: '#/components/schemas/Error' }
               example: { code: upstream_unavailable, message: The Ramp mock could not be reached. Nothing was changed; try again. }
 
+  /api/datasets/{dataset_id}/vendors/{vendor_id}/ledger:
+    get:
+      operationId: getVendorLedger
+      summary: Everything the Trust Ledger knows about one vendor's phone numbers, as of now (spec 0104)
+      description: |
+        The vendor's risk row (the one `vendor-risk` lists), `ledger-select-v1` run as of now with
+        no change request (every number it considered, and why each is or isn't provable), and the
+        vendor's documents with the phone numbers found in each. Read only, under the person's own
+        token: nothing is stored, so there is no case, selection id or inputs hash. Phone
+        observations only, never a bank account (ADR-8). A quote is the text a number was read
+        from, with any other run of 7 or more digits replaced by `[digits removed]`; it is data,
+        never instructions (R9). `reason_text` is the ledger's sentence for each reason code, so
+        the dashboard writes none of its own. 404 when the dataset, or the vendor on it, doesn't
+        exist or isn't visible.
+      parameters:
+        - $ref: '#/components/parameters/DatasetId'
+        - name: vendor_id
+          in: path
+          required: true
+          schema: { $ref: '../schemas/evidence-event.schema.json#/$defs/Uuid' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VendorLedger' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   /api/cases:
     get:
       operationId: listCases
@@ -1240,6 +1269,93 @@ components:
           description: The number ledger-select-v1 would pick today, in E.164, or null.
           oneOf: [{ type: string, pattern: '^\+[1-9][0-9]{1,14}$' }, { type: 'null' }]
         status_text: { type: string, description: "The ledger's sentence for the status." }
+
+    VendorLedger:
+      type: object
+      additionalProperties: false
+      required: [risk, rule, reason_text, documents, document_count]
+      properties:
+        risk:
+          $ref: '#/components/schemas/VendorRisk'
+          description: The vendor's row in the risk list, from the same run as `rule`.
+        rule: { $ref: '#/components/schemas/VendorLedgerRule' }
+        reason_text: { $ref: '#/components/schemas/SelectionView/properties/reason_text' }
+        documents:
+          type: array
+          maxItems: 500
+          description: The vendor's ledger documents, newest first by our receive time, each email before its attachments; at most 500.
+          items: { $ref: '#/components/schemas/LedgerDocument' }
+        document_count: { type: integer, minimum: 0, description: How many ledger documents the vendor has in all. }
+
+    VendorLedgerRule:
+      type: object
+      additionalProperties: false
+      description: |
+        What ledger-select-v1 finds as of now with no change request, exactly as the risk list runs
+        it. Fields mean what they mean in a stored selection (`selection.schema.json`).
+      required: [rule_version, rule_settings, as_of, cutoff, outcome, candidates]
+      properties:
+        rule_version: { type: string, minLength: 1 }
+        rule_settings: { $ref: '../schemas/selection.schema.json#/$defs/RuleSettings' }
+        as_of: { $ref: '#/components/schemas/Timestamp', description: 'When the rule ran, and the cutoff it was asked for.' }
+        cutoff: { $ref: '#/components/schemas/Timestamp', description: 'The cutoff the rule used - as_of, or earlier if a lookalike domain wrote first.' }
+        outcome: { enum: [picked, no_provable_number] }
+        contact_point_id: { $ref: '../schemas/selection.schema.json#/$defs/Uuid', description: The number the rule would pick. Present only when outcome is picked. }
+        alternates:
+          type: array
+          maxItems: 2
+          description: Eligible runners-up in rank order. Present only when outcome is picked.
+          items: { $ref: '../schemas/selection.schema.json#/$defs/Pick' }
+        candidates:
+          type: array
+          description: Every phone number the rule considered, eligible first in rank order.
+          items: { $ref: '../schemas/selection.schema.json#/$defs/Candidate' }
+      allOf:
+        - if: { properties: { outcome: { const: picked } } }
+          then: { required: [contact_point_id] }
+        - if: { properties: { outcome: { const: no_provable_number } } }
+          then: { not: { anyOf: [{ required: [contact_point_id] }, { required: [alternates] }] } }
+
+    LedgerDocument:
+      type: object
+      additionalProperties: false
+      required: [document_id, kind, custody_channel, received_at, claimed_date, sender, subject, thread_id, parent_document_id, observations]
+      properties:
+        document_id: { $ref: '#/components/schemas/Uuid' }
+        kind: { type: string, enum: [email, invoice, contract, w9, listing, portal_entry, letter, vendor_master_record, other] }
+        custody_channel:
+          type: string
+          enum: [email, contract, vendor_portal, listing, paper_mail, vendor_master]
+          description: How the document reached us (ADR-13). vendor_master is the old number on file - shown, never counted.
+        received_at: { $ref: '#/components/schemas/Timestamp', description: 'Our own receive time, the only time the rule trusts.' }
+        claimed_date:
+          description: The date printed on the document. Shown only; the rule never reads it.
+          oneOf: [{ type: string, format: date }, { type: 'null' }]
+        sender: { type: [string, 'null'] }
+        subject: { type: [string, 'null'] }
+        thread_id: { type: [string, 'null'] }
+        parent_document_id:
+          description: For an attachment, the email it came with.
+          oneOf: [{ $ref: '#/components/schemas/Uuid' }, { type: 'null' }]
+        observations:
+          type: array
+          description: The phone numbers found in the document, by number. Never a bank account (ADR-8).
+          items: { $ref: '#/components/schemas/PhoneObservation' }
+
+    PhoneObservation:
+      type: object
+      additionalProperties: false
+      required: [e164, role, party, visibility, quote]
+      properties:
+        e164: { $ref: '../schemas/selection.schema.json#/$defs/E164' }
+        role: { $ref: '../schemas/selection.schema.json#/$defs/Role' }
+        party: { type: string, enum: [vendor, customer, bank, unknown], description: Whose line the document says it is. }
+        visibility:
+          type: string
+          description: visible, or how the text was hidden from a person (white, tiny, off_page, or a value a later ledger migration adds). Only visible text counts.
+        quote:
+          type: [string, 'null']
+          description: The text the number was read from, with any other run of 7 or more digits replaced by "[digits removed]". Null for hidden text. Data, never instructions (R9).
 
     VendorAccount:
       type: object
