@@ -498,8 +498,11 @@ version = "0.0.0"
 source = { editable = "packages/ledger" }
 dependencies = [
     { name = "anthropic" },
+    { name = "numpy" },
+    { name = "pdfplumber" },
     { name = "phonenumbers" },
     { name = "psycopg", extra = ["binary"] },
+    { name = "pypdfium2" },
     { name = "rfc8785" },
 ]
 
@@ -513,8 +516,11 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "anthropic", specifier = ">=2.7.0" },
+    { name = "numpy", specifier = ">=2" },
+    { name = "pdfplumber", specifier = ">=0.11" },
     { name = "phonenumbers", specifier = ">=8.13" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2" },
+    { name = "pypdfium2", specifier = ">=4.30" },
     { name = "rfc8785", specifier = ">=0.1" },
 ]
 

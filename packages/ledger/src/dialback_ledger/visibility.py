@@ -1,4 +1,5 @@
-"""Could a person see this text? White (on the white page), under 4 points, or off the page is hidden.
+"""Could a person see this text? White (on the white page), under 4 points, off the page, or drawn with no
+ink (a span from a real PDF can say `ink: false`, spec 0092) is hidden.
 
 Hidden values are kept, marked, and never eligible (design §4). Anything this can't read, such
 as an unparseable colour, counts as hidden: fail closed (R7).
@@ -32,4 +33,6 @@ def classify(span: dict, width: float, height: float) -> str:
         return "tiny"
     if _is_white(span.get("color")):
         return "white"
+    if "ink" in span and span["ink"] is not True:
+        return "no_ink"   # drawing it leaves no mark (spec 0092): anything but a plain true counts (R7)
     return "visible"

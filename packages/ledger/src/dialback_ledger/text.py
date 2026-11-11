@@ -1,7 +1,7 @@
 """A document's text, line by line, with whether a person could see each line.
 
-Reads the corpus page model: spans with position, size and colour, the facts pdfplumber reports
-per character. Reading real PDFs is a later spec (0016, out of scope).
+Reads the page model: spans with position, size and colour, the facts pdfplumber reports per
+character. A real PDF becomes this page model in `pdf.py` (spec 0092).
 """
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from .visibility import classify
 @dataclass(frozen=True)
 class Line:
     text: str
-    visibility: str   # visible, white, tiny, off_page
+    visibility: str   # visible, white, tiny, off_page, no_ink
     page: int
     index: int        # position in the document, across pages
 
