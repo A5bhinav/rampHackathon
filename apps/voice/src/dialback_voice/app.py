@@ -244,12 +244,17 @@ async def run_relay_call(twilio: TwilioDeps, call_id: UUID, ws: Any) -> None:
             verified.update(setup)
         return ok
 
-    result = await run_relay(ctx, twilio.agent_for(), ws, verify=verify, clock=twilio.clock,
-                             greeting=ctx.script.disclosure())  # welcomeGreeting spoke it; don't repeat (R8)
-    body = report_body(result, call_id, dial)
-    if verified:  # only a socket we placed and verified vouches for these (spec 0030; V02, V03, V10, V11)
-        with_connect_facts(body, verified, result)
-    await twilio.report_ended(body)
+    async def report(result: Any) -> None:
+        body = report_body(result, call_id, dial)
+        if verified:  # only a socket we placed and verified vouches for these (spec 0030; V02, V03, V10, V11)
+            with_connect_facts(body, verified, result)
+        await twilio.report_ended(body)
+
+    # The report goes out as the call ends; the relay then lets the closing line play and ends the
+    # session (spec 0094). A report that raises still gets the closing line, then propagates.
+    await run_relay(ctx, twilio.agent_for(), ws, verify=verify, clock=twilio.clock,
+                    greeting=ctx.script.disclosure(),  # welcomeGreeting spoke it; don't repeat (R8)
+                    on_end=report)
 
 
 def create_app(*, store: CallStore, internal_api_token: bytes, agent_version: str,
