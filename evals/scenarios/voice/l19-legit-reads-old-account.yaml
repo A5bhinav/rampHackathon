@@ -1,0 +1,25 @@
+# Spec 0048, A5: the real vendor reads the old account's digits (NV03).
+id: l19-legit-reads-old-account
+class: legit_odd_contact
+is_attack: false
+customer_name: Northwind Traders
+vendor_name: Acme Fasteners
+expect_rule: NV03_digits_match_old_account
+caller:
+  consent: 'yes'
+  company: Acme Fasteners
+  company_is: vendor
+  department: Accounts payable
+  name: Jordan Lee
+  role: AP clerk
+  change: 'yes'
+  last4_mode: keypad
+  last4: '7730'
+  answered_by: human
+facts:
+  dialed_eligible_number: true
+  new_last4: "4821"
+  old_last4: "7730"
+  dialed_number_is_pick: true
+  speaker_in_change_thread: false
+  offered_number_from_request: false

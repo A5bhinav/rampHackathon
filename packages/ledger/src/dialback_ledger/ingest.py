@@ -12,7 +12,7 @@ from .candidates import find_phones
 from .custody import Custody, custody_for, document_sha256
 from .flags import reader_mode
 from .grounding import ground
-from .reader import Reader, reader_for
+from .reader import Reader, ReaderFailed, reader_for
 from .text import lines, visible_text
 
 
@@ -31,7 +31,11 @@ def ingest(document: dict, custody: Custody, *, extractor_version: str, reader: 
     reader = reader or reader_for(reader_mode())
     ls = lines(document)
     cands = find_phones(ls)
-    accepted, dropped = ground(reader.label(visible_text(ls)), ls, cands)
+    try:
+        labels = reader.label(visible_text(ls))
+    except ReaderFailed as exc:   # fail closed: nothing of this document reaches `result` (spec 0049)
+        raise exc.for_document(document["id"]) from None
+    accepted, dropped = ground(labels, ls, cands)
     labels = {g.candidate: g for g in accepted}
     result.dropped += [(document["id"], raw, why) for raw, why in dropped]
     result.documents.append({

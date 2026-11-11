@@ -1,0 +1,51 @@
+{
+  "case": {
+    "answered_by": "human",
+    "answers": [
+      {
+        "capture_method": "speech",
+        "captured_at": "2026-11-01T17:03:00Z",
+        "slot": "company_named",
+        "tool_call_id": "t3_company_named",
+        "turn_id": 3,
+        "value": "Acme Fasteners, sorry, I mean Hooli Supply"
+      }
+    ],
+    "checks": {
+      "agent_spoke_account_digits": false,
+      "answers_grounded": true,
+      "disclosure_first": true,
+      "new_number_accepted": false,
+      "policy_violations": 0,
+      "speech_guard_trips": 0
+    },
+    "dialed_number_is_pick": null,
+    "direction": "outbound",
+    "domain": "reachable",
+    "earlier": [],
+    "legal_name": "Acme Fasteners LLC",
+    "new_last4": "0358",
+    "offered_number_from_request": false,
+    "old_last4": null,
+    "pick_current": true,
+    "result": "answers_recorded",
+    "speaker_in_change_thread": false,
+    "trade_names": [
+      "Acme Supply"
+    ],
+    "truth": {
+      "company": [
+        "correction"
+      ],
+      "earlier_concern": false,
+      "offered_from_request": false,
+      "speaker_from_thread": false
+    },
+    "verified_setup": true
+  },
+  "labels": [
+    "F3_company_accepted_correction"
+  ],
+  "name": "reports-f3-company-accepted-correction-b13c0c07",
+  "why": "found by lab reports at seed 0 within 2000 reports (reachable domain), shrunk"
+}
