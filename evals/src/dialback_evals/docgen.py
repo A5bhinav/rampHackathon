@@ -57,7 +57,10 @@ from .worldgen import fictional
 EXTRACTOR = "lab-0052"
 T0 = dt.datetime(2026, 10, 1, 16, 0, tzinfo=dt.UTC)   # every change request arrives at T0
 WIDTH, HEIGHT = 612, 792
-HIDE = {"white": {"color": "#ffffff"}, "tiny": {"size": 1}, "off_page": {"x": WIDTH + 90}}
+HIDE = {"white": {"color": "#ffffff"}, "tiny": {"size": 1}}
+# An off-page row moves right by one offset, so its spans keep their relative x and never overlap (spec 0092,
+# D6): a one-span row lands at x = WIDTH + 90, and a table row's number stays to the right of its label.
+OFF_PAGE_SHIFT = WIDTH + 90 - 72
 VENDOR_DOMAIN = "acme.example"
 FILE = "case.json"
 VISIBILITY_WEIGHTS = (7, 1, 1, 1)                      # visible, white, tiny, off_page
@@ -230,7 +233,8 @@ def render(plan: DocPlan) -> dict:
     spans = []
     for k, (row, visibility) in enumerate(rows):
         for text, x in row:
-            spans.append({"text": text, "x": x, "y": 72 + 14 * k, "size": 10, "color": "#000000"}
+            shift = OFF_PAGE_SHIFT if visibility == "off_page" else 0
+            spans.append({"text": text, "x": x + shift, "y": 72 + 14 * k, "size": 10, "color": "#000000"}
                          | HIDE.get(visibility, {}))
     if 72 + 14 * len(rows) >= HEIGHT:
         raise ValueError(f"{plan.id} runs off its page")

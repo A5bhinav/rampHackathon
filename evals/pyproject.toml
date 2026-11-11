@@ -10,13 +10,16 @@ dependencies = [
   "jsonschema>=4",
   "dialback-core",
   "pyyaml>=6",
+  "reportlab>=4.2",   # spec 0092: the lab renderer (pdfrender.py)
+  "fonttools>=4.50",  # spec 0092, D10: the glyph-swap plant
+  "numpy>=2",
 ]
 
 [project.scripts]
 lab = "dialback_evals.cli:main"
 
 [dependency-groups]
-dev = ["pytest>=8", "hypothesis>=6"]
+dev = ["pytest>=8", "hypothesis>=6", "pdfplumber>=0.11"]
 
 [tool.pytest.ini_options]
 markers = [
