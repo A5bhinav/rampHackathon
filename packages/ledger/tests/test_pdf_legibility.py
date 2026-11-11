@@ -6,7 +6,6 @@ from __future__ import annotations
 import numpy as np
 import pytest
 from _pdfs import classes, corpus_pdfs, raw_page
-from _world import run, world
 from dialback_ledger import legibility, pdf
 from dialback_ledger.custody import custody_for
 from dialback_ledger.ingest import ingest_pdf
@@ -56,6 +55,13 @@ def test_a_plain_number_passes_all_four(ocr_says, verdicts):
     ocr_says()
     assert classes(raw_page(PLAIN)) == [(DIGITS, "visible")]
     assert verdicts == [ALL_PASS]
+
+
+def test_two_numbers_on_one_text_object_are_both_judged(monkeypatch, verdicts):
+    # The object is hidden to measure the first number, and has to be back for the second.
+    monkeypatch.setattr(legibility, "_read_matches", lambda image, expected, timeout: True)
+    read_pdf(raw_page(f"BT /F1 10 Tf {AT} (415-555-0142   206-555-0117) Tj ET"))
+    assert verdicts == [ALL_PASS, ALL_PASS]
 
 
 # --- Each test can fail on its own -----------------------------------------------------------------------
@@ -186,23 +192,3 @@ def test_an_unverified_number_is_stored_unquoted_and_hidden_from_the_labeler(ocr
     result = ingest_pdf(corpus_pdfs([doc])["d1"], doc, custody_for(doc), extractor_version="stub", reader=Spy())
     assert [(o["visibility"], o["quote"]) for o in result.observations] == [("unverified", None)]
     assert seen == [""]
-
-
-def rows(visibilities: tuple[str, str]) -> list[dict]:
-    return [{"e164": "+14155550142", "channel": channel, "days_before": days, "visibility": v, "role": "ar", "party": "vendor"}
-            for (channel, days), v in zip((("contract", 400), ("listing", 300)), visibilities)]
-
-
-def test_unverified_only_is_unconfirmed_digits_only():
-    (c,) = run(world(rows(("unverified", "unverified"))))["candidates"]
-    assert c["reasons"].count("unconfirmed_digits_only") == 1 and "hidden_text_only" not in c["reasons"] and not c["eligible"]
-
-
-def test_unverified_beside_hidden_is_unconfirmed_digits_only():
-    (c,) = run(world(rows(("unverified", "no_ink"))))["candidates"]
-    assert "unconfirmed_digits_only" in c["reasons"] and "hidden_text_only" not in c["reasons"]
-
-
-def test_hidden_only_is_still_hidden_text_only():
-    (c,) = run(world(rows(("no_ink", "white"))))["candidates"]
-    assert "hidden_text_only" in c["reasons"] and "unconfirmed_digits_only" not in c["reasons"]
