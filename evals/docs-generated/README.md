@@ -9,9 +9,12 @@ phrasing or format, makes the failure go away. `case.json` holds:
 - `documents`: the plan rendered as the page model ingestion reads. A re-run checks the plan still
   renders to exactly these, so a case always means what it meant when it was frozen.
 - `patterns`: what failed when it was frozen, as `<check>/<phrasing>/<placement>`.
+- `violations`: each failure when it was frozen, with its pattern, its number and what happened. A G5
+  pattern can name the phrasing of a rewording the plan itself doesn't hold; this says which.
 - `why`: where it came from.
 
-`lab docs` re-runs every case here on each run, through the real `ingest_all` with the stub reader,
+Only a run at the gate's seed (0) freezes cases here; another seed freezes into the gitignored
+`evals/out/docs-generated-seed<N>`. `lab docs` re-runs every case here on each run, through the real `ingest_all` with the stub reader,
 then `select()` for G7. A pattern a case shows must be on `lab-docs`' list in
 `evals/known-failures.json` with its finding in `evals/FINDINGS.md`:
 

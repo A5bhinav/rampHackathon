@@ -110,7 +110,8 @@ def main(argv: list[str] | None = None) -> int:
     dc.add_argument("--out", default=None, help="where frozen cases live (default: evals/docs-generated at the gate's "
                     "seed, evals/out/docs-generated-seed<N> at any other, so exploring never touches the gate)")
     dc.add_argument("--report", default=str(_REPO / "evals" / "out" / "docs-report.json"))
-    dc.add_argument("--known-failures", default="auto", help=_KNOWN_HELP)
+    dc.add_argument("--known-failures", default="auto", help=_KNOWN_HELP + "; for lab docs, auto with --out left "
+                    "out holds any seed to the repo's list")
     freeze = sub.add_parser("freeze", help="record each scenario's hash and required outcome (expected.lock.json)")
     freeze.add_argument("--split", default="voice")
     freeze.add_argument("--scenarios-root", default=str(_REPO / "evals" / "scenarios"))
@@ -139,8 +140,7 @@ def main(argv: list[str] | None = None) -> int:
         return _sweep(Path(args.scenarios_root) / args.split, args.examples, args.seed, Path(args.unreachable))
     if args.command == "docs":
         out = _docs_out(args.out, args.seed)
-        return _docs(args.examples, args.seed, out, Path(args.report),
-                     _known(args.known_failures, out, _REPO / "evals" / "docs-generated"))
+        return _docs(args.examples, args.seed, out, Path(args.report), _docs_known(args.known_failures, args.out, out))
     if args.command == "reports":
         return _reports(args.examples, args.seed, Path(args.out),
                         _known(args.known_failures, Path(args.out), _REPO / "evals" / "reports-generated"))
@@ -264,6 +264,14 @@ def _docs_out(out: str | None, seed: int) -> Path:
     if seed == DOCS_GATE_SEED:
         return _REPO / "evals" / "docs-generated"
     return _REPO / "evals" / "out" / f"docs-generated-seed{seed}"
+
+
+def _docs_known(choice: str, out_arg: str | None, out: Path) -> Path | None:
+    """The list a `lab docs` run holds itself to. `auto` with --out left out is the repo's list at any seed (the
+    committed folder at the gate's seed, the per-seed folder otherwise); with a folder of your own, none."""
+    if choice == "auto" and out_arg is None:
+        return KNOWN_FAILURES
+    return _known(choice, out, _REPO / "evals" / "docs-generated")
 
 
 def _docs(examples: int, seed: int, out_dir: Path, report_path: Path, known_failures: Path | None = None) -> int:

@@ -462,6 +462,17 @@ def test_another_seed_never_writes_to_the_committed_cases():
     assert "evals/out/" in (ROOT / ".gitignore").read_text(encoding="utf-8").splitlines()
     assert cli._docs_out("somewhere/else", 1) == Path("somewhere/else")
 
+
+def test_another_seed_is_held_to_the_list_by_default():
+    # The second review: `lab docs --seed 5` with no --out was held to no list, so it exited 1 on every listed
+    # pattern. With --out left out, auto holds any seed to the repo's list; a folder of your own gets none.
+    from dialback_evals import cli
+    assert cli._docs_known("auto", None, cli._docs_out(None, 5)) == cli.KNOWN_FAILURES
+    assert cli._docs_known("auto", None, cli._docs_out(None, SEED)) == cli.KNOWN_FAILURES
+    assert cli._docs_known("auto", "mine", Path("mine")) is None
+    assert cli._docs_known("none", None, cli._docs_out(None, 5)) is None
+    assert cli._docs_known("listed.json", None, cli._docs_out(None, 5)) == Path("listed.json")
+
 # --- The stub report ---------------------------------------------------------------------------------
 
 def _recount(plans) -> tuple:
