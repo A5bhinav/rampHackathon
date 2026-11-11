@@ -124,6 +124,15 @@ None.
   (22:25 UTC) among the events read (the read stops at 1,000; whether it stopped wasn't printed).
   So while pending, the change shows only as a pending account. Whether approving it writes an
   event, and what the account's new id is, is still open: approve it and run the probe again.
+  **Answered on approval (same day, approved in the dashboard):** the account came back `active`
+  under a new id (`4879cce7-d182-4d04-a319-b9506d0feec9`), its pending id gone and `proposal_id`
+  null, so the pending and the approved account share only the last four. The old account (6789)
+  stayed active: the edit added an account. Ramp wrote `Bank account updated` (with `Approval chain
+  updated`) under the vendor, `event_details` keys `references` only; no `Bill pay bank account
+  updated`. So D4 asks for the wrong name for a change made in the dashboard, and the author can't
+  be read from it as built (no `new_account_id` key): the release needs two approvers (fail closed).
+  What `references` holds isn't printed yet. And the vendor's `updated_at` moved neither on the
+  request nor on the approval: see Q210.
 - **Q205:** a bank change can wait for approval in Ramp, and until then the proposed account shows
   only with `include_pending`, under an id Ramp replaces when it approves the change (Ramp's
   document). The layer reads without `include_pending`, so it sees the change only once approved,
