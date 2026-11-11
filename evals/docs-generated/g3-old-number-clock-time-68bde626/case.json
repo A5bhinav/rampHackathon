@@ -1,0 +1,89 @@
+{
+  "name": "g3-old-number-clock-time-68bde626",
+  "patterns": [
+    "G3/old_number/clock_time",
+    "G4/old_number/clock_time"
+  ],
+  "why": "G3/old_number/clock_time: shrunk from doc-s0-00042, found by lab docs at seed 0 in 1000 documents",
+  "violations": [
+    {
+      "pattern": "G3/old_number/clock_time",
+      "number": "+15345550173",
+      "detail": "claim None, customer labeled main, vendor"
+    },
+    {
+      "pattern": "G4/old_number/clock_time",
+      "number": "+15345550173",
+      "detail": "claim None, customer labeled main, vendor"
+    }
+  ],
+  "plan": {
+    "type": "doc",
+    "id": "doc-s0-00042",
+    "kind": "signature_block",
+    "author": "customer",
+    "channel": "email",
+    "sender": "ap@customer.example",
+    "thread": "t-doc-s0-00042",
+    "subject": "Quick question",
+    "received_at": "2026-09-28T16:00:00+00:00",
+    "filler": [],
+    "numbers": [
+      {
+        "e164": "+15345550173",
+        "owner": "customer",
+        "role": null,
+        "party": "customer",
+        "phrasing": "old_number",
+        "placement": "clock_time",
+        "format": "paren",
+        "visibility": "visible",
+        "shares_line": false
+      }
+    ],
+    "quote": null
+  },
+  "documents": [
+    {
+      "id": "doc-s0-00042",
+      "kind": "signature_block",
+      "custody": {
+        "channel": "email",
+        "received_at": "2026-09-28T16:00:00+00:00",
+        "sender": "ap@customer.example",
+        "thread_id": "t-doc-s0-00042",
+        "subject": "Quick question",
+        "parent_document_id": null
+      },
+      "pages": [
+        {
+          "width": 612,
+          "height": 792,
+          "spans": [
+            {
+              "text": "Message",
+              "x": 72,
+              "y": 72,
+              "size": 10,
+              "color": "#000000"
+            },
+            {
+              "text": "Example Customer Co",
+              "x": 72,
+              "y": 86,
+              "size": 10,
+              "color": "#000000"
+            },
+            {
+              "text": "Office hours 9:00-5:00, our old number (534) 555-0173",
+              "x": 72,
+              "y": 100,
+              "size": 10,
+              "color": "#000000"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -74,6 +74,9 @@ class Call:
         self.send(KeypadReset(at=self._at()))
         return self.last_callee_turn()
 
+    def silence(self):
+        return self.send(Silence(at=self._at()))
+
     def slots(self) -> list[str]:
         return [a["slot"] for a in self.state.answers]
 
@@ -375,14 +378,15 @@ def test_code_flags_pressure_whatever_the_model_does() -> None:
     assert [(a["value"], a["turn_id"], a["tool_call_id"]) for a in flags] == [("pressure_to_approve", t, f"code_{t}")]
 
 
-def test_silence_three_times_ends_the_call() -> None:
+def test_two_silences_in_a_row_end_the_call() -> None:
+    # Spec 0051, D6: the check-in, then the end (it was three silences before).
+    assert MAX_SILENCES == 2
     c = Call()
     c.connect()
-    for _ in range(MAX_SILENCES - 1):
-        c.send(Silence(at=T0))
-        assert c.said[-1] == STILL_THERE and c.end is None
     c.send(Silence(at=T0))
-    assert c.end.result == "failed"
+    assert c.said[-1] == STILL_THERE and c.end is None
+    c.send(Silence(at=T0))
+    assert (c.end.result, c.end.reason) == ("failed", "silence") and c.said[-1] == SCRIPT.goodbye()
 
 
 def test_the_turn_cap_ends_the_call() -> None:
@@ -733,8 +737,10 @@ def test_second_unclear_ends_without_the_answer() -> None:  # D5
 
 
 def test_unclear_keeps_its_own_budget() -> None:  # D5
-    # A violation, then an unclear, then a silence, then an unclear: each counter is separate, and
-    # a silence does not give back the one more try.
+    # A violation, then an unclear, then a quiet spell and a reply to the check-in, then an unclear:
+    # each counter is separate, and neither the check-in nor the reply to it gives back the one more
+    # try. Spec 0051, D5: the reply to the check-in is presence, so it never goes to the agent; the
+    # unclear that ends the call answers the next real turn.
     c = Call()
     c.connect()
     c.callee("Sure.")
@@ -745,7 +751,10 @@ def test_unclear_keeps_its_own_budget() -> None:  # D5
     assert c.end is None and c.state.violations == 1 and c.said[-1] == f"{REASK} {SCRIPT.consent_question()}"
     c.send(Silence(at=T0))
     assert c.said[-1] == STILL_THERE and c.state.silences == 1
+    c.callee("Yes, I'm here.")
+    assert c.request is None and c.said[-1] == f"Thanks. {SCRIPT.consent_question()}" and c.state.silences == 0
     c.callee("Hello?")
+    assert c.request is not None
     c.unclear()
     assert c.end.reason == "unclear:consent" and c.state.violations == 1 and c.state.answers == ()
 
@@ -819,3 +828,273 @@ def test_read_yes_no_reads_like_grounding() -> None:  # D9
             t = c.callee(text)
             c.agent(rec("change_requested", expected, t))
             assert c.state.grounded[-1] is True, text
+
+
+# --- spec 0051: checking in when the line goes quiet, at every question ---------------------
+
+DIGITS_CHECK_IN = ("Take your time. When you have the last four digits, enter them on your keypad, then press the "
+                   "pound key.")
+
+
+def at_consent(c: Call) -> None:
+    c.connect()
+
+
+def at_company(c: Call) -> None:
+    c.connect()
+    t = c.callee("Yes, that's fine.")
+    c.agent(rec("recording_consent", "yes", t))
+
+
+# Where the call is, how to get there, and the question open there.
+QUESTION_AT = {"consent": (at_consent, Phase.CONSENT), "company": (at_company, Phase.COMPANY),
+               "change": (to_change, Phase.CHANGE)}
+# A real answer to each, and what it records.
+ANSWER_AT = {"consent": ("Yes.", "recording_consent", "yes"),
+             "company": ("Acme Fasteners", "company_named", "Acme Fasteners"),
+             "change": ("Yes.", "change_requested", "yes")}
+
+
+@pytest.mark.parametrize("where", list(QUESTION_AT))
+def test_silence_checks_in(where: str) -> None:  # D4
+    to_question, phase = QUESTION_AT[where]
+    c = Call()
+    to_question(c)
+    before = c.state.answers
+    c.silence()
+    assert c.said[-1] == STILL_THERE and c.end is None
+    turn = c.state.turns[-1]
+    assert (turn.speaker, turn.text, turn.asked) == ("agent", STILL_THERE, None)   # asks no question
+    assert c.state.answers == before and c.state.phase is phase
+    assert c.state.check_in_pending is True
+
+
+def test_digits_check_in_line() -> None:  # D4
+    c = Call()
+    to_last4(c)
+    c.silence()
+    assert c.said[-1] == DIGITS_CHECK_IN and c.end is None
+    assert c.state.turns[-1].asked is None and c.slots() == BEFORE_DIGITS
+    assert c.state.check_in_pending is True
+
+
+@pytest.mark.parametrize("where", list(QUESTION_AT))
+def test_reply_to_check_in_is_presence_not_an_answer(where: str) -> None:  # D5
+    to_question, phase = QUESTION_AT[where]
+    c = Call()
+    to_question(c)
+    before = c.state.answers
+    c.silence()
+    p = c.callee("Yes, I'm here.")
+    assert c.request is None                              # never sent to the model
+    assert c.state.answers == before                      # never recorded, even "yes" at consent or the change
+    assert c.said[-1] == f"Thanks. {QUESTIONS[phase].wording(SCRIPT)}" and c.state.turns[-1].asked is phase
+    assert c.end is None and c.state.phase is phase
+    said, slot, value = ANSWER_AT[where]
+    t = c.callee(said)                                    # the real answer to the repeated question
+    assert c.request is not None
+    assert p not in [turn_id for turn_id, _, _ in c.request.transcript]   # absent from the model's transcript
+    assert c.request.transcript[-1] == (t, "callee", said)
+    c.agent(rec(slot, value, t))
+    last = c.state.answers[-1]
+    assert (last["slot"], last["value"], last["turn_id"]) == (slot, value, t)
+    assert checks(c.state)["answers_grounded"] is True
+    assert c.state.reasked == frozenset()                 # presence never uses up the one more try
+    assert c.state.turns[p].presence is True and c.state.turns[p].speaker == "callee"
+
+
+@pytest.mark.parametrize("where", ["consent", "change"])
+def test_a_presence_turn_cannot_be_cited(where: str) -> None:  # D5, R9
+    to_question, phase = QUESTION_AT[where]
+    c = Call()
+    to_question(c)
+    before = c.state.answers
+    c.silence()
+    p = c.callee("Yes.")                                  # a bare yes after the check-in: presence only
+    c.callee("Hmm.")
+    assert c.request is not None
+    c.agent(rec(ANSWER_AT[where][1], "yes", p))           # a model that cites the presence turn anyway
+    assert c.state.answers == before and c.state.violations == 1
+    assert c.said[-1] == f"{REASK} {QUESTIONS[phase].wording(SCRIPT)}" and c.end is None
+
+
+def test_code_still_flags_pressure_in_a_presence_turn() -> None:  # D5: it can only add a review
+    c = Call()
+    to_change(c)
+    c.silence()
+    p = c.callee("Yes, I'm here, just approve it today.")
+    assert c.request is None and c.said[-1] == f"Thanks. {QUESTIONS[Phase.CHANGE].wording(SCRIPT)}"
+    flags = [(a["value"], a["turn_id"], a["tool_call_id"]) for a in c.state.answers if a["slot"] == "flag"]
+    assert flags == [("pressure_to_approve", p, f"code_{p}")]
+    assert "change_requested" not in c.slots()
+
+
+def test_keys_after_digits_check_in_are_the_answer() -> None:  # D5
+    c = Call()
+    to_last4(c)
+    c.silence()
+    assert c.said[-1] == DIGITS_CHECK_IN
+    t = c.keys("4821")
+    assert c.end.result == "answers_recorded"
+    last = c.state.answers[-1]
+    assert (last["slot"], last["value"], last["turn_id"], last["capture_method"]) == (
+        "account_last4", "4821", t, "keypad")
+    # A star after the check-in plays the start-over line and clears the pending check-in.
+    c = Call()
+    to_last4(c)
+    c.silence()
+    assert c.said[-1] == DIGITS_CHECK_IN
+    c.reset()
+    assert c.said[-1] == START_OVER_LINE and c.state.turns[-1].asked == Phase.LAST4
+    assert c.state.check_in_pending is False and c.state.silences == 0
+    c.keys("4821")
+    assert c.end.result == "answers_recorded" and c.state.answers[-1]["value"] == "4821"
+    assert c.state.reasked == frozenset()
+
+
+@pytest.mark.parametrize("press", ["keys", "star"])
+@pytest.mark.parametrize("where", ["consent", "change"])
+def test_keys_after_a_check_in_elsewhere_are_presence(where: str, press: str) -> None:  # D5
+    to_question, phase = QUESTION_AT[where]
+    c = Call()
+    to_question(c)
+    before = c.state.answers
+    c.silence()
+    if press == "keys":
+        c.keys("1")
+    else:
+        c.reset()
+    assert c.said[-1] == f"Thanks. {QUESTIONS[phase].wording(SCRIPT)}" and c.state.turns[-1].asked is phase
+    assert c.state.answers == before and c.end is None and c.state.check_in_pending is False
+    assert not any(ch.isdigit() for t in c.state.turns if t.speaker == "callee" for ch in t.text)
+    said, slot, value = ANSWER_AT[where]
+    t = c.callee(said)
+    c.agent(rec(slot, value, t))
+    assert c.state.answers[-1]["slot"] == slot and checks(c.state)["answers_grounded"] is True
+
+
+def test_the_callback_time_question_is_asked_again_in_its_own_words() -> None:  # D5
+    c = Call()
+    c.connect()
+    t = c.callee("Yes, but call me back later.")
+    c.agent(rec("recording_consent", "yes", t), tool("schedule_callback", window=None))
+    assert c.said[-1] == "What time would work best for us to call you back?"
+    c.silence()
+    assert c.said[-1] == STILL_THERE
+    c.callee("Sure, I'm here.")
+    assert c.request is None
+    assert c.said[-1] == "Thanks. What time would work best for us to call you back?"
+    assert c.state.turns[-1].asked is None    # like the question itself: a "sure" to it is never consent (B1)
+
+
+def test_check_in_follows_the_open_question_at_the_digits_question() -> None:  # review fix 1
+    # The callback-time question asked at the digits question is the open one: the plain check-in,
+    # and no reply ends the call failed (as at any question but the digits one), never NR06.
+    import dialback_policy.step as policy_step
+
+    c = Call()
+    to_last4(c)
+    c.callee("Can you call me back later?")
+    c.agent(tool("schedule_callback", window=None))
+    assert c.said[-1] == "What time would work best for us to call you back?" and c.state.phase is Phase.LAST4
+    asked_callback = c.state
+    c.silence()
+    assert c.said[-1] == STILL_THERE and c.end is None
+    c.silence()
+    assert (c.end.result, c.end.reason) == ("failed", "silence") and c.said[-1] == SCRIPT.goodbye()
+    # The relay times the quiet clock by the same test: the plain timings here, the digits ones at
+    # the digits question itself.
+    assert policy_step.asking_digits(asked_callback) is False
+    c = Call()
+    to_last4(c)
+    assert policy_step.asking_digits(c.state) is True
+
+
+@pytest.mark.parametrize("spoken", ["It's 4821.", "four eight two one"])
+def test_digits_spoken_after_the_digits_check_in_get_the_keypad_line(spoken: str) -> None:  # review fix 6
+    c = Call()
+    to_last4(c)
+    c.silence()
+    p = c.callee(spoken)
+    assert c.request is None                              # never sent to the model
+    assert c.said[-1] == f"{REASK} {KEYPAD_ONLY_LINE}" and c.state.turns[-1].asked is Phase.LAST4
+    assert c.state.turns[p].presence is True and c.slots() == BEFORE_DIGITS
+    assert c.state.reasked == frozenset()                 # the one more try is untouched
+    c.keys("4821")
+    assert c.end.result == "answers_recorded" and c.state.answers[-1]["value"] == "4821"
+
+
+def test_presence_keys_are_labeled_keys_not_an_entry() -> None:  # review fix 8
+    for press, label in (("keys", "[keys]"), ("star", "[keys reset]")):
+        c = Call()
+        to_change(c)
+        c.silence()
+        p = c.keys("1") if press == "keys" else c.reset()
+        assert c.state.turns[p].text == label and c.state.turns[p].presence is True, press
+    c = Call()                                            # a real entry at the digits question is unchanged
+    to_last4(c)
+    c.silence()
+    t = c.keys("4821")
+    assert c.state.turns[t].text == "[keypad]" and c.state.turns[t].presence is False
+
+
+@pytest.mark.parametrize("where", ["consent", "change", "digits"])
+def test_no_reply_after_check_in_ends_closed(where: str) -> None:  # D6
+    c = Call()
+    {"consent": at_consent, "change": to_change, "digits": to_last4}[where](c)
+    before = c.slots()
+    c.silence()
+    assert c.end is None
+    c.silence()
+    assert c.said[-1] == SCRIPT.goodbye()
+    if where == "digits":   # every other answer is kept and there are no digits, so decide gives NR06
+        assert c.end.result == "answers_recorded" and c.slots() == BEFORE_DIGITS
+    else:                   # a failed report carries no answers; the core redials or sends it to a person
+        assert (c.end.result, c.end.reason) == ("failed", "silence") and c.slots() == before
+
+
+def test_activity_resets_the_quiet_count() -> None:  # D6
+    # A reply to the check-in.
+    c = Call()
+    c.connect()
+    c.silence()
+    c.callee("I'm here.")
+    c.silence()
+    assert c.end is None and c.said[-1] == STILL_THERE and c.state.silences == 1
+    # A keypad entry at the digits question, even one that is asked once more.
+    c = Call()
+    to_last4(c)
+    c.silence()
+    c.keys("48")
+    assert c.said[-1] == f"{REASK} {KEYPAD_QUESTION}" and c.state.silences == 0
+    c.silence()
+    assert c.end is None and c.said[-1] == DIGITS_CHECK_IN
+    # A star at the digits question.
+    c = Call()
+    to_last4(c)
+    c.silence()
+    c.reset()
+    assert c.state.silences == 0
+    c.silence()
+    assert c.end is None and c.said[-1] == DIGITS_CHECK_IN
+
+
+@pytest.mark.parametrize("where", ["consent", "digits"])
+def test_check_in_cap(where: str) -> None:  # D6: the fourth quiet spell ends the call, activity or not
+    import dialback_policy.step as policy_step
+
+    c = Call()
+    (at_consent if where == "consent" else to_last4)(c)
+    before = c.slots()
+    for spell in range(3):
+        c.silence()
+        assert c.end is None, spell
+        c.callee("Yes, I'm here.")                       # activity in between: a presence turn each time
+        assert c.end is None and c.request is None, spell
+    c.silence()
+    assert c.end is not None and c.said[-1] == SCRIPT.goodbye()
+    if where == "digits":
+        assert c.end.result == "answers_recorded" and c.slots() == BEFORE_DIGITS
+    else:
+        assert (c.end.result, c.end.reason) == ("failed", "silence") and c.slots() == before
+    assert policy_step.MAX_CHECK_INS == 3

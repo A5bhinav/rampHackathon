@@ -1,0 +1,101 @@
+{
+  "name": "g3-customer-billing-label-number-0b075474",
+  "patterns": [
+    "G3/customer_billing/label_number",
+    "G4/customer_billing/label_number"
+  ],
+  "why": "G3/customer_billing/label_number: shrunk from doc-s0-00068, found by lab docs at seed 0 in 1000 documents",
+  "violations": [
+    {
+      "pattern": "G3/customer_billing/label_number",
+      "number": "+16455550124",
+      "detail": "claim billing, customer labeled billing, vendor"
+    },
+    {
+      "pattern": "G4/customer_billing/label_number",
+      "number": "+16455550124",
+      "detail": "claim billing, customer labeled billing, vendor"
+    }
+  ],
+  "plan": {
+    "type": "doc",
+    "id": "doc-s0-00068",
+    "kind": "email_body",
+    "author": "unrelated",
+    "channel": "email",
+    "sender": "info@other.example",
+    "thread": "t-doc-s0-00068",
+    "subject": "Following up",
+    "received_at": "2026-05-02T16:00:00+00:00",
+    "filler": [],
+    "numbers": [],
+    "quote": {
+      "author": "attacker",
+      "sender": "ar@acrne.example",
+      "filler": [],
+      "numbers": [
+        {
+          "e164": "+16455550124",
+          "owner": "customer",
+          "role": "billing",
+          "party": "customer",
+          "phrasing": "customer_billing",
+          "placement": "label_number",
+          "format": "paren",
+          "visibility": "visible",
+          "shares_line": false
+        }
+      ]
+    }
+  },
+  "documents": [
+    {
+      "id": "doc-s0-00068",
+      "kind": "email_body",
+      "custody": {
+        "channel": "email",
+        "received_at": "2026-05-02T16:00:00+00:00",
+        "sender": "info@other.example",
+        "thread_id": "t-doc-s0-00068",
+        "subject": "Following up",
+        "parent_document_id": null
+      },
+      "pages": [
+        {
+          "width": 612,
+          "height": 792,
+          "spans": [
+            {
+              "text": "Message",
+              "x": 72,
+              "y": 72,
+              "size": 10,
+              "color": "#000000"
+            },
+            {
+              "text": "Other Example Logistics",
+              "x": 72,
+              "y": 86,
+              "size": 10,
+              "color": "#000000"
+            },
+            {
+              "text": "On 2026-09-14, ar@acrne.example wrote:",
+              "x": 72,
+              "y": 100,
+              "size": 10,
+              "color": "#000000"
+            },
+            {
+              "text": "> Customer billing: (645) 555-0124",
+              "x": 72,
+              "y": 114,
+              "size": 10,
+              "color": "#000000"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

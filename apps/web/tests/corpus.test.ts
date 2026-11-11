@@ -1,7 +1,7 @@
 // The corpus page (spec 0038): words for what the script recorded. `pnpm test`.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { CORPUS, groups, numberVerdict, pickedPlanted } from "../src/lib/corpus.ts";
+import { CORPUS, groups, numberVerdict, pickedPlanted, plantedStat } from "../src/lib/corpus.ts";
 
 test("twenty cases: attacks, the stated limit, the controls, in that order", () => {
   const g = groups(CORPUS.cases);
@@ -26,4 +26,14 @@ test("hidden text is all or some, and proposed cases are marked as such", () => 
 test("the known limit is the one case where the rule picks a planted number", () => {
   const hits = CORPUS.cases.filter((c) => pickedPlanted(c));
   assert.deepEqual(hits.map((c) => c.id), ["K01"]);
+});
+
+test("the planted-pick stat: the known limit reads as one known limit, in amber, not a red 1 (spec 0066)", () => {
+  assert.deepEqual(plantedStat(CORPUS.cases), { value: "1 known limit", tone: "warn" });
+  const limit = CORPUS.cases.find((c) => c.kind === "known_limit")!;
+  const attack = CORPUS.cases.find((c) => c.kind !== "known_limit" && !pickedPlanted(c))!;
+  assert.deepEqual(plantedStat([attack]), { value: 0, tone: "ok" });
+  // An attack case that picked a planted number is a failure, and says so in red.
+  const failed = { ...attack, picked_planted: true } as typeof attack;
+  assert.deepEqual(plantedStat([failed, limit]), { value: "1 + 1 known limit", tone: "bad" });
 });

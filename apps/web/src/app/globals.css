@@ -711,7 +711,7 @@ ul.reason-chips li { font-size: 12px; padding: 1px 8px; border-radius: var(--rad
 .tour { position: fixed; right: 24px; bottom: 24px; z-index: 30; width: 340px; background: var(--surface); color: var(--ink);
   border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; box-shadow: var(--shadow-lift); }
 .tour-count { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); margin: 0 0 8px; }
-.tour-bar { list-style: none; margin: 0 0 12px; padding: 0; display: grid; grid-template-columns: repeat(8, 1fr); gap: 3px; }
+.tour-bar { list-style: none; margin: 0 0 12px; padding: 0; display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
 .tour-bar li { height: 3px; border-radius: 2px; background: var(--line); }
 .tour-bar li.is-on { background: var(--brand-deep); }
 .tour-title { font-size: 15px; line-height: 22px; margin: 0 0 4px; }
@@ -798,7 +798,8 @@ ul.reason-chips li { font-size: 12px; padding: 1px 8px; border-radius: var(--rad
   .feed li { grid-template-columns: 1fr; gap: 2px; padding: 10px 16px; }
   /* Case: the action rail first, then the stepper as a list; tables stack. */
   .case-page { display: flex; flex-direction: column; }
-  .case-page > .ring-band { order: -3; }
+  .case-page > .banners { order: -5; }  /* the case's own alerts, then its title, then the rail */
+  .case-page > .page-title { order: -4; }
   .case-page > .page-notice { order: -2; }
   .case-grid { display: contents; }
   .case-actions { order: -1; }
@@ -976,3 +977,62 @@ ol.slots li.is-filled { animation: slot-in 360ms var(--ease) both; }
 .ramp-form input { font-family: var(--mono); letter-spacing: 0.04em; }
 .ramp-form .actions { margin-top: 8px; }
 .ramp-watch .stepper-card { border: 0; padding: 0; margin-bottom: 12px; }
+
+/* Spec 0066, PR 1: compact chrome. Inner pages get one title line and one subtitle line, no ring
+   art; alerts become one chip in the top bar (a case keeps its own as banners). ------------------ */
+.main-col > main { padding-top: 20px; }
+.page-title { display: grid; gap: 6px; padding-bottom: 4px; }
+.page-title-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-width: 0; }
+.page-title h1 { font-size: 28px; line-height: 34px; font-weight: 700; letter-spacing: -0.03em; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.page-title-aside { flex: none; display: flex; gap: 8px; align-items: center; }
+.page-title-aside .present-links { margin: 0; }
+.page-sub { font-size: 14px; line-height: 22px; color: var(--muted); min-width: 0; }
+.page-sub .tags { display: inline-flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; margin: 0; }  /* wraps, never clips */
+.page-sub .held-n { font-size: 14px; color: var(--ink); }
+.page-intro { max-width: 80ch; margin: -8px 0 0; font-size: 14px; line-height: 21px; }
+.main-col > .banners { display: none; }  /* no stacked banners above inner pages */
+.case-page > .banners { margin-bottom: -8px; }
+.alert-chip { position: relative; }
+.alert-chip > summary { cursor: pointer; list-style: none; height: 26px; padding: 0 10px; }
+.alert-chip > summary::-webkit-details-marker { display: none; }
+.alert-pop { position: absolute; left: 0; top: calc(100% + 6px); z-index: 30; width: min(460px, 90vw); list-style: none; margin: 0; padding: 6px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); box-shadow: var(--shadow-lift); }
+.alert-pop li { display: grid; gap: 4px; padding: 10px; border-bottom: 1px solid var(--line-soft); font-size: 13px; line-height: 18px; }
+.alert-pop li:last-child { border-bottom: 0; }
+.alert-pop p { margin: 0; }
+.alert-pop .badge { justify-self: start; }
+.utilbar { justify-content: flex-start; gap: 16px; }
+.utilbar .viewing-as, .utilbar .present { margin-left: auto; }
+.utilbar .present + .viewing-as { margin-left: 12px; }
+.utilbar:not(:has(.crumbs, .viewing-as, .present, .alert-chip)) { display: none; }
+@media (max-width: 720px) {
+  .page-title h1 { white-space: normal; }
+  .page-title-row { flex-wrap: wrap; }
+}
+
+/* Spec 0066, PR 2: the case page's cards fold to one line; the current station's card starts open. */
+.fold-card > summary { list-style: none; cursor: pointer; flex-wrap: nowrap; min-width: 0; }
+.fold-card > summary::-webkit-details-marker { display: none; }
+.fold-card > summary::after { content: ""; flex: none; width: 8px; height: 8px; margin-left: 4px; border-right: 1.5px solid var(--muted);
+  border-bottom: 1.5px solid var(--muted); transform: rotate(-45deg); transition: transform .15s; }
+.fold-card[open] > summary::after { transform: rotate(45deg); }
+.fold-card:not([open]) > summary { border-bottom: 0; }
+.fold-card > summary h2 { flex: none; }
+.fold-line { flex: 1 1 auto; min-width: 0; color: var(--muted); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fold-card > summary .card-meta { margin-left: 0; flex: none; }
+.fold-card > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.fold-links { margin: 0 0 8px; font-size: 13px; }
+.card-body.fold-links { padding-bottom: 0; }
+.case-main { gap: 12px; }
+.attempt-lines { list-style: none; margin: 0; padding: 12px 20px; border-bottom: 1px solid var(--line-soft); display: grid; gap: 6px;
+  font-size: 13px; color: var(--muted); }
+.attempt-lines li::before { content: "↺ "; }
+.show-checks > summary { cursor: pointer; font-size: 13px; color: var(--accent-ink, var(--accent)); margin: 8px 0; }
+.call-body:has(> .show-checks:not([open])) .chips { display: none; }
+.phone-pick { margin: 0; font-size: 12px; font-weight: 600; }
+@media (max-width: 720px) { .fold-line { display: none; } }
+
+/* Spec 0066, PR 3: the station strip says what its counts are. */
+.rail-card .rail-title { margin: 0 0 12px; font-family: var(--mono, inherit); font-size: 11px; font-weight: 500; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--muted); }

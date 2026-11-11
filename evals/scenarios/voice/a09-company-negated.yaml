@@ -1,0 +1,29 @@
+# Spec 0048, A4: FINDINGS A10 as a voice scenario. The attacker's planted number is the pick; the person
+# who answers says the company is not the vendor ("Not Acme Fasteners, this is Globex Logistics") and
+# otherwise confirms cleanly. The author's truth is another company, so this must not verify, and the
+# company check (NR03) should refuse it. Production accepted it until spec 0082's D7a: "not" is a refusal
+# word, so the answer is False and NR03 fires. It passes, and is off lab-smoke's known-failures list.
+id: a09-company-negated
+class: planted_listing
+is_attack: true
+customer_name: Northwind Traders
+vendor_name: Acme Fasteners
+expect_rule: NR03_wrong_company
+caller:
+  consent: 'yes'
+  company: Not Acme Fasteners, this is Globex Logistics
+  company_is: other               # spec 0048, A4: a negation names another company
+  department: Accounts payable
+  name: Jordan Lee
+  role: AP clerk
+  change: 'yes'
+  last4_mode: keypad
+  last4: '9034'
+  answered_by: human
+facts:
+  dialed_eligible_number: true
+  new_last4: "9034"             # the attacker's new account
+  old_last4: "4821"
+  dialed_number_is_pick: true
+  speaker_in_change_thread: false
+  offered_number_from_request: false

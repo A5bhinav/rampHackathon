@@ -1,0 +1,89 @@
+{
+  "name": "g3-main-label-number-036c3c1b",
+  "patterns": [
+    "G3/main/label_number",
+    "G4/main/label_number"
+  ],
+  "why": "G3/main/label_number: shrunk from doc-s0-00081, found by lab docs at seed 0 in 1000 documents",
+  "violations": [
+    {
+      "pattern": "G3/main/label_number",
+      "number": "+14235550101",
+      "detail": "claim main, bank labeled main, vendor"
+    },
+    {
+      "pattern": "G4/main/label_number",
+      "number": "+14235550101",
+      "detail": "claim main, bank labeled main, vendor"
+    }
+  ],
+  "plan": {
+    "type": "doc",
+    "id": "doc-s0-00081",
+    "kind": "email_body",
+    "author": "bank",
+    "channel": "email",
+    "sender": "notices@firstexamplebank.example",
+    "thread": "t-doc-s0-00081",
+    "subject": "Following up",
+    "received_at": "2026-01-20T16:00:00+00:00",
+    "filler": [],
+    "numbers": [
+      {
+        "e164": "+14235550101",
+        "owner": "bank",
+        "role": "main",
+        "party": "bank",
+        "phrasing": "main",
+        "placement": "label_number",
+        "format": "paren",
+        "visibility": "visible",
+        "shares_line": false
+      }
+    ],
+    "quote": null
+  },
+  "documents": [
+    {
+      "id": "doc-s0-00081",
+      "kind": "email_body",
+      "custody": {
+        "channel": "email",
+        "received_at": "2026-01-20T16:00:00+00:00",
+        "sender": "notices@firstexamplebank.example",
+        "thread_id": "t-doc-s0-00081",
+        "subject": "Following up",
+        "parent_document_id": null
+      },
+      "pages": [
+        {
+          "width": 612,
+          "height": 792,
+          "spans": [
+            {
+              "text": "Message",
+              "x": 72,
+              "y": 72,
+              "size": 10,
+              "color": "#000000"
+            },
+            {
+              "text": "First Example Bank",
+              "x": 72,
+              "y": 86,
+              "size": 10,
+              "color": "#000000"
+            },
+            {
+              "text": "Main: (423) 555-0101",
+              "x": 72,
+              "y": 100,
+              "size": 10,
+              "color": "#000000"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -2,6 +2,8 @@
 scripted vendor, no Twilio. This is the same step() the Twilio adapter and the lab will call."""
 from __future__ import annotations
 
+import asyncio
+
 import pytest
 from dialback_decision import decide
 from dialback_decision.facts import CallChecks, facts_from_answers
@@ -184,6 +186,49 @@ def test_clean_keypad_call_verifies(make_ctx, clock):
     r = _run(make_ctx, clock, VendorScript(last4=NEW_LAST4, last4_mode="keypad"))
     assert r.end.result == "answers_recorded" and _by_slot(r)["account_last4"]["capture_method"] == "keypad"
     assert _decide(r).outcome == "verified"
+
+
+class _QuietSocket:
+    """A live call where the caller never says or presses anything after the setup."""
+
+    def __init__(self) -> None:
+        self._setup_sent = False
+        self.sent: list[str] = []
+
+    async def receive_json(self) -> dict:
+        if not self._setup_sent:
+            self._setup_sent = True
+            return {"type": "setup"}
+        await asyncio.sleep(60)                          # the line stays open and quiet
+        raise ConnectionError("the test ran too long")
+
+    async def send_json(self, obj: dict) -> None:
+        self.sent.append(obj["token"])
+
+    async def close(self) -> None: ...
+
+
+def test_a_silent_vendor_gets_the_check_in_then_the_end(make_ctx, clock):
+    # Spec 0051, D8: the text line's silent vendor goes through the same policy rules as a quiet
+    # live call: the check-in, then, with no reply, the end.
+    from dialback_voice.twilio import relay
+
+    ctx = make_ctx()
+    text = run_call(ctx, ScriptedAgent(), ScriptedVendor(VendorScript(silent=True)), clock=clock())
+    lines = [t.text for t in text.transcript if t.speaker == "agent"]
+    assert lines == [ctx.script.disclosure(), ctx.script.consent_question(), "Sorry, are you still there?",
+                     ctx.script.goodbye()]
+    assert (text.end.result, text.end.reason) == ("failed", "silence") and text.answers["answers"] == []
+
+    ws = _QuietSocket()
+    no_estimate = relay.SpeechEstimate(lead=0.0, chars_per_second=1e9, margin=0.0)   # short, for the test
+    live = asyncio.run(relay.run_relay(ctx, ScriptedAgent(), ws, verify=lambda setup: True, clock=clock(),
+                                       greeting=ctx.script.disclosure(), quiet_seconds=0.1,
+                                       after_check_in_seconds=0.1, estimate=no_estimate))
+    assert [t.text for t in live.transcript if t.speaker == "agent"] == lines
+    assert ws.sent == lines[1:]                          # the welcome greeting spoke the disclosure
+    assert (live.end.result, live.end.reason) == (text.end.result, text.end.reason)
+    assert live.answers["answers"] == []
 
 
 @pytest.mark.parametrize(("typed", "rule"), [("1234", "NV02_digits_mismatch"),

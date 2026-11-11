@@ -34,6 +34,14 @@ export function NavLinks({ links }: { links: NavLink[] }) {
 export function Crumbs({ datasetId }: { datasetId: string }) {
   const path = usePathname();
   const base = `/d/${datasetId}`;
+  const ramp = new RegExp(`^${base}/ramp/([^/]+)$`).exec(path);
+  if (ramp) {
+    return (
+      <nav className="crumbs" aria-label="Breadcrumb">
+        <Link href={`${base}/ramp`}>Ramp (mock)</Link><span aria-hidden="true">/</span><span aria-current="page">Vendor</span>
+      </nav>
+    );
+  }
   const m = new RegExp(`^${base}/cases/(?!all$)([^/]+)(/lineage)?$`).exec(path);  // /cases/all is the Cases list, not a case
   if (!m) return <span />;
   const kase = `${base}/cases/${m[1]}`;

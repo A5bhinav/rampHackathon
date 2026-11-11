@@ -1,0 +1,23 @@
+# Spec 0048, A5: the ledger cannot say whether the person appeared in the change thread (V07).
+id: l23-legit-speaker-unknown
+class: legit_odd_contact
+is_attack: false
+customer_name: Northwind Traders
+vendor_name: Acme Fasteners
+expect_rule: V07_right_person_confirmed_unmet
+caller:
+  consent: 'yes'
+  company: Acme Fasteners
+  company_is: vendor
+  department: Accounts payable
+  name: Jordan Lee
+  role: AP clerk
+  change: 'yes'
+  last4_mode: keypad
+  last4: '4821'
+  answered_by: human
+facts:
+  dialed_eligible_number: true
+  new_last4: "4821"
+  dialed_number_is_pick: true
+  offered_number_from_request: false

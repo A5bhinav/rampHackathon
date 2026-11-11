@@ -1,0 +1,1356 @@
+{
+ "about": "all_violations() labels before spec 0046 exposed the probe outputs: 300 worlds drawn by worldgen.worlds() at seed 0 (max_examples 300, pinned draws through dialback_evals.draws.sample), and every frozen case in evals/corpus-generated, on the pinned select.py",
+ "recorded_at_commit": "6990fa4",
+ "hypothesis": "6.170.14",
+ "seed": 0,
+ "examples": 300,
+ "select_sha256": "3cece871006a9d1f48b2d5316c9fd57bbd212908df5ed81a6076497f1fc971af",
+ "worlds": [
+  ["7de3564481798d422c865ab62b20900ef7dd906c2b48e294a254fbdd4a3f4618", []],
+  ["29c233da8643905cc8fd6f013ee86c049c882cc4515e3c05eb2a93a974a30dbd", ["M_incontext_label_moved_pick"]],
+  ["fe8dd03e0e748c09d0e38076103fadf9db8474e3d0c533046350fb746ca2b5ee", []],
+  ["5e202698d896cffa00338d23085a30adaa6702641e6252782e1a889d283ea159", ["M_incontext_label_moved_pick"]],
+  ["7de3564481798d422c865ab62b20900ef7dd906c2b48e294a254fbdd4a3f4618", []],
+  ["7bd3e4c10e70596a04a6dc101d892363680d8e37467bb665138ae78cae350a1a", []],
+  ["0acc189e7137254e27f10ae073f480fcef8c18a56844b9e03ae553c3cab3b0df", []],
+  ["7de3564481798d422c865ab62b20900ef7dd906c2b48e294a254fbdd4a3f4618", []],
+  ["65b489700182cdaf906bd6bb7af86bcbb4696db3ab54094dff4b84d2ac4ae540", []],
+  ["0d35d4b663bb2a113b802a91d93a8b8211d086d0d825d6d3decaf6cc53eeee1d", []],
+  ["6e06b2723db26ee20565a2c3782530111d808d01300242dec1470ec5dcc05dbb", []],
+  ["b0408eaa77c253ae366de131d7332ce887f7d5d66182ce0024c560fdbf6aae85", []],
+  ["b0408eaa77c253ae366de131d7332ce887f7d5d66182ce0024c560fdbf6aae85", []],
+  ["e27156c814fe1568fc9210e49366bbaaf7a738698df8a29a9ba82c16da75fcd0", []],
+  ["35fa41bb638446779b28bcdeaaf64d59db24a1946035e263ddf05f4e89fa8db4", []],
+  ["a960ad562dc8cb18c23efe1d7fefce16bdde13a5686b92375f9af0823ec98008", []],
+  ["8ae45b438e1a5f8d02a53d6fc35556c906c58dc4cdfcb5095e0c54599dfd80af", []],
+  ["4fbcff1f69b794fa620c4562f452d265c062e260c54d9127f49a78aa150dc233", []],
+  ["b6c8a5ba7f5d84aeb112d72e42bfaa00d6f2e8409329d2f818989be671d38889", []],
+  ["7de3564481798d422c865ab62b20900ef7dd906c2b48e294a254fbdd4a3f4618", []],
+  ["dbd979018e662a69092e87c22a5a2eb7747812bc1fbf11a83b1aa9d66cc37639", []],
+  ["528590161f9e6a32c49c607c6bd5a6e2a46398e1224e312ba9b355b3aecf4c81", []],
+  ["d544dab94c2f9a1665a2299133c89cfaf5110e2baf3cd5a7e8e7f38c2c2daafe", []],
+  ["4632b5693e77c95aaea9c2025fbde012b715c94e8621495cb1d51facffe09453", []],
+  ["af0b49cb30c89102b0761677163c806fa4646e27232069a45c1baa123bf5291c", []],
+  ["af0b49cb30c89102b0761677163c806fa4646e27232069a45c1baa123bf5291c", []],
+  ["cac666c9f5ca66dec395a476bf638170f477f69f78c391e699beb5bf8f28fea2", []],
+  ["ac9b374cf907758aaade2cf852260ffad3843a22a431d7407972d4faf113c74f", []],
+  ["b782f6bf202b1d5633e4561be9749838e48d0e68e1f349c8d88ce33f01af49f5", []],
+  ["31a69f9052af66ce53d174711bbae3c714acd416bf9ce5353096f1adb2665191", []],
+  ["fde7a85b107da0e826c408b80a1a2c04858d318a003c15f2438d2dc76735b857", []],
+  ["354dda387f69d7041f378eab0a2ebc767ff64a91c97775d017562b8955a23cfe", []],
+  ["edee9dd5064fd53d450d2045d1ccc9ff12b6fd824231449d8fb20f4798ac2874", []],
+  ["13210f55184bed18881da72df3a3c79d9bd1e4f93e867c366b30de7919390b57", []],
+  ["95b6f5168bd81880b38ab70017d917364afca9ce1d2839d720a25a7d7f15e5e3", []],
+  ["0f87ca68e46a8126845677516b82ff7c99fd577afbda069d6fa88f6f1d295876", []],
+  ["8a4ebe6a0712518d8e918e28299525bf7587bda2be9565b08c7b6a5dfe61de76", []],
+  ["5b241a4671c88c54b4b4dd45aa1f2863875c7400f1522cfba52371444abb1a25", ["M_shared_id_helped"]],
+  ["728a475048cb65b418d9447614fe01f5d56e577031376582023092e56e61446c", ["M_shared_id_helped"]],
+  ["d6ff174b0c252847f297017debf2c1e5ef5b4ed0cea59e305db319dce6b7af4c", ["M_shared_id_helped"]],
+  ["3e3d7c5bea8a15a363ef9027f4809a5eca1567d0002e72e735810cd499faf306", ["M_shared_id_helped"]],
+  ["3e3d7c5bea8a15a363ef9027f4809a5eca1567d0002e72e735810cd499faf306", ["M_shared_id_helped"]],
+  ["3e3d7c5bea8a15a363ef9027f4809a5eca1567d0002e72e735810cd499faf306", ["M_shared_id_helped"]],
+  ["3e3d7c5bea8a15a363ef9027f4809a5eca1567d0002e72e735810cd499faf306", ["M_shared_id_helped"]],
+  ["f26cf597ac43e8d16450316a769a6edaecb10dbcdda63b1c13582baf780ed5a1", ["M_shared_id_helped"]],
+  ["fe9bc05a87b8d45cd168689dca746b58aadbb33c06fe68d5fb9326f223b4636c", ["M_incontext_label_moved_pick"]],
+  ["d4ed1a5f86cc09560c12df1f06cb6d8e1f71b4577537490435386c7a0a4dc365", ["M_incontext_label_moved_pick"]],
+  ["e16c9ea3077d07862f97c15898458527b56a472d9ca9047155ec2367026e8649", ["M_incontext_label_moved_pick"]],
+  ["660c0fbf7f7266e792dbf89d5c8c84b3646d9bfeac80b37bd3019e009fd96303", []],
+  ["660c0fbf7f7266e792dbf89d5c8c84b3646d9bfeac80b37bd3019e009fd96303", []],
+  ["660c0fbf7f7266e792dbf89d5c8c84b3646d9bfeac80b37bd3019e009fd96303", []],
+  ["10f25b988056b8c1364d089f75e5563c990bfe6482febff3b2383cacccde6414", []],
+  ["0d20ce128619a95f9d02f7a975c3cd4c8f37e52405edaeaa96ce298b824c63c4", []],
+  ["0d20ce128619a95f9d02f7a975c3cd4c8f37e52405edaeaa96ce298b824c63c4", []],
+  ["d7e4731da2919c2eaec2bfe479778ce8bc0b4e7a9b4055e2ca562c452d9684b1", []],
+  ["d613e776edc9b5438556f69d31feeba1e2f0cdd3fe9dc56daa72aae2e59dd46f", []],
+  ["af9ac4744f850cfaeb0476f3f034a761cd46fce1eba8ccd72648aea653f99ffc", []],
+  ["f241af57079e19e6c41592dc5a4e56d5b2a7e0343ba04b39d875072ba1e8f45f", []],
+  ["35cce4326ade1a549c840e5838ee2aa66aeb5d658c6d53fc7bbb3cb20bea27d5", ["M_incontext_label_moved_pick"]],
+  ["4331e5c2ed0b951e50d7e31e41950ebe4a7c326f65fd7988fd03dea330d5a0bf", ["M_incontext_label_moved_pick"]],
+  ["63fda9f6f54e5d878181dca279bea578bfa99b3b6d8f15b2465b9735fb7d018c", ["M_incontext_label_moved_pick"]],
+  ["ebebc9c2f4bc27f6860a1fa1a81d2515ec0de8aa4be80b6e5ef45584dc06e674", ["M_incontext_label_moved_pick"]],
+  ["34248d0c6fdd600190ebb82b042a714e5adf01c89d4767c2aa666bdbb6888c67", ["M_incontext_label_moved_pick"]],
+  ["e5cd37eb758388cdb19c5dc1938ab6fa41e9eeacb418f5ade5b67c56e54cd7f3", ["M_incontext_label_moved_pick"]],
+  ["9316165b7fb4bf771c4a0b97fbc57704f19ac281bd85aa8df24ea013caf63f03", ["M_incontext_label_moved_pick"]],
+  ["590bfbb29a5f2327813032026e0235b122fbcd5bf5617a82a436b8dfb1c2dffa", ["M_incontext_label_moved_pick"]],
+  ["c5c69ae9447e1d2261ddbf244fd9e282276d8d0d676a7c75be8b63fbf3f8d41f", ["M_incontext_label_moved_pick"]],
+  ["aa743994a83a0002dbc40b8570ea487af1342b03a6384a33d1e5dba98c2c754a", ["M_incontext_label_moved_pick"]],
+  ["990ca0f5a59e32653324b395ac0eae117761cbb86d301ae1c4d0fffba02f0b67", ["M_incontext_label_moved_pick"]],
+  ["4fb00c3df6bc41425365158737a9d6a75cee0d4b575bada87409a032f1be4c5c", ["M_incontext_label_moved_pick"]],
+  ["4fb00c3df6bc41425365158737a9d6a75cee0d4b575bada87409a032f1be4c5c", ["M_incontext_label_moved_pick"]],
+  ["dbbb74e5c90f5351fa2fd6e9b30841db144ca65b4d73cecb7d901d9d13f0e7fb", ["M_incontext_label_moved_pick"]],
+  ["27e2444023839959c493710024d91916fb2049be7a3d0db1bbb5db1fffad8540", []],
+  ["70d4391a0d3e892d25ccad7bb629678e5bd8056208fe9c6f200e30ac510e1c97", []],
+  ["8cfaa343df2ae5c2fcd8524d08a4d6764f365d8cf37e078dd7ea61c881d26646", []],
+  ["f0f8a310431c96ad82a34f6f67d68e2b292a3d1d9abf594690660852bdbead8a", []],
+  ["f0f8a310431c96ad82a34f6f67d68e2b292a3d1d9abf594690660852bdbead8a", []],
+  ["82dcdbdaf2db80f540638590c67c3bcd12aa5b2bcf228d1822d771e879c78c12", []],
+  ["939c99105a29ec72d6e3c63385b4d76e038c9deb29ae14e1d882bf27c5fc22b2", []],
+  ["d94b5967d9ad3b7dddc2914baa033f2272ba6f28395b18378b1ab1c4f330c5e6", []],
+  ["d94b5967d9ad3b7dddc2914baa033f2272ba6f28395b18378b1ab1c4f330c5e6", []],
+  ["ff2b46aeab3d99a29b23acde2bc3b317545f0e3bb1b651fc300e15a670043dd9", []],
+  ["7f41c8dd67bae9b1083f2f04a43848d10df9ec8d28589e7fa491ce998130a151", []],
+  ["64bf3409de199167100f2673d7ea45a82ecf2667729020540cdb6c6533ecc4ed", []],
+  ["52c268f76a4d2cbd46d5ec866b16003ad7e9b65c326c49301414e67fc9b80ba3", []],
+  ["01a199b675405b809c732aaca78ab6bb299ff38957304b8f5e9ab60291edb32c", []],
+  ["872384366efe3d8d5d235b1b432ce0781af3ce91653b4de2e597450d1a5ff552", ["M_shared_id_helped"]],
+  ["95a90bc585806672408cc416d248f6f82892d360bb9ff4f5a24859e563502a5d", ["M_shared_id_helped"]],
+  ["73d213fdea68059c7af039084ac9dcedf9135711851ddcdf8dfb29697a136d36", ["M_incontext_label_moved_pick"]],
+  ["c347cd51f5d44951045310fbdf62fb55ac9b4ee9f2a6925105e6f480df8b0a53", ["M_incontext_label_moved_pick"]],
+  ["701f76fd9c3cd5761900b56c5210360c5d457b0afd2f180fa2a05e47bdfe1c53", ["M_incontext_label_moved_pick"]],
+  ["6a69eb60bbabd045cff0a639f740e99b10877f79cf7a9972b31b912ab67df1ba", ["M_incontext_label_moved_pick"]],
+  ["6a69eb60bbabd045cff0a639f740e99b10877f79cf7a9972b31b912ab67df1ba", ["M_incontext_label_moved_pick"]],
+  ["086541e2ed0350434b691639fd393be3250d7e2ed75e135fa8d070f138e0d1b1", ["M_shared_id_helped"]],
+  ["8f159b5b97154bbd4ed62037eded269a3d3cb6a9ad3cfc3d63cf08d4bee5d450", ["M_shared_id_helped"]],
+  ["d73b2e8285d7a84337e92ef835c53a7b25e9b0a7b4eb5c446d440707dba1897e", ["M_shared_id_helped"]],
+  ["87f30e2403b822fb68cf2a1bc65c8ba220acfab3a9dd7be486a2de08d2610a1c", ["M_shared_id_helped"]],
+  ["87f30e2403b822fb68cf2a1bc65c8ba220acfab3a9dd7be486a2de08d2610a1c", ["M_shared_id_helped"]],
+  ["87f30e2403b822fb68cf2a1bc65c8ba220acfab3a9dd7be486a2de08d2610a1c", ["M_shared_id_helped"]],
+  ["43ae1739b2b613bd727e9b5f8d4ae2ab40b66c3b6c963eedf06182de4caebe73", ["M_shared_id_helped"]],
+  ["5273f677c785d25c93d2ed1a7d1c4ebe2547b33df245d1643dc3335c82558574", []],
+  ["f04c31b7d6ec616568033b1159333ac0282aaedc7796d98291b53be0c7c78ef1", []],
+  ["dee1558d6e4f24cc38e746723f0cbe8d63c9d3e6558073cdf204610c7806e27d", []],
+  ["efac768a90e3733c4e79a240a7a7d66f654c2df69b1cce567911a762caa8de8f", []],
+  ["a386ccd7fa03d4d3fd974341703442b6d6b0c58cb628b59cd5fa93e630d70ea7", []],
+  ["8579bf8f44984a5c72c7b0619c6dced54f231b41b645c2492bdcc76f4d460f30", []],
+  ["59e59f3a30190eea4100b0ca04e0e4fc1e9b603630ce17fe7f41c234f2733e64", []],
+  ["d4f0452ccb77d88849b08abcc27575a71291e8b7417057ad8c4f5af66397ee69", []],
+  ["7a3e08c1465e624dfe54b32eae33d8ab9c890bb9dbfa512c78e1cc30e6d65c65", []],
+  ["7a3e08c1465e624dfe54b32eae33d8ab9c890bb9dbfa512c78e1cc30e6d65c65", []],
+  ["a87e5fbbfd3be2f101c7558594d4aaa54fb213e6ff5e1d4ed66dae95fa5ce7a1", []],
+  ["a87e5fbbfd3be2f101c7558594d4aaa54fb213e6ff5e1d4ed66dae95fa5ce7a1", []],
+  ["361136a31814baa5874402db453f71c60e873004ea0eeb50bb731aa722e4b802", []],
+  ["84d3066b15c1df78191a035f16e08eb0573b3dc021299348e8694b310996c5f7", []],
+  ["5b394b9f63f8f62cc031a16bbcf6eee5a644d0ad4bc522ed0a9b08fd07345dfd", []],
+  ["5b394b9f63f8f62cc031a16bbcf6eee5a644d0ad4bc522ed0a9b08fd07345dfd", []],
+  ["2b10466e1122e5e0f223d4841eef9aed2b2c2bc0e80923692b752a4c1770ee71", []],
+  ["d0b8ab3d01c007dd00e066b0bfed1fd5b035724bd408b4ba65310056ea3b3c75", []],
+  ["d0b8ab3d01c007dd00e066b0bfed1fd5b035724bd408b4ba65310056ea3b3c75", []],
+  ["8e9b67fec25dd8a8265e4747a6ae9b7d1fcc6ee75362bcd45bde8a48a734a7d8", []],
+  ["c790b848dae7f7b02837c5594c206b5392ffc7dfff778629052cb850de5e2cd5", []],
+  ["987579f2abf95a8bc5f87cc5f158934fd9781a22dbabad222d008bbbb423b988", []],
+  ["b48e03a913c64d8c074e36141c45ac3fc629112f92124197fa04a2755faa1efa", []],
+  ["dfe22b24fbbf460a985a6e114c7c8503164e77a34b0bc5472430292e60041bf3", []],
+  ["ae95abd2992c07ac4d6885cc412d248b97b9037ee27f2c0bbf48c0c40f9ed95b", []],
+  ["e001ece0c0d40bf881478c5c49f3083f546be476558f9ff1bc6b50c8121c7181", []],
+  ["1790fa2709be2f21e86a7796e924ed5af8b925da76f5039b76a4223cc0fa964e", []],
+  ["0c38567bd6508391d738c1c3f47fee274bff607001100d5ea49ca8729066aa63", []],
+  ["43f708b57be1b68c6504adfc016f3b2046d3e735c9cc06020e5015e521d415a2", []],
+  ["43f708b57be1b68c6504adfc016f3b2046d3e735c9cc06020e5015e521d415a2", []],
+  ["159a29ce6e8a662460e87823213da95ff98322a8731d160290d12b00d4e62f30", []],
+  ["1092f8eecf2c04e3415a910639f2ab307ec99f21d1e740f24ad51cffdeb253c7", []],
+  ["1092f8eecf2c04e3415a910639f2ab307ec99f21d1e740f24ad51cffdeb253c7", []],
+  ["bf35b30ba0fc7dce85635d9be249cac0d3ee08e68a6869197002a8b594da1fbd", []],
+  ["064876e102fe93073d3b5ef3c400c205e6840aafc8eb7e73d74aaf1e081073b8", []],
+  ["dfc01a9aac684cac5718a2484a9f28069e298b85629f7ff2a02a9a6b59633771", []],
+  ["dfc01a9aac684cac5718a2484a9f28069e298b85629f7ff2a02a9a6b59633771", []],
+  ["f57d0fd17a518d5f4da272f150e47ef0108737e94c3a798aabf414442e0cd1d1", ["M_shared_id_helped"]],
+  ["f57d0fd17a518d5f4da272f150e47ef0108737e94c3a798aabf414442e0cd1d1", ["M_shared_id_helped"]],
+  ["372f07a694f161ebba985e10c9d2390e5c471751c3b3594b828e3ec917f665e1", ["M_shared_id_helped"]],
+  ["942e9c7a7d9b7387553f2747a97d5b3f4493482b5fb93c8a6216fe7ae11b5c6f", []],
+  ["942e9c7a7d9b7387553f2747a97d5b3f4493482b5fb93c8a6216fe7ae11b5c6f", []],
+  ["731aaad70689663a2ce7c9cfb8f9a1b37e3aaf9de4437710c2cffd0fd25d54a5", []],
+  ["02e198623e991e4db3a30835e2773f9d718885f7eee690d2e955a1053c45330f", ["M_shared_id_helped"]],
+  ["b1df5e93c82a96ba054c42c32cfc87802cb08fd18feec059b076ddc60e0e4ff8", ["M_incontext_label_moved_pick"]],
+  ["343817e8fafffe9ab4c7396695a58c61eb47af11ca0621c2095d6a642515f320", ["M_incontext_label_moved_pick"]],
+  ["c731fa565fe723d84568617a61e20ddb4b41e00a1836ff72a8810bfecd3fda89", ["M_incontext_label_moved_pick"]],
+  ["441108eaa8e46fea187bd5b6cf2d4e4d023c92e7ab5944adc86d2cbc43864a58", ["M_incontext_label_moved_pick"]],
+  ["c099e843eeae5254341e2eaf519a3c2148b4b2ec6d2953bfa801f573246a36ec", ["M_incontext_label_moved_pick"]],
+  ["fa1e7fe668003f8d777e9d2aa4eb1e30d2f842bdb13b250f3dcbab052e549592", ["M_incontext_label_moved_pick"]],
+  ["82cd35369f75c5f6e21c81754f14781711cb6882939c0a1c5901a96c3a2d727d", ["M_incontext_label_moved_pick"]],
+  ["f81ed0a8c1127f8b58bbfbdbaef963ba3017d67f7df94a5d1a1a0ed7dcc33f58", []],
+  ["057f61611807bd5d4fd31682131ef32da635ca62a06997e65583a8f74bb9b0ca", []],
+  ["057f61611807bd5d4fd31682131ef32da635ca62a06997e65583a8f74bb9b0ca", []],
+  ["270d63b7155f1e7a2333993a6a6bd0c4b2afac0616053ef20d27ee49114a70d3", []],
+  ["2600aa61e80b4991edb858f3b55166f999c53200e635deff027a3dca469470cf", []],
+  ["2600aa61e80b4991edb858f3b55166f999c53200e635deff027a3dca469470cf", []],
+  ["dc72436a005cc3b0d6fb66641c1b8b22d139d3e495da5b770e8aa44e070a3ecd", []],
+  ["cb73027a6499661fc7febcdc0f43f56e005b8a0a9b1bfed86a23b5a9764bf328", []],
+  ["b055aeee7fab99df8f8bcaa5ad3d9b8f7418ac9a635f03edc483e3e30cc3d9e8", []],
+  ["a64ae52b7316730066d7af8703a0ef172d8f47dfe513afb7b266830db32d252f", []],
+  ["6fd457ceb23365e942ef4e60b0a94a7e81f3afe93cf434bf002a1f0af818e385", []],
+  ["6fd457ceb23365e942ef4e60b0a94a7e81f3afe93cf434bf002a1f0af818e385", []],
+  ["6fd457ceb23365e942ef4e60b0a94a7e81f3afe93cf434bf002a1f0af818e385", []],
+  ["bf8e66d13afefb9765a538e8f13478aa81ed9db65a92a508aa9baa129cc42b2f", []],
+  ["c0c06f75d513b24cfaf6edfa78a7df0997445ef06a129c8af3d49a8c40071dd8", ["M_shared_id_helped"]],
+  ["dc578bbd81bab03c2ab07fe95a1a22fa0ac6cd0e48b24983fe77b2f5c024882d", []],
+  ["f97526df387912c37351d166577bae91cf9db3240efdcad6f707def65df7c037", []],
+  ["f97526df387912c37351d166577bae91cf9db3240efdcad6f707def65df7c037", []],
+  ["6d79a831699de714de5d19d0c54f01b69d7adacd0580dda05dc43f7f36edaabc", []],
+  ["6d79a831699de714de5d19d0c54f01b69d7adacd0580dda05dc43f7f36edaabc", []],
+  ["2883027a6e43d9a89c0e1f0aa2eff986b79dc5f602959bdd53745effc47f9482", []],
+  ["be813f96cef59be9b3ffc4b90d81e36cc35ac90cc1c88c709e07684446f49ab1", ["M_shared_id_helped"]],
+  ["f5c07c8d1c3ca3f72620c691b83456cfc7abd2e11ce485fff9e3f06dcbcfb594", ["M_shared_id_helped"]],
+  ["2934a6d1047bb8c2c6360dbcafa37b37be69cdbe1f99f448937a30c4d959dc5b", []],
+  ["f7b0019831524e94bda84accabce84c353779f1d2013e56e420f5e084fdc8783", ["M_shared_id_helped"]],
+  ["1157a9df2573a0616a32b61b5aacac9281ee062387b1b90e94f1bcca91d718a3", ["M_shared_id_helped"]],
+  ["92c936e802fdf4965ff603386689b94496a8589c7a635f969bc82efb0eded0e3", ["M_shared_id_helped"]],
+  ["66f506cdff7999d69fefa927840e6a2e1a79b846e41ddc32dc7a6b72c0359134", []],
+  ["ca68f31511b2d6a877869834e5a6c2dc28f1c396ab89325fc3d91f4788caa08d", []],
+  ["7bb0cdba6a9803a0c8da39669d5d463eeaf1dda5b9f55173e07fe4eb3bc81c7c", []],
+  ["ca38833b4254974b1e7808ea0ec32dcd8314ea59a06aa08f7fa84b4b5b1b2709", []],
+  ["4918ccadb3ac3a795662534b337933eb9d8d53ec39ef5cd31c9bbc28be87d0b3", []],
+  ["29557d72b4b1c60c1d335df7d05a0ee94cb57a235fddc6ef81985a8f12978d6a", []],
+  ["35997a8a3cf4f399765980afcd82a377319bbac7f118379d234f76afd93ac2df", []],
+  ["5be95656e751f91dd9d5f9f59d5ca69717b640282048cdcfa4b5f9655b84bd08", []],
+  ["a05cb0d3eb0fdf045075758d71726777d8cc202fac4bec27373f648f45271c0f", ["M_shared_id_helped"]],
+  ["a05cb0d3eb0fdf045075758d71726777d8cc202fac4bec27373f648f45271c0f", ["M_shared_id_helped"]],
+  ["708d00522dff0e7df5350abdbc6ab9229329abc700d9cb84c1be53b3d85ef79d", ["M_shared_id_helped"]],
+  ["708d00522dff0e7df5350abdbc6ab9229329abc700d9cb84c1be53b3d85ef79d", ["M_shared_id_helped"]],
+  ["708d00522dff0e7df5350abdbc6ab9229329abc700d9cb84c1be53b3d85ef79d", ["M_shared_id_helped"]],
+  ["6a87d8d28ff68cbf256101cebf4dcaf49725b0ace7ffb371c700a8e339e3b9bf", ["M_shared_id_helped"]],
+  ["6a87d8d28ff68cbf256101cebf4dcaf49725b0ace7ffb371c700a8e339e3b9bf", ["M_shared_id_helped"]],
+  ["e4393303589e2e47b5d445495587ac43932c43f39f98fe91de6e6e54d513ad43", []],
+  ["0f1841f5ec3d9d06f60da1203c32aca37e77bb6a72bff21a47d8b661f7f9a00a", []],
+  ["7d23fc808da5ea8c2921cf30852f32c4cefc2a8d05990e23ffde5595f7a2e8ad", []],
+  ["e5b46c61d0bbedf16afd9bda2651a8c85d9c057035f3fabc18f26875cae6b5fc", []],
+  ["bda991881e45c114cc6e8f2931bf897e685395e4beadd592c8c7525d9e8ef4c2", []],
+  ["d78da55d269cfa21f541f1b4a43e728b80d5857135ef2902e78dd0a3400699b0", []],
+  ["faa84c6a3f699120ec1e52d6784a435e8dbc22eb1fc5c9c50d492d1c24754d01", []],
+  ["f0b23b16002acbd7b0b69d2080d266c3dce9af4ff7e0c66326395b2022dccd81", ["M_incontext_label_moved_pick"]],
+  ["f65951efa3ef7bca0a2d700224a1145faee4bd21343d27880b84f67a2bd4911f", ["M_incontext_label_moved_pick"]],
+  ["690c4a8304b9c3140a0ed8ee9ab976d383c4b762867f16b46a4d85efaffff1bc", ["M_incontext_label_moved_pick"]],
+  ["31f777d379f9896aa21cd59265c55434b54517ae90549e3b20035a6d7300bb7b", ["M_incontext_label_moved_pick"]],
+  ["ec1586a7878260f40c353ad7e00e8a83a4400c13954b6dfecc7ed2820068dec1", ["M_incontext_label_moved_pick"]],
+  ["cdd78b824f9456aa0ee4f89b57a96f6b931ae9736101696ac058aa5e82f728ee", []],
+  ["026a6e5995110821e0ddee6b6b826a9b775e6ce21912533b2989c1cb7210ae2a", []],
+  ["20eab628fe88efae8d1e4da60ad6fd628817132a1747a99d2568463feae0d6ca", []],
+  ["a6cf670ab352e11dec90e9d8f236e50c4775a7d802125e52269824e5801343cf", []],
+  ["82d3188be1164aa1b7d5b8713ab7151cdcbde6ca400bb12bd55586db9379ad2a", []],
+  ["82d3188be1164aa1b7d5b8713ab7151cdcbde6ca400bb12bd55586db9379ad2a", []],
+  ["82d3188be1164aa1b7d5b8713ab7151cdcbde6ca400bb12bd55586db9379ad2a", []],
+  ["a69f6c6ca2fc7e848097cd6df3739b754acc45f4286f62fa049249b6c449cffc", []],
+  ["ba820df6620ebcabb682de7d326b6c8b58ebcd22ef23ed2fff20c04c7ec2726e", []],
+  ["2026c12bd06f4e5a1bb2678c7f6ccf2bc5bbe7211a9820c4c05c184860946e58", []],
+  ["c10b264a3f0a9944b60b522ba2a885d61f38c664eb932e2957b778715fc412d8", []],
+  ["24eee8b1ab8b1b95c8e85a6637819cff8f46d8e3cb063c1beea76a662ce807b6", []],
+  ["b00b1edeb16f961223afaedd51934c67f106980426cbf036ffd0c76d842b4271", []],
+  ["77ed990837ae4ed2218ed9a8a3837f8317b08d57902876733cc148c34fddc7cb", []],
+  ["66fd8b12c1ee42b9d8698db5acbc06f2b3beed67bb7e4cb47fdbce1bf6c5dce3", ["M_shared_id_helped"]],
+  ["780133686405d93fad32fdbbf23c2dc92cb250ecc4956df04541fe3c3be45957", ["M_shared_id_helped"]],
+  ["8ad60943db0c786c48afd83bc7116468fd9f690247711feb2ea600fd402f02cf", ["M_incontext_label_moved_pick"]],
+  ["a734317d08983ce8bafb46662bbe0507e2d63b90cd6d99d5dcc099450e6f3eac", ["M_incontext_label_moved_pick"]],
+  ["91b366eaf76e2e78fc9fc33d375143ba18e9a2719d71a6f2792520970c6957b9", ["M_incontext_label_moved_pick"]],
+  ["cdda72f075e69f740b2f917a228b98200de83a308257fe7961ec3c5167de965c", ["M_incontext_label_moved_pick"]],
+  ["2e972c3d37338e83cb8e46438e93f609e995e594aad39745a48b0793c2b9dda4", ["M_shared_id_helped"]],
+  ["9cdc44de9454c094327092dfdf08a5dbba7edf0ac2c068ed7508263b4a2c67b2", ["M_shared_id_helped"]],
+  ["9cdc44de9454c094327092dfdf08a5dbba7edf0ac2c068ed7508263b4a2c67b2", ["M_shared_id_helped"]],
+  ["d87e0d15484990d4277b685e9a178a31abf0b7076a8b2bd76ec6362c88a67a92", ["M_shared_id_helped"]],
+  ["2825864a2cc07674e105b410aa0a21b14751d193cf7387cbe340ca573435e37c", ["M_shared_id_helped"]],
+  ["cda65b64bf1052fcb950886d3f2fd035b7cb0fdca7fd89f8606e9c055395a3ab", ["M_shared_id_helped"]],
+  ["49db409d39502736eabfe43a50a836c690c8edcd4db5a12d7b6b17703c604e72", ["M_shared_id_helped"]],
+  ["559d04e806c560c32da4ced2b37303d1b08b26d55f3fbd4fcc0bb441b63e5900", []],
+  ["eebc5bf2166b67704130f2b00ac914e09f4d142c2a5302adbf64efb39b2c1dc2", []],
+  ["51ab0ec6d56d9c3c9409826045dddfdee0391587de64b791ec1890a74acd0703", []],
+  ["38649a72685cb3952bfb9ca3a7b0db8cd1ac9577a2e1baf9e76824d12406cf92", []],
+  ["4737671a5149f4cb0b2a32072fe2e92b56b0b7e01bcb32bb5af14537d4f36331", ["M_incontext_label_moved_pick"]],
+  ["35b5d977945b628198ecea8771cd4662c8bb12e2c8c4e4950fd24c02c4131bc6", ["M_incontext_label_moved_pick"]],
+  ["02d59184292e6f97ce80c63b158ee9a50124f215c4b8aa61222f740620cffa37", ["M_incontext_label_moved_pick"]],
+  ["8504767c562fba91fa94077766ae6248758a855653c99a5e6c25739136cf48a1", ["M_incontext_label_moved_pick"]],
+  ["7067462ed75c59e4d421889f898ce6f08e22f377f60831b8972184ecca04d7ad", ["M_incontext_label_moved_pick"]],
+  ["dacaa66b75064dd396f671cfae0d075812095f6d48deb0a2e9cef73d6e8627d7", ["M_incontext_label_moved_pick"]],
+  ["afe283b200a5ccb0c997306be3952188c104406045e816cc9d0cc08e152d52ea", ["M_incontext_label_moved_pick"]],
+  ["8d96128c005cfc7b4bb806b77a4524d86539e0653a86acf37d947f0ceb845010", []],
+  ["54a9a64ed46f7e2cc86ab72aa129df4879fcc527259d3dc32841cc82274f6337", []],
+  ["02196339f16aea7685319e1a72ca67654eb4d858c0322f595d159083685c1fc2", []],
+  ["02196339f16aea7685319e1a72ca67654eb4d858c0322f595d159083685c1fc2", []],
+  ["02196339f16aea7685319e1a72ca67654eb4d858c0322f595d159083685c1fc2", []],
+  ["6d32f1eabaad239d4777d1eab51b7b22a5e4bfc7169d78574abe91128927f0e2", []],
+  ["61b7a23fce731afa9b6e37cbce8eb449c3b1db4d9a57a9fba7a592512d506ecc", ["M_incontext_label_moved_pick"]],
+  ["3c9c10dcfa918fb73fec72b3714cdef902be7ca5554f57a76a4c4ab5b04dda50", ["M_incontext_label_moved_pick"]],
+  ["46bc4c24038eb658e26da76f92cf4c914025cd5e8643d55eab7b34bca7a6f625", ["M_incontext_label_moved_pick"]],
+  ["26c951032d3a31b839c7f67e2cbfb7b2d86a5c3f59abc28e58ad5ff71e45759f", ["M_incontext_label_moved_pick"]],
+  ["3f0338b22c999205be610fa62d326515b00d6a69883fca72a57244dd4fd856c3", ["M_incontext_label_moved_pick"]],
+  ["ed83a35c06cbf967944aeb2c69dc242f347ed9c47dc6e3725d95ec1fe9ad1db8", ["M_incontext_label_moved_pick"]],
+  ["dfd748cac4b6dee04ee68616cafcb4c99ec3a58d6db748f0cf3c4b9ff43343ed", ["M_incontext_label_moved_pick"]],
+  ["81cf154fb991e977656f2248f32e475112d04e47b786909a6c1f408846edda6d", []],
+  ["2bfa5c48c43990f77d842930b019073c96247de34ee206dfcce97c7593b748c9", []],
+  ["6260d2a1ed2baecb7fd8f67fafc7e3c0ff56d92d7a4734499a1102beebc744d0", []],
+  ["220e6977699c99b87d7bb5450af7efb80b87dcfb6a7f4e0f9ca0af58046bd58d", []],
+  ["220e6977699c99b87d7bb5450af7efb80b87dcfb6a7f4e0f9ca0af58046bd58d", []],
+  ["220e6977699c99b87d7bb5450af7efb80b87dcfb6a7f4e0f9ca0af58046bd58d", []],
+  ["220e6977699c99b87d7bb5450af7efb80b87dcfb6a7f4e0f9ca0af58046bd58d", []],
+  ["2ca993dccc816dfa0fb235ecc7603aa393fb9694e823e546a63ea960743faa3a", ["M_incontext_label_moved_pick"]],
+  ["17b0f97182993ebb959e8f7890f69a2f4b8c76ebe61102b2a13b635149979ed0", ["M_incontext_label_moved_pick"]],
+  ["f2a141d9145ef3cce48cd4acdd114993b47093b491f6ba12059e7ed44c4b2a46", []],
+  ["f2a141d9145ef3cce48cd4acdd114993b47093b491f6ba12059e7ed44c4b2a46", []],
+  ["ded94a468f2abb710a35079722ef0a0e3f2d3d249ad54a094154b992aa28d21d", []],
+  ["9d7382b628d960fcf6c6a4d56957f5a76f9eefccf2613980cf38adbed9dd68e8", []],
+  ["d650bfb8628a41e71b95d5d119948d70be9254254594bfa759eed16dde6a8949", ["M_incontext_label_moved_pick"]],
+  ["d650bfb8628a41e71b95d5d119948d70be9254254594bfa759eed16dde6a8949", ["M_incontext_label_moved_pick"]],
+  ["a7bae40723b6fba98fc5c528e7b8a992e6811eb56bf9671300c6271febb806cf", ["M_incontext_label_moved_pick"]],
+  ["a7bae40723b6fba98fc5c528e7b8a992e6811eb56bf9671300c6271febb806cf", ["M_incontext_label_moved_pick"]],
+  ["a7bae40723b6fba98fc5c528e7b8a992e6811eb56bf9671300c6271febb806cf", ["M_incontext_label_moved_pick"]],
+  ["108d4c5a2bd00a299bfa62a3d7d79fcda11638f355e49214861690ebd1b38bde", ["M_incontext_label_moved_pick"]],
+  ["e8757e535755cfe481a6677376dc15bf3b5825c1173851d6c83b91dc8c301338", ["M_incontext_label_moved_pick"]],
+  ["ecf967fc15e846b80b4e2d4ed791212641dbf744c247cec33677986051fe02cc", ["M_incontext_label_moved_pick"]],
+  ["73391348afb6c368e456bfcf95c892dbff4b3512d08a4f716839fe782a5c7c47", ["M_incontext_label_moved_pick"]],
+  ["477eb5aeff23a2d5a543d924ac7890850fa289787a4f2baeaebe1851d0e3bc3d", []],
+  ["c64d8d3466357f1e5ef760c68fa3a9e1ac85b9a3037ee0d2a325c7a02a003029", []],
+  ["3a5affaf7b0d5b34d599ce33f59d688e61d24779107d207f31631dc3c4c5e992", ["M_shared_id_helped"]],
+  ["97b2b86f8b934ac207368de07fb4106dc794a11a3cd74bd5f55329c4c7ca1601", ["M_shared_id_helped"]],
+  ["ca5b0e3447d728d385083fa22767ac917665b71531bb85f0a7a423360183f57e", []],
+  ["8cedd5b6f2e580e76f8dcd852eed78677e7668e3f19294d44b03bc9394ac2888", []],
+  ["8cedd5b6f2e580e76f8dcd852eed78677e7668e3f19294d44b03bc9394ac2888", []],
+  ["d78e51ceacdf514225cfaf37df179d4b5277dce07a27b24b98a46bfc196e1123", []],
+  ["d78e51ceacdf514225cfaf37df179d4b5277dce07a27b24b98a46bfc196e1123", []],
+  ["56a8903e2852d9e49068d7928a52d0bc453167da97384d1e5198c1d62695d356", []],
+  ["c58bcc5080ba63e59aac0aa737ac79bc15d409be757ed88e734bf234ef1b7174", []],
+  ["c4bacdb35247dc4e9827d3264568e7424323921fe83a5d36bf9e1202807a8642", []],
+  ["f82e980486852e53ed497ea4d25d5b8a8f19838debc473007abd03d84bf3f251", []],
+  ["820d3fee38e83e0dff5156762aa4c7d95664963667973b5d7f928ca98f70dee7", []],
+  ["a07296164483ef195f028491f13e38c5dffe06adba57b25ef6603609ccf3e970", []],
+  ["b2ed50e3506887ccc9e6f23adcee05cdad9867fb167d4497cfb13c6e1dc40bf0", []],
+  ["d291ecbebbbc093615e226cffe8074c64c1e41a06ace339aedac3b693e807152", []],
+  ["83e0124e863aeb72f44783f4af8ec0d480431d0df274bdc8b1e01f9e741e2127", []],
+  ["83e0124e863aeb72f44783f4af8ec0d480431d0df274bdc8b1e01f9e741e2127", []],
+  ["251b72c18e2fef87279de2b2b64b54454ed84a13731cdf61e1a882ac0982d77a", []],
+  ["72fa91c9ba6f89312d363b86f49a00c0ea73c8341d152c3602d34de4bd232db7", ["M_incontext_label_moved_pick"]],
+  ["363bb588944109cde85f8fb212125d2304765c5236807f7be8554cdca169d100", ["M_incontext_label_moved_pick"]]
+ ],
+ "frozen": [
+  {
+   "case": "fuzz-seed0-m-incontext-label-blocked-7de35644",
+   "labels": [],
+   "world": {
+    "case_id": "00000000-0000-0000-0000-000000000001",
+    "dataset_id": "00000000-0000-0000-0000-000000000002",
+    "vendor_id": "00000000-0000-0000-0000-000000000003",
+    "vendor_domains": [
+     "acme.example"
+    ],
+    "requested_cutoff": "2026-10-01T16:00:00+00:00",
+    "case_opened_at": "2026-10-01T17:00:00+00:00",
+    "request": {
+     "document_id": "req",
+     "received_at": "2026-10-01T16:00:00+00:00",
+     "thread_id": "req",
+     "subject": "Updated banking details",
+     "sender": "ar@acme.example"
+    },
+    "settings": {
+     "min_source_types": 2,
+     "min_age_days": 90,
+     "near_miss_distance": 1,
+     "same_subject_window_days": 30,
+     "established_days": 365
+    },
+    "poison": [],
+    "documents": [
+     {
+      "id": "req",
+      "channel": "email",
+      "received_at": "2026-10-01T16:00:00+00:00",
+      "sender": "ar@acme.example",
+      "thread_id": "req",
+      "subject": "Updated banking details",
+      "recorded_at": "2026-10-01T16:00:00+00:00"
+     },
+     {
+      "id": "d0-0",
+      "channel": "email",
+      "received_at": "2026-10-01T16:00:00+00:00",
+      "sender": "ar@acme.example",
+      "thread_id": "t0-0",
+      "subject": "Doc 0-0",
+      "recorded_at": "2026-10-01T16:00:00+00:00"
+     },
+     {
+      "id": "d1-0",
+      "channel": "contract",
+      "received_at": "2025-05-19T16:00:00+00:00",
+      "sender": "ar@acme.example",
+      "thread_id": "t1-0",
+      "subject": "Doc 1-0",
+      "recorded_at": "2025-05-19T16:00:00+00:00"
+     },
+     {
+      "id": "d1-1",
+      "channel": "listing",
+      "received_at": "2025-05-19T16:00:00+00:00",
+      "sender": "ar@acme.example",
+      "thread_id": "t1-1",
+      "subject": "Doc 1-1",
+      "recorded_at": "2025-05-19T16:00:00+00:00"
+     }
+    ],
+    "sightings": [
+     {
+      "e164": "+12015550100",
+      "document_id": "d0-0",
+      "channel": "email",
+      "received_at": "2026-10-01T16:00:00+00:00",
+      "visibility": "visible",
+      "role": "main",
+      "party": "vendor",
+      "recorded_at": "2026-10-01T16:00:00+00:00"
+     },
+     {
+      "e164": "+19785550100",
+      "document_id": "d1-0",
+      "channel": "contract",
+      "received_at": "2025-05-19T16:00:00+00:00",
+      "visibility": "visible",
+      "role": "ar",
+      "party": "vendor",
+      "recorded_at": "2025-05-19T16:00:00+00:00"
+     },
+     {
+      "e164": "+19785550100",
+      "document_id": "d1-1",
+      "channel": "listing",
+      "received_at": "2025-05-19T16:00:00+00:00",
+      "visibility": "visible",
+      "role": "ar",
+      "party": "vendor",
+      "recorded_at": "2025-05-19T16:00:00+00:00"
+     }
+    ]
+   }
+  },
+  {
+   "case": "fuzz-seed0-m-incontext-label-moved-pick-29c233da",
+   "labels": [
+    "M_incontext_label_moved_pick"
+   ],
+   "world": {
+    "case_id": "00000000-0000-0000-0000-000000000001",
+    "dataset_id": "00000000-0000-0000-0000-000000000002",
+    "vendor_id": "00000000-0000-0000-0000-000000000003",
+    "vendor_domains": [
+     "acme.example"
+    ],
+    "requested_cutoff": "2026-10-01T16:00:00+00:00",
+    "case_opened_at": "2026-10-01T17:00:00+00:00",
+    "request": {
+     "document_id": "req",
+     "received_at": "2026-10-01T16:00:00+00:00",
+     "thread_id": "req",
+     "subject": "Updated banking details",
+     "sender": "ar@acme.example"
+    },
+    "settings": {
+     "min_source_types": 1,
+     "min_age_days": 0,
+     "near_miss_distance": 0,
+     "same_subject_window_days": 0,
+     "established_days": 365
+    },
+    "poison": [],
+    "documents": [
+     {
+      "id": "req",
+      "channel": "email",
+      "received_at": "2026-10-01T16:00:00+00:00",
+      "sender": "ar@acme.example",
+      "thread_id": "req",
+      "subject": "Updated banking details",
+      "recorded_at": "2026-10-01T16:00:00+00:00"
+     },
+     {
+      "id": "d0-0",
+      "channel": "email",
+      "received_at": "2026-10-01T16:00:00+00:00",
+      "sender": "ar@acme.example",
+      "thread_id": "t0-0",
+      "subject": "Doc 0-0",
+      "recorded_at": "2026-10-01T16:00:00+00:00"
+     },
+     {
+      "id": "d1-0",
+      "channel": "contract",
+      "received_at": "2025-05-19T16:00:00+00:00",
+      "sender": "ar@acme.example",
+      "thread_id": "t1-0",
+      "subject": "Doc 1-0",
+      "recorded_at": "2025-05-19T16:00:00+00:00"
+     },
+     {
+      "id": "d1-1",
+      "channel": "listing",
+      "received_at": "2025-05-19T16:00:00+00:00",
+      "sender": "ar@acme.example",
+      "thread_id": "t1-1",
+      "subject": "Doc 1-1",
+      "recorded_at": "2025-05-19T16:00:00+00:00"
+     }
+    ],
+    "sightings": [
+     {
+      "e164": "+12015550100",
+      "document_id": "d0-0",
+      "channel": "email",
+      "received_at": "2026-10-01T16:00:00+00:00",
+      "visibility": "visible",
+      "role": "main",
+      "party": "vendor",
+      "recorded_at": "2026-10-01T16:00:00+00:00"
+     },
+     {
+      "e164": "+19785550100",
+      "document_id": "d1-0",
+      "channel": "contract",
+      "received_at": "2025-05-19T16:00:00+00:00",
+      "visibility": "visible",
+      "role": "ar",
+      "party": "vendor",
+      "recorded_at": "2025-05-19T16:00:00+00:00"
+     },
+     {
+      "e164": "+19785550100",
+      "document_id": "d1-1",
+      "channel": "listing",
+      "received_at": "2025-05-19T16:00:00+00:00",
+      "visibility": "visible",
+      "role": "ar",
+      "party": "vendor",
+      "recorded_at": "2025-05-19T16:00:00+00:00"
+     }
+    ]
+   }
+  },
+  {
+   "case": "fuzz-seed0-m-shared-id-helped-06bbe3c8",
+   "labels": [
+    "M_shared_id_helped"
+   ],
+   "world": {
+    "case_id": "00000000-0000-0000-0000-000000000001",
+    "dataset_id": "00000000-0000-0000-0000-000000000002",
+    "vendor_id": "00000000-0000-0000-0000-000000000003",
+    "vendor_domains": [
+     "acme.example"
+    ],
+    "requested_cutoff": "2026-10-01T16:00:00+00:00",
+    "case_opened_at": "2026-10-01T17:00:00+00:00",
+    "request": {
+     "document_id": "req",
+     "received_at": "2026-10-01T16:00:00+00:00",
+     "thread_id": "req",
+     "subject": "Updated banking details",
+     "sender": "ar@acme.example"
+    },
+    "settings": {
+     "min_source_types": 2,
+     "min_age_days": 90,
+     "near_miss_distance": 1,
+     "same_subject_window_days": 30,
+     "established_days": 365
+    },
+    "poison": [],
+    "documents": [
+     {
+      "id": "req",
+      "channel": "email",
+      "received_at": "2026-10-01T16:00:00+00:00",
+      "sender": "ar@acme.example",
+      "thread_id": "req",
+      "subject": "Updated banking details",
+      "recorded_at": "2026-10-01T16:00:00+00:00"
+     },
+     {
+      "id": "d0-0",
+      "channel": "email",
+      "received_at": "2026-10-01T16:00:00+00:00",
+      "sender": "ar@acme.example",
+      "thread_id": "t0-0",
+      "subject": "Doc 0-0",
+      "recorded_at": "2026-10-01T16:00:00+00:00"
+     },
+     {
+      "id": "d0-1",
+      "channel": "email",
+      "received_at": "2026-10-01T16:00:00+00:00",
+      "sender": "ar@acme.example",
+      "thread_id": "t0-1",
+      "subject": "Doc 0-1",
+      "recorded_at": "2026-10-01T16:00:00+00:00"
+     },
+     {
+      "id": "d0-2",
+      "channel": "email",
+      "received_at": "2025-08-16T16:00:00+00:00",
+      "sender": "ar@acrne.example",
+      "thread_id": "t0-2",
+      "subject": "Doc 0-2",
+      "recorded_at": "2025-08-16T16:00:00+00:00"
+     },
+     {
+      "id": "d1-0",
+      "channel": "contract",
+      "received_at": "2025-05-19T16:00:00+00:00",
+      "sender": "ar@acme.example",
+      "thread_id": "t1-0",
+      "subject": "Doc 1-0",
+      "recorded_at": "2025-05-19T16:00:00+00:00"
+     },
+     {
+      "id": "d1-1",
+      "channel": "listing",
+      "received_at": "2025-05-19T16:00:00+00:00",
+      "sender": "ar@acme.example",
+      "thread_id": "t1-1",
+      "subject": "Doc 1-1",
+      "recorded_at": "2025-05-19T16:00:00+00:00"
+     }
+    ],
+    "sightings": [
+     {
+      "e164": "+12015550100",
+      "document_id": "d0-0",
+      "channel": "email",
+      "received_at": "2026-10-01T16:00:00+00:00",
+      "visibility": "visible",
+      "role": "main",
+      "party": "vendor",
+      "recorded_at": "2026-10-01T16:00:00+00:00"
+     },
+     {
+      "e164": "+12015550100",
+      "document_id": "d0-1",
+      "channel": "email",
+      "received_at": "2026-10-01T16:00:00+00:00",
+      "visibility": "visible",
+      "role": "main",
+      "party": "vendor",
+      "recorded_at": "2026-10-01T16:00:00+00:00"
+     },
+     {
+      "e164": "+12015550100",
+      "document_id": "d0-2",
+      "channel": "email",
+      "received_at": "2025-08-16T16:00:00+00:00",
+      "visibility": "visible",
+      "role": "main",
+      "party": "vendor",
+      "recorded_at": "2025-08-16T16:00:00+00:00"
+     },
+     {
+      "e164": "+19785550100",
+      "document_id": "d1-0",
+      "channel": "contract",
+      "received_at": "2025-05-19T16:00:00+00:00",
+      "visibility": "visible",
+      "role": "ar",
+      "party": "vendor",
+      "recorded_at": "2025-05-19T16:00:00+00:00"
+     },
+     {
+      "e164": "+19785550100",
+      "document_id": "d1-1",
+      "channel": "listing",
+      "received_at": "2025-05-19T16:00:00+00:00",
+      "visibility": "visible",
+      "role": "ar",
+      "party": "vendor",
+      "recorded_at": "2025-05-19T16:00:00+00:00"
+     }
+    ]
+   }
+  },
+  {
+   "case": "lookalike-erased-by-first-sorting-twin",
+   "labels": [
+    "M_shared_id_helped"
+   ],
+   "world": {
+    "case_id": "00000000-0000-0000-0000-000000000001",
+    "dataset_id": "00000000-0000-0000-0000-000000000002",
+    "vendor_id": "00000000-0000-0000-0000-000000000003",
+    "vendor_domains": [
+     "acme.example"
+    ],
+    "requested_cutoff": "2026-10-01T16:00:00+00:00",
+    "case_opened_at": "2026-10-01T17:00:00+00:00",
+    "request": {
+     "document_id": "req",
+     "received_at": "2026-10-01T16:00:00+00:00",
+     "thread_id": "req",
+     "subject": "Updated banking details",
+     "sender": "ar@acme.example"
+    },
+    "settings": {
+     "min_source_types": 2,
+     "min_age_days": 90,
+     "near_miss_distance": 1,
+     "same_subject_window_days": 30,
+     "established_days": 365
+    },
+    "poison": [
+     "+12065550169"
+    ],
+    "documents": [
+     {
+      "id": "req",
+      "channel": "email",
+      "received_at": "2026-10-01T16:00:00+00:00",
+      "sender": "ar@acme.example",
+      "thread_id": "req",
+      "subject": "Updated banking details",
+      "recorded_at": "2026-10-01T16:00:00+00:00"
+     },
+     {
+      "id": "d0-0",
+      "channel": "email",
+      "received_at": "2025-12-05T16:00:00+00:00",
+      "sender": "ar@acrne.example",
+      "thread_id": "t0-0",
+      "subject": "Doc 0-0",
+      "recorded_at": "2025-12-05T16:00:00+00:00"
+     },
+     {
+      "id": "d1-0",
+      "channel": "contract",
+      "received_at": "2026-03-15T16:00:00+00:00",
+      "sender": "ar@acme.example",
+      "thread_id": "t1-0",
+      "subject": "Doc 1-0",
+      "recorded_at": "2026-03-15T16:00:00+00:00"
+     },
+     {
+      "id": "d1-1",
+      "channel": "listing",
+      "received_at": "2026-03-15T16:00:00+00:00",
+      "sender": "ar@acme.example",
+      "thread_id": "t1-1",
+      "subject": "Doc 1-1",
+      "recorded_at": "2026-03-15T16:00:00+00:00"
+     }
+    ],
+    "sightings": [
+     {
+      "e164": "+18675550120",
+      "document_id": "d0-0",
+      "channel": "email",
+      "received_at": "2025-12-05T16:00:00+00:00",
+      "visibility": "white",
+      "role": "ar",
+      "party": "vendor",
+      "recorded_at": "2025-12-05T16:00:00+00:00"
+     },
+     {
+      "e164": "+12065550169",
+      "document_id": "d1-0",
+      "channel": "contract",
+      "received_at": "2026-03-15T16:00:00+00:00",
+      "visibility": "visible",
+      "role": "ar",
+      "party": "vendor",
+      "recorded_at": "2026-03-15T16:00:00+00:00"
+     },
+     {
+      "e164": "+12065550169",
+      "document_id": "d1-1",
+      "channel": "listing",
+      "received_at": "2026-03-15T16:00:00+00:00",
+      "visibility": "visible",
+      "role": "ar",
+      "party": "vendor",
+      "recorded_at": "2026-03-15T16:00:00+00:00"
+     }
+    ]
+   }
+  },
+  {
+   "case": "near-miss-unanchored-by-old-lookalike",
+   "labels": [
+    "M_lookalike_helped",
+    "M_shared_id_helped"
+   ],
+   "world": {
+    "case_id": "00000000-0000-0000-0000-000000000001",
+    "dataset_id": "00000000-0000-0000-0000-000000000002",
+    "vendor_id": "00000000-0000-0000-0000-000000000003",
+    "vendor_domains": [
+     "acme.example"
+    ],
+    "requested_cutoff": "2026-10-01T16:00:00+00:00",
+    "case_opened_at": "2026-10-01T17:00:00+00:00",
+    "request": {
+     "document_id": "req",
+     "received_at": "2026-10-01T16:00:00+00:00",
+     "thread_id": "req",
+     "subject": "Updated banking details",
+     "sender": "ar@acme.example"
+    },
+    "settings": {
+     "min_source_types": 1,
+     "min_age_days": 30,
+     "near_miss_distance": 1,
+     "same_subject_window_days": 90,
+     "established_days": 365
+    },
+    "poison": [
+     "+14155550143"
+    ],
+    "documents": [
+     {
+      "id": "req",
+      "channel": "email",
+      "received_at": "2026-10-01T16:00:00+00:00",
+      "sender": "ar@acme.example",
+      "thread_id": "req",
+      "subject": "Updated banking details",
+      "recorded_at": "2026-10-01T16:00:00+00:00"
+     },
+     {
+      "id": "d0-0",
+      "channel": "contract",
+      "received_at": "2026-05-04T16:00:00+00:00",
+      "sender": "ar@acme.example",
+      "thread_id": "t0-0",
+      "subject": "Updated banking details",
+      "recorded_at": "2026-05-04T16:00:00+00:00"
+     },
+     {
+      "id": "d1-0",
+      "channel": "listing",
+      "received_at": "2026-05-14T16:00:00+00:00",
+      "sender": "ar@acme.example",
+      "thread_id": "t1-0",
+      "subject": "Doc 1-0",
+      "recorded_at": "2026-05-14T16:00:00+00:00"
+     }
+    ],
+    "sightings": [
+     {
+      "e164": "+14155550142",
+      "document_id": "d0-0",
+      "channel": "contract",
+      "received_at": "2026-05-04T16:00:00+00:00",
+      "visibility": "visible",
+      "role": "ar",
+      "party": "vendor",
+      "recorded_at": "2026-05-04T16:00:00+00:00"
+     },
+     {
+      "e164": "+14155550143",
+      "document_id": "d1-0",
+      "channel": "listing",
+      "received_at": "2026-05-14T16:00:00+00:00",
+      "visibility": "visible",
+      "role": "ar",
+      "party": "vendor",
+      "recorded_at": "2026-05-14T16:00:00+00:00"
+     }
+    ]
+   }
+  },
+  {
+   "case": "near-miss-unanchored-by-shared-id",
+   "labels": [
+    "M_shared_id_helped"
+   ],
+   "world": {
+    "case_id": "00000000-0000-0000-0000-000000000001",
+    "dataset_id": "00000000-0000-0000-0000-000000000002",
+    "vendor_id": "00000000-0000-0000-0000-000000000003",
+    "vendor_domains": [
+     "acme.example"
+    ],
+    "requested_cutoff": "2026-10-01T16:00:00+00:00",
+    "case_opened_at": "2026-10-01T17:00:00+00:00",
+    "request": {
+     "document_id": "req",
+     "received_at": "2026-10-01T16:00:00+00:00",
+     "thread_id": "req",
+     "subject": "Updated banking details",
+     "sender": "ar@acme.example"
+    },
+    "settings": {
+     "min_source_types": 2,
+     "min_age_days": 90,
+     "near_miss_distance": 1,
+     "same_subject_window_days": 30,
+     "established_days": 365
+    },
+    "poison": [
+     "+14155550143"
+    ],
+    "documents": [
+     {
+      "id": "req",
+      "channel": "email",
+      "received_at": "2026-10-01T16:00:00+00:00",
+      "sender": "ar@acme.example",
+      "thread_id": "req",
+      "subject": "Updated banking details",
+      "recorded_at": "2026-10-01T16:00:00+00:00"
+     },
+     {
+      "id": "d0-0",
+      "channel": "contract",
+      "received_at": "2026-03-15T16:00:00+00:00",
+      "sender": "ar@acme.example",
+      "thread_id": "t0-0",
+      "subject": "Doc 0-0",
+      "recorded_at": "2026-03-15T16:00:00+00:00"
+     },
+     {
+      "id": "d1-0",
+      "channel": "listing",
+      "received_at": "2026-05-04T16:00:00+00:00",
+      "sender": "ar@acme.example",
+      "thread_id": "t1-0",
+      "subject": "Doc 1-0",
+      "recorded_at": "2026-05-04T16:00:00+00:00"
+     },
+     {
+      "id": "d1-1",
+      "channel": "vendor_portal",
+      "received_at": "2026-05-04T16:00:00+00:00",
+      "sender": "ar@acme.example",
+      "thread_id": "t1-1",
+      "subject": "Doc 1-1",
+      "recorded_at": "2026-05-04T16:00:00+00:00"
+     }
+    ],
+    "sightings": [
+     {
+      "e164": "+14155550142",
+      "document_id": "d0-0",
+      "channel": "contract",
+      "received_at": "2026-03-15T16:00:00+00:00",
+      "visibility": "visible",
+      "role": "ar",
+      "party": "vendor",
+      "recorded_at": "2026-03-15T16:00:00+00:00"
+     },
+     {
+      "e164": "+14155550143",
+      "document_id": "d1-0",
+      "channel": "listing",
+      "received_at": "2026-05-04T16:00:00+00:00",
+      "visibility": "visible",
+      "role": "ar",
+      "party": "vendor",
+      "recorded_at": "2026-05-04T16:00:00+00:00"
+     },
+     {
+      "e164": "+14155550143",
+      "document_id": "d1-1",
+      "channel": "vendor_portal",
+      "received_at": "2026-05-04T16:00:00+00:00",
+      "visibility": "visible",
+      "role": "ar",
+      "party": "vendor",
+      "recorded_at": "2026-05-04T16:00:00+00:00"
+     }
+    ]
+   }
+  },
+  {
+   "case": "planted-number-picked-after-bare-mention-in-request",
+   "labels": [
+    "M_incontext_label_moved_pick"
+   ],
+   "world": {
+    "case_id": "00000000-0000-0000-0000-000000000001",
+    "dataset_id": "00000000-0000-0000-0000-000000000002",
+    "vendor_id": "00000000-0000-0000-0000-000000000003",
+    "vendor_domains": [
+     "acme.example"
+    ],
+    "requested_cutoff": "2026-10-01T16:00:00+00:00",
+    "case_opened_at": "2026-10-01T17:00:00+00:00",
+    "request": {
+     "document_id": "req",
+     "received_at": "2026-10-01T16:00:00+00:00",
+     "thread_id": "req",
+     "subject": "Updated banking details",
+     "sender": "ap@acme.example"
+    },
+    "settings": {
+     "min_source_types": 2,
+     "min_age_days": 90,
+     "near_miss_distance": 1,
+     "same_subject_window_days": 30,
+     "established_days": 365
+    },
+    "poison": [
+     "+16455550177"
+    ],
+    "documents": [
+     {
+      "id": "c1",
+      "channel": "contract",
+      "received_at": "2026-03-15T16:00:00+00:00",
+      "sender": null,
+      "thread_id": null,
+      "subject": null,
+      "recorded_at": "2026-03-15T16:00:00+00:00"
+     },
+     {
+      "id": "l1",
+      "channel": "listing",
+      "received_at": "2026-03-15T16:00:00+00:00",
+      "sender": null,
+      "thread_id": null,
+      "subject": null,
+      "recorded_at": "2026-03-15T16:00:00+00:00"
+     },
+     {
+      "id": "c2",
+      "channel": "contract",
+      "received_at": "2026-05-04T16:00:00+00:00",
+      "sender": null,
+      "thread_id": null,
+      "subject": null,
+      "recorded_at": "2026-05-04T16:00:00+00:00"
+     },
+     {
+      "id": "l2",
+      "channel": "listing",
+      "received_at": "2026-05-04T16:00:00+00:00",
+      "sender": null,
+      "thread_id": null,
+      "subject": null,
+      "recorded_at": "2026-05-04T16:00:00+00:00"
+     },
+     {
+      "id": "req",
+      "channel": "email",
+      "received_at": "2026-10-01T16:00:00+00:00",
+      "sender": "ap@acme.example",
+      "thread_id": "req",
+      "subject": "Updated banking details",
+      "recorded_at": "2026-10-01T16:00:00+00:00"
+     }
+    ],
+    "sightings": [
+     {
+      "e164": "+14155550142",
+      "document_id": "c1",
+      "channel": "contract",
+      "received_at": "2026-03-15T16:00:00+00:00",
+      "visibility": "visible",
+      "role": "ar",
+      "party": "vendor",
+      "recorded_at": "2026-03-15T16:00:00+00:00"
+     },
+     {
+      "e164": "+14155550142",
+      "document_id": "l1",
+      "channel": "listing",
+      "received_at": "2026-03-15T16:00:00+00:00",
+      "visibility": "visible",
+      "role": "ar",
+      "party": "vendor",
+      "recorded_at": "2026-03-15T16:00:00+00:00"
+     },
+     {
+      "e164": "+16455550177",
+      "document_id": "c2",
+      "channel": "contract",
+      "received_at": "2026-05-04T16:00:00+00:00",
+      "visibility": "visible",
+      "role": "ar",
+      "party": "vendor",
+      "recorded_at": "2026-05-04T16:00:00+00:00"
+     },
+     {
+      "e164": "+16455550177",
+      "document_id": "l2",
+      "channel": "listing",
+      "received_at": "2026-05-04T16:00:00+00:00",
+      "visibility": "visible",
+      "role": "ar",
+      "party": "vendor",
+      "recorded_at": "2026-05-04T16:00:00+00:00"
+     },
+     {
+      "e164": "+14155550142",
+      "document_id": "req",
+      "channel": "email",
+      "received_at": "2026-10-01T16:00:00+00:00",
+      "visibility": "visible",
+      "role": "unknown",
+      "party": "unknown",
+      "recorded_at": "2026-10-01T16:00:00+00:00"
+     }
+    ]
+   }
+  },
+  {
+   "case": "planted-number-picked-after-follow-up-email",
+   "labels": [
+    "M_incontext_label_moved_pick"
+   ],
+   "world": {
+    "case_id": "00000000-0000-0000-0000-000000000001",
+    "dataset_id": "00000000-0000-0000-0000-000000000002",
+    "vendor_id": "00000000-0000-0000-0000-000000000003",
+    "vendor_domains": [
+     "acme.example"
+    ],
+    "requested_cutoff": "2026-10-01T16:00:00+00:00",
+    "case_opened_at": "2026-10-01T17:00:00+00:00",
+    "request": {
+     "document_id": "req",
+     "received_at": "2026-10-01T16:00:00+00:00",
+     "thread_id": "req",
+     "subject": "Updated banking details",
+     "sender": "ap@acme.example"
+    },
+    "settings": {
+     "min_source_types": 2,
+     "min_age_days": 90,
+     "near_miss_distance": 1,
+     "same_subject_window_days": 30,
+     "established_days": 365
+    },
+    "poison": [
+     "+16455550177"
+    ],
+    "documents": [
+     {
+      "id": "c1",
+      "channel": "contract",
+      "received_at": "2026-03-15T16:00:00+00:00",
+      "sender": null,
+      "thread_id": null,
+      "subject": null,
+      "recorded_at": "2026-03-15T16:00:00+00:00"
+     },
+     {
+      "id": "l1",
+      "channel": "listing",
+      "received_at": "2026-03-15T16:00:00+00:00",
+      "sender": null,
+      "thread_id": null,
+      "subject": null,
+      "recorded_at": "2026-03-15T16:00:00+00:00"
+     },
+     {
+      "id": "c2",
+      "channel": "contract",
+      "received_at": "2026-05-04T16:00:00+00:00",
+      "sender": null,
+      "thread_id": null,
+      "subject": null,
+      "recorded_at": "2026-05-04T16:00:00+00:00"
+     },
+     {
+      "id": "l2",
+      "channel": "listing",
+      "received_at": "2026-05-04T16:00:00+00:00",
+      "sender": null,
+      "thread_id": null,
+      "subject": null,
+      "recorded_at": "2026-05-04T16:00:00+00:00"
+     },
+     {
+      "id": "req",
+      "channel": "email",
+      "received_at": "2026-10-01T16:00:00+00:00",
+      "sender": "ap@acme.example",
+      "thread_id": "req",
+      "subject": "Updated banking details",
+      "recorded_at": "2026-10-01T16:00:00+00:00"
+     },
+     {
+      "id": "f1",
+      "channel": "email",
+      "received_at": "2026-10-01T16:20:00+00:00",
+      "sender": "ap@acme.example",
+      "thread_id": "t-f1",
+      "subject": "One more thing",
+      "recorded_at": "2026-10-01T16:20:00+00:00"
+     }
+    ],
+    "sightings": [
+     {
+      "e164": "+14155550142",
+      "document_id": "c1",
+      "channel": "contract",
+      "received_at": "2026-03-15T16:00:00+00:00",
+      "visibility": "visible",
+      "role": "ar",
+      "party": "vendor",
+      "recorded_at": "2026-03-15T16:00:00+00:00"
+     },
+     {
+      "e164": "+14155550142",
+      "document_id": "l1",
+      "channel": "listing",
+      "received_at": "2026-03-15T16:00:00+00:00",
+      "visibility": "visible",
+      "role": "ar",
+      "party": "vendor",
+      "recorded_at": "2026-03-15T16:00:00+00:00"
+     },
+     {
+      "e164": "+16455550177",
+      "document_id": "c2",
+      "channel": "contract",
+      "received_at": "2026-05-04T16:00:00+00:00",
+      "visibility": "visible",
+      "role": "ar",
+      "party": "vendor",
+      "recorded_at": "2026-05-04T16:00:00+00:00"
+     },
+     {
+      "e164": "+16455550177",
+      "document_id": "l2",
+      "channel": "listing",
+      "received_at": "2026-05-04T16:00:00+00:00",
+      "visibility": "visible",
+      "role": "ar",
+      "party": "vendor",
+      "recorded_at": "2026-05-04T16:00:00+00:00"
+     },
+     {
+      "e164": "+14155550142",
+      "document_id": "f1",
+      "channel": "email",
+      "received_at": "2026-10-01T16:20:00+00:00",
+      "visibility": "visible",
+      "role": "unknown",
+      "party": "bank",
+      "recorded_at": "2026-10-01T16:20:00+00:00"
+     }
+    ]
+   }
+  },
+  {
+   "case": "planted-number-picked-after-in-thread-bank-label",
+   "labels": [
+    "M_incontext_label_moved_pick"
+   ],
+   "world": {
+    "case_id": "00000000-0000-0000-0000-000000000001",
+    "dataset_id": "00000000-0000-0000-0000-000000000002",
+    "vendor_id": "00000000-0000-0000-0000-000000000003",
+    "vendor_domains": [
+     "acme.example"
+    ],
+    "requested_cutoff": "2026-10-01T16:00:00+00:00",
+    "case_opened_at": "2026-10-01T17:00:00+00:00",
+    "request": {
+     "document_id": "req",
+     "received_at": "2026-10-01T16:00:00+00:00",
+     "thread_id": "req",
+     "subject": "Updated banking details",
+     "sender": "ar@acme.example"
+    },
+    "settings": {
+     "min_source_types": 2,
+     "min_age_days": 90,
+     "near_miss_distance": 1,
+     "same_subject_window_days": 30,
+     "established_days": 365
+    },
+    "poison": [
+     "+16455550177"
+    ],
+    "documents": [
+     {
+      "id": "req",
+      "channel": "email",
+      "received_at": "2026-10-01T16:00:00+00:00",
+      "sender": "ar@acme.example",
+      "thread_id": "req",
+      "subject": "Updated banking details",
+      "recorded_at": "2026-10-01T16:00:00+00:00"
+     },
+     {
+      "id": "d0-0",
+      "channel": "contract",
+      "received_at": "2026-03-15T16:00:00+00:00",
+      "sender": "ar@acme.example",
+      "thread_id": "t0-0",
+      "subject": "Doc 0-0",
+      "recorded_at": "2026-03-15T16:00:00+00:00"
+     },
+     {
+      "id": "d0-1",
+      "channel": "listing",
+      "received_at": "2026-03-15T16:00:00+00:00",
+      "sender": "ar@acme.example",
+      "thread_id": "t0-1",
+      "subject": "Doc 0-1",
+      "recorded_at": "2026-03-15T16:00:00+00:00"
+     },
+     {
+      "id": "d1-0",
+      "channel": "email",
+      "received_at": "2026-10-01T16:00:00+00:00",
+      "sender": "ar@other.example",
+      "thread_id": "req",
+      "subject": "Doc 1-0",
+      "recorded_at": "2026-10-01T16:00:00+00:00"
+     },
+     {
+      "id": "d2-0",
+      "channel": "contract",
+      "received_at": "2026-05-04T16:00:00+00:00",
+      "sender": "ar@acme.example",
+      "thread_id": "t2-0",
+      "subject": "Doc 2-0",
+      "recorded_at": "2026-05-04T16:00:00+00:00"
+     },
+     {
+      "id": "d2-1",
+      "channel": "listing",
+      "received_at": "2026-05-04T16:00:00+00:00",
+      "sender": "ar@acme.example",
+      "thread_id": "t2-1",
+      "subject": "Doc 2-1",
+      "recorded_at": "2026-05-04T16:00:00+00:00"
+     }
+    ],
+    "sightings": [
+     {
+      "e164": "+14155550142",
+      "document_id": "d0-0",
+      "channel": "contract",
+      "received_at": "2026-03-15T16:00:00+00:00",
+      "visibility": "visible",
+      "role": "ar",
+      "party": "vendor",
+      "recorded_at": "2026-03-15T16:00:00+00:00"
+     },
+     {
+      "e164": "+14155550142",
+      "document_id": "d0-1",
+      "channel": "listing",
+      "received_at": "2026-03-15T16:00:00+00:00",
+      "visibility": "visible",
+      "role": "ar",
+      "party": "vendor",
+      "recorded_at": "2026-03-15T16:00:00+00:00"
+     },
+     {
+      "e164": "+14155550142",
+      "document_id": "d1-0",
+      "channel": "email",
+      "received_at": "2026-10-01T16:00:00+00:00",
+      "visibility": "visible",
+      "role": "ar",
+      "party": "bank",
+      "recorded_at": "2026-10-01T16:00:00+00:00"
+     },
+     {
+      "e164": "+16455550177",
+      "document_id": "d2-0",
+      "channel": "contract",
+      "received_at": "2026-05-04T16:00:00+00:00",
+      "visibility": "visible",
+      "role": "ar",
+      "party": "vendor",
+      "recorded_at": "2026-05-04T16:00:00+00:00"
+     },
+     {
+      "e164": "+16455550177",
+      "document_id": "d2-1",
+      "channel": "listing",
+      "received_at": "2026-05-04T16:00:00+00:00",
+      "visibility": "visible",
+      "role": "ar",
+      "party": "vendor",
+      "recorded_at": "2026-05-04T16:00:00+00:00"
+     }
+    ]
+   }
+  }
+ ]
+}

@@ -2,10 +2,28 @@
 name = "dialback-evals"
 version = "0.0.0"
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+  "dialback-policy",
+  "dialback-voice",
+  "dialback-decision",
+  "dialback-ledger",
+  "jsonschema>=4",
+  "dialback-core",
+  "pyyaml>=6",
+]
+
+[project.scripts]
+lab = "dialback_evals.cli:main"
 
 [dependency-groups]
 dev = ["pytest>=8", "hypothesis>=6"]
+
+[tool.pytest.ini_options]
+markers = [
+  "selection_gate: the spec 0083 gate on the number-selection rule; lab-fuzz carries it in CI, lab-smoke deselects it",
+  "report_gate: the spec 0048 call-report checks on production; lab-reports carries it in CI, the others deselect it",
+  "docs_gate: the spec 0052 checks on generated documents through ingestion; lab-docs carries it in CI, the others deselect it",
+]
 
 [build-system]
 requires = ["hatchling"]

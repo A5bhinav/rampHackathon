@@ -1,21 +1,24 @@
-import { RingBand, type RingVariant } from "./ring-band";
-
-/** Every page's head (spec 0041): the ring band with an optional way back, an eyebrow, the title,
- *  one lead line, tags under it, and an aside on the right that clears the rings. */
-export function PageHead({ title, lead, back, aside, children, eyebrow, variant, titleId }: {
+/** An inner page's head (spec 0066): one title line (with any actions on the right) and one subtitle
+ *  line: the tags when given, else the lead. No ring art, no eyebrow and no back link: the top bar's
+ *  breadcrumbs say where you are. The rings stay on the front door and sign-in (RingBand, Rings). */
+export function PageHead({ title, lead, aside, children, titleId }: {
   title: React.ReactNode;
   lead?: React.ReactNode;
-  back?: { href: string; label: string };
+  back?: { href: string; label: string };   // kept for callers; the breadcrumbs carry the way back
   aside?: React.ReactNode;
   children?: React.ReactNode;
-  eyebrow?: React.ReactNode;
-  variant?: RingVariant;
+  eyebrow?: React.ReactNode;                 // kept for callers; not shown
   titleId?: string;
 }) {
+  const sub = children ?? lead;
   return (
-    <RingBand title={title} lead={lead} back={back} aside={aside} eyebrow={eyebrow} variant={variant} titleId={titleId}>
-      {children}
-    </RingBand>
+    <header className="page-title">
+      <div className="page-title-row">
+        <h1 id={titleId}>{title}</h1>
+        {aside ? <div className="page-title-aside">{aside}</div> : null}
+      </div>
+      {sub ? <div className="page-sub">{sub}</div> : null}
+    </header>
   );
 }
 
@@ -47,6 +50,25 @@ export function CardHead({ marker, title, id, meta, as: H = "h2" }: {
       <H id={id}>{title}</H>
       {meta ? <span className="card-meta">{meta}</span> : null}
     </div>
+  );
+}
+
+/** A card that collapses to its head and one line (spec 0066). A <details>, so it works without
+ *  JavaScript and a link to an id inside it still lands. Nothing interactive goes in the head. */
+export function FoldCard({ id, marker, title, line, meta, open, className, children }: {
+  id: string; marker?: string; title: React.ReactNode; line?: React.ReactNode; meta?: React.ReactNode;
+  open?: boolean; className?: string; children: React.ReactNode;
+}) {
+  return (
+    <details className={`card fold-card${className ? ` ${className}` : ""}`} open={open} aria-labelledby={id}>
+      <summary className="card-head">
+        {marker ? <span className="section-marker">{marker}</span> : null}
+        <h2 id={id}>{title}</h2>
+        {line ? <span className="fold-line">{line}</span> : null}
+        {meta ? <span className="card-meta">{meta}</span> : null}
+      </summary>
+      {children}
+    </details>
   );
 }
 

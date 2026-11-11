@@ -11,13 +11,29 @@ nothing.
 ## Interface
 
 ```bash
-lab run --split dev --epochs 1 --max-usd 20
+uv run lab run --split voice                  # the voice scenarios, scripted callers, no spend
+uv run lab freeze --split voice               # re-freeze scenario hashes and required outcomes
+uv run lab fuzz --search archive --examples 2000 --seed 0 --out evals/corpus-generated   # selection: frozen cases, then every world
+uv run lab frontier                           # measurement: what an attack costs (prints its grid)
+uv run lab overblock                          # measurement: what a defense costs
+uv run lab reports --examples 2000 --seed 0   # call reports: frozen findings, then F1 to F3 (spec 0048)
+uv run lab docs --examples 1000 --seed 0      # documents: frozen cases, then G1 to G7 through ingestion (spec 0052)
+uv run lab docs --examples 1000 --seed 5      # another seed: held to the same list; cases go to evals/out
+uv run lab sweep                              # remove each decision rule: seen, or in UNREACHABLE.md
+cd evals && uv run pytest -q -m "not selection_gate and not report_gate and not docs_gate"   # the checks that must stay green
 ```
 
-writes `results.jsonl` and `scorecard.json`, and exits non-zero when a hard gate fails,
-which is what CI checks (`lab-smoke` on PRs that touch the agent, ledger, decision engine,
-prompts or model pins: 40 to 60 scenarios in text mode; `lab-full` nightly and on release
-tags: the full dev and held-out sets, repeated).
+`lab run` writes `results.jsonl` and `scorecard.json`, and exits non-zero when a hard gate
+fails, which is what CI checks (`lab-smoke` on PRs that touch the agent, the call flow, the
+decision engine or the lab). `lab fuzz` exits non-zero on a frozen case that still fails or a
+new finding (`lab-fuzz`); `--search archive` (spec 0046) runs the whole budget instead of stopping at
+the first hit, and writes near misses to `evals/out/near-misses.json`, which never gate.
+`lab reports` exits non-zero on a frozen report that still fails or any violation on reports
+production can send (`lab-reports`). `lab docs` checks generated documents (each with a known claim and
+owner for every number) through real ingestion with the stub reader, then `select()`; it exits non-zero on
+a failing pattern its known-failures list lacks, a listed pattern that no longer fails, or a frozen case in
+`evals/docs-generated` whose plan no longer renders to its frozen documents (`lab-docs`). `voice` is the only split today; the dev and held-out sets, and
+`lab-full`, come later.
 
 ## Scenarios
 
