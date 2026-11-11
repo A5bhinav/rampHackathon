@@ -127,6 +127,23 @@ Written and committed before the set was written or any run.
 - **What it cannot show:** one run on synthetic text-only emails. It says nothing about real mail, HTML parts or attackers who have read the prompt.
 - **Addendum, written before the run:** a blind label checker read every email and reported file names only: no wrong labels, no ON-FILE-ONLY problems, no hidden mismatches. It marked 36 of the 110 as near-copies of the opened sets: cr-02 to cr-07, cr-11, cr-13, cr-15, cr-17, cr-20, cr-22, cr-23, cr-25, cr-28, cr-39, ord-02, ord-04, ord-08, ord-10, ord-12, ord-13, ord-14, ord-24, ord-25, ord-26, ord-30, ord-31, ord-38, ord-39, ord-40, ord-41, ord-44, ord-46, ord-54, ord-66. Word overlap with those sets is low (5-word Jaccard: median 0.007, highest 0.19), so these share a scenario, not text. They stay in the set and in the bar. The result also reports the counts on the 74 emails not marked (22 in-bar change requests, 50 ordinary), so the effect of shared scenarios can be seen.
 
+### Decision 12: the re-test result (heldout4, run once)
+
+Haiku, prompt v2 (`prompt_sha256` starts `168990eec3fdf1a2`), `--confirm-heldout4`. Run stamp `2026-11-11T041834Z`, result file in `eval_results/`.
+
+| Measure | Result | Bar |
+|---|---|---|
+| Change requests in the bar | 36/37 flagged (missed: cr-31) | all |
+| Ordinary emails | 1/70 flagged (ord-05) | at most 3 |
+| Failures (counted as not flagged) | none | |
+| ON-FILE-ONLY cr-38, cr-39, cr-40 (separate) | 0/3 flagged | not in the bar |
+| All 40 change requests | 36/40 flagged | not the bar |
+| The with-ON-FILE-ONLY line | FAIL | not the bar |
+| The 74 emails not marked as near-copies | 21/22 change requests, 1/50 ordinary | reported only |
+| Cost, latency | $0.0134 for 110 calls; p50 0.98 s, p95 2.38 s | |
+
+**Result: FAIL, by one missed change request.** This is the first cleanly sealed result for this flagger. False flags met the bar; recall did not. Both errors are in emails the checker did not mark as near-copies. As pre-registered: no prompt revision and no re-run unless Sami decides. Nobody has opened cr-31 or ord-05. Caveats as for the pre-registration: one run, synthetic text-only emails.
+
 ### What the ledger gets, and what can still reach it (review fix round 5)
 
 The model's copy (`redact_for_model`) has no numeric characters at all (`str.isnumeric`, since Task 6b's fix round 1; before it, no `str.isdigit` characters). The ledger stores only rebuilt phone lines: `ledger_text` emits one line per kept phone, made of the words before it (letters, colons and apostrophes; nothing numeric) and the phone in phonenumbers' canonical form, and nothing else from the email. Rounds 2 to 4 masked the email's text in place for the ledger and each round's masking changed what the ledger's matcher read (masking created a phone where there was none; masking beside a kept phone hid it so a second phone, or a phone-shaped account, passed the stub reader's one-phone rule: `Ph 212-555-0199, 77777/(617) 555-0143x51826279-` stored 6175550143 and `Account (call 212-555-0199 to confirm): 7783110245x1` stored the account). The property test over 200 fixed seeds (phones in every format the rounds found, `(digits)` glue, extensions, `~` `|` and middle-dot joins, phone-shaped labeled and unlabeled accounts, CJK and fullwidth numerals, several phones per line) now checks that every line the stub reader would store is words plus exactly the digits of one phone the keep-decision kept, and its guard shows the same generator leaks through the stub reader on the original text.
