@@ -112,12 +112,19 @@ def main(argv: list[str] | None = None) -> int:
     dc.add_argument("--report", default=str(_REPO / "evals" / "out" / "docs-report.json"))
     dc.add_argument("--known-failures", default="auto", help=_KNOWN_HELP + "; for lab docs, auto with --out left "
                     "out holds any seed to the repo's list")
+    sn = sub.add_parser("snapshot", help="run the voice scenarios and the fuzz search for the scorecard page (spec 0101)")
+    sn.add_argument("--examples", type=int, default=2000)
+    sn.add_argument("--seed", type=int, default=0)
+    sn.add_argument("--scenarios-root", default=str(_REPO / "evals" / "scenarios"))
+    sn.add_argument("--out", default=str(_REPO / "apps" / "web" / "src" / "data" / "lab-results.json"))
     freeze = sub.add_parser("freeze", help="record each scenario's hash and required outcome (expected.lock.json)")
     freeze.add_argument("--split", default="voice")
     freeze.add_argument("--scenarios-root", default=str(_REPO / "evals" / "scenarios"))
     args = parser.parse_args(argv)
     if args.command == "freeze":
         return _freeze(Path(args.scenarios_root) / args.split)
+    if args.command == "snapshot":
+        return _snapshot(Path(args.scenarios_root) / "voice", args.examples, args.seed, Path(args.out))
     if args.command == "run":
         attacker = os.environ.get("DIALBACK_LAB_ATTACKER", "scripted").strip().lower() or "scripted"
         if attacker != "scripted" or args.max_usd > 0:
@@ -385,6 +392,20 @@ def _drift(scenarios_dir: Path, scenarios: list[Scenario]) -> str | None:
     frozen, now = json.loads(path.read_text(encoding="utf-8")), _expectations(scenarios)
     changed = sorted(i for i in set(frozen) | set(now) if frozen.get(i) != now.get(i))
     return f"scenario(s) changed, added or removed since the freeze: {changed}" if changed else None
+
+
+def _snapshot(scenarios_dir: Path, examples: int, seed: int, out: Path) -> int:
+    """Spec 0101: one real run, for the scorecard page. A lab failure is a result to show, so only
+    scenarios that drifted from their freeze stop it."""
+    from . import snapshot
+    if drift := _drift(scenarios_dir, load_scenarios(scenarios_dir)):
+        print(f"lab: {drift}; review the change, then run `lab freeze` to accept it")
+        return 2
+    doc = snapshot.build(scenarios_dir, examples=examples, seed=seed, commit=snapshot.head(_REPO))
+    snapshot.write(doc, out)
+    print(f"lab snapshot: {doc['voice']['passed']}/{doc['voice']['total']} scenarios passed, {doc['fuzz']['worlds']} "
+          f"worlds, {sum(map(len, doc['fuzz']['hits'].values()))} flags, on {doc['commit']}: wrote {out}")
+    return 0
 
 
 def _score_one(s: Scenario) -> ScenarioResult:
