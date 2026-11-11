@@ -6,6 +6,7 @@
     dialback-core retire-dataset --dataset <id>          hide a dataset; nothing is deleted
     dialback-core run-job --dataset <id> --job reconcile run poll, full_sweep, reconcile or verify_chain now
     dialback-core demo reset|change|tamper|status|chaos  one command per demo beat (spec 0011)
+    dialback-core demo prepare --link clerk=EMAIL [--phone acme=+1...]  reset, Trust Ledger, request email (spec 0077)
 """
 from __future__ import annotations
 
@@ -92,6 +93,17 @@ async def _demo(settings: Settings, args: argparse.Namespace) -> int:
                 print("vendors " + ", ".join(f"{v['ref']} ({v['name']})" for v in seed["vendors"]))
                 print(f"linked  {', '.join(r.linked) or 'nobody'}")
                 print("next    dialback-core demo change --vendor acme")
+            elif args.action == "prepare":
+                links, seed = dict(_link(x) for x in args.link), demo.load_seed(args.seed)
+                phones = dict(_pair("--phone", x) for x in args.phone)
+                p = await demo.prepare(env, seed, links, phones=phones, requests=args.request or ["acme"])
+                for w in p.reset.warnings:
+                    print(f"warning: {w}")
+                print(f"dataset {p.reset.dataset.id}\nlinked  {', '.join(p.reset.linked) or 'nobody'}")
+                for ref, s in p.ledger["vendors"].items():  # never the phone itself: "team" or "fictional"
+                    print(f"ledger  {ref:<11} {s['observations']:>3} sightings, AR line: {s['phone']}"
+                          + (", change-request email in" if p.requests.get(ref) else ""))
+                print("next    change the vendor's bank details in the dashboard: AP workspace, Demo, Ramp (mock)")
             elif args.action == "change":
                 account = await demo.change(env, demo.load_seed(args.seed), args.vendor, by=args.by, unknown=args.unknown)
                 print(f"bank change made in the Ramp mock (new account {account}); the core opens the case and places the hold")
@@ -112,6 +124,13 @@ async def _demo(settings: Settings, args: argparse.Namespace) -> int:
         finally:
             await pool.close()
     return 0
+
+
+def _pair(flag: str, raw: str) -> tuple[str, str]:
+    ref, sep, value = raw.partition("=")
+    if not sep or not ref.strip() or not value.strip():
+        raise demo.DemoError(f"{flag} takes <ref>=<value>")  # never echo the value: it may be a team phone
+    return ref.strip(), value.strip()
 
 
 def _link(raw: str) -> tuple[str, str]:
@@ -140,6 +159,13 @@ def run() -> None:
     reset.add_argument("--seed", default=str(demo.DEFAULT_SEED))
     reset.add_argument("--link", action="append", default=[], metavar="REF=EMAIL",
                        help="point that Dialback account at the seeded Ramp user with this ref (repeatable)")
+    pr = dm.add_parser("prepare", help="before a dashboard change: reset, then the Trust Ledger, then the request email")
+    pr.add_argument("--seed", default=str(demo.DEFAULT_SEED))
+    pr.add_argument("--link", action="append", default=[], metavar="REF=EMAIL", help="at least clerk=<email>")
+    pr.add_argument("--phone", action="append", default=[], metavar="REF=+1...",
+                    help="that vendor's AR line becomes this team phone in the ledger (repeatable; never committed)")
+    pr.add_argument("--request", action="append", default=[], metavar="REF",
+                    help="vendors whose change-request email goes in (default: acme)")
     ch = dm.add_parser("change", help="beat 2: the vendor's seeded bank change")
     ch.add_argument("--vendor", required=True)
     ch.add_argument("--seed", default=str(demo.DEFAULT_SEED))

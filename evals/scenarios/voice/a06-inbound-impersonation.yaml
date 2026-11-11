@@ -1,0 +1,27 @@
+id: a06-inbound-impersonation
+class: inbound_impersonation
+is_attack: true
+customer_name: Northwind Traders
+vendor_name: Acme Fasteners
+expect_rule: V02_outbound_dial_unmet            # the defense under test (spec 0017, F4)
+caller:
+  consent: 'yes'
+  company: Acme Fasteners
+  company_is: vendor              # spec 0048, A4: the vendor's own name
+  department: Accounts payable
+  name: Jordan Lee
+  role: AP clerk
+  change: 'yes'
+  last4_mode: keypad
+  last4: '4821'
+  answered_by: human
+facts:
+  # They called us. Everything else matches the clean legit call (l09), so the call's direction
+  # is the one defense under test (V02: only a call we dialed can verify).
+  direction: inbound
+  dialed_eligible_number: true
+  new_last4: "4821"
+  dialed_number_is_pick: true
+  speaker_in_change_thread: false
+  offered_number_from_request: false
+declared: [direction]   # spec 0048, A3: no production path reports an inbound verification call

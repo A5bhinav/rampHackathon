@@ -1,37 +1,7 @@
-// The money path drawn as a rail, and the held-payments chart's day axis (spec 0032).
+// The hold gate and the held-payments chart's day axis (spec 0032). The stations moved to
+// lib/stations.ts (spec 0064).
 // Display only: these count and place what the core sends; nothing here decides anything.
-import type { CaseState, HoldStatus } from "./api-types";
-import { stationOf, type StageKey } from "./progress.ts";
-
-export type Station = { key: StageKey; label: string; meaning: string };
-
-/** The five stations every change passes through, each said in one plain line. */
-export const STATIONS: Station[] = [
-  { key: "hold", label: "Hold", meaning: "Payments to the vendor are frozen in Ramp" },
-  { key: "call", label: "Call", meaning: "Dialback calls a number it can prove is theirs" },
-  { key: "decision", label: "Decision", meaning: "Code checks the answers against the rules" },
-  { key: "person", label: "Sign-off", meaning: "A different person approves or blocks" },
-  { key: "release", label: "Release", meaning: "The hold lifts and saved dates come back" },
-];
-
-export type SignOffSplit = { needs_review: number; awaiting_release: number; blocked: number; other: number };
-export type StationCount = Station & { count: number; split?: SignOffSplit };
-
-/** How many changes sit at each station; released ones count at release. Sign-off is split
- *  by what it waits for. An unknown state counts at sign-off, like the case page shows it. */
-export function stationCounts(cases: readonly { state: CaseState }[]): StationCount[] {
-  const counts = [0, 0, 0, 0, 0];
-  const split: SignOffSplit = { needs_review: 0, awaiting_release: 0, blocked: 0, other: 0 };
-  const named = ["needs_review", "awaiting_release", "blocked"] as const;
-  for (const c of cases) {
-    const index = Math.min(stationOf(c.state).index, 4);
-    counts[index] += 1;
-    if (index !== 3) continue;
-    const key = named.find((k) => k === c.state);
-    split[key ?? "other"] += 1;  // a state the dashboard doesn't know still says it needs a person
-  }
-  return STATIONS.map((s, i) => ({ ...s, count: counts[i], ...(s.key === "person" ? { split } : {}) }));
-}
+import type { HoldStatus } from "./api-types";
 
 export type HoldGate = { kind: "held" | "lifted" | "placing" | "failed"; text: string };
 
@@ -85,3 +55,4 @@ export function place(date: string | null | undefined, w: DayWindow): { pct: num
   if (d > end) return { pct: 100, off: "after" };
   return { pct: Math.round(((d - start) / (end - start)) * 1000) / 10, off: null };
 }
+

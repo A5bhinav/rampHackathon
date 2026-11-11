@@ -146,6 +146,71 @@ paths:
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /api/datasets/{dataset_id}/vendor-accounts:
+    get:
+      operationId: listVendorAccounts
+      summary: Each vendor's current bank account, for the demo's Ramp (mock) portal (spec 0077)
+      description: |
+        Every vendor on the dataset with its current account as Dialback stores it (routing number
+        and last four only, ADR-8) and its open case, if any. `can_change` says whether the signed-in
+        person can send a bank change from the dashboard: only on the current demo dataset, against
+        the Ramp mock, for a person linked to a Ramp user. When it is false, `reason` is the core's
+        sentence for why.
+      parameters:
+        - $ref: '#/components/parameters/DatasetId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VendorAccounts' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/datasets/{dataset_id}/vendors/{vendor_id}/bank-change:
+    post:
+      operationId: changeVendorBankAccount
+      summary: A clerk changes a vendor's bank details in the Ramp mock, as their linked Ramp user (demo only, spec 0077)
+      description: |
+        Demo datasets only, with `DIALBACK_RAMP=mock`. The core forwards the change to the Ramp
+        mock as the signed-in person's linked Ramp user, then asks the mock to deliver its webhooks.
+        Dialback then detects the change the way it detects any change in Ramp, and the person who
+        sent it is the change's author, so they can't release it (R5). The full account number passes
+        through to the mock and is never stored, logged or returned (ADR-8). A refusal sends nothing
+        to Ramp. Only a clerk can send a change, and a dataset takes at most one change a minute (409),
+        so a shared demo account can't set off a run of holds and calls.
+      parameters:
+        - $ref: '#/components/parameters/DatasetId'
+        - name: vendor_id
+          in: path
+          required: true
+          schema: { $ref: '../schemas/evidence-event.schema.json#/$defs/Uuid' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BankChangeRequest' }
+            example: { routing_number: '026009593', account_number: '000123450001' }
+      responses:
+        '202':
+          description: Sent to Ramp; Dialback will detect it
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BankChangeResult' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/InvalidRequest' }
+        '502':
+          description: |
+            The Ramp mock refused the change, could not be reached, or did not confirm it. The message
+            says which: only a refusal or an unreachable mock means nothing was changed.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { code: upstream_unavailable, message: The Ramp mock could not be reached. Nothing was changed; try again. }
+
   /api/cases:
     get:
       operationId: listCases
@@ -850,6 +915,49 @@ components:
           oneOf: [{ type: string, pattern: '^\+[1-9][0-9]{1,14}$' }, { type: 'null' }]
         status_text: { type: string, description: "The ledger's sentence for the status." }
 
+    VendorAccount:
+      type: object
+      additionalProperties: false
+      required: [vendor_id, legal_name, account, open_case_id]
+      properties:
+        vendor_id: { $ref: '../schemas/evidence-event.schema.json#/$defs/Uuid' }
+        legal_name: { type: string }
+        account:
+          description: The vendor's current account as Dialback last saw it in Ramp, or null if none.
+          oneOf: [{ $ref: '#/components/schemas/AccountRef' }, { type: 'null' }]
+        open_case_id:
+          description: The vendor's unfinished case, if one is open.
+          oneOf: [{ $ref: '../schemas/evidence-event.schema.json#/$defs/Uuid' }, { type: 'null' }]
+
+    VendorAccounts:
+      type: object
+      additionalProperties: false
+      required: [vendors, can_change, reason]
+      properties:
+        vendors:
+          type: array
+          items: { $ref: '#/components/schemas/VendorAccount' }
+        can_change: { type: boolean, description: Whether the signed-in person can send a bank change from the dashboard here. }
+        reason:
+          description: When can_change is false, the core's sentence for why; otherwise null.
+          oneOf: [{ type: string }, { type: 'null' }]
+
+    BankChangeRequest:
+      type: object
+      additionalProperties: false
+      required: [routing_number, account_number]
+      properties:
+        routing_number: { type: string, maxLength: 64, description: Nine digits with a valid ABA checksum. }
+        account_number: { type: string, maxLength: 64, description: 4 to 17 digits. Forwarded to the Ramp mock; never stored, logged or returned. }
+
+    BankChangeResult:
+      type: object
+      additionalProperties: false
+      required: [vendor_id, account]
+      properties:
+        vendor_id: { $ref: '../schemas/evidence-event.schema.json#/$defs/Uuid' }
+        account: { $ref: '#/components/schemas/AccountRef' }
+
     Error:
       type: object
       additionalProperties: false
@@ -857,5 +965,5 @@ components:
       properties:
         code:
           type: string
-          enum: [unauthenticated, forbidden, not_found, version_conflict, transition_refused, invalid_request]
+          enum: [unauthenticated, forbidden, not_found, version_conflict, transition_refused, invalid_request, upstream_unavailable]
         message: { type: string }

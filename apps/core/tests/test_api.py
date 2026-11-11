@@ -16,7 +16,7 @@ from dialback_core.db import system_tx
 from dialback_core.detection import import_all
 from dialback_core.flags import ResolverMode
 from dialback_core.ports import LedgerResolver
-from flows import case_of, change_and_detect, report
+from flows import add_vendor, case_of, change_and_detect, report
 from psycopg.types.json import Jsonb
 
 pytestmark = pytest.mark.anyio
@@ -107,6 +107,24 @@ async def test_queue_detail_and_release(world):
     assert detail["permissions"]["reasons"] == ["This case is released; the hold is off and nothing is left to decide."]
     assert detail["timeline"][-1]["summary"] == "The hold was lifted in Ramp and 2 payment dates restored."
     assert detail["releases"][0]["actor"]["display_name"] == "Approver1"
+
+
+async def test_a_first_account_change_shows_no_previous_account(world):
+    """Spec 0050: a vendor paid by check gets its first bank account. The detail has no old
+    account, matches the contract, and the timeline reads as for any change."""
+    await add_vendor(world, "birch", "Birch Supply Co")
+    await import_all(world.pool, world.ramp, world.keys, world.dataset.id)
+    await world.bank_change(vendor_ref="birch")
+    await world.deliver_webhooks()
+    await world.worker.drain(world.dataset.id)
+    case = await case_of(world)
+    assert case is not None, "a known vendor's first account opens a case"
+
+    detail = await get(world, f"/api/cases/{case['id']}", "approver1", "/api/cases/{case_id}")
+    assert detail["change"]["old_account"] is None and detail["change"]["new_account"]["last4"] == "6666"
+    assert detail["timeline"][0]["summary"] == "A bank-detail change was detected for this vendor (via webhook)."
+    assert [e["type"] for e in detail["timeline"]] == ["change_detected", "hold_confirmed", "number_resolved", "call_started"]
+    assert detail["chain"]["ok"] and detail["entered_by"]["display_name"] == "Clerk"
 
 
 async def test_an_unknown_changer_needs_two_approvers(world):
@@ -287,6 +305,7 @@ RISK = "/api/datasets/{dataset_id}/vendor-risk"
 
 async def test_the_vendor_risk_list_reads_the_ledger(world):
     from dialback_ledger.ingest import ingest_all
+    from dialback_ledger.reader import StubReader
     from dialback_ledger.store import add_vendor_domain, write_ingest
     await import_all(world.pool, world.ramp, world.keys, world.dataset.id)
     truth = json.loads((Path(__file__).resolve().parents[3] / "corpus/truth/C01.json").read_text())
@@ -294,7 +313,8 @@ async def test_the_vendor_risk_list_reads_the_ledger(world):
     async with world.pool.connection() as conn, conn.transaction():
         vendor = (await (await conn.execute("select id from app.vendors where dataset_id = %s order by legal_name limit 1",
                                             (world.dataset.id,))).fetchone())["id"]
-        await write_ingest(conn, dataset_id=world.dataset.id, vendor_id=vendor, result=ingest_all(docs, extractor_version="t"))
+        result = ingest_all(docs, extractor_version="t", reader=StubReader())   # spec 0049, decision 8
+        await write_ingest(conn, dataset_id=world.dataset.id, vendor_id=vendor, result=result)
         await add_vendor_domain(conn, dataset_id=world.dataset.id, vendor_id=vendor, domain=truth["vendor"]["domain"])
     body = await get(world, f"/api/datasets/{world.dataset.id}/vendor-risk", "clerk", RISK)
     (row,) = body["vendors"]                      # only vendors the ledger has documents for

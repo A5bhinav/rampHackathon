@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
-import { BrandMark } from "@/components/nav";
+import { FrontDoor } from "@/components/front-door";
 import { core } from "@/lib/core";
 import { sessionToken } from "@/lib/session";
 import { caseFor, demoStory, newestDemo } from "@/lib/story";
@@ -14,17 +14,13 @@ export default async function DemoCase({ params }: { params: Promise<{ ref: stri
   const demo = newestDemo(await core.datasets());
   if (!demo) {
     return (
-      <main className="shell">
-        <div className="card signin">
-          <p className="brand"><BrandMark />Dialback</p>
-          <h1>No demo data yet</h1>
+      <FrontDoor title="No demo data yet">
           <p className="muted">
             {story.legal_name}&apos;s case lives on the demo dataset, and there isn&apos;t one right now. The team creates it
             with <span className="mono">dialback-core demo reset</span>.
           </p>
-          <p><Link href="/app">Open the dashboard</Link> or go back to <Link href="/">how Dialback works</Link>.</p>
-        </div>
-      </main>
+        <p className="front-links"><Link className="button-link primary" href="/app">Open the dashboard</Link> <Link className="button-link" href="/">How Dialback works</Link></p>
+      </FrontDoor>
     );
   }
   const found = caseFor(await core.allCases(demo.id), story.legal_name);

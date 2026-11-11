@@ -63,11 +63,19 @@ second owner (the partner) who reviews it.
 | Corpus: committed files match the generator, truth unchanged | `python3 corpus/generator/build.py --check` |
 | Call policy tests (script, tools, speech guard) | `cd packages/policy && uv run pytest` |
 | Voice service tests (text line, agent port, fail-closed) | `cd apps/voice && uv run pytest` |
+| Attack lab tests (the checks that must stay green; the gates run in their own jobs) | `cd evals && uv run pytest -q -m "not selection_gate and not report_gate"` |
+| Attack lab: run the voice scenarios (scripted callers, no spend) | `uv run lab run --split voice` |
+| Attack lab: re-freeze the voice scenarios' hashes and required outcomes after a reviewed change | `uv run lab freeze --split voice` |
+| Attack lab: re-run the frozen selection findings, then search every generated world (near misses in `evals/out/`) | `uv run lab fuzz --search archive --examples 2000 --seed 0 --out evals/corpus-generated` |
+| Attack lab: the known-limit frontier and the over-block sweep (measurement, not gates) | `uv run lab frontier`, `uv run lab overblock` |
+| Attack lab: re-run the frozen call-report findings, then check generated call reports | `uv run lab reports --examples 2000 --seed 0` |
+| Attack lab: remove each decision rule in turn; every one is seen or listed in `evals/UNREACHABLE.md` | `uv run lab sweep` |
 | Run the whole skeleton locally (Postgres, Ramp mock, core with worker; seeded demo dataset) | `uv run python scripts/dev/stack.py --changes` |
 | End-to-end smoke run (the demo-smoke CI job) | `uv run python scripts/dev/stack.py --smoke` |
 | Rehearse the demo beats (reset, change, release, tamper) on the local stack | `uv run python scripts/dev/demo_rehearsal.py` |
 | Demo commands (core shell) | `dialback-core demo reset [--link clerk=<email>]`, `demo change --vendor acme [--unknown]`, `demo tamper --yes-break-the-chain`, `demo status`, `demo chaos on\|off` |
 | Demo ledger (after `demo reset`; team phone given at run time, never committed) | `dialback-ledger demo load [--phone acme=+1...]`, then before each `demo change`: `dialback-ledger demo request --vendor acme` |
+| Get the demo ready for a clerk's change in the dashboard: reset, Trust Ledger, request email, in that order (spec 0077) | `dialback-core demo prepare --link clerk=<email> [--phone acme=+1...]`; hosted, with the team phone read from the voice allowlist: `scripts/demo/prepare_hosted.sh <clerk email>` |
 | Dashboard checks | `cd apps/web && pnpm check:api && pnpm typecheck && pnpm build` |
 | No imports between apps | `python3 scripts/ci/boundaries.py` |
 
