@@ -161,12 +161,18 @@ async def run_relay(ctx: policy.CallContext, agent: Agent, ws: WebSocketLike, *,
         for _ in range(max_steps):
             out = policy.step(state, event)
             state = out.state
+            spoken = True
             if out.say:
-                await _send(ws, out.say, greeting)
+                try:
+                    await _send(ws, out.say, greeting)
+                except Exception:                            # mid-call this propagates, as before
+                    if out.end is None:
+                        raise
+                    spoken = False                           # hung up at the closing line: still report (D7)
             if out.end is not None:
                 result = CallResult(end=out.end, answers=policy.answers_object(state),
                                     checks=policy.checks(state), transcript=state.turns)
-                closing = tuple(line for line in out.say or () if line != greeting)
+                closing = tuple(line for line in out.say or () if line != greeting) if spoken else ()
                 if closing:
                     inbox.arm(closing, 0.0, estimate)        # the estimate counts from the send (spec 0094, D2)
                 try:
@@ -339,8 +345,12 @@ class _Inbox:
             try:
                 msg = await self._receive(max(0.0, deadline - loop.time()))
             except Exception:  # noqa: BLE001  a dead socket: nothing more to send
+                log.info("closing line: the wait ended (dropped)")
                 return False
             if msg is _TIMED_OUT:
+                # Which ended it, for tuning from live calls (spec 0094, D8). No content, no number.
+                why = "agent_stopped" if self._stopped_at is not None and deadline < self._estimate_at else "estimate"
+                log.info("closing line: the wait ended (%s)", why)
                 return True
             if isinstance(msg, dict) and msg.get("type") == "info":
                 self._info(msg, loop.time())

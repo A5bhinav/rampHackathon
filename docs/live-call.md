@@ -233,8 +233,11 @@ The agent now ends the call itself, after its closing line has played. Written b
   - (a) a full call, which ends with "Thank you, that's everything I needed. Have a good day.";
   - (b) "No" at the consent question, which ends with "No problem, we won't continue. You can
     reach us at ... Goodbye."
-- **Pass:** each line is heard to the end, and the call ends within about 2 seconds after it.
-  Stay on the line and let the agent hang up.
+- **Record for each call:** the voice service's `closing line: the wait ended (...)` log line.
+- **Pass:** each line is heard to the end, and the agent ends the call itself. Stay on the line
+  and let it hang up. Expect the drop about half a second after the line if the log says
+  `agent_stopped`, and up to about 4 seconds after if it says `estimate` (Twilio sent no speaker
+  events). Neither is a failure.
 - **If a line is cut off,** or the call hangs open, report it: the timing changes, not the bar
   (spec 0094, Q160).
 

@@ -4,7 +4,7 @@
 
 ## Goal
 
-At the end of a call the agent says its closing line: "Thank you, that's everything I needed.",
+At the end of a call the agent says its closing line: "Thank you, that's everything I needed. Have a good day.",
 "Thanks for your time. Goodbye.", or the line after a refusal or a callback request. Today the
 caller rarely hears all of it.
 
@@ -48,7 +48,15 @@ After this change:
    report's error then propagates as it does today.
 6. **No closing line means no wait.** An End that spoke nothing (a dropped socket, say) returns
    at once, as today. So does a rejected setup: it is closed at once with nothing spoken.
-7. **The text line is unchanged.** `transport.run_call` has no audio.
+7. **A hang-up at the closing line still reports.** If sending the closing line fails, the caller
+   hung up as it went out. The result is reported through `on_end` as usual, with no wait and no
+   `end`. Before this, the send's error left the call unreported until the core's
+   `call_timeout`. A send that fails mid-call still propagates, as before. Added after the review.
+8. **One log line says what ended the wait.** `closing line: the wait ended (agent_stopped |
+   estimate | dropped)`, on logger `dialback_voice.twilio.relay`, with no content and no number. It
+   lets the first live calls tell a missing agentSpeaking (Q117) from a slow end. Added after the
+   review.
+9. **The text line is unchanged.** `transport.run_call` has no audio.
 
 ## Contract touched
 
@@ -72,16 +80,28 @@ None.
   with no closing line sends no `end` and doesn't wait.
 - [ ] G8. `docs/live-call.md` says the agent now finishes its closing line and hangs up itself,
   and carries the check below.
+- [ ] G9. If sending the closing line fails, the call is still reported, with no wait and no `end`
+  (D7).
+- [ ] G10. The wait logs one line naming what ended it: `agent_stopped`, `estimate` or `dropped`
+  (D8).
 
 ### Check for the first live calls (written before any call)
 
 - **Question:** do you hear the whole closing line before the line drops?
 - **Cases:**
-  - (a) a full call that ends with "Thank you, that's everything I needed.";
+  - (a) a full call that ends with "Thank you, that's everything I needed. Have a good day.";
   - (b) a refusal at consent, which ends with the "we won't continue" line.
-- **Pass:** both lines are heard to the end, and the call ends within about 2 s after.
-- **If it fails,** revisit `END_TAIL_SECONDS` or the estimate, not the bar. One call per case:
-  this is a smoke check.
+- **Record per call:** the `closing line: the wait ended (...)` log line.
+- **Pass:** both lines are heard to the end, and the agent ends the call itself, without the
+  caller hanging up.
+- **How long after the line to expect the drop:**
+  - about 0.5 s when the log says `agent_stopped`;
+  - up to about 4 s when it says `estimate`, which means Twilio sent no speaker events (Q117).
+
+  Neither is a failure. Clarified after the review: the first draft's "within about 2 s" would
+  fail on every call with no speaker events, without saying why.
+- **If a line is cut off,** revisit `END_TAIL_SECONDS` or the estimate, not the bar. One call per
+  case: this is a smoke check.
 
 ## Tests (written first)
 
@@ -93,6 +113,9 @@ None.
 | G5 | `apps/voice/tests/test_relay.py::test_a_drop_while_the_closing_line_plays_sends_no_end` |
 | G6 | `apps/voice/tests/test_relay.py::test_a_failed_report_still_plays_the_closing_line` |
 | G7 | `apps/voice/tests/test_relay.py::test_no_closing_line_or_a_rejected_setup_sends_no_end` |
+| G2, D2 | `apps/voice/tests/test_relay.py::test_a_slow_report_does_not_move_the_end` (fails if the estimate is armed after the report) |
+| G9 | `apps/voice/tests/test_relay.py::test_a_hang_up_at_the_closing_line_still_reports` |
+| G10 | `apps/voice/tests/test_relay.py::test_the_wait_logs_what_ended_it` |
 
 The test socket keeps the spoken `text` tokens in `sent`, as before, and any other message (the
 `end`) in `control`. The existing tests read only `sent`.

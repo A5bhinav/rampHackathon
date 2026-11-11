@@ -788,6 +788,52 @@ def test_the_closing_line_is_reported_then_played_then_ended(make_ctx, clock):  
     assert _about(ws.control_at[0] - ws.sent_at[-1], 0.4)
 
 
+def test_a_slow_report_does_not_move_the_end(make_ctx, clock):  # G2, D2 (review fix)
+    # The estimate counts from the send, not from when the report returns: a report that takes 1.0 s of a
+    # 1.2 s estimate still sees the end at about 1.2 s from the line (counting from the report would give
+    # 2.2 s, past the slack).
+    async def slow_report(result) -> None:
+        await asyncio.sleep(1.0)
+
+    _, ws = _closing_relay(make_ctx(), clock, [{"pause": 3.0}], on_end=slow_report, estimate=_estimate(lead=1.2))
+    assert ws.control == [{"type": "end"}] and _about(ws.control_at[0] - ws.sent_at[-1], 1.2)
+
+
+def test_a_hang_up_at_the_closing_line_still_reports(make_ctx, clock):  # G9 (review fix)
+    # The caller hangs up as the closing line goes out, so sending it fails. The call still reports
+    # (no wait for the core's call_timeout), and nothing more is sent.
+    class HungUp(FakeWS):
+        async def send_json(self, obj: dict) -> None:
+            if obj.get("token") == make_ctx().script.consent_refused():
+                raise WSClosed("the caller hung up")
+            await super().send_json(obj)
+
+    results: list = []
+
+    async def on_end(result) -> None:
+        results.append(result)
+
+    ctx = make_ctx()
+    ws = HungUp([_good_setup(), REFUSE, {"pause": LONG}])
+    r = asyncio.run(run_relay(ctx, ScriptedAgent(), ws, verify=_verify, clock=clock(), greeting=ctx.script.disclosure(),
+                              on_end=on_end, estimate=_estimate(lead=5.0)))
+    assert results == [r] and r.result == "answers_recorded" and r.end.reason == "consent_refused"
+    assert ws.control == []
+
+
+@pytest.mark.parametrize(("inbound", "lead", "why"), [
+    ([{"pause": 0.05}, _info("agentSpeaking", "on"), {"pause": 0.05}, _info("agentSpeaking", "off"), {"pause": 5.0}],
+     3.0, "agent_stopped"),                                  # the "off" plus the tail comes before the estimate
+    ([{"pause": LONG}], 0.4, "estimate"),
+    ([], 3.0, "dropped"),
+])
+def test_the_wait_logs_what_ended_it(inbound, lead, why, make_ctx, clock, caplog):  # G10 (review fix)
+    caplog.set_level("INFO", logger="dialback_voice.twilio.relay")
+    _closing_relay(make_ctx(), clock, inbound, estimate=_estimate(lead=lead))
+    lines = [rec.getMessage() for rec in caplog.records if rec.name == "dialback_voice.twilio.relay"]
+    assert f"closing line: the wait ended ({why})" in lines
+
+
 def test_end_follows_the_agent_stopping_or_the_estimate(make_ctx, clock):  # G3
     on, off = _info("agentSpeaking", "on"), _info("agentSpeaking", "off")
     # With an "on" then an "off" after the line, the end follows the "off" by the tail, long before
