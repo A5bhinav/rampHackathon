@@ -145,6 +145,7 @@
     {"check": "G7", "phrasing": "verify_with_bank", "placement": "table_row", "finding": "A1", "owner": "Inesh"}
   ],
   "lab-pdf": [
-    {"case": "glyph-swap", "labels": ["text_layer_disagrees_with_glyphs"], "finding": "H1", "owner": "Sami"}
+    {"case": "glyph-swap", "labels": ["text_layer_disagrees_with_glyphs"], "finding": "H1", "owner": "Sami"},
+    {"case": "digit-patch", "labels": ["a_patch_changes_a_digit"], "finding": "H2", "owner": "Sami"}
   ]
 }

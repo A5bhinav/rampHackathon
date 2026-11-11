@@ -10,7 +10,7 @@ import numpy as np
 import pypdfium2 as pdfium
 import pytest
 from dialback_evals import known
-from dialback_evals.pdfrender import FONT_PATH, render_pdf
+from dialback_evals.pdfrender import FONT_PATH, render_pdf, text_width
 from dialback_ledger.candidates import find_phones
 from dialback_ledger.pdf import read_pdf
 from dialback_ledger.text import lines
@@ -54,7 +54,7 @@ def _failing(data: bytes, seen: str) -> dict[str, set[str]]:
 
 def test_glyph_swap(swapped_font):
     failing = _failing(render_pdf(_doc(TEXT_LAYER), font_path=swapped_font), WHAT_A_PERSON_SEES)
-    entries = known.for_job(KNOWN, "lab-pdf")
+    entries = [e for e in known.for_job(KNOWN, "lab-pdf") if e.case == "glyph-swap"]
     assert known.judge(entries, failing).problems == []
     assert known.missing_findings(entries, FINDINGS.read_text(encoding="utf-8")) == []
 
@@ -78,5 +78,37 @@ def test_glyph_swap_plant_really_swaps(swapped_font):
 
 def test_the_list_goes_red_once_the_swap_is_caught():
     # Part B's pixel check will stop this failing; the strict list then says to take it off.
-    verdict = known.judge(known.for_job(KNOWN, "lab-pdf"), {})
+    entries = [e for e in known.for_job(KNOWN, "lab-pdf") if e.case == "glyph-swap"]
+    verdict = known.judge(entries, {})
     assert verdict.red and "take it off the list" in verdict.problems[0]
+
+
+# A patch inside a digit: the same family. White rectangles over the left side of an 8, between its bars, leave a
+# 3. The digit still has ink across its rows and columns, so the ink rule passes it; only reading the pixels can tell.
+HEAD = "AR direct: (415) 555-018"
+PATCHED = "+14155550183"
+
+
+def _patched(with_patches: bool) -> dict:
+    doc = _doc(HEAD + "8")
+    x = 72 + text_width(HEAD, 10)
+    if with_patches:
+        doc["pages"][0]["after"] = [{"rect": [x, 101.3, x + 2.9, 103.2], "color": "#ffffff"},
+                                    {"rect": [x, 104.6, x + 2.9, 106.6], "color": "#ffffff"}]
+    return doc
+
+
+def test_digit_patch():
+    failing = {}
+    found = find_phones(lines({"pages": read_pdf(render_pdf(_patched(True)))}))
+    if [c for c in found if c.visibility == "visible" and c.e164 != PATCHED]:
+        failing = {"digit-patch": {"a_patch_changes_a_digit"}}
+    entries = [e for e in known.for_job(KNOWN, "lab-pdf") if e.case == "digit-patch"]
+    assert len(entries) == 1 and known.judge(entries, failing).problems == []
+    assert known.missing_findings(entries, FINDINGS.read_text(encoding="utf-8")) == []
+
+
+def test_digit_patch_really_changes_the_digit():
+    def picture(doc: dict) -> np.ndarray:
+        return np.asarray(pdfium.PdfDocument(render_pdf(doc))[0].render(scale=3).to_numpy()).astype(int)
+    assert np.abs(picture(_patched(True)) - picture(_patched(False))).max() > 200

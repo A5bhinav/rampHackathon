@@ -13,8 +13,8 @@ Optional span fields, read only here, plant what a page model can't say:
 - Test plants for the reader's own tests: `under` (a filled rectangle of that colour drawn first, over the
   span's box), `color_space` (`gray`, `cmyk` or `separation`) with `color_value`, `hscale` (percent, the
   `Tz` operator) and `rotate` (degrees, in the text matrix). Page keys: `crop` (`[x0, top, x1, bottom]`,
-  from the top-left), `rotate` (the page's `/Rotate`), `annotations` (`text`, `link`, `freetext`) and
-  `form_field` (an AcroForm text field).
+  from the top-left), `rotate` (the page's `/Rotate`), `annotations` (`text`, `link`, `freetext`),
+  `form_field` (an AcroForm text field) and `after` (filled rectangles drawn over the text).
 
 The font is reportlab's bundled Bitstream Vera, whose license allows changes under another name (D10's
 glyph swap). A character it can't draw fails the render.
@@ -163,6 +163,10 @@ def _span(c: canvas.Canvas, span: dict, height: float, font: tuple[str, TTFont],
 
 
 def _page_extras(c: canvas.Canvas, page: dict, width: float, height: float, where: str) -> None:
+    for shape in page.get("after") or []:          # filled rectangles drawn over the text, from the top-left
+        x0, top, x1, bottom = (float(v) for v in shape["rect"])
+        c.setFillColorRGB(*_rgb(shape["color"], where))
+        c.rect(x0, height - bottom, x1 - x0, bottom - top, stroke=0, fill=1)
     if page.get("crop") is not None:
         x0, top, x1, bottom = (float(v) for v in page["crop"])
         c.setCropBox((x0, height - bottom, x1, height - top))
