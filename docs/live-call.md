@@ -217,14 +217,16 @@ finished") are educated guesses. The first calls test them. This check was writt
     redialed later while the case has attempts left, so the team phone may ring again.
   - (d) Pick up and say nothing. Expect the label `unknown` and the disclosure after about 2.5
     seconds. Then answer as usual and type the digits: the call should still verify (spec 0080,
-    Parts B and C). Also try once saying "Hello?" at about 3 seconds, and note whether it overlaps
-    the disclosure.
+    Parts B and C). Once, also say "Hello?" at about 3 seconds. It will land on the disclosure;
+    note whether you still heard all of it ("AI" and "recorded line" included).
 - **Record for each call:**
   - the `AnsweredBy` and `MachineDetectionDuration` values from the log line;
   - whether the account is a trial account. On a trial account, say your greeting only after
     pressing the key;
   - whether the disclosure started while you were still talking (yes or no).
-- **Pass:** (a) and (b) are labeled `human`, and the disclosure did not start over them.
+- **Pass:** (a) and (b) are labeled `human`, and the disclosure did not start over them. (d) is
+  labeled `unknown`, the whole disclosure is heard, and the call verifies. Report it if the
+  "Hello?" at 3 seconds kept you from hearing the whole disclosure.
 - **If (a) or (b) comes back `machine_start` or `unknown`, or the disclosure talked over you,**
   report it: the settings change, not the pass bar. One exception: on a trial account, retry an
   `unknown` once first, since the trial message may confuse detection.
