@@ -48,7 +48,7 @@ seen, by source" chart, and the vendor's documents with the exact text each numb
   were first seen in one document it is the one that shows. Limits: an email from outside the
   vendor's domains still dates the email dot (the rule doesn't count it); a vendor with more than
   500 documents gets no per-source dates (the oldest may be the missing ones), so its chart draws
-  first-seen dates, as the case page does (Q224).
+  first-seen dates, as the case page does (Q224), under a caption that then claims per-source dates.
 
 ## Acceptance
 
@@ -108,8 +108,10 @@ counts as change context or doesn't count; paging past 500 documents.
 - **Q224:** The case lineage page draws the same chart with the same caption, which is false there
   too: the selection has no per-source dates, so each number's dots sit at its overall first-seen
   date. Either change that page's caption to say what it shows, or add per-source first-seen dates
-  to the selection contract (`Candidate`) first, then draw them. Not chosen here; the case page's
-  dots stay where they were (only the draw order changed, D7) until this is answered.
+  to the selection contract (`Candidate`) first, then draw them. **Answered (Sami, Nov 11: "Yes,
+  fix the caption"):** the caption is fixed on main now (#166: "Each dot is when the number was
+  first seen, repeated in every source it appeared in, not that source's own date"); per-source
+  dates on the case page are deferred. Its dots stay where they were (only the draw order changed, D7).
 
 ## Commands
 
