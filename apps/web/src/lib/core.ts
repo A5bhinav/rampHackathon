@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { sessionToken } from "./session";
 import type {
   ActionResult, AdminLog, Alert, ApiError, BankChangeResult, CaseDetail, CaseState, CaseSummary, ChainStatus, Dataset, DemoState,
-  EvidenceLog, MailItem, Me, PersonAdminView, Role, SelectionView, VendorAccounts, VendorRisk,
+  EvidenceLog, MailItem, Me, PersonAdminView, Role, SelectionView, VendorAccounts, VendorLedger, VendorRisk,
 } from "./api-types";
 import { ACCESS_OFF } from "./people";
 
@@ -47,6 +47,9 @@ export const core = {
   alerts: (datasetId: string) => call<{ alerts: Alert[] }>(`/api/datasets/${datasetId}/alerts`).then((r) => r.alerts),
   vendorRisk: (datasetId: string) =>
     call<{ vendors: VendorRisk[] }>(`/api/datasets/${datasetId}/vendor-risk`).then((r) => r.vendors),
+  /** One vendor's history in the Trust Ledger, as of now (spec 0104). Phone numbers only. */
+  vendorLedger: (datasetId: string, vendorId: string) =>
+    call<VendorLedger>(`/api/datasets/${encodeURIComponent(datasetId)}/vendors/${encodeURIComponent(vendorId)}/ledger`),
   cases: (datasetId: string) =>
     call<{ cases: CaseSummary[] }>(`/api/cases?dataset_id=${encodeURIComponent(datasetId)}`).then((r) => r.cases),
   /** Every case on the dataset, released ones included (the demo links, spec 0033). */

@@ -3,9 +3,11 @@
 import type { Candidate, Selection } from "./api-types";
 
 export type Split = { pick: Candidate | null; alternates: Candidate[]; refused: Candidate[] };
+/** What the chart and table need from a rule run: a stored selection, or the rule as of now (spec 0104). */
+export type RuleRun = Pick<Selection, "candidates" | "cutoff" | "rule_settings" | "outcome" | "contact_point_id" | "alternates">;
 
 /** The pick, then its alternates in rank order, then every number the rule refused. */
-export function split(selection: Selection): Split {
+export function split(selection: RuleRun): Split {
   const ranked = selection.candidates.filter((c) => c.eligible).sort((a, b) => (a.rank ?? 0) - (b.rank ?? 0));
   const alternateIds = new Set((selection.alternates ?? []).map((a) => a.contact_point_id));
   const pick = selection.outcome === "picked"
@@ -26,13 +28,13 @@ export function phone(e164: string): string {
 const DAY_MS = 86_400_000;
 
 /** How long before the cutoff a number was first seen, in the largest whole unit. */
-export function seenBefore(firstSeen: string, cutoff: string): string {
+export function seenBefore(firstSeen: string, cutoff: string, what = "the request"): string {
   const ms = Date.parse(cutoff) - Date.parse(firstSeen);
   const days = Math.floor(ms / DAY_MS);
-  if (ms < 0) return "after the request";
-  if (days < 1) return "with the request";
+  if (ms < 0) return `after ${what}`;
+  if (days < 1) return `with ${what}`;
   const [n, unit] = days >= 365 ? [Math.floor(days / 365), "year"] : days >= 60 ? [Math.floor(days / 30), "month"] : [days, "day"];
-  return `${n} ${unit}${n === 1 ? "" : "s"} before the request`;
+  return `${n} ${unit}${n === 1 ? "" : "s"} before ${what}`;
 }
 
 const SOURCES: Record<string, string> = {
@@ -61,7 +63,7 @@ export type LaneChart = {
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-export function lanePoints(selection: Selection | null): LaneChart | null {
+export function lanePoints(selection: RuleRun | null): LaneChart | null {
   if (!selection || selection.candidates.length === 0) return null;
   const pickId = split(selection).pick?.contact_point_id;
   const cutoff = Date.parse(selection.cutoff);
