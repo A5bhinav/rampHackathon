@@ -253,7 +253,22 @@ silently then hears the disclosure after about 2.5 seconds instead of 5.
   would send more good calls to review, so it waits.
 - **Risk:** someone who waits about 2.5 seconds and then says "Hello?" may overlap the first words
   of the disclosure. Check case (d) and the talk-over question cover this.
-- It gets its own small PR.
+- It gets its own small PR, stacked on Part B's and merged after it.
+
+#### Acceptance, Part C
+
+- [ ] C1. The dial request sends `MachineDetectionSilenceTimeout=2500`. The other detection
+  settings are unchanged (A1), and the constant's comment says why.
+- [ ] C2. `docs/live-call.md`: picking up in silence now gets the disclosure after about 2.5
+  seconds, and the check gains case (d), pick up and say nothing. Pass: the label is `unknown`,
+  the disclosure doesn't start over a "Hello?" said at about 3 seconds, and the call can still
+  verify with typed digits.
+
+#### Tests, Part C
+
+| Acceptance item | Test |
+|---|---|
+| C1 | `apps/voice/tests/test_origination.py::test_dial_request_carries_the_detection_settings` (its 5000 becomes 2500, on purpose) |
 
 ## Considered and rejected
 

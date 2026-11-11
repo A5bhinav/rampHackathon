@@ -131,9 +131,9 @@ report of the call reaches the core first.
   payable, this is Jane, how can I help you?". Then stay quiet: after about 1.2 seconds of quiet,
   detection decides and the disclosure starts a moment later. Talking for more than 4.5 seconds is
   labeled a machine.
-- **Say something.** If you pick up and wait in silence, detection gives up after about 5 seconds
-  with the label `unknown`, and only then does the disclosure start. The call can still verify,
-  since the digits go in on the keypad.
+- **Say something.** If you pick up and wait in silence, detection gives up after about 2.5
+  seconds with the label `unknown`, and only then does the disclosure start (spec 0080, Part C).
+  The call can still verify, since the digits go in on the keypad.
 - **On a trial account,** Twilio first plays its trial message and waits for a key. Press any key,
   then answer.
 
@@ -215,6 +215,10 @@ finished") are educated guesses. The first calls test them. This check was writt
   - (c) The phone's voicemail greeting (let the call go to voicemail). For information only:
     either label is fine. Run it last, then reset (section 3): a call that reaches voicemail is
     redialed later while the case has attempts left, so the team phone may ring again.
+  - (d) Pick up and say nothing. Expect the label `unknown` and the disclosure after about 2.5
+    seconds. Then answer as usual and type the digits: the call should still verify (spec 0080,
+    Parts B and C). Also try once saying "Hello?" at about 3 seconds, and note whether it overlaps
+    the disclosure.
 - **Record for each call:**
   - the `AnsweredBy` and `MachineDetectionDuration` values from the log line;
   - whether the account is a trial account. On a trial account, say your greeting only after
