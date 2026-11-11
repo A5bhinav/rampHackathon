@@ -106,10 +106,10 @@ async def _verified_twilio_params(twilio: TwilioDeps, request: Request) -> dict[
     return dict(pairs) if request.method == "POST" else dict(request.query_params)
 
 
-def _report_body(result: CallResult, call_id: UUID, dial: CallDial) -> dict[str, Any]:
+def report_body(result: CallResult, call_id: UUID, dial: CallDial) -> dict[str, Any]:
     """The CallEndedRequest body for a call that ran over the WebSocket (internal.yaml). Answers ride
     along only when the call recorded them; retry_at only when the result carries one (a requested
-    callback, or a dropped call to redial)."""
+    callback, or a dropped call to redial). Public so the attack lab chains it (spec 0048, A1)."""
     body: dict[str, Any] = {"call_id": str(call_id), "case_id": str(dial.case_id),
                             "result": result.result, "attempt": dial.attempt}
     _with_pick(body, dial.contact_point_id)
@@ -129,11 +129,12 @@ def _answered_by(detected: str) -> str | None:
     return None  # unknown or absent: nothing is claimed, so decide() can't count a live person (V03)
 
 
-def _with_connect_facts(body: dict[str, Any], setup: dict[str, Any], result: CallResult) -> None:
+def with_connect_facts(body: dict[str, Any], setup: dict[str, Any], result: CallResult) -> None:
     """The facts decide() reads, from code (spec 0030). The setup passed verify_setup, which checks the
     one-time token and that Twilio dialed the pick, so dialed_number_is_pick is that check's result.
     The direction is Twilio's own; answered_by is the machine detection our TwiML carried; the checks
-    are the policy's, computed from the transcript, never by the model."""
+    are the policy's, computed from the transcript, never by the model. Public so the attack lab
+    chains it (spec 0048, A1)."""
     body["dialed_number_is_pick"] = True
     direction = str(setup.get("direction") or "")
     if direction.startswith("outbound"):
@@ -222,9 +223,9 @@ async def run_relay_call(twilio: TwilioDeps, call_id: UUID, ws: Any) -> None:
 
     result = await run_relay(ctx, twilio.agent_for(), ws, verify=verify, clock=twilio.clock,
                              greeting=ctx.script.disclosure())  # welcomeGreeting spoke it; don't repeat (R8)
-    body = _report_body(result, call_id, dial)
+    body = report_body(result, call_id, dial)
     if verified:  # only a socket we placed and verified vouches for these (spec 0030; V02, V03, V10, V11)
-        _with_connect_facts(body, verified, result)
+        with_connect_facts(body, verified, result)
     await twilio.report_ended(body)
 
 

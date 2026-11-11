@@ -11,7 +11,7 @@ V = [r.id for r in rules.VERIFIED]
 
 def test_verified_passes_every_condition():
     items, note = checklist("verified", V, ENGINE_VERSION)
-    assert [i["status"] for i in items] == ["passed"] * 12 and [i["id"] for i in items] == V
+    assert [i["status"] for i in items] == ["passed"] * 11 and [i["id"] for i in items] == V
     assert note.startswith("Every condition")
 
 
@@ -19,7 +19,7 @@ def test_unmet_conditions_are_exactly_the_ones_recorded():
     items, _ = checklist("needs_review", [rules.NOT_MET, "V08_digits_match_unmet", "V12_no_flags_unmet"], ENGINE_VERSION)
     status = {i["id"]: i["status"] for i in items}
     assert [k for k, v in status.items() if v == "not_met"] == ["V08_digits_match", "V12_no_flags"]
-    assert sum(v == "passed" for v in status.values()) == 10
+    assert sum(v == "passed" for v in status.values()) == 9, "11 conditions since V05 was retired (spec 0082, D7b)"
     v08 = next(i for i in items if i["id"] == "V08_digits_match")
     assert v08["sentence"] == "The person did not give matching digits for the new account."
 
@@ -50,6 +50,14 @@ def test_fired_rules_name_their_block():
                                        "NR02_no_recording_consent", "V01_number_eligible", "V02_live_person", "made_up"])] \
         == ["not_met", "not_met", "needs_review", "not_verified", "input", "verified", "retired", "retired"]
     assert fired(["made_up"])[0]["sentence"] == "made_up"
+
+
+def test_a_retired_company_condition_still_renders():
+    # A decision-1.0.0 decision recorded V05; spec 0082 D7b retired it, and it still renders with its sentence.
+    rows = fired(["V05_company_matches", "V05_company_matches_unmet"])
+    assert [r["block"] for r in rows] == ["retired", "retired"]
+    assert [r["sentence"] for r in rows] == ["The person named this vendor.",
+                                             "The person did not clearly name this vendor."]
 
 
 def test_effects_say_what_happens_to_the_hold():

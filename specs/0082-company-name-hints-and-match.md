@@ -97,27 +97,6 @@ say (Part B), and keeps the clear-mismatch signal.
 
 ### Part B (`apps/core`, Abhi's code; Sami builds, Abhi reviews): accept the short name
 
-**Status (Nov 10, after the code review): on hold, not landing.** The implementation on
-`sami/company-name-matcher` does exactly what D6 says. But the reviewer showed that D6 accepts
-clearly different companies well beyond D9's accepted costs. All of these were `False` before and
-`True` after:
-
-| Kind | Said | Vendor |
-|---|---|---|
-| first two words, even common ones | "This is Globex on Main Street" | Main Street Supply LLC |
-| | "This is the United States Postal Service" | United States Steel Corp |
-| ordinary sentence words | "This is Globex" | This Old House LLC |
-| | "Hello, Globex speaking" | Hello Fresh LLC |
-| | "Thanks for calling Globex" | Calling Cards Inc |
-| a person's name | "Globex, this is Mike Johnson" | Johnson Controls Inc |
-| digits and letters | "Globex, established 2020" | 2020 Office Supply LLC |
-| | "This is Globex, we are a B Corp" | A & B Supply |
-
-The guard's variant list was built to catch the agent saying the vendor's name, where matching too
-much is safe. It is not a judge of what a caller says. This is the second loosening of the
-matcher to fail review on whole-sentence answers; the first was the draft's one-letter and
-first-word rule (D8). So no third rule is attempted here. Q137 asks for a decision instead.
-
 5. **The input is a sentence.** The matcher reads the caller's whole turn, so any loosening applies
    to every word of it. That rules out fuzzy word matching (D8).
 6. **One more way to match.** An answer is `True` if:
@@ -139,6 +118,99 @@ first-word rule (D8). So no third rule is attempted here. Q137 asks for a decisi
 7. **`False` and `None` are as today.** Anything not `True` under D6 keeps today's result: `False`
    when the answer has readable words, and `None` when it has none. The several-answers rule is
    unchanged (any `False` gives `False`; otherwise any `None` gives `None`; otherwise `True`).
+
+   **7a. Refusal words override a match** (amendment, Sami, Nov 10). An answer that says the person
+   is not with the vendor, or only works with it, is `False` (NR03) even when the vendor's name is in
+   it. It keeps the "clearly a different company" signal the Goal wants. Its cost to honest answers
+   was small for the first list; the extension below raises it, since everyday contractions now count
+   ("Sorry, I didn't catch that, this is Acme" goes to review).
+   - **The words,** read as whole words the way the guard reads text: `not`, `isn` (from "isn't"),
+     `aren`, `wasn`, `weren`, `never`, `former`, `formerly`, `until`, `reseller`, `resellers`,
+     `resell`, `resells`, `distribute`, `distributes`, `distributor`, `behalf`.
+   - **The phrases,** as runs of whole words: "used to" and "I mean".
+   - **Never these:** bare "no" and "sorry". Honest answers start with them ("No problem, this is
+     Acme", "Sorry, Acme Fasteners").
+   - **A word in the vendor's own name doesn't count** ("Never Summer Industries" answering "Never
+     Summer").
+   - **What it catches:** "Not Acme, this is Globex", "This isn't Acme", "We're a reseller for
+     Acme", "We distribute for Acme", "I used to work at Acme", "I was at Acme until last year",
+     "Acme, sorry, I mean Globex".
+   - **What it doesn't:** a correction with no such word ("Acme? No, Globex"), and another company
+     whose name contains the vendor's ("Acme Fasteners Supply Co"). Both stay accepted costs (D9).
+   - **Its cost:** an honest answer that happens to use one of these words goes to review ("Not
+     sure, I think this is Acme"). That is the safe direction (R7).
+   - **The list is exploratory.** It was chosen after reading the lab's phrase bank (spec 0048), so
+     its effect there proves nothing, and D10's run on that same bank is exploratory too.
+     Confirming it needs fresh data: real calls, or phrases written by someone who hasn't seen the
+     list.
+   - **Extended (Sami, Nov 10, after the code review listed refusals the list missed):**
+     - **Words:** `doesn` and `didn` (from "doesn't", "didn't"), and the spellings speech-to-text
+       may write with no apostrophe: `isnt`, `arent`, `wasnt`, `werent`, `dont`, `doesnt`, `didnt`.
+     - **Phrases:** "don t" (from "don't"), "no longer", "wrong number", "different company".
+       "Don't" is a phrase and not the word `don`, because "Don" is a first name ("Hi, this is Don
+       at Acme" must not flag).
+     - **Then, after the extension's review (Sami, Nov 10):**
+       - words `hasn` and `hadn` (from "hasn't", "hadn't");
+       - the no-apostrophe spellings `aint`, `havent`, `hasnt`, `hadnt`;
+       - the phrases "ain t" and "haven t" (from "ain't", "haven't"). These are phrases for the same
+         reason as "don t": "Haven" is a first name and part of place names ("New Haven"), and "Ain"
+         is a first name.
+     - **Not added:** an outsourced AP firm ("We handle AP for Acme"). Its words ("handle", "for") are
+       everyday words, so flagging them would send honest answers to review.
+     - **Not measured.** The lab's phrase bank has none of these phrases, so only unit tests pin
+       them (B11). Their cost on real answers is unknown until real calls.
+
+   **7b. The decision (Sami, Nov 10): the company answer no longer has to match** (amendment). D7a
+   stands as written. Where D7, D8, B2 to B5, "Contract touched", "Considered and rejected" or "Out
+   of scope" say otherwise, this wins.
+   1. **The company answer is no longer required to verify.** `V05_company_matches` is retired: it
+      leaves `rules.VERIFIED`, and `V05_company_matches` and `V05_company_matches_unmet` keep their
+      sentences in `engine.RETIRED`, so old decisions still render. A short ("Acme"), garbled
+      ("acne") or missing answer does not block.
+   2. **`NR03_wrong_company` keeps its id and its predicate** (`company_matches is False`), but now
+      fires only for an answer with a refusal word or phrase (D7a). Its sentence becomes "The
+      company answer did not name this vendor, or said the person is not with it or only works with
+      it." That is true under both meanings NR03 has had, so a `decision-1.0.0` decision that
+      recorded NR03 for a plain mismatch doesn't read as the vendor denying it (review fix).
+      `SLOT_RULES["company_named"]` becomes `("NR03_wrong_company",)`.
+   3. **The matcher** (`company.py`): an answer with readable words that neither matches nor holds a
+      refusal word is `None`, not `False`. `every_name_matches` keeps its rule (any `False` gives
+      `False`; otherwise any `None` gives `None`; otherwise `True`).
+   4. **`ENGINE_VERSION` becomes `decision-1.1.0`.** A decision recorded by `decision-1.0.0` shows
+      its checklist as "not checked", with a note. An old decision that recorded NR03 renders with
+      the new sentence, which point 2 keeps true for it.
+
+   | Answer | `company_matches` | Engine |
+   |---|---|---|
+   | names the vendor, with no refusal word | `True` | nothing fires |
+   | holds a refusal word or phrase ("Not Acme, this is Globex", "We're a reseller for Acme") | `False` | NR03, needs review |
+   | anything else: another company ("This is Globex"), a garbled name ("acne"), nonsense, no readable words, no answer | `None` | nothing fires |
+
+   - **"This is Globex" passes.** Code can't tell another company's name from a garbled vendor
+     name. The person who releases sees the answer on the call record.
+   - **Why.** Requiring a match sent honest calls to review ("acne" on the first real call), and the
+     Goal shows it gives no protection against a fraudster on the line, who knows the vendor's
+     name. The signal kept, a person saying they are not with the vendor, stays as NR03.
+   - **What it gives up.** A clearly different company named with no refusal word, on a call that
+     otherwise passes, is no longer flagged; only the releaser sees it. Conflicting companies across
+     answers are not flagged either (D9).
+   - **R7 (unclear answers fail closed).** The company answer is now not required, like the
+     department answer, whose slot has no rule. So an unclear company answer is no longer a reason to
+     keep the hold. The cost, measured in the lab (exploratory):
+     - **A29:** a call whose free-text answers are all nonsense, but whose keypad digits match the
+       new account, now verifies. The company answer was the only check that read such a call;
+       V06 and grounding accept any words the caller said (A24).
+     - **A28:** a look-alike company name ("Acme Fastners LLC") verifies, through D6.
+     - Both still need the new account's last four typed on the keypad (V08), and a person to
+       release (R5) who sees the answers.
+   - **How D7a reads the vendor's own words.** A refusal word that is also a word of one of the
+     vendor's names is ignored anywhere in the answer, not only where the name is said. So for
+     "Never Summer Industries", "We never worked with Never Summer" is `True`. A refusal phrase is
+     ignored only when both its words are in the vendor's names. And the refusal check reads the
+     answer as the guard does (NFKC), so a fullwidth "Not Acme" is `False` too (review fix).
+   - **The rule table changes, the contract doesn't.** `company_matches` stays `bool | None`, and
+     `rules_fired` is still a list of ids.
+   - **Q137 is answered:** decided: demote, with NR03 kept for refusal words; Sami, Nov 10.
 8. **No fuzzy matching.** A one-letter slip rule was drafted and dropped after the builder check:
    - On sentences it accepts "help" for "Yelp", "this" for "Thin Air", and "Bell" for "Dell".
    - Phonetic codes disagree with each other: Soundex gives "acme" and "acne" the same code,
@@ -148,9 +220,9 @@ first-word rule (D8). So no third rule is attempted here. Q137 asks for a decisi
 9. **Accepted costs.**
    - A different company that shares a distinctive first word passes ("Acme Bolts" for "Acme
      Fasteners").
-   - A negated or corrected short name passes ("Not Acme, this is Globex"). Today the same already
-     happens with the full name ("Not Acme Fasteners, this is Globex"). The lab has measured this
-     class of answer: `evals/FINDINGS.md` A8 and A10 on `sami/attack-lab-generative`.
+   - A correction with no refusal word passes ("Acme? No, Globex"), as it does today with the full
+     name. Negations, resellers and past connections no longer pass (D7a). The lab has measured
+     these classes of answer: `evals/FINDINGS.md` A8 and A10 on `sami/attack-lab-generative`.
    - Conflicting companies across answers are not flagged, because NR18 leaves companies to NR03
      and both answers match.
    - The digits must still match in every case.
@@ -159,15 +231,27 @@ first-word rule (D8). So no third rule is attempted here. Q137 asks for a decisi
     Part B, report both numbers:
     - over-blocking, the share of answers that name the vendor but are not `True` (18.3%, 533 of
       2,920, in A10);
-    - other-company acceptance, the answers naming someone else that come out `True`.
+    - other-company acceptance, the answers naming someone else that come out `True`;
+    - for D7a, the answers each refusal word turns to `False`, per phrase class.
 
     The expectation is that over-blocking falls and other-company acceptance rises. That is the
     accepted cost in D9. Neither number gates the merge; both go to Abhi with Q137.
+    - **When D7a lands,** the lab's known-failures entries for negation, reseller and past
+      connection should start passing and must come off (spec 0048, D3). Correction and "contains
+      the vendor's name" stay listed.
+    - **Under D7b** (amendment, Nov 10, **added after the run**, so not a pre-registered metric),
+      only `False` blocks, so over-blocking counts the answers that name the vendor but come out
+      `False`; those that come out `None` are reported apart, since they block nothing. The run
+      reports both: under the original definition above ("not `True`"), 533 of 2,920 before and
+      332 of 2,920 (11.4%, all typos, which are unknown) after; under this one, 0 after. The lab's F3 then gates only negation, reseller and past connection, so the
+      correction and "contains the vendor's name" entries come off too (`evals/FINDINGS.md` C14).
 
 ### Considered and rejected
 
 - **Demote the check entirely.** It loses the "clearly different company, right digits" signal,
   which costs nothing to keep.
+  - D7b demotes it after all, keeping NR03 for refusal words; the plain "different company"
+    signal is given up.
 - **One-letter slips, and phonetic matching.** See D8.
 - **The first word alone, whatever it is** (the first draft). On sentences it accepts "Hi, this is
   Globex" for "Thin Air" and "the main line at Globex" for "Main Street Supply". The guard's
@@ -177,6 +261,9 @@ first-word rule (D8). So no third rule is attempted here. Q137 asks for a decisi
 ## Contract touched
 
 None. `company_matches` stays `bool | None`, and the decision rules don't change.
+
+D7b changes the decision rules (V05 retired, NR03's sentence, `decision-1.1.0`), but no contract:
+`company_matches` stays `bool | None`.
 
 ## Acceptance
 
@@ -205,7 +292,7 @@ the vendor unless stated:
   - Today's matches still match: "Acme Fasteners" and "Fasteners, Acme" are `True`.
   - For "Brightline Office Supply Inc", "Brightline Office" is `True`.
 - [ ] B2. Clearly different companies stay `False`, including near-sounding and common-word cases.
-  These come from the builder check:
+  These come from the builder check. (D7b: none of them is a match, and each is now `None`; see B9.)
 
   | Said | Vendor |
   |---|---|
@@ -217,18 +304,50 @@ the vendor unless stated:
   | "Bell Canada" | Dell Inc |
   | "We're a plumbing firm, Globex" | A & B Supply |
 
-- [ ] B3. No fuzzy matching (D8): "acne" and "This is acne" are `False`.
+- [ ] B3. No fuzzy matching (D8): "acne" and "This is acne" are `False`. (D7b: not a match, and now
+  `None`; see B9.)
 - [ ] B4. A common first word alone doesn't match: "First" is `False` for "First Solar Inc", and
-  "Main" is `False` for "Main Street Supply LLC".
+  "Main" is `False` for "Main Street Supply LLC". (D7b: not a match, and now `None`; see B9.)
 - [ ] B5. Unchanged:
   - "LLC" alone and no answers give `None`.
   - Any `False` among several answers gives `False`.
   - A vendor with no usable name gives today's result.
   - The existing tests in `apps/core/tests/test_worker.py` pass unedited.
+  - (D7b: a vendor with no usable name now gives `None` for an answer with readable words, and the
+    company tests in `test_worker.py` change as B9 says.)
 - [ ] B6. The matcher reads names as the guard does: for each B1 example, the variant that matches
   is in `vendor_variants`.
 - [ ] B7. The matcher stays pure and total. Empty, suffix-only and non-ASCII names, and empty
   answers, never raise.
+- [ ] B8. Refusal words override a match (D7a).
+  - Each "what it catches" example in D7a is `False`.
+  - Honest answers stay `True`: "No problem, this is Acme", "Sorry, Acme Fasteners", "Yes, Acme",
+    and "Never Summer" for "Never Summer Industries".
+  - "Acme? No, Globex" stays `True` (an accepted cost), and "Not sure, I think this is Acme" is
+    `False` (the safe cost). Both are pinned.
+- [ ] B9. A plain mismatch is unknown (D7b), and only a refusal is `False`.
+  - `None`: every row of B2's table, B3's "acne" and "This is acne", B4's "First" and "Main", D6's
+    whole-word cases, and B5's "no usable name" rows that have readable words.
+  - "This is Globex" and nonsense are `None` for "Acme Fasteners LLC".
+  - B8's refusals stay `False`, and `every_name_matches(["This is Globex", "Not Acme, this is
+    Globex"])` is `False`.
+  - End to end (Postgres): an extra answer "Globex Corporation" doesn't fire NR03, and the call
+    decides exactly as it does without that answer. "Not Acme Fasteners, this is Globex" fires NR03.
+- [ ] B10. The engine (D7b).
+  - `V05_company_matches` is not in `rules.VERIFIED`, and neither it nor `V05_company_matches_unmet`
+    is a current id. Both render from `engine.RETIRED` with their old sentences.
+  - NR03's sentence is D7b's, its `FIRES` case (`company_matches=False`) still fires it alone, and
+    `SLOT_RULES["company_named"]` is `("NR03_wrong_company",)`.
+  - `ENGINE_VERSION` is `decision-1.1.0`.
+  - The clean call (`GOOD`) verifies with `company_matches=None` and with `True`.
+  - A worked example, another company named with no refusal word (`company_matches` null) and
+    everything else clean, is verified.
+- [ ] B11. D7a's extension. The refusal lists are exactly D7a's, extension included. Each added
+  word and phrase flags on its own ("I don't work for Acme", "We're no longer Acme", "Sorry, wrong
+  number", "This is a different company", "This ain't Acme", "I haven't worked at Acme in years",
+  "Acme hasn't been here", "We hadn't heard of Acme", and each apostrophe-free spelling). Names stay
+  names: "Hi, this is Don at Acme", "This is Haven at Acme", "Acme, New Haven office" and "This is Ain
+  at Acme" name the vendor (`True`).
 
 ## Tests (written first)
 
@@ -240,21 +359,27 @@ the vendor unless stated:
 | A5 | `apps/voice/tests/test_twiml.py::test_the_route_hints_the_calls_vendor_names_and_never_speaks_them` |
 | A6 | the existing `packages/policy` and `apps/voice` suites, unedited |
 | B1 to B7 | `apps/core/tests/test_company.py` (new, pure, no database) |
-| B5 | the existing `apps/core/tests/test_worker.py` company tests, unedited (they need Postgres) |
+| B8 | `apps/core/tests/test_company.py::test_b8_refusal_words_override_a_match`, `::test_b8_honest_answers_and_pinned_costs` |
+| B5 | the existing `apps/core/tests/test_worker.py` company tests, unedited (they need Postgres); D7b edits them (B9) |
+| B9 | `apps/core/tests/test_company.py::test_b9_another_company_or_nonsense_is_unknown`, `::test_b9_a_refusal_in_any_answer_is_false`, and the B2 to B6 and D6 tests' `None` rows; `apps/core/tests/test_call_facts.py::test_the_company_matches_a_trade_name`; `apps/core/tests/test_worker.py::test_another_company_named_decides_as_the_call_would_without_it`, `::test_a_refusal_in_the_company_answer_goes_to_review` (Postgres) |
+| B10 | `packages/decision/tests/test_rules.py::test_the_company_answer_is_not_required_to_verify`, `::test_v05_is_retired_and_its_ids_still_render`, `::test_nr03_has_its_new_sentence_and_is_the_company_answers_only_rule`; `test_engine.py` (the version); `tests/examples/22-another-company-named.json` |
+| B11 | `apps/core/tests/test_company.py::test_d7a_the_refusal_lists_are_exactly_the_specs`, `::test_d7a_each_refusal_word_and_phrase_flags_on_its_own`, `::test_d7a_a_first_name_is_not_a_refusal` |
 
 ## Landing
 
-Two small PRs, each independent of the other: Part A (hints) and Part B (matcher, which Abhi
-reviews). Part B is on hold (Q137); its branch stays unopened. Part A edits the same `build_connect_twiml` attribute line as open PR #102, so whichever
-merges second rebases and keeps both attributes.
+Two PRs: Part B landed first (PR #123, with D7a and D7b), then Part A (hints, PR #118). Part A edits
+the same `build_connect_twiml` attribute line as PR #102, so whichever merges second rebases and
+keeps both attributes.
 
 ## Out of scope
 
 - Line-takeover detection (`line_risk`, NR21) and turning on strict mode (S01). Those are the real
   answers to a fraudster on the line (Goal); the gap is noted here, not fixed.
-- Negations and corrections in the company answer (D9; lab A8, A10).
+- Corrections with no refusal word, and other companies whose name contains the vendor's (D9; lab
+  A8, A10). Negations, resellers and past connections are handled by D7a.
 - Who fills `trade_names`.
-- Changing the company question's wording, or the decision rules.
+- Changing the company question's wording, or the decision rules. (D7b changes the rules: V05 and
+  NR03.)
 
 ## Open questions
 
@@ -263,18 +388,15 @@ merges second rebases and keeps both attributes.
   - Which provider does this account use? The TwiML doesn't set `transcriptionProvider`, so the
     account default applies: Deepgram (nova-3), or Google for accounts that used ConversationRelay
     before Sep 12, 2025.
-- **Q137 (Sami, then Abhi):** Part B is on hold (see its status note). Which way?
-  - (a) **Demote the company check.** NR03 and V05 stop deciding the outcome. The company answer
-    stays on the record, where the person who releases the payment (R5) sees it.
-  - (b) **Keep today's strict rule.** Rely on Part A's hints, and on callers saying the full name.
-  - (c) **A later spec** that extracts the company name from the sentence: a model read, grounded
-    in the turn by code, so a negated name fails grounding.
-- **Q139 (Sami):** a possessive or hyphenated first word gets no first-word hint ("Mike's Plumbing
-  LLC", "Acme-Fasteners LLC"). Only the full name is sent. Should "Mike's" or "Mike" be sent too?
-  Possessive names are common for small vendors.
+- **Q137 (Abhi):** accept Part B (D5 to D10), including its accepted costs (D9), with the
+  measurement in D10 if it is run?
+  - **Answered (D7b):** decided: demote, with NR03 kept for refusal words; Sami, Nov 10.
 - **Q138 (Abhi, Sami):** should hints and the matcher use the vendor's name as it was before the
   change (a snapshot on the case), rather than Ramp's current record? A clerk can edit both in the
   same session.
+- **Q139 (Sami):** a possessive or hyphenated first word gets no first-word hint ("Mike's Plumbing
+  LLC", "Acme-Fasteners LLC"). Only the full name is sent. Should "Mike's" or "Mike" be sent too?
+  Possessive names are common for small vendors. (From Part A's review.)
 
 ## Commands
 

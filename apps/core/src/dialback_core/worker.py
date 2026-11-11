@@ -23,14 +23,14 @@ from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
 
-from dialback_decision import CallChecks, decide
-from dialback_decision.facts import earlier_call, facts_from_answers, values
+from dialback_decision import decide
+from dialback_decision.facts import values
 from psycopg import AsyncConnection
 from psycopg.types.json import Jsonb
 from psycopg_pool import AsyncConnectionPool
 
+from .call_facts import call_facts
 from .calling_window import CallingWindow
-from .company import every_name_matches
 from .db import dataset_now, system_tx
 from .detection import Keys, process_inbound_webhooks
 from .events import TransitionRefused, apply_event
@@ -367,33 +367,11 @@ class Worker:
         answers = (body.get("answers") or {}).get("answers") or []
         async with system_tx(self.pool) as conn:
             generation = await (await conn.execute(GENERATION, (case["id"], case["version"]))).fetchall()
-        picks = [e["body"].get("contact_point_id") for e in generation if e["type"] == "number_resolved"]
-        # Only this version's pick counts, and a report that doesn't name it isn't eligible (D1).
-        dialed_eligible = bool(picks) and body.get("contact_point_id") == picks[-1]
-        # Earlier calls can count against the change, never for it (D2).
-        earlier = tuple(earlier_call(e["body"]) for e in generation
-                        if e["type"] == "call_ended" and e["body"].get("call_id") != body.get("call_id"))
         context = await self.change_context.check(
             case_id=case["id"], dataset_id=case["dataset_id"], vendor_id=case["vendor_id"],
             cutoff=case["ramp_changed_at"] or case["detected_at"],
             speaker_names=values(answers, "speaker_name"), offered_numbers=values(answers, "offered_number"))
-        checks = body.get("checks")
-        facts = facts_from_answers(
-            answers,
-            call_result=body["result"],
-            dialed_eligible_number=dialed_eligible,
-            last_four_result=body.get("last_four_result"),
-            company_matches=every_name_matches(values(answers, "company_named"), case["legal_name"], case["trade_names"] or ()),
-            checks=CallChecks(**checks) if checks else None,
-            earlier_calls=earlier,
-            dialed_out=None if body.get("direction") is None else body["direction"] == "outbound",
-            dialed_number_is_pick=body.get("dialed_number_is_pick"),
-            answered_by=body.get("answered_by"),
-            speaker_in_change_thread=context.speaker_in_change_thread,
-            offered_number_from_request=context.offered_number_from_request,
-            speaker_known_before_request=context.speaker_known_before_request,
-        )
-        decision = decide(facts)
+        decision = decide(call_facts(body, case, generation, context))   # the pick, earlier calls, company (D1, D2)
         await self._emit(case, "decision_made", f"{cmd.key}:made", decision.body())
 
     # release_hold ------------------------------------------------------------------------------
