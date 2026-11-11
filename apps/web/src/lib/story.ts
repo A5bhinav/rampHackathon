@@ -18,7 +18,7 @@ export const DEMO_STORIES: DemoStory[] = [
  *  so the parameter can't send anyone off the site. */
 export function safeNext(raw: unknown): string {
   if (typeof raw !== "string") return "/app";
-  if (/^\/tour\/[1-8]$/.test(raw)) return raw;  // the guided demo (spec 0039)
+  if (/^\/tour\/([1-8]|flow)$/.test(raw)) return raw;  // the guided demo (specs 0039, 0066; /tour/8 is an old link)
   if (raw === "/app/control") return raw;  // the front door's Control button (spec 0063)
   // A dataset page, for "Viewing as" (spec 0041): a uuid, then plain lower-case path segments only.
   if (/^\/d\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(\/[a-z0-9-]+)*$/.test(raw)) return raw;

@@ -22,8 +22,8 @@ export default function CorpusPage() {
         <Callout>
           <p>
             This is the selection rule only, run by <span className="mono">{CORPUS.generated_by}</span> with{" "}
-            <span className="mono">{CORPUS.rule_version}</span>. It is not the attack lab, which would replay whole scams
-            through calls and decisions; the lab isn&apos;t built, so there is no scorecard.
+            <span className="mono">{CORPUS.rule_version}</span>. It is not the attack lab, which replays whole scams
+            through calls and decisions and has its own scorecard page.
           </p>
         </Callout>
 

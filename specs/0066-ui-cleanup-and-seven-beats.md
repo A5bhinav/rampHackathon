@@ -58,6 +58,7 @@ PR 4: the 7-beat guided demo
 - [ ] The card buttons: "Open the call", "See the decision", "Try to release as the clerk" and "Show the whole flow".
 - [ ] Steps 2 to 5 follow the case the presenter's change opened, found with `latestCase`/`pickedUp`, never hard-coded.
 - [ ] `tourStep` accepts 1 to 7. No caption contains `dialback-core`, `scroll` or "isn't built". Every link resolves on the local stack after one change in the Ramp mock. Old `/tour/8` links fall back to step 7.
+- [ ] The card stays through the redirects a beat's own action makes (saving the change, Viewing as, a release): the tab remembers its beat until End the tour. The last beat's button is `/tour/flow`, a value of the existing `/tour/[step]` route, not a new route.
 
 PR 5: the scorecard
 - [ ] `/scorecard` and Assurance's lab card show the newest committed lab run, read from a scorecard file that validates against `packages/contracts/schemas/scorecard.schema.json`:
@@ -71,7 +72,7 @@ PR 5: the scorecard
 - [ ] With the committed run from `uv run lab run --split voice`, `/scorecard` shows 31 scenarios and 29 passed, and lists `a02-lookalike-domain` (A28) and `l16-garbage-answers` (A29) as known failures.
 
 Never
-- [ ] No page decides or computes anything new. No new routes. No full account number, spoken digit or phone number on any page.
+- [ ] No page decides or computes anything new. No new routes. No full account number or spoken digit on any page, and no phone number in any new place (the Trust Ledger's pick already shows on Number chosen, the lineage, the live call and `/corpus`).
 
 ## Tests (written first)
 
@@ -98,6 +99,11 @@ the dashboard's demo reset button (it needs a contract change; for now, `scripts
 3. **Should a clerk see Control at all?** Today `canSeeControl` shows it to everyone on a demo dataset.
 4. **Flow mode's empty middle column.** Fill it with the current station's detail (the answer being checked and the rule that fired), or leave flow mode as it is for now?
 5. **The spec number.** Sami's unmerged branch also has a `specs/0066-red-team-the-document-reader.md`. Two specs would share the number (the repo already has two 0034s and two 0041s). Renumber one of them?
+6. **PR 5 is blocked: the lab's scorecard doesn't match the contract.** `uv run lab run --split voice` writes `evals/out/scorecard.json` with `total`, `passed`, `failed`, `hard_gate_failures` (scenario ids), `by_class`, `declared`, `generated_at`, `config` and `scenarios_hash`. `packages/contracts/schemas/scorecard.schema.json` (`scorecard/v0`) instead requires `run_id`, `git_sha`, `split` (one of smoke, dev, held_out; the run's split is `voice`), `started_at`, `finished_at`, `config_version_ids`, `totals` with family counts, `hard_gates` by kind (false_verified, released_to_fraud, …) and `rates` with Wilson intervals. The run's file has none of these, so it can't validate. Turning one into the other would mean making up values, which the dashboard doesn't do. One of these is needed first:
+   - the lab's owner makes `lab run` write `scorecard/v0`;
+   - the schema grows a shape for what the lab writes today (a contract change in its own PR);
+   - this spec drops the validation requirement and reads the lab's file as it is, with the FINDINGS ids joined from `evals/known-failures.json`.
+7. **Blocked cases and "Needs you".** The core offers nobody an action on a blocked case, so the role-aware count drops them for everyone. On the local stack Riley Approver's count goes from 4 to 3, not "unchanged". Keep that (it follows the lock card's rule), or count blocked cases as needing someone?
 
 ## Commands
 
