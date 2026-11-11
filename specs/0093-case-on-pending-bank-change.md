@@ -52,6 +52,24 @@ None. The database gains one column (D2).
   checks Ramp's side: detection, the hold, the release, the dates, the approval. Without the
   credentials it says so and stops; without `--sandbox` nothing changes (the smoke run still passes).
 
+## Found on the sandbox, 2026-11-10 (first end-to-end run, `stack.py --sandbox`; one vendor, one run)
+
+- A bank change entered in Ramp's dashboard and left pending opened one change and one case. The
+  hold, the number and the stand-in call each succeeded on the first try.
+- The decision was `needs_review` (`NR07_digits_ambiguous`): the test account number ended in the
+  same four digits as the vendor's old account, so the digits proved nothing. The "verified" path
+  was not exercised.
+- A person cleared the review and two others released: the worker lifted the hold on its first try,
+  Ramp showed the vendor Active, and Dialback recorded the bill's date as restored.
+- Approved in Ramp afterwards: the account arrived active under a new id and was mirrored as
+  current, with still one change and one case (D3). Both the old and the new account are now
+  current in the mirror, as both are active in Ramp.
+- The decision waited about 7 minutes (03:14 to 03:21 UTC) behind a sweep: the worker runs the
+  scheduled jobs before each round of case steps.
+- A needs-review case with no known author takes three approvers (the reviewer can't release, and
+  the release needs two). The stack seeds two; a third was added by hand to that run's database.
+- Not shown: a real call, a payment, a rejection in Ramp.
+
 ## Acceptance
 
 - [x] The layer asks Ramp for pending accounts and marks a `pending_approval` one pending, not active.
