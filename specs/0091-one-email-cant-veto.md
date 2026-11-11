@@ -3,7 +3,7 @@
 **Owner:** Sami (in `packages/ledger`)  **Slice:** evidence  **Target day:** not set
 **Builds on:** spec 0079 (`sami/0079-guard`, #121). This lands after it, stacked on its branch once
 main is merged into that branch (the lab lives on main; the branch is 36 commits behind).
-**Status:** draft. Q154 is open. The rule below is the one measured (prototype W4).
+**Status:** approved by Sami, Nov 10. The rule below is the one measured (prototype W4).
 
 ## Goal
 
@@ -148,9 +148,9 @@ bank's, now gets that reason). The web copy that repeats them follows.
 - **Q152, open:** should documents filed as any case's change request never count as support?
 - **Q153, resolved:** the near-miss check keeps today's "which number is older". Sami, Nov 10
   ("Yes, fix it"); measured again as W4 above.
-- **Q154, open:** accept `M_shared_id_helped` rising from 230 to 271, all through A5's latent
-  duplicate ids, or fix A5 first? Proposed: accept, since production can't file two documents
-  under one id, and A5 gets its own fix.
+- **Q154, resolved: accepted.** `M_shared_id_helped` rises from 230 to 271, all through A5's latent
+  duplicate ids; production can't file two documents under one id, and A5 gets its own fix. Sami,
+  Nov 10.
 - **Q155, resolved: the middle option is rejected.** It used this rule only where today's rule
   calls nobody, and otherwise called what both rules agree on, else nobody. In generated worlds it
   sent the honest-warning case (the table's last row) to a person instead of the planted number.
