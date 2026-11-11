@@ -65,7 +65,7 @@ begin
 end
 $$;
 
--- The inbox's claim joins each notice to its email by delivery_id: it is indexed (0017).
+-- The inbox's claim joins each notice to its email by delivery_id: it is indexed (0024).
 do $$
 begin
   assert exists (select 1 from pg_indexes where schemaname = 'app' and tablename = 'inbound_emails'

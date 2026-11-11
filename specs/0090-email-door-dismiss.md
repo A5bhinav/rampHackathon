@@ -42,14 +42,14 @@ existing `POST /api/cases/{case_id}/release` with `action=approve`.
       ambiguous account on file; the changer; the reviewer who cleared the case; the first
       dismisser acting as the second, also straight through `apply_case_event`.
 - [ ] `release_case` on every other state behaves exactly as before, except the backstop below.
-- [ ] Backstop (final review finding C1, `0016_email_ramp_mix.sql`): `first_approver` and
+- [ ] Backstop (final review finding C1, `0023_email_ramp_mix.sql`): `first_approver` and
       `four_eyes` also refuse when the case's current change came in by email and
       `app.case_email_only(case)` is false
       (`app.email_release_refused(case)`). A case verifies its current change, so such a case could
       otherwise be released while Ramp pays an account the call never verified. The email door never
       makes one (spec 0087, `ramp_case_open`); this catches a bug or another writer. It also refuses an
       email case whose vendor had no account on file (rule A), which keeps that hold on (fail closed).
-      Every other `eval_guard` branch is exactly 0015's, `reject` is unchanged, and no transition changes.
+      Every other `eval_guard` branch is exactly 0022's, `reject` is unchanged, and no transition changes.
 - [ ] `docs/state-machine.md` shows the two new `blocked` moves.
 - [ ] (Task 14) `permissions.can_dismiss` is true only for an approver on a blocked email-only case
       who is not in `app.blocked_approvers(case)`; the timeline reads "Dismissed by {name}: Ramp never changed,
@@ -83,9 +83,9 @@ existing `POST /api/cases/{case_id}/release` with `action=approve`.
 
 | Acceptance item | Test |
 |---|---|
-| 1 to 5 | `supabase/tests/017_email_dismiss.sql` (blocks 13 to 15: paths A, B, C; block 16: a forged evidence row) |
+| 1 to 5 | `supabase/tests/020_email_dismiss.sql` (blocks 13 to 15: paths A, B, C; block 16: a forged evidence row) |
 | 6 | `supabase/tests/002_case_machine.sql`, `008_release_replay.sql`, `014_review_needs_approver.sql` (unchanged, still pass) |
-| 7 | `supabase/tests/018_email_ramp_mix.sql` (blocks 1 to 5 refused, including 4b where only `four_eyes`'s new check refuses; blocks 6 to 9 are controls that still release or reject) |
+| 7 | `supabase/tests/021_email_ramp_mix.sql` (blocks 1 to 5 refused, including 4b where only `four_eyes`'s new check refuses; blocks 6 to 9 are controls that still release or reject) |
 | 8 | `scripts/db/test.sh` redraws it; the diff is in the PR |
 | 9 | `apps/core/tests/test_email_door.py::test_a_not_verified_email_case_is_dismissed_by_two_people_and_the_hold_lifts`, `::test_the_changer_and_the_reviewer_can_never_dismiss`, `::test_the_first_dismisser_is_told_a_second_person_must_dismiss`, `apps/web/tests/states.test.ts` |
 
@@ -96,7 +96,7 @@ existing `POST /api/cases/{case_id}/release` with `action=approve`.
   (`command_failed`, then review, then `blocked` at the same version), a completed dismissal moves
   the case to `releasing` but queues no new `release_hold`, so it waits there with the hold on
   (fails closed). The same was already true for a re-release from `awaiting_release`.
-  `017_email_dismiss.sql` block 15 asserts today's behaviour and says to change it when fixed.
+  `020_email_dismiss.sql` block 15 asserts today's behaviour and says to change it when fixed.
 - **The hold is lifted without a fresh look at Ramp.** `release_hold` lifts the hold using what
   Dialback's mirror says. A Ramp change not yet detected (no webhook or poll yet) is invisible to
   `case_email_only`. Running `sync_vendor` before lifting a dismissed case's hold would close that

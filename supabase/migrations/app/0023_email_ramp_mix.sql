@@ -6,12 +6,12 @@
 -- call would verify the email's account while Ramp pays the clerk's, and two approvers could lift
 -- the hold for an account nobody verified (R1). The email door now writes nothing for a vendor
 -- whose unfinished case has any change that did not come by email, and lists the email with the
--- outcome ramp_case_open, linked to that case. 0013 is applied, so its check is replaced here.
+-- outcome ramp_case_open, linked to that case. 0020 is applied, so its check is replaced here.
 --
 -- The backstop, in case a bug or another writer ever does join them: first_approver and
 -- four_eyes also refuse when the case's current change came by email and the case is not email
--- only (app.case_email_only, 0015). eval_guard is redefined in full, as 0008, 0011 and 0015 did,
--- so one file shows the whole function; every other branch is exactly 0015's. No transition
+-- only (app.case_email_only, 0022). eval_guard is redefined in full, as 0008, 0011 and 0022 did,
+-- so one file shows the whole function; every other branch is exactly 0022's. No transition
 -- changes. create or replace keeps the grants on eval_guard (owner only; see 0004).
 
 alter table app.inbound_emails drop constraint inbound_emails_outcome_check;
@@ -42,7 +42,7 @@ comment on function app.email_release_refused(app.cases) is
 revoke execute on function app.email_release_refused(app.cases) from public;
 grant  execute on function app.email_release_refused(app.cases) to authenticated, service_role;
 
--- Guards: 0015's eval_guard, with first_approver and four_eyes refusing such a case -------------
+-- Guards: 0022's eval_guard, with first_approver and four_eyes refusing such a case -------------
 
 create or replace function app.eval_guard(p_guard text, p_case app.cases, p_actor_id uuid, p_body jsonb)
 returns boolean

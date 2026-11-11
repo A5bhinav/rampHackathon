@@ -8,7 +8,7 @@ A flagged bank-change email opens a Dialback case on its own, through the existi
 
 ## Contract touched
 
-None. `app.inbound_emails` (spec 0084) already has every column, outcome and red flag used here (`ramp_case_open` was added to spec 0084's contract and to the outcome check by `0016_email_ramp_mix.sql`).
+None. `app.inbound_emails` (spec 0084) already has every column, outcome and red flag used here (`ramp_case_open` was added to spec 0084's contract and to the outcome check by `0023_email_ramp_mix.sql`).
 
 ## Acceptance
 
