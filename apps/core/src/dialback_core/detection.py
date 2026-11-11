@@ -12,6 +12,7 @@ who made each new account, then write the mirror, the change and the case event 
 """
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import hmac
 import json
@@ -25,10 +26,14 @@ from psycopg_pool import AsyncConnectionPool
 from .db import dataset_now, system_tx
 from .events import apply_event
 from .ramp import RampAccount, RampConnector, RampError, RampPort
+from .ramp.port import RampVendor
 
 log = logging.getLogger(__name__)
 
 POLICY_VERSION = "policy-v0"
+# Spec 0100, D2: five reads at about half a second each already exceed Ramp's ten requests a second
+# (the rate limiter holds them to it), and the ten database connections are shared with the API.
+SYNC_CONCURRENCY = 5
 BANK_CHANGE_EVENT = "VENDOR_BANK_ACCOUNT_UPDATED"  # confirm against Ramp's audit-log types
 
 
@@ -57,9 +62,28 @@ def fingerprint(keys: Keys, account: RampAccount) -> str:
     return hmac.new(keys.fingerprint_key, material, hashlib.sha256).hexdigest()
 
 
+async def sync_vendors(pool: AsyncConnectionPool, ramp: RampPort, keys: Keys, dataset_id: UUID,
+                       vendors: list[RampVendor], detected_via: str) -> list[list[DetectedChange]]:
+    """Spec 0100: each vendor as Ramp's list gave it (no second read), at most SYNC_CONCURRENCY at once,
+    in the list's order. Every vendor is synced; then the first error, in that order, is raised (D3)."""
+    slots = asyncio.Semaphore(SYNC_CONCURRENCY)
+
+    async def one(vendor: RampVendor) -> list[DetectedChange]:
+        async with slots:
+            return await sync_vendor(pool, ramp, keys, dataset_id, vendor.id, detected_via, vendor=vendor)
+
+    results = await asyncio.gather(*(one(v) for v in vendors), return_exceptions=True)
+    for result in results:
+        if isinstance(result, BaseException):
+            raise result
+    return results  # type: ignore[return-value]
+
+
 async def sync_vendor(pool: AsyncConnectionPool, ramp: RampPort, keys: Keys, dataset_id: UUID,
-                      ramp_vendor_id: str, detected_via: str) -> list[DetectedChange]:
-    vendor = await ramp.get_vendor(ramp_vendor_id)
+                      ramp_vendor_id: str, detected_via: str, vendor: RampVendor | None = None) -> list[DetectedChange]:
+    # Spec 0100, D1: the vendor Ramp's list gave is all a sync uses of it; a webhook passes only the id.
+    if vendor is None:
+        vendor = await ramp.get_vendor(ramp_vendor_id)
     accounts = await ramp.list_vendor_accounts(ramp_vendor_id)
 
     # Phase 1: have we synced this vendor before, and which of Ramp's accounts do we know?
@@ -168,8 +192,7 @@ async def import_all(pool: AsyncConnectionPool, ramp: RampPort, keys: Keys, data
     """Sync every vendor. On a fresh dataset this is the initial import (a baseline); afterwards
     it is the nightly full sweep that catches changes no webhook announced."""
     vendors = await ramp.list_vendors_updated_since(None)
-    for v in vendors:
-        await sync_vendor(pool, ramp, keys, dataset_id, v.id, "poll")
+    await sync_vendors(pool, ramp, keys, dataset_id, vendors, "poll")
     return len(vendors)
 
 

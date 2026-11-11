@@ -40,8 +40,9 @@ None. The database gains one column (D2).
   a new change.
 - **D4. Finding a pending change.** It moves neither the vendor's `updated_at` nor the audit log
   (spec 0097, Q204), so only the full sweep finds it. A sandbox deployment runs the sweep every
-  minute: `DIALBACK_FULL_SWEEP_SECONDS=60` (about 95 vendors, one accounts read each, within Ramp's
-  100 requests per 10 seconds).
+  minute: `DIALBACK_FULL_SWEEP_SECONDS=60`. (First written as "about 95 vendors"; the first
+  end-to-end run found 432, and a sweep of them took 7 to 8 minutes. Spec 0100 brings it to under a
+  minute.)
 - **D5. Where the approver sees the verdict**: Dialback's case page. Ramp has no API to show it on
   the approval. The approver approves or rejects in Ramp; a person releases in Dialback (R5).
 - **D6. Running it end to end locally**: `scripts/dev/stack.py --sandbox`, with the developer's
