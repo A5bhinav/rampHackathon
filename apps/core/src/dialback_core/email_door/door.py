@@ -34,6 +34,7 @@ from uuid import NAMESPACE_URL, UUID, uuid5
 from dialback_ledger.candidates import parse_phone
 from dialback_ledger.ingest import ingest_all
 from dialback_ledger.lookalike import sender_domain
+from dialback_ledger.reader import StubReader
 from dialback_ledger.store import mark_change_request, write_ingest
 from psycopg import AsyncConnection
 from psycopg_pool import AsyncConnectionPool
@@ -61,7 +62,11 @@ if TYPE_CHECKING:
 
 log = logging.getLogger(__name__)
 
-EXTRACTOR = "email-door-v1"
+# The ledger's reader for the door's document, chosen here and not by DIALBACK_READER (final review I4): the
+# document is rebuilt phone lines only, so a model adds nothing, and `llm` would be a synchronous model call on
+# the event loop whose failure lands after the try below as a terminal `failed`. The stored extractor_version is
+# the reader's, as everywhere else in the ledger (spec 0049, decision 7).
+LEDGER_READER = StubReader()
 PAGE_LINES = 51   # a span at y = 72 + 14 * i stays on the 792-point page for i < 51; later lines start a new page
 PAIR_REACH = 200  # off its line, an account's routing number is the nearest within this many characters
 MASK_REACH = 1_000_000   # accounts that mask the ledger's copy, or reveal a planted header, are read this far per part
@@ -471,7 +476,8 @@ async def _act(pool: AsyncConnectionPool, settings: Settings, keys: Keys, datase
     try:
         async with system_tx(pool) as conn:
             await write_ingest(conn, dataset_id=dataset_id, vendor_id=vendor_id,
-                               result=ingest_all([document], extractor_version=EXTRACTOR))
+                               result=ingest_all([document], extractor_version=LEDGER_READER.version,
+                                                 reader=LEDGER_READER))
             await mark_change_request(conn, dataset_id=dataset_id, vendor_id=vendor_id, document_id=document["id"])
         return await _case_transaction(pool, dataset_id, email, facts, keys, fingerprint, source_event_id)
     except Exception as exc:  # noqa: BLE001  fail closed (R7); the message can hold the email's values (ADR-8)

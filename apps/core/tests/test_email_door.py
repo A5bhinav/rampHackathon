@@ -173,6 +173,25 @@ async def test_cobalt_email_opens_a_case_via_email_and_rejects_the_emails_phone(
     assert (await ramp.get_vendor(w.demo_refs["cobalt"])).hold_id is not None, "payments to Cobalt are on hold"
 
 
+async def test_the_ledger_write_never_builds_the_configured_reader(door_world, monkeypatch):
+    """Final review I4: ingest_all's default reader follows DIALBACK_READER, and `llm` is a synchronous model
+    call on the event loop. The door's document is rebuilt phone lines only, so it passes the stub reader
+    itself and no reader is built from the flag; the stored extractor_version is that reader's."""
+    import dialback_ledger.ingest as ingest
+
+    monkeypatch.setenv("DIALBACK_READER", "llm")
+
+    def refuse(*args, **kwargs):
+        raise AssertionError("the door built the configured reader")
+
+    monkeypatch.setattr(ingest, "reader_for", refuse)
+    row = await arrive(door_world)
+    assert row["outcome"] == "case_opened"
+    found = await one(door_world.pool, "select array_agg(distinct extractor_version order by extractor_version) as v "
+                                       "from ledger.observations")
+    assert found["v"] == ["stub"], "the seed and the door both store the stub reader's version"
+
+
 async def test_a_duplicate_delivery_opens_nothing_new(door_world):
     w = door_world
     first = await arrive(w, message_id="<same@gmail.example>")
