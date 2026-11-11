@@ -77,7 +77,7 @@ def _swap_text(text: str, swap: tuple[str, str]) -> str:
     return text
 
 
-def _with_phone(doc: dict, swap: tuple[str, str]) -> dict:
+def with_phone(doc: dict, swap: tuple[str, str]) -> dict:
     """A copy of `doc` with the team phone in its text: what the stored rows describe."""
     d = copy.deepcopy(doc)
     for page in d["pages"]:
@@ -101,7 +101,7 @@ def labeled(documents: list[dict], reader: Reader, swap: tuple[str, str] | None 
     if swap is None:
         return result
     old, new = swap
-    hashes = {d["id"]: document_sha256(_with_phone(d, swap)) for d in documents}
+    hashes = {d["id"]: document_sha256(with_phone(d, swap)) for d in documents}
     for row in result.documents:
         row["sha256"] = hashes[row["id"]]
     for o in result.observations:
@@ -122,7 +122,7 @@ def _reader(reader: Reader | None) -> Reader:
         raise DemoError(str(exc)) from None
 
 
-def _phones(given: dict[str, str], seed: dict) -> dict[str, str]:
+def team_phones(given: dict[str, str], seed: dict) -> dict[str, str]:
     out = {}
     for ref, raw in given.items():
         if ref not in seed["vendors"]:
@@ -145,7 +145,7 @@ def check(phones: dict[str, str], requests: list[str]) -> dict[str, str]:
     for ref in requests:
         if ref not in seed["vendors"]:
             raise DemoError(f"the demo seed has no vendor {ref!r} (it has {', '.join(seed['vendors'])})")
-    return _phones(phones, seed)
+    return team_phones(phones, seed)
 
 
 async def _dataset(conn: psycopg.AsyncConnection, dataset_id: UUID | None, seed: dict) -> tuple[UUID, dict[str, UUID]]:
@@ -201,7 +201,7 @@ async def load(database_url: str | None = None, *, phones: dict[str, str], datas
     `reader` defaults to the one DIALBACK_READER names."""
     reader = _reader(reader)
     seed = load_seed()
-    swaps = _phones(phones, seed)
+    swaps = team_phones(phones, seed)
     now = now or dt.datetime.now(dt.UTC)
     delta = now - _when(seed["anchor"])
     summary = {}

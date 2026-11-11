@@ -13,6 +13,10 @@ label; it exits non-zero on a frozen report that still fails or any reachable-do
 documents (and G7's sweep of worlds) at `--seed` through real ingestion with the stub reader, freezes a
 shrunk case for each new failing pattern, and holds the failing patterns to lab-docs' known-failures list.
 
+`lab pdf render` (spec 0092) writes the demo seed's history as real PDFs into the ledger's demo_pdfs, or
+into `--out DIR` outside the repo, with `--phone REF=+1...` putting a team phone in them; `--check` exits
+non-zero when a committed PDF is stale.
+
 `lab fuzz` re-runs every frozen finding under `--out`, then searches `--examples` generated worlds at
 `--seed`, freezing the first shrunk violation there; it exits non-zero on any frozen case that still
 fails or any new finding. `lab frontier` and `lab overblock` write the two measurement tables and exit
@@ -112,12 +116,21 @@ def main(argv: list[str] | None = None) -> int:
     dc.add_argument("--report", default=str(_REPO / "evals" / "out" / "docs-report.json"))
     dc.add_argument("--known-failures", default="auto", help=_KNOWN_HELP + "; for lab docs, auto with --out left "
                     "out holds any seed to the repo's list")
+    pf = sub.add_parser("pdf", help="the demo seed as real PDFs (spec 0092)").add_subparsers(dest="pdf_command", required=True)
+    pr = pf.add_parser("render", help="render the demo seed's history into the ledger's demo_pdfs (or --out DIR)")
+    pr.add_argument("--check", action="store_true", help="compare with the committed PDFs; exit 1 on any difference")
+    pr.add_argument("--demo", action="store_true", help="the demo seed: the default, and the only source")
+    pr.add_argument("--phone", action="append", default=[], metavar="REF=+1...",
+                    help="that vendor's AR line becomes this team phone; needs --out, outside the repo")
+    pr.add_argument("--out", default=None, metavar="DIR", help="write here instead; must be outside the repo")
     freeze = sub.add_parser("freeze", help="record each scenario's hash and required outcome (expected.lock.json)")
     freeze.add_argument("--split", default="voice")
     freeze.add_argument("--scenarios-root", default=str(_REPO / "evals" / "scenarios"))
     args = parser.parse_args(argv)
     if args.command == "freeze":
         return _freeze(Path(args.scenarios_root) / args.split)
+    if args.command == "pdf":
+        return _pdf_render(args.check, args.phone, args.out)
     if args.command == "run":
         attacker = os.environ.get("DIALBACK_LAB_ATTACKER", "scripted").strip().lower() or "scripted"
         if attacker != "scripted" or args.max_usd > 0:
@@ -145,6 +158,46 @@ def main(argv: list[str] | None = None) -> int:
         return _reports(args.examples, args.seed, Path(args.out),
                         _known(args.known_failures, Path(args.out), _REPO / "evals" / "reports-generated"))
     return 2
+
+
+def _pdf_render(check: bool, phones: list[str], out: str | None) -> int:
+    """`lab pdf render` (spec 0092, D9): the demo seed's PDFs, like the corpus generator: write them, or --check
+    that the committed ones are current. A team phone goes only into a folder outside the repo."""
+    from dialback_ledger.demo import DemoError, load_seed, team_phones
+
+    from . import pdfrender
+    if check and (out or phones):
+        print("lab pdf render: --check compares the committed PDFs; it takes neither --out nor --phone")
+        return 2
+    if phones and not out:
+        print("lab pdf render: --phone needs --out DIR, outside the repo")
+        return 2
+    target = Path(out).resolve() if out else pdfrender.DEMO_PDFS
+    if out and (target == _REPO or _REPO in target.parents):
+        print(f"lab pdf render: --out must be outside the repo: team phones are never committed ({target})")
+        return 2
+    try:
+        swaps = team_phones(dict(p.partition("=")[::2] for p in phones), load_seed())
+    except DemoError as exc:
+        print(f"lab pdf render: refused: {exc}")
+        return 2
+    want = pdfrender.render_demo(swaps)
+    have = {p.name: p.read_bytes() for p in target.glob("*.pdf")} if target.is_dir() else {}
+    if check:
+        wrong = [f"missing {n}" for n in sorted(set(want) - set(have))] + [f"extra {n}" for n in sorted(set(have) - set(want))]
+        wrong += [f"different {n}" for n in sorted(set(want) & set(have)) if want[n] != have[n]]
+        for line in wrong:
+            print(f"lab pdf render --check: {line}")
+        print(f"lab pdf render --check: {len(want)} PDFs, {len(wrong)} out of date" + (": run `uv run lab pdf render`" if wrong else ""))
+        return 1 if wrong else 0
+    target.mkdir(parents=True, exist_ok=True)
+    for name, data in want.items():
+        (target / name).write_bytes(data)
+    if not out:
+        for name in set(have) - set(want):     # only the committed folder is ours to tidy
+            (target / name).unlink()
+    print(f"lab pdf render: {len(want)} PDFs written to {target}")
+    return 0
 
 
 def _fuzz(examples: int, seed: int, out_dir: Path, known_failures: Path | None = None) -> int:

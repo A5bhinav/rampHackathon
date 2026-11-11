@@ -19,6 +19,8 @@ uv run lab overblock                          # measurement: what a defense cost
 uv run lab reports --examples 2000 --seed 0   # call reports: frozen findings, then F1 to F3 (spec 0048)
 uv run lab docs --examples 1000 --seed 0      # documents: frozen cases, then G1 to G7 through ingestion (spec 0052)
 uv run lab docs --examples 1000 --seed 5      # another seed: held to the same list; cases go to evals/out
+uv run lab pdf render --check                 # the committed demo PDFs are current (spec 0092)
+uv run lab pdf render --demo --phone acme=+1... --out DIR   # with a team phone, into a folder outside the repo
 uv run lab sweep                              # remove each decision rule: seen, or in UNREACHABLE.md
 cd evals && uv run pytest -q -m "not selection_gate and not report_gate and not docs_gate"   # the checks that must stay green
 ```
