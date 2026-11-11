@@ -170,7 +170,7 @@ place:
 | "And what's your role there?" | "AR clerk." | Any role works; a name and a role are both needed (V06) |
 | "Has your company recently asked [customer] to change how you get paid?" | "Yes." | "I think so" goes to review (NR09 or NR14). An answer the agent can't make out is asked once more, as at consent |
 | "For the account you'd like to be paid into, please use your phone's keypad to enter the last four digits, then press the pound key. To start over, press the star key." | Key `0` `0` `0` `1`, then `#` | See the keypad steps below |
-| "Thank you, that's everything I needed." | Hang up | The line may cut off mid-sentence; the answers are already in |
+| "Thank you, that's everything I needed. Have a good day." | Nothing, or hang up | The agent finishes the line and then ends the call itself (spec 0094). The answers are already in, so hanging up early loses nothing |
 
 The keypad steps (`specs/0043-keypad-only-digits.md`):
 
@@ -223,6 +223,20 @@ finished") are educated guesses. The first calls test them. This check was writt
   report it: the settings change, not the pass bar. One exception: on a trial account, retry an
   `unknown` once first, since the trial message may confuse detection.
 - One call per case is a smoke check, not a measurement. Say so when you report the result.
+
+### The closing-line check, on the first calls (spec 0094)
+
+The agent now ends the call itself, after its closing line has played. Written before any call.
+
+- **Question:** do you hear the whole closing line before the line drops?
+- **Cases** (one call each; these can be the same calls as the detection check):
+  - (a) a full call, which ends with "Thank you, that's everything I needed. Have a good day.";
+  - (b) "No" at the consent question, which ends with "No problem, we won't continue. You can
+    reach us at ... Goodbye."
+- **Pass:** each line is heard to the end, and the call ends within about 2 seconds after it.
+  Stay on the line and let the agent hang up.
+- **If a line is cut off,** or the call hangs open, report it: the timing changes, not the bar
+  (spec 0094, Q160).
 
 ## 6. After the call
 
