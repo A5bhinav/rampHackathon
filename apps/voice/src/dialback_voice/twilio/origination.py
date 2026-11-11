@@ -42,9 +42,10 @@ AMD_SPEECH_THRESHOLD_MS = 4500
 # sent explicitly. Lower would save a little dead air but end a greeting at a natural pause, so
 # the disclosure would start while the person is still talking, on a call that can verify.
 AMD_SPEECH_END_THRESHOLD_MS = 1200
-# Silence after pickup before Twilio gives up with "unknown". Twilio's default, sent explicitly;
-# Part C of spec 0080 lowers it once an "unknown" label stops blocking verification (Part B).
-AMD_SILENCE_TIMEOUT_MS = 5000
+# Silence after pickup before Twilio gives up with "unknown": half Twilio's 5000 ms default (spec 0080,
+# Part C), so someone who picks up and waits hears the disclosure after about 2.5 s. More calls come
+# back "unknown", which no longer blocks: with the digits typed on the keypad they verify (Part B).
+AMD_SILENCE_TIMEOUT_MS = 2500
 
 
 class Originator(Protocol):

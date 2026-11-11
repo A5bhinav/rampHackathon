@@ -262,7 +262,28 @@ silently then hears the disclosure after about 2.5 seconds instead of 5.
   would send more good calls to review, so it waits.
 - **Risk:** someone who waits about 2.5 seconds and then says "Hello?" may overlap the first words
   of the disclosure. Check case (d) and the talk-over question cover this.
-- It gets its own small PR.
+- It gets its own small PR, stacked on Part B's and merged after it.
+
+#### Acceptance, Part C
+
+- [ ] C1. The dial request sends `MachineDetectionSilenceTimeout=2500`. The other detection
+  settings are unchanged (A1), and the constant's comment says why.
+- [ ] C2. `docs/live-call.md`: picking up in silence now gets the disclosure after about 2.5
+  seconds, and the check gains case (d), pick up and say nothing.
+  - **Pass:** the label is `unknown`, the whole disclosure is heard, and the call verifies with
+    typed digits.
+  - **Also record, once:** say "Hello?" at about 3 seconds, which lands on the disclosure, since it
+    starts at about 2.5 seconds. Note whether the disclosure was still heard in full. That is the
+    real R8 risk Part C adds. It isn't a pass condition, but a "no" is reported and revisits the
+    value.
+  - Corrected after the review: the first draft's bar ("the disclosure doesn't start over a 'Hello?'
+    at about 3 seconds") could not fail.
+
+#### Tests, Part C
+
+| Acceptance item | Test |
+|---|---|
+| C1 | `apps/voice/tests/test_origination.py::test_dial_request_carries_the_detection_settings` (its 5000 becomes 2500, on purpose) |
 
 ## Considered and rejected
 
@@ -288,7 +309,7 @@ Part A:
 
 - [ ] A1. The dial request sends `MachineDetection=Enable`, `MachineDetectionSpeechThreshold=4500`,
   `MachineDetectionSpeechEndThreshold=1200` and `MachineDetectionSilenceTimeout=5000`, and sends no
-  `AsyncAmd` and no `MachineDetectionTimeout`.
+  `AsyncAmd` and no `MachineDetectionTimeout`. (Part C's C1 supersedes the 5000: it is 2500.)
 - [ ] A2. The values are named constants in `twilio/origination.py`, each with its reason in a comment.
 - [ ] A3. A signed TwiML fetch logs exactly one INFO line on `dialback_voice.app` in D3's format,
   with our path call id, the `AnsweredBy` value and the duration. The TwiML returned is the same as
