@@ -6,15 +6,13 @@ import dataclasses
 import datetime as dt
 import json
 import re
-import uuid
 from pathlib import Path
 
 import pytest
+from dialback_evals.bridge import world_from_documents
 from dialback_evals.gencorpus import freeze, fuzz, load_all, load_world, rerun, world_digest
 from dialback_evals.worldgen import NumberSpec, SightingSpec, World, make_world, run
-from dialback_ledger.ingest import ingest_all
 from dialback_ledger.reader import StubReader
-from dialback_ledger.select import ChangeRequest, DocumentRef, Settings, Sighting
 
 ROOT = Path(__file__).resolve().parents[2]
 GENERATED = ROOT / "evals" / "corpus-generated"
@@ -158,7 +156,7 @@ def _ingest(request_lines: list[str], extra: list[tuple]) -> World:
                             "subject": subject},
                 "pages": [{"width": 612, "height": 792, "spans": spans}]}
 
-    ingested = ingest_all([
+    documents = [
         doc("c1", "contract", 200, None, None, None, "Accounts receivable: (415) 555-0142"),
         doc("l1", "listing", 200, None, None, None, "Accounts receivable: (415) 555-0142"),
         doc("c2", "contract", 150, None, None, None, "Accounts receivable: (645) 555-0177"),
@@ -166,21 +164,12 @@ def _ingest(request_lines: list[str], extra: list[tuple]) -> World:
         doc("req", "email", 0, "ap@acme.example", "req", "Updated banking details", *request_lines),
         *(doc(i, ch, days, sender, thread, subject, *texts, minutes=minutes)
           for i, ch, days, sender, thread, subject, texts, minutes in extra),
-    ], extractor_version="lab-0083", reader=StubReader())   # named, never from the environment (spec 0049, D8)
-    req = next(d for d in ingested.documents if d["id"] == "req")
-    settings = Settings()
-    kwargs = {
-        "case_id": uuid.UUID(int=1), "dataset_id": uuid.UUID(int=2), "vendor_id": uuid.UUID(int=3),
-        "vendor_domains": ("acme.example",),
-        "request": ChangeRequest("req", req["received_at"], "req", req["subject"], req["sender"]),
-        "requested_cutoff": t0, "case_opened_at": t0 + dt.timedelta(hours=1),
-        "documents": [DocumentRef(d["id"], d["custody_channel"], d["received_at"], d["sender"], d["thread_id"],
-                                  d["subject"], d["received_at"]) for d in ingested.documents],
-        "sightings": [Sighting(o["value_normalized"], o["document_id"], o["source_type"], o["seen_at"], o["visibility"],
-                               o["role"], o["party"], o["seen_at"]) for o in ingested.observations],
-        "settings": settings,
-    }
-    return World(kwargs=kwargs, poison=frozenset({PLANTED_LINE}), settings=settings)
+    ]
+    # Spec 0052, decision 4: the one bridge from ingestion to select(), with the stub reader named, never
+    # taken from the environment (spec 0049, D8).
+    return world_from_documents(documents, request_id="req", vendor_domains=("acme.example",), requested_cutoff=t0,
+                                case_opened_at=t0 + dt.timedelta(hours=1), reader=StubReader(),
+                                extractor_version="lab-0083", poison=frozenset({PLANTED_LINE}))
 
 
 def test_ingested_case_is_still_what_real_ingestion_produces():

@@ -1,0 +1,89 @@
+{
+  "name": "g3-customer-billing-clock-time-c10f3246",
+  "patterns": [
+    "G3/customer_billing/clock_time",
+    "G4/customer_billing/clock_time"
+  ],
+  "why": "G3/customer_billing/clock_time: shrunk from doc-s0-00179, found by lab docs at seed 0 in 1000 documents",
+  "violations": [
+    {
+      "pattern": "G3/customer_billing/clock_time",
+      "number": "+13125550116",
+      "detail": "claim billing, customer labeled main, vendor"
+    },
+    {
+      "pattern": "G4/customer_billing/clock_time",
+      "number": "+13125550116",
+      "detail": "claim billing, customer labeled main, vendor"
+    }
+  ],
+  "plan": {
+    "type": "doc",
+    "id": "doc-s0-00179",
+    "kind": "email_body",
+    "author": "attacker",
+    "channel": "email",
+    "sender": "ar@acrne.example",
+    "thread": "t-doc-s0-00179",
+    "subject": "Following up",
+    "received_at": "2026-07-04T16:00:00+00:00",
+    "filler": [],
+    "numbers": [
+      {
+        "e164": "+13125550116",
+        "owner": "vendor",
+        "role": "billing",
+        "party": "customer",
+        "phrasing": "customer_billing",
+        "placement": "clock_time",
+        "format": "paren",
+        "visibility": "visible",
+        "shares_line": false
+      }
+    ],
+    "quote": null
+  },
+  "documents": [
+    {
+      "id": "doc-s0-00179",
+      "kind": "email_body",
+      "custody": {
+        "channel": "email",
+        "received_at": "2026-07-04T16:00:00+00:00",
+        "sender": "ar@acrne.example",
+        "thread_id": "t-doc-s0-00179",
+        "subject": "Following up",
+        "parent_document_id": null
+      },
+      "pages": [
+        {
+          "width": 612,
+          "height": 792,
+          "spans": [
+            {
+              "text": "Message",
+              "x": 72,
+              "y": 72,
+              "size": 10,
+              "color": "#000000"
+            },
+            {
+              "text": "Acme Fasteners",
+              "x": 72,
+              "y": 86,
+              "size": 10,
+              "color": "#000000"
+            },
+            {
+              "text": "Office hours 9:00-5:00, Customer billing: (312) 555-0116",
+              "x": 72,
+              "y": 100,
+              "size": 10,
+              "color": "#000000"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

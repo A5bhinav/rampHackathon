@@ -9,6 +9,10 @@ and needs no key. `--max-usd` is accepted for forward compatibility; the scripte
 `--out`, then checks `--examples` reports per domain at `--seed`, freezing the first report for each new
 label; it exits non-zero on a frozen report that still fails or any reachable-domain violation.
 
+`lab docs` (spec 0052) re-runs the frozen document cases under `--out`, then checks `--examples` generated
+documents (and G7's sweep of worlds) at `--seed` through real ingestion with the stub reader, freezes a
+shrunk case for each new failing pattern, and holds the failing patterns to lab-docs' known-failures list.
+
 `lab fuzz` re-runs every frozen finding under `--out`, then searches `--examples` generated worlds at
 `--seed`, freezing the first shrunk violation there; it exits non-zero on any frozen case that still
 fails or any new finding. `lab frontier` and `lab overblock` write the two measurement tables and exit
@@ -100,6 +104,14 @@ def main(argv: list[str] | None = None) -> int:
     rp.add_argument("--seed", type=int, default=0)
     rp.add_argument("--out", default=str(_REPO / "evals" / "reports-generated"))
     rp.add_argument("--known-failures", default="auto", help=_KNOWN_HELP)
+    dc = sub.add_parser("docs", help="re-run frozen document findings, then check generated documents (spec 0052)")
+    dc.add_argument("--examples", type=int, default=1000)
+    dc.add_argument("--seed", type=int, default=0)
+    dc.add_argument("--out", default=None, help="where frozen cases live (default: evals/docs-generated at the gate's "
+                    "seed, evals/out/docs-generated-seed<N> at any other, so exploring never touches the gate)")
+    dc.add_argument("--report", default=str(_REPO / "evals" / "out" / "docs-report.json"))
+    dc.add_argument("--known-failures", default="auto", help=_KNOWN_HELP + "; for lab docs, auto with --out left "
+                    "out holds any seed to the repo's list")
     freeze = sub.add_parser("freeze", help="record each scenario's hash and required outcome (expected.lock.json)")
     freeze.add_argument("--split", default="voice")
     freeze.add_argument("--scenarios-root", default=str(_REPO / "evals" / "scenarios"))
@@ -126,6 +138,9 @@ def main(argv: list[str] | None = None) -> int:
         return _overblock(Path(args.out))
     if args.command == "sweep":
         return _sweep(Path(args.scenarios_root) / args.split, args.examples, args.seed, Path(args.unreachable))
+    if args.command == "docs":
+        out = _docs_out(args.out, args.seed)
+        return _docs(args.examples, args.seed, out, Path(args.report), _docs_known(args.known_failures, args.out, out))
     if args.command == "reports":
         return _reports(args.examples, args.seed, Path(args.out),
                         _known(args.known_failures, Path(args.out), _REPO / "evals" / "reports-generated"))
@@ -236,6 +251,59 @@ def _reports(examples: int, seed: int, out_dir: Path, known_failures: Path | Non
           f"label(s) (seed {seed}, {examples} reports per domain)")
     held = _held("lab-reports", known_failures, dict(done.frozen_failing), done.reachable_hits)
     return (1 if done.frozen_failing or done.gated else 0) if held is None else held
+
+
+DOCS_GATE_SEED = 0   # the seed lab-docs gates on; its frozen cases are the committed ones
+
+
+def _docs_out(out: str | None, seed: int) -> Path:
+    """Where `lab docs` keeps frozen cases: `out` when given; else the committed folder at the gate's seed,
+    and a gitignored one per seed otherwise, so a run at another seed never adds cases the gate re-runs."""
+    if out is not None:
+        return Path(out)
+    if seed == DOCS_GATE_SEED:
+        return _REPO / "evals" / "docs-generated"
+    return _REPO / "evals" / "out" / f"docs-generated-seed{seed}"
+
+
+def _docs_known(choice: str, out_arg: str | None, out: Path) -> Path | None:
+    """The list a `lab docs` run holds itself to. `auto` with --out left out is the repo's list at any seed (the
+    committed folder at the gate's seed, the per-seed folder otherwise); with a folder of your own, none."""
+    if choice == "auto" and out_arg is None:
+        return KNOWN_FAILURES
+    return _known(choice, out, _REPO / "evals" / "docs-generated")
+
+
+def _docs(examples: int, seed: int, out_dir: Path, report_path: Path, known_failures: Path | None = None) -> int:
+    """Spec 0052: re-run every frozen document case, then check the fixed sample of generated documents
+    and worlds against the stub reader (no network), freeze a shrunk case for each failing pattern no frozen
+    case shows yet, and hold the failing patterns to lab-docs' known-failures list (decision 6)."""
+    from dialback_ledger.reader import StubReader
+
+    from . import docgen
+    reader = StubReader()
+    frozen = docgen.rerun_frozen(out_dir, reader=reader)
+    drifted = [name for name, _, drift in frozen if drift]
+    for name in drifted:
+        print(f"lab docs: frozen case {name} no longer renders to its frozen documents: it no longer means what it meant")
+    for name, patterns, _ in frozen:
+        if patterns:
+            print(f"lab docs: frozen case {name} still fails: {', '.join(patterns)}")
+    found = docgen.run(examples=examples, seed=seed, reader=reader)
+    new = docgen.freeze_new(found, out_dir, {p for _, patterns, _ in frozen for p in patterns}, reader=reader)
+    body = docgen.report(found)          # the stub report: unsafe, wrong parties, over-blocks, G5 stability
+    _write(report_path, body)
+    for line in docgen.report_lines(body):
+        print(f"lab docs: {line}")
+    for name, pattern in new:
+        print(f"lab docs: {pattern} frozen as {name} under {out_dir}")
+    failing = {p: [p.split("/", 1)[0]] for p in {*body["patterns"], *(p for _, ps, _ in frozen for p in ps)}}
+    print(f"lab docs: {len(failing)} failing pattern(s), {len(frozen)} frozen case(s) re-run, {len(new)} new "
+          f"(seed {seed}, {examples} documents, stub reader); report in {report_path}")
+    held = _held("lab-docs", known_failures, failing, [])
+    if drifted:
+        return 1
+    return (1 if failing else 0) if held is None else held
 
 
 def _write(path: Path, body: dict) -> None:

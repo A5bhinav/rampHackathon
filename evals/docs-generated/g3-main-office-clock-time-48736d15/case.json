@@ -1,0 +1,89 @@
+{
+  "name": "g3-main-office-clock-time-48736d15",
+  "patterns": [
+    "G3/main_office/clock_time",
+    "G4/main_office/clock_time"
+  ],
+  "why": "G3/main_office/clock_time: shrunk from doc-s0-00086, found by lab docs at seed 0 in 1000 documents",
+  "violations": [
+    {
+      "pattern": "G3/main_office/clock_time",
+      "number": "+19785550141",
+      "detail": "claim main, bank labeled main, vendor"
+    },
+    {
+      "pattern": "G4/main_office/clock_time",
+      "number": "+19785550141",
+      "detail": "claim main, bank labeled main, vendor"
+    }
+  ],
+  "plan": {
+    "type": "doc",
+    "id": "doc-s0-00086",
+    "kind": "email_body",
+    "author": "bank",
+    "channel": "email",
+    "sender": "notices@firstexamplebank.example",
+    "thread": "t-doc-s0-00086",
+    "subject": "Following up",
+    "received_at": "2025-09-07T16:00:00+00:00",
+    "filler": [],
+    "numbers": [
+      {
+        "e164": "+19785550141",
+        "owner": "bank",
+        "role": "main",
+        "party": "bank",
+        "phrasing": "main_office",
+        "placement": "clock_time",
+        "format": "paren",
+        "visibility": "visible",
+        "shares_line": false
+      }
+    ],
+    "quote": null
+  },
+  "documents": [
+    {
+      "id": "doc-s0-00086",
+      "kind": "email_body",
+      "custody": {
+        "channel": "email",
+        "received_at": "2025-09-07T16:00:00+00:00",
+        "sender": "notices@firstexamplebank.example",
+        "thread_id": "t-doc-s0-00086",
+        "subject": "Following up",
+        "parent_document_id": null
+      },
+      "pages": [
+        {
+          "width": 612,
+          "height": 792,
+          "spans": [
+            {
+              "text": "Message",
+              "x": 72,
+              "y": 72,
+              "size": 10,
+              "color": "#000000"
+            },
+            {
+              "text": "First Example Bank",
+              "x": 72,
+              "y": 86,
+              "size": 10,
+              "color": "#000000"
+            },
+            {
+              "text": "Office hours 9:00-5:00, Main office: (978) 555-0141",
+              "x": 72,
+              "y": 100,
+              "size": 10,
+              "color": "#000000"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
