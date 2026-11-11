@@ -1,0 +1,32 @@
+{
+  "set": "heldout2",
+  "model": "claude-haiku-5-5",
+  "flagger": "model",
+  "emails": 110,
+  "change_requests_total": 39,
+  "change_requests_flagged": 39,
+  "change_requests_by_model": 39,
+  "ordinary_total": 70,
+  "ordinary_flagged": 4,
+  "ordinary_by_model": 4,
+  "failures": {},
+  "failed": {},
+  "missed": [],
+  "false_flags": [
+    "ord-06.json",
+    "ord-25.json",
+    "ord-38.json",
+    "ord-39.json"
+  ],
+  "calls": 110,
+  "input_tokens": 85497,
+  "output_tokens": 5842,
+  "cost_usd": 0.0114707,
+  "latency_p50_s": 0.9521748750121333,
+  "latency_p95_s": 2.8913637080113403,
+  "cr_36": {
+    "flagged": false
+  },
+  "bar_without_cr_36": "FAIL",
+  "bar_with_cr_36": "FAIL"
+}
