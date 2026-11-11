@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import config from "../next.config.ts";
-import { appOf, canSeeControl, isCurrent, navFor, switchTargets } from "../src/lib/apps.ts";
+import { appOf, canSeeControl, isCurrent, navFor, switchTargets, pageCrumb } from "../src/lib/apps.ts";
 
 test("AP workspace lists Inbox, Cases and Vendors", () => {
   const nav = navFor("ap", "ds1");
@@ -61,4 +61,17 @@ test("the old routes redirect to Control, keeping the dataset (and the query, wh
   assert.equal(to("/d/:datasetId/risk")?.destination, "/d/:datasetId/control/trust-ledger");
   assert.equal(to("/d/:datasetId/evidence")?.destination, "/d/:datasetId/control/evidence");
   for (const r of rules) assert.equal(r.permanent, false, r.source);
+});
+
+test("the top bar names every page: the app, then the page", () => {
+  assert.deepEqual(pageCrumb("control", "ds1", "/d/ds1/control/evidence"),
+    { app: { label: "Control", href: "/d/ds1/control" }, page: "Evidence" });
+  assert.equal(pageCrumb("control", "ds1", "/d/ds1/control").page, "Overview");
+  assert.equal(pageCrumb("control", "ds1", "/d/ds1/control/people").page, "People");
+  assert.equal(pageCrumb("control", "ds1", "/d/ds1/control/demo").page, "Demo controls");
+  assert.equal(pageCrumb("ap", "ds1", "/d/ds1/cases").page, "Inbox");
+  assert.equal(pageCrumb("ap", "ds1", "/d/ds1/cases/all").page, "Cases");
+  assert.equal(pageCrumb("ap", "ds1", "/d/ds1/vendors").page, "Vendors");
+  assert.equal(pageCrumb("ap", "ds1", "/d/ds1/ramp").page, "Ramp (mock)");
+  assert.deepEqual(pageCrumb("ap", "ds1", "/d/ds1/somewhere"), { app: { label: "AP workspace", href: "/d/ds1/cases" }, page: null });
 });
