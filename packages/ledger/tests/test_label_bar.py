@@ -12,7 +12,7 @@ around it. The last sections run `select()`, the guard around it, under the two 
 import datetime as dt
 
 import pytest
-from _world import REQUEST, T0, at, calls, flags, frozen, in_thread, provable, run, world
+from _world import REQUEST, T0, at, calls, corpus_world, flags, frozen, in_thread, provable, run, world
 from dialback_ledger.select import (
     NO_REQUEST,
     RULE_VERSION,
@@ -26,6 +26,8 @@ from dialback_ledger.select import (
     change_context_documents,
 )
 from hypothesis import example, given, settings
+from test_demo_picks import STORIES, demo_world
+from test_select_corpus import TRUTHS
 from test_select_properties import any_rows
 
 REAL, PLANTED = "+14155550142", "+16455550177"   # the vendor's line; a provable number someone planted
@@ -428,3 +430,20 @@ def test_todays_eligible_stay_eligible_in_order(rs):
     today, new = ranked(frozen(w)), ranked(inner(w))
     assert set(today) <= set(new)
     assert [e for e in new if e in today] == today
+
+
+# The label-free worlds on file: the frozen corpus and the demo ----------------------------------------
+
+FILED = [*(pytest.param(lambda path=path: corpus_world(path)[1], id=path.stem) for path in TRUTHS),
+         *(pytest.param(lambda ref=ref: demo_world(ref), id=f"demo-{ref}") for ref in sorted(STORIES))]
+
+
+@pytest.mark.parametrize("build", FILED)
+def test_corpus_and_demo_worlds_are_todays(build):
+    # The acceptance list: on every label-free world, the result is today's, field for field but the
+    # three that name the rule, against 0079's frozen copy.
+    w = build()
+    against = [s for s in w["sightings"]
+               if s.visibility == "visible" and (s.party != "vendor" or s.role.strip().lower() == "fax")]
+    assert against == [], "the premise: no visible label against any number"
+    assert without(inner(w), VERSION_FIELDS) == without(frozen(w), VERSION_FIELDS)
