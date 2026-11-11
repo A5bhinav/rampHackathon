@@ -39,11 +39,10 @@ type Attempt = Pick<CallAttempt, "call_id" | "attempt" | "result" | "started_at"
 export function attemptRows<T extends Attempt>(calls: readonly T[]): { call: T; expanded: boolean; line: string }[] {
   const answered = calls.findLastIndex((c) => c.answers.length > 0);
   const shown = answered >= 0 ? answered : calls.length - 1;
-  const total = Math.max(calls.length, ...calls.map((c) => c.attempt));
   return calls.map((c, i) => {
     const result = c.result ? words(c.result) : "in progress";
     const line = i === shown
-      ? [`Attempt ${c.attempt} of ${total}`, result,
+      ? [`Attempt ${c.attempt}`, result,  // no "of N": the list can hold earlier versions' calls, each numbered from 1
          c.dialed_number_is_pick === true ? "the Trust Ledger's pick" : c.dialed_number_is_pick === false ? "not the Trust Ledger's pick" : null]
         .filter(Boolean).join(" · ")
       : [`Attempt ${c.attempt}`, result, brief(c.started_at) || null].filter(Boolean).join(" · ");

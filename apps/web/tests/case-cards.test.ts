@@ -35,7 +35,9 @@ test("only the attempt the decision read stays expanded; earlier ones are one li
   const rows = attemptRows([call(1, "callback_requested"), call(2, "answers_recorded", 5)]);
   assert.deepEqual(rows.map((r) => r.expanded), [false, true]);
   assert.equal(rows[0].line, "Attempt 1 · callback requested · Nov 11, 00:51 UTC");
-  assert.equal(rows[1].line, "Attempt 2 of 2 · answers recorded · the Trust Ledger's pick");
+  assert.equal(rows[1].line, "Attempt 2 · answers recorded · the Trust Ledger's pick");
+  // Earlier versions' calls are listed too and each version numbers from 1, so no "of N" (it read "1 of 3").
+  assert.equal(attemptRows([call(1, "answers_recorded", 5), call(1, "answers_recorded", 5)])[1].line, "Attempt 1 · answers recorded · the Trust Ledger's pick");
   // A later attempt without answers doesn't take the place of the one the decision read.
   assert.deepEqual(attemptRows([call(1, "answers_recorded", 5), call(2, "no_answer")]).map((r) => r.expanded), [true, false]);
   // Nothing answered yet: the newest attempt is the one to show.
