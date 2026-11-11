@@ -164,7 +164,9 @@ them follows.
   ("Yes, fix it"); measured again as W4 above.
 - **Q154, resolved: accepted.** `M_shared_id_helped` rises from 230 to 271, all through A5's latent
   duplicate ids; production can't file two documents under one id, and A5 gets its own fix. Sami,
-  Nov 10.
+  Nov 10. While building, the same gap also showed up as `I1`, `I4` and `I5` hits in the archive
+  search (a number a weak label used to refuse becomes eligible, so the lab's worst-of-both-copies
+  view of a duplicate id now applies to it). They are listed under A5 too.
 - **Q155, resolved: the middle option is rejected.** It used this rule only where today's rule
   calls nobody, and otherwise called what both rules agree on, else nobody. In generated worlds it
   sent the honest-warning case (the table's last row) to a person instead of the planted number.
