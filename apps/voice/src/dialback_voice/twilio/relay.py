@@ -23,11 +23,18 @@ the caller (a prompt, partial or final, even an empty one; a key; Twilio's clien
 it, and a caller mid-sentence holds it, but never past QUIET_CAP_FACTOR waits, so nothing keeps a
 wait open for good. When the quiet has lasted from the latest activity, the relay hands step a
 Silence, and step checks in or ends the call closed. Code, never the model, decides what counts as
-activity (R3). While digits are held, the keypad wait governs instead (D7)."""
+activity (R3). While digits are held, the keypad wait governs instead (D7).
+
+At the end (spec 0094) the call is reported first, through `on_end`, so the decision is not held
+back. The relay then waits for the closing line to play, until Twilio says the agent stopped or
+the speech estimate runs out, and sends ConversationRelay's `end`, so Twilio ends the call on
+purpose instead of losing the socket mid-sentence."""
 from __future__ import annotations
 
 import asyncio
 import datetime as dt
+import logging
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any, Protocol
 
@@ -36,6 +43,8 @@ from dialback_policy import step as policy
 from .. import tokens as _tokens
 from ..agent import Agent
 from ..transport import CallResult, Clock, _ask
+
+log = logging.getLogger(__name__)
 
 
 class WebSocketLike(Protocol):
@@ -105,6 +114,10 @@ class SpeechEstimate:
 
 SPEECH_ESTIMATE = SpeechEstimate()
 
+# After Twilio says the closing line stopped, this long before the end, so network delay never
+# clips the last word (spec 0094, D2). Without that report, the speech estimate is the wait.
+END_TAIL_SECONDS = 0.5
+
 
 async def run_relay(ctx: policy.CallContext, agent: Agent, ws: WebSocketLike, *,
                     verify: Any, clock: Clock, greeting: str | None = None,
@@ -112,17 +125,26 @@ async def run_relay(ctx: policy.CallContext, agent: Agent, ws: WebSocketLike, *,
                     quiet_seconds_last4: float = QUIET_SECONDS_LAST4,
                     after_check_in_seconds: float = AFTER_CHECK_IN_SECONDS,
                     after_check_in_seconds_last4: float = AFTER_CHECK_IN_SECONDS_LAST4,
-                    estimate: SpeechEstimate = SPEECH_ESTIMATE, max_steps: int = 500) -> CallResult:
+                    estimate: SpeechEstimate = SPEECH_ESTIMATE, max_steps: int = 500,
+                    on_end: Callable[[CallResult], Awaitable[None]] | None = None) -> CallResult:
     """Read the setup, verify it, then run step() to its End over the socket. Mirrors run_call.
 
     `greeting`, when set, is a line ConversationRelay has already spoken as the welcomeGreeting (the
     disclosure): step still produces and records it, but it is not sent again over the socket, so the
     callee hears it once (R8). `keypad_timeout` is the wait after the last key; the quiet timings and
-    the speech `estimate` set the quiet clock (spec 0051). Tests shorten them all."""
+    the speech `estimate` set the quiet clock (spec 0051). Tests shorten them all.
+
+    `on_end`, when set, is awaited with every result this returns, before any waiting: the caller
+    reports the call there (spec 0094, D1). After an End that spoke a closing line, the relay then
+    waits for the line to play and sends ConversationRelay's `end`, even when `on_end` raises; the
+    error then propagates (D5)."""
     setup = await _setup_message(ws)
     if not verify(setup):
         await ws.close()                                     # a stray or cross-wired socket (R7)
-        return _failed(ctx, "setup_rejected")
+        rejected = _failed(ctx, "setup_rejected")
+        if on_end is not None:
+            await on_end(rejected)                           # reported, with nothing spoken and no end (D6)
+        return rejected
 
     def quiet_limit(state: policy.State) -> float:
         """The seconds of quiet this wait allows: longer while the digits question is the open one,
@@ -139,11 +161,27 @@ async def run_relay(ctx: policy.CallContext, agent: Agent, ws: WebSocketLike, *,
         for _ in range(max_steps):
             out = policy.step(state, event)
             state = out.state
+            spoken = True
             if out.say:
-                await _send(ws, out.say, greeting)
+                try:
+                    await _send(ws, out.say, greeting)
+                except Exception:                            # mid-call this propagates, as before
+                    if out.end is None:
+                        raise
+                    spoken = False                           # hung up at the closing line: still report (D7)
             if out.end is not None:
-                return CallResult(end=out.end, answers=policy.answers_object(state),
-                                  checks=policy.checks(state), transcript=state.turns)
+                result = CallResult(end=out.end, answers=policy.answers_object(state),
+                                    checks=policy.checks(state), transcript=state.turns)
+                closing = tuple(line for line in out.say or () if line != greeting) if spoken else ()
+                if closing:
+                    inbox.arm(closing, 0.0, estimate)        # the estimate counts from the send (spec 0094, D2)
+                try:
+                    if on_end is not None:
+                        await on_end(result)                 # the report goes out before any waiting (D1)
+                finally:
+                    if closing and await inbox.finish(END_TAIL_SECONDS):
+                        await _end_session(ws)               # only a socket still up gets the end (D4)
+                return result
             if out.ask_agent is not None:
                 event = _ask(agent, out.ask_agent, clock())
                 continue
@@ -169,6 +207,15 @@ async def _send(ws: WebSocketLike, lines: tuple[str, ...], greeting: str | None 
         if greeting is not None and line == greeting:
             continue  # ConversationRelay already spoke this as the welcomeGreeting (R8); don't repeat it
         await ws.send_json({"type": "text", "token": line, "last": True})
+
+
+async def _end_session(ws: WebSocketLike) -> None:
+    """ConversationRelay's `end`: Twilio ends the session, and with no TwiML after it, the call. A
+    send that fails changes nothing: the call is over either way (spec 0094, D4)."""
+    try:
+        await ws.send_json({"type": "end"})
+    except Exception:  # noqa: BLE001  the far end is already gone
+        log.info("the end message did not send; the caller had already hung up")
 
 
 _TIMED_OUT = object()   # what _Inbox._receive returns when a wait runs out: never a message
@@ -283,6 +330,30 @@ class _Inbox:
             if event is not None:
                 self._digits.clear()                         # a spoken turn ends a partial keypad entry
                 return event
+
+    async def finish(self, tail: float) -> bool:
+        """Wait for the closing lines armed by `arm` to play (spec 0094, D2): until Twilio says the
+        agent stopped (an "off" after an "on" since the send) plus `tail`, or until the estimate,
+        whichever comes first. Everything else that arrives meanwhile, a prompt or a key included,
+        is dropped: the call has ended (D3). True if the wait ran out with the socket still up, False
+        if a receive failed (the caller hung up first)."""
+        loop = asyncio.get_running_loop()
+        while True:
+            deadline = self._estimate_at
+            if self._stopped_at is not None:
+                deadline = min(deadline, self._stopped_at + tail)
+            try:
+                msg = await self._receive(max(0.0, deadline - loop.time()))
+            except Exception:  # noqa: BLE001  a dead socket: nothing more to send
+                log.info("closing line: the wait ended (dropped)")
+                return False
+            if msg is _TIMED_OUT:
+                # Which ended it, for tuning from live calls (spec 0094, D8). No content, no number.
+                why = "agent_stopped" if self._stopped_at is not None and deadline < self._estimate_at else "estimate"
+                log.info("closing line: the wait ended (%s)", why)
+                return True
+            if isinstance(msg, dict) and msg.get("type") == "info":
+                self._info(msg, loop.time())
 
     async def _receive(self, timeout: float) -> Any:
         """The next message, or _TIMED_OUT when `timeout` seconds pass first. Raises what the socket
