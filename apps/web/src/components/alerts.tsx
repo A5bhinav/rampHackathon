@@ -46,9 +46,10 @@ export function AlertChip({ alerts, datasetId }: { alerts: Alert[]; datasetId: s
   return (
     <details className="alert-chip">
       <summary className={`badge tone-${chip.tone}`} aria-label={`Alerts: ${chip.label}`}>{chip.label}</summary>
+      {chip.tone === "bad" ? <span className="sr-only" role="alert">{`Alerts: ${chip.label}`}</span> : null}
       <ul className="alert-pop">
         {shown.map((a) => (
-          <li key={a.id} role={a.severity === "critical" ? "alert" : undefined}>
+          <li key={a.id}>
             <span className={`badge tone-${a.severity === "critical" ? "bad" : "warn"}`}>{TITLES[a.kind] ?? a.kind}</span>
             <p>{a.message}</p>
             <p className="muted sub">{when(a.raised_at)}{a.case_id ? <> · <Link href={`/d/${datasetId}/cases/${a.case_id}`}>Open the case</Link></> : null}</p>

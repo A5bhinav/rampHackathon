@@ -986,8 +986,8 @@ ol.slots li.is-filled { animation: slot-in 360ms var(--ease) both; }
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .page-title-aside { flex: none; display: flex; gap: 8px; align-items: center; }
 .page-title-aside .present-links { margin: 0; }
-.page-sub { font-size: 14px; line-height: 22px; color: var(--muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.page-sub .tags { display: inline-flex; flex-wrap: nowrap; gap: 8px; align-items: center; margin: 0; }
+.page-sub { font-size: 14px; line-height: 22px; color: var(--muted); min-width: 0; }
+.page-sub .tags { display: inline-flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; margin: 0; }  /* wraps, never clips */
 .page-sub .held-n { font-size: 14px; color: var(--ink); }
 .page-intro { max-width: 80ch; margin: -8px 0 0; font-size: 14px; line-height: 21px; }
 .main-col > .banners { display: none; }  /* no stacked banners above inner pages */
@@ -1007,7 +1007,5 @@ ol.slots li.is-filled { animation: slot-in 360ms var(--ease) both; }
 .utilbar:not(:has(.crumbs, .viewing-as, .present, .alert-chip)) { display: none; }
 @media (max-width: 720px) {
   .page-title h1 { white-space: normal; }
-  .page-sub { white-space: normal; }
-  .page-sub .tags { flex-wrap: wrap; }
   .page-title-row { flex-wrap: wrap; }
 }
