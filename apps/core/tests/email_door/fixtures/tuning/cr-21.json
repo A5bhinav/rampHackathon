@@ -1,0 +1,8 @@
+{
+  "subject": "Quick request - vendor bank update",
+  "sender": "CFO Office <cfo@brightline.example>",
+  "text": "Are you at your desk? I need you to update the bank details for Brightline Office Supply\nInc in the vendor system before end of day. I am in meetings so reply here and I will send\nthe details. Keep this between us until it is done.",
+  "label": "change_request",
+  "vendor": "brightline",
+  "note": "Internal-looking BEC style request to change vendor details; no details yet."
+}

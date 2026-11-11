@@ -57,7 +57,10 @@ None.
   among them, and any other); and each unpaid bill's status and payment date. The release's
   read-backs now read the bills too. Parts within one read are read one after another, a second or
   two apart on the sandbox, so the timeline is coarse; a part that changes reads earlier than one
-  that doesn't is still plain.
+  that doesn't is still plain. Since spec 0097 D5 the layer reads a vendor's `status` when it has
+  one, so the check reads the audit log on its own for that column (and reuses the layer's reading
+  when the vendor has no `status`), and reports a second hold Ramp refused as already on (D5 reads
+  it as placed) with Ramp's own answer, not as "accepted".
 
 ## Found on the sandbox, 2026-11-10 (first run, one vendor: DocuSign, one unpaid bill)
 
@@ -93,6 +96,17 @@ None.
   audit log still showed the hold until the third (+7.0 s). Second hold refused again (400,
   `BILL_PAY_7284`); the date came back again. So the audit log is the part that lags (spec 0097,
   Q209).
+
+## Found on the sandbox, 2026-11-10 (fourth run, with spec 0097 D5)
+
+- The hold read back on the first read (2.4 seconds, that read's own length), so the worker's
+  first read-back would have seen it; the release likewise (2.9 seconds). The audit log showed
+  neither by then. The second hold's 400 read as on. The date came back.
+- New: on that first read the bill was `ON_HOLD` but still had its payment date; by the release's
+  first read the date was gone. So Ramp clears a held bill's date a moment after it marks it held.
+  The worker saves the dates before the hold, so it isn't misled; and in a case the release comes
+  minutes after the hold, so the date is long cleared before the worker sets it again. (In this
+  check the release comes seconds later; the date still came back.)
 
 ## Acceptance
 

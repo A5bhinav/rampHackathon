@@ -1,0 +1,8 @@
+{
+  "subject": "Bank merger notice",
+  "sender": "Dana Whitfield <dwhitfield@acmefasteners.com>",
+  "text": "Hi all, you may have seen our bank is being acquired. We've confirmed with them that routing and account numbers are unaffected. No action is needed on your side.\n\nDana",
+  "label": "ordinary",
+  "vendor": "acme",
+  "note": "Bank merger with no action requested."
+}

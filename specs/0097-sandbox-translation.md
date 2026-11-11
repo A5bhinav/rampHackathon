@@ -51,6 +51,24 @@ None.
   `Bill pay bank account updated` and answers under the core's name. A core name with no Ramp
   equivalent is a `RampError`. Ramp doesn't document `event_details` for this event, so the change's
   author stays unknown, and the release needs two approvers (ADR-10).
+- **D5. The hold from the vendor's own `status`** (added after the sandbox runs of spec 0099 showed
+  the audit log about 7 seconds behind, both ways, and the vendor's `status` right at once; Q209).
+  Ramp's vendor answer carries an undocumented `status`; its help center names the vendor statuses
+  Active, Inactive, On hold, Pending and Unmanaged. `ON_HOLD` is a hold (`hold_id` is
+  `status:ON_HOLD`, since Ramp gives a hold no id); `ACTIVE`, `INACTIVE`, `PENDING` and `UNMANAGED`
+  are not. Anything else (no field, null, a value not in that list) falls back to D3's audit-log
+  reading, so a status Ramp adds later can't be misread. And a hold Ramp refuses with
+  `BILL_PAY_7284` ("Vendor is already on hold") counts as placed: it is on, by Ramp's word, so the
+  worker's retry goes on to read it back. Any other refusal still raises.
+- **D6. Vendors whose bank accounts changed, though `updated_at` didn't** (Q210). With a `since`,
+  `list_vendors_updated_since` also reads Ramp's audit log across the business from `since` for the
+  bank-account event names that can add or change a vendor's account (`Bank account updated`, seen
+  on approval; `Bill pay bank account updated`; `Bill pay accepted sync for bank account from vendor
+  network`, Ramp's automatic replacements), and adds each vendor one is filed under (`Vendor /
+  Merchant`) that the `updated_at` list missed, read by id. Listing a vendor too many is harmless:
+  detection only acts on accounts it hasn't seen. The core's poll already looks back two minutes
+  (`WATERMARK_OVERLAP`), which covers the audit log's seconds of lag. A full read (no `since`) is
+  unchanged. A change still pending writes no event (Q204), so it isn't found here; that is Q205's.
 
 ## Acceptance
 
@@ -63,6 +81,13 @@ None.
 - [x] Importing a sandbox dataset's vendors stores them and their accounts, with an empty routing
       number and Ramp's last four.
 - [x] Everything else is unchanged: the core and SQL suites and the smoke run pass.
+- [x] D5: a vendor whose `status` is `ON_HOLD` is held, and one whose `status` is a known other value
+      isn't, both without reading the audit log; a missing or unknown `status` reads the audit log as
+      before; a hold refused with `BILL_PAY_7284` returns as placed, any other refusal raises.
+- [x] D6: with a `since`, a vendor with one of those events since then is listed though its
+      `updated_at` is older, once, and an event filed under anything but a vendor adds nothing;
+      without a `since`, the audit log isn't read; and the core's poll, given a watermark, finds a
+      new account on a vendor whose `updated_at` didn't move.
 
 ## Tests (written first)
 
@@ -112,12 +137,24 @@ None.
   (22:25 UTC) among the events read (the read stops at 1,000; whether it stopped wasn't printed).
   So while pending, the change shows only as a pending account. Whether approving it writes an
   event, and what the account's new id is, is still open: approve it and run the probe again.
+  **Answered on approval (same day, approved in the dashboard):** the account came back `active`
+  under a new id (`4879cce7-d182-4d04-a319-b9506d0feec9`), its pending id gone and `proposal_id`
+  null, so the pending and the approved account share only the last four. The old account (6789)
+  stayed active: the edit added an account. Ramp wrote `Bank account updated` (with `Approval chain
+  updated`) under the vendor, `event_details` keys `references` only; no `Bill pay bank account
+  updated`. So D4 asks for the wrong name for a change made in the dashboard, and the author can't
+  be read from it as built (no `new_account_id` key): the release needs two approvers (fail closed).
+  What `references` holds isn't printed yet. And the vendor's `updated_at` moved neither on the
+  request nor on the approval: see Q210.
 - **Q205:** a bank change can wait for approval in Ramp, and until then the proposed account shows
   only with `include_pending`, under an id Ramp replaces when it approves the change (Ramp's
   document). The layer reads without `include_pending`, so it sees the change only once approved,
   and a payment Ramp schedules between that approval and the core's next sync isn't held (R1).
   Should a sandbox dataset open the case while the change is pending, and how does the case follow
   the account across the new id (the last four and `proposal_id` are the candidates)?
+  **Decided (Sami, 2026-11-10): yes, so the approver sees Dialback's verdict.** Built as spec 0093:
+  the layer reads pending accounts, detection opens the case on one, and follows it by the last four,
+  since Ramp drops `proposal_id` on approval (Q204).
 - **Q206:** Ramp showed a hold about 7 to 10 seconds after answering 204 (the hold check, one run;
   each read took about 3 seconds). The worker's read-back reads three times, 0.2 and 0.4 seconds
   apart, so it may miss a hold that is on; it then retries the step, which places the hold again.
@@ -148,8 +185,23 @@ None.
   (+7.0 s). (One run each way: the pattern is plain, the seconds are coarse.) So the layer could read
   the hold from the vendor's `status` (undocumented, so falling back to the audit log if it's
   missing), and treat `BILL_PAY_7284` as the hold being on; then the worker's quick read-backs
-  would pass at once, with no change to the worker. Not built: that is spec 0097's layer, a
-  change of its own.
+  would pass at once, with no change to the worker. Built as D5: the worker's own read-back
+  (`Worker._read_back_hold`) now passes on its first read against a fake whose audit log is ten
+  reads behind, and misses without the status (`test_the_workers_own_read_back_*`). **Seen on the
+  sandbox, 2026-11-10 (fourth hold-check run):** the hold and the release each read back on the
+  first read (2.4 and 2.9 seconds, the length of that read), while the audit log showed neither yet;
+  the second hold's 400 read as on; the date came back. One vendor, one run: confirmed, not general.
+- **Q210, the biggest gap found:** on Ramp, a bank change doesn't move the vendor's `updated_at`
+  (seen: neither the request nor the approval did). The core's 60-second poll asks for vendors
+  updated since its last run (`list_vendors_updated_since`), so it never sees a bank change; only
+  the full sweep does, once a day by default. A payment to the new account could go out before
+  Dialback notices (R1). Candidates, sandbox side: the layer's updated-since list also returns
+  vendors with a `Bank account updated` event since then (the audit log, seconds behind, is fine
+  for a one-minute poll); and, for a change still pending (no event, no `updated_at`), a sweep
+  every minute (the sandbox has about 430 vendors, one accounts read each; spec 0100).
+  Built for approved changes as D6: the core's poll now finds a new account on a vendor whose
+  `updated_at` didn't move (`test_the_poll_finds_a_bank_change_*`). Not yet seen on the sandbox; a
+  change still pending is Q205's.
 - **Q207:** Ramp issued a token for a scope the app isn't allowed (`bills:write`) and refused only
   the call (HTTP 403). The core's login doesn't compare what Ramp granted with what it needs, so a
   sandbox dataset missing `bills:write` would hold and call normally, then fail every release when

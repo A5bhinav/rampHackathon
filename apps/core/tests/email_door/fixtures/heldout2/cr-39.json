@@ -1,0 +1,8 @@
+{
+  "subject": "Brightline Office Supply Inc - direction to pay",
+  "sender": "Whitcomb & Aldridge LLP <collections@whitcombaldridge-law.com>",
+  "text": "Re: Brightline Office Supply Inc. / Larkspur Industries\nOur File No. 26-4471\n\nDear Sir or Madam:\n\nThis firm represents Brightline Office Supply Inc. in connection with the settlement of certain disputed receivables and the restructuring of its accounts. Pursuant to the agreement between our client and its lender, our client has directed that, effective immediately, all payments due to Brightline Office Supply Inc. be made to this firm's IOLTA trust account for disbursement:\n\nWhitcomb & Aldridge LLP IOLTA Trust Account\nBank: Bank of America\nABA: 026009593\nAccount: 4831 0076 2259\nReference: Brightline / Larkspur\n\nPayment to any other account will not be credited to your balance. Please confirm receipt of this direction.\n\nVery truly yours,\n\nHarold J. Whitcomb, Esq.\nWhitcomb & Aldridge LLP",
+  "label": "change_request",
+  "vendor": "brightline",
+  "note": "Third-party legal 'direction to pay' into a law-firm trust account; sender is not the vendor, payee changes."
+}

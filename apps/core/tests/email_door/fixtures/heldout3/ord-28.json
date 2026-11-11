@@ -1,0 +1,8 @@
+{
+  "subject": "Please update our contact for purchase orders",
+  "sender": "orders@brightlineoffice.com",
+  "text": "Hi,\n\nCould you update the email address your purchasing system sends POs to? We are consolidating inboxes: please send Brightline orders to orders@brightlineoffice.com instead of sam.okafor@brightlineoffice.com.\n\nThanks,\nBrightline Order Desk",
+  "label": "ordinary",
+  "vendor": "brightline",
+  "note": "Vendor-side contact change for orders."
+}

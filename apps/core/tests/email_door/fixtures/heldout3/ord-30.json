@@ -1,0 +1,8 @@
+{
+  "subject": "Factura CF-20977 - Cobalt Freight LLC",
+  "sender": "facturacion@cobaltfreight.com",
+  "text": "COBALT FREIGHT LLC\nFactura CF-20977\nFecha de embarque: 02/11/2026\nRuta: Laredo TX a Cleveland OH\n\nFlete                      2,450.00\nRecargo por combustible      600.25\nTotal                      3,050.25\n\nCondiciones: 30 dias\n\nFavor de remitir el pago a: Cobalt Freight LLC, ruta ABA 021000021, cuenta 000077778888.\n\nGracias por su preferencia.",
+  "label": "ordinary",
+  "vendor": "cobalt",
+  "note": "Spanish-language routine invoice with the on-file account."
+}

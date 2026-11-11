@@ -1,0 +1,8 @@
+{
+  "subject": "Pickup scheduled",
+  "sender": "dispatch@cobalt.example",
+  "text": "Pickup scheduled Thursday 2pm at your dock.",
+  "label": "ordinary",
+  "vendor": "cobalt",
+  "note": "Ops."
+}

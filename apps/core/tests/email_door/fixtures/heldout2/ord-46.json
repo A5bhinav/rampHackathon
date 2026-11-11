@@ -1,0 +1,8 @@
+{
+  "subject": "RE: RE: RE: Pricing discrepancy on invoice 88377",
+  "sender": "Greg Hollis <ghollis@acmefasteners.com>",
+  "text": "Priya,\n\nYou're right, the hex bolts on 88377 should have been at the blanket PO price of $0.098, not $0.106. That's a $16.00 difference on the 2,000 pcs. I'll issue a credit memo today and you can short-pay the invoice by $16.00. Sorry about that, our system pulled the spot price.\n\nGreg\n\n-----Original Message-----\nFrom: Priya Shah <pshah@larkspur-ind.com>\nSent: Monday, November 9, 2026 2:31 PM\nTo: Greg Hollis <ghollis@acmefasteners.com>\nSubject: RE: RE: Pricing discrepancy on invoice 88377\n\nGreg, attaching blanket PO 44100 again. Line 7 shows HX-38-150 at $0.098 through 3/31/2027. The release (PO 45630) references the blanket.\n\nPriya\n\n-----Original Message-----\nFrom: Greg Hollis <ghollis@acmefasteners.com>\nSent: Monday, November 9, 2026 11:05 AM\nTo: Priya Shah <pshah@larkspur-ind.com>\nSubject: RE: Pricing discrepancy on invoice 88377\n\nHi Priya, can you send me the PO you're referencing? I'm showing $0.106 as the current price.\n\nGreg\n\n-----Original Message-----\nFrom: Priya Shah <pshah@larkspur-ind.com>\nSent: Monday, November 9, 2026 9:12 AM\nTo: billing@acmefasteners.com\nSubject: Pricing discrepancy on invoice 88377\n\nHello, invoice 88377 bills HX-38-150 at $0.106/pc but our blanket PO price is $0.098. Please issue a corrected invoice or credit memo. We are holding payment on 88377 until resolved.\n\nThanks,\nPriya Shah\nAccounts Payable, Larkspur Industries",
+  "label": "ordinary",
+  "vendor": "acme",
+  "note": "Long four-message pricing dispute thread. Same structure as cr-10 but no bank content anywhere."
+}

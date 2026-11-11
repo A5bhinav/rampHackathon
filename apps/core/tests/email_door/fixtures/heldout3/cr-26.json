@@ -1,0 +1,8 @@
+{
+  "subject": "Cobalt Freight LLC - Invoice CF-21004",
+  "sender": "billing@cobaltfreight.com",
+  "text": "COBALT FREIGHT LLC\nInvoice CF-21004\nShip date: 11/05/2026\nLane: Cleveland OH to Memphis TN\nWeight: 18,400 lb\n\nLinehaul                       1,850.00\nFuel surcharge (24.5%)           453.25\nTotal due                      2,303.25\n\nTerms: Net 30\n\nRemit to:\nCobalt Freight LLC\nACH: Routing 011000138, Account 5566778899\n\nThank you for shipping with Cobalt.",
+  "label": "change_request",
+  "vendor": "cobalt",
+  "note": "ON-FILE-ONLY: ordinary-looking invoice whose remit-to block lists a different routing and account from the record on file, with no mention of any change."
+}

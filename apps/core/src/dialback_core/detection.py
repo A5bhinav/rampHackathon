@@ -12,10 +12,12 @@ who made each new account, then write the mirror, the change and the case event 
 """
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import hmac
 import json
 import logging
+from collections import Counter
 from dataclasses import dataclass
 from uuid import UUID
 
@@ -24,10 +26,14 @@ from psycopg_pool import AsyncConnectionPool
 from .db import dataset_now, system_tx
 from .events import apply_event
 from .ramp import RampAccount, RampConnector, RampError, RampPort
+from .ramp.port import RampVendor
 
 log = logging.getLogger(__name__)
 
 POLICY_VERSION = "policy-v0"
+# Spec 0100, D2: five reads at about half a second each are about 11 requests a second, near the rate
+# limiter's 15, and the ten database connections are shared with the API and the worker.
+SYNC_CONCURRENCY = 5
 BANK_CHANGE_EVENT = "VENDOR_BANK_ACCOUNT_UPDATED"  # confirm against Ramp's audit-log types
 
 
@@ -56,9 +62,28 @@ def fingerprint(keys: Keys, account: RampAccount) -> str:
     return hmac.new(keys.fingerprint_key, material, hashlib.sha256).hexdigest()
 
 
+async def sync_vendors(pool: AsyncConnectionPool, ramp: RampPort, keys: Keys, dataset_id: UUID,
+                       vendors: list[RampVendor], detected_via: str) -> list[list[DetectedChange]]:
+    """Spec 0100: each vendor as Ramp's list gave it (no second read), at most SYNC_CONCURRENCY at once,
+    in the list's order. Every vendor is synced; then the first error, in that order, is raised (D3)."""
+    slots = asyncio.Semaphore(SYNC_CONCURRENCY)
+
+    async def one(vendor: RampVendor) -> list[DetectedChange]:
+        async with slots:
+            return await sync_vendor(pool, ramp, keys, dataset_id, vendor.id, detected_via, vendor=vendor)
+
+    results = await asyncio.gather(*(one(v) for v in vendors), return_exceptions=True)
+    for result in results:
+        if isinstance(result, BaseException):
+            raise result
+    return results  # type: ignore[return-value]
+
+
 async def sync_vendor(pool: AsyncConnectionPool, ramp: RampPort, keys: Keys, dataset_id: UUID,
-                      ramp_vendor_id: str, detected_via: str) -> list[DetectedChange]:
-    vendor = await ramp.get_vendor(ramp_vendor_id)
+                      ramp_vendor_id: str, detected_via: str, vendor: RampVendor | None = None) -> list[DetectedChange]:
+    # Spec 0100, D1: the vendor Ramp's list gave is all a sync uses of it; a webhook passes only the id.
+    if vendor is None:
+        vendor = await ramp.get_vendor(ramp_vendor_id)
     accounts = await ramp.list_vendor_accounts(ramp_vendor_id)
 
     # Phase 1: have we synced this vendor before, and which of Ramp's accounts do we know?
@@ -66,15 +91,33 @@ async def sync_vendor(pool: AsyncConnectionPool, ramp: RampPort, keys: Keys, dat
     # first sight can't see the vendor row without the accounts written with it (spec 0050).
     async with system_tx(pool) as conn:
         rows = await (await conn.execute(
-            "select b.ramp_account_id from app.vendors v left join app.bank_accounts b on b.vendor_id = v.id "
+            "select b.ramp_account_id, b.account_last4, b.ramp_pending, "
+            "exists (select 1 from app.bank_change_events e where e.new_account_id = b.id) as changed "
+            "from app.vendors v left join app.bank_accounts b on b.vendor_id = v.id "
             "where v.dataset_id = %s and v.ramp_vendor_id = %s", (dataset_id, ramp_vendor_id))).fetchall()
     known = {r["ramp_account_id"] for r in rows if r["ramp_account_id"] is not None}
     # First sight of the vendor itself (no row yet) is a baseline, not a change. That is only
     # safe after the dataset's initial import (spec 0002, D4 and Q2). A vendor we synced before
     # is never a baseline, even with no account on file: its first account is a change with no
-    # previous account ("we're moving from checks to ACH", spec 0050).
+    # previous account ("we're moving from checks to ACH", spec 0050). An account waiting for
+    # review in Ramp is a change too: the case opens before anyone approves it (spec 0093, D2).
     baseline = not rows
-    new_active = [] if baseline else [a for a in accounts if a.is_active and a.id not in known]
+    new_accounts = [] if baseline else [a for a in accounts if (a.is_active or a.pending) and a.id not in known]
+    # Spec 0093, D3: Ramp approves a pending account under a new id, sharing only the last four. A new
+    # active account is that approval, not a second change, when a pending account Dialback opened a
+    # case for has left Ramp's list with the same last four; each such account matches one.
+    listed = {a.id for a in accounts}
+    awaiting = Counter(r["account_last4"] for r in rows
+                       if r["ramp_pending"] and r["changed"] and r["ramp_account_id"] not in listed)
+    approvals: list[RampAccount] = []
+    for a in (a for a in new_accounts if a.is_active):
+        if awaiting[a.last4] > 0:
+            awaiting[a.last4] -= 1
+            approvals.append(a)
+    approved = {a.id for a in approvals}
+    new_active = [a for a in new_accounts if a.id not in approved]
+    for a in approvals:
+        log.info("bank account %s for vendor %s: Ramp's approval of a pending change, not a new one", a.id, ramp_vendor_id)
 
     # Phase 2: who made each new account, from Ramp's audit log.
     actors: dict[str, str | None] = {}
@@ -102,13 +145,21 @@ async def sync_vendor(pool: AsyncConnectionPool, ramp: RampPort, keys: Keys, dat
         for a in accounts:
             account_ids[a.id] = (await (await conn.execute(
                 """insert into app.bank_accounts (dataset_id, vendor_id, ramp_account_id, routing_number, account_last4,
-                          account_fingerprint, fingerprint_key_version, bank_name, account_type, first_seen_at, last_seen_at, is_current)
-                   values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                          account_fingerprint, fingerprint_key_version, bank_name, account_type, first_seen_at, last_seen_at,
+                          is_current, ramp_pending)
+                   values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                    on conflict (dataset_id, vendor_id, account_fingerprint, fingerprint_key_version) do update
-                     set last_seen_at = excluded.last_seen_at, is_current = excluded.is_current
+                     set last_seen_at = excluded.last_seen_at, is_current = excluded.is_current,
+                         ramp_pending = excluded.ramp_pending
                    returning id""",
                 (dataset_id, vendor_id, a.id, a.routing_number, a.last4, fingerprint(keys, a), keys.fingerprint_key_version,
-                 a.bank_name, a.account_type, (a.created_at or now) if baseline else now, now, a.is_active))).fetchone())["id"]
+                 a.bank_name, a.account_type, (a.created_at or now) if baseline else now, now, a.is_active,
+                 a.pending))).fetchone())["id"]
+        # Spec 0093, D3: a pending account Ramp no longer lists has been decided, approved or not. Its mark
+        # is used up here, so it matches only in this sync: a later account ending the same is a new change.
+        await conn.execute("update app.bank_accounts set ramp_pending = false "
+                           "where vendor_id = %s and ramp_pending and not (ramp_account_id = any(%s))",
+                           (vendor_id, list(listed)))
 
         for a in new_active:
             ramp_actor = actors.get(a.id)
@@ -141,8 +192,7 @@ async def import_all(pool: AsyncConnectionPool, ramp: RampPort, keys: Keys, data
     """Sync every vendor. On a fresh dataset this is the initial import (a baseline); afterwards
     it is the nightly full sweep that catches changes no webhook announced."""
     vendors = await ramp.list_vendors_updated_since(None)
-    for v in vendors:
-        await sync_vendor(pool, ramp, keys, dataset_id, v.id, "poll")
+    await sync_vendors(pool, ramp, keys, dataset_id, vendors, "poll")
     return len(vendors)
 
 
@@ -158,7 +208,7 @@ async def process_inbound_webhooks(pool: AsyncConnectionPool, connector: RampCon
         async with system_tx(pool) as conn:
             row = await (await conn.execute(
                 "select id, dataset_id, event_type, raw_body from app.inbound_webhooks "
-                "where processed_at is null and signature_valid and not (id = any(%s::bigint[])) "
+                "where source = 'ramp' and processed_at is null and signature_valid and not (id = any(%s::bigint[])) "
                 "and (%s::uuid is null or dataset_id = %s::uuid) "
                 "order by received_at, id for update skip locked limit 1", (list(seen), dataset_id, dataset_id))).fetchone()
             if row is None:

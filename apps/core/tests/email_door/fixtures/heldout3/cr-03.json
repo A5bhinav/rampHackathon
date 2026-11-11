@@ -1,0 +1,8 @@
+{
+  "subject": "FW: Cobalt Freight - revised payment details",
+  "sender": "Mark Delaney <mdelaney@northgate-mfg.com>",
+  "text": "Can you take care of this before Thursday's run? They have been patient with us on the late April invoices.\n\nMark\n\n-----Original Message-----\nFrom: Teresa Vance <tvance@cobaltfreight.com>\nSent: Monday, November 2, 2026 9:14 AM\nTo: Mark Delaney <mdelaney@northgate-mfg.com>\nSubject: Cobalt Freight - revised payment details\n\nHi Mark,\n\nQuick heads up that our treasury team consolidated accounts last month. Going forward please remit to:\n\nWells Fargo Bank\nRouting 121000248\nAcct 8830019924\nCobalt Freight LLC\n\nThe old account will stop accepting deposits at month end. Let me know if your AP team needs a signed letter.\n\nThanks,\nTeresa",
+  "label": "change_request",
+  "vendor": "cobalt",
+  "note": "Change request lives entirely in the quoted vendor message; the top message is an internal forward from a manager."
+}

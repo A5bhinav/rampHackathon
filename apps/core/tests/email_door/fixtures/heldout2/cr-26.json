@@ -1,0 +1,8 @@
+{
+  "subject": "ACH enrollment form - Brightline Office Supply",
+  "sender": "Carla Benson <cbenson@brightlineoffice.com>",
+  "text": "Hi AP,\n\nAttached please find our completed ACH Vendor Enrollment form with our new bank account details, along with a voided check from the new account. Please replace the account you currently have on file for Brightline with the one on the form.\n\nLet me know if you need anything else.\n\nThanks!\nCarla\n\n[Attachment: Brightline_ACH_Enrollment_2026.pdf]\n[Attachment: voided_check.jpg]",
+  "label": "change_request",
+  "vendor": "brightline",
+  "note": "New details only in attachments; the body has no numbers but clearly asks to replace the on-file account."
+}

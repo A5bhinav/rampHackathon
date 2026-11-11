@@ -1,0 +1,8 @@
+{
+  "subject": "Fraud Watch: Business email compromise and vendor payment scams",
+  "sender": "Meridian Commercial Bank Security <security-news@meridiancommercial.com>",
+  "text": "Fraud Watch | November 2026\n\nBusiness email compromise (BEC) remains the costliest fraud type our commercial clients face. In the most common version, a criminal impersonates one of your vendors and asks you to update their bank account.\n\nWhat a typical fraudulent request looks like:\n\n   \"Please be advised that we have changed our bank. Kindly update your records and send all outstanding and future payments to our new account below. Routing: XXXXXXXXX Account: XXXXXXXX. Please treat as urgent.\"\n\nRed flags:\n- Urgency, secrecy, or pressure from an executive\n- A sender domain that is one character off from the real one\n- A request to change bank details by email alone\n\nWhat to do:\n- Never update payment instructions based on email alone.\n- Call the vendor back using a phone number you already have on file, not one in the email.\n- Require a second person to approve any change to vendor bank details.\n\nTo report suspected fraud, call 1-800-555-0177.\n\nMeridian Commercial Bank | Member FDIC",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Bank fraud-awareness newsletter that quotes a sample bank-change request verbatim. Describes the attack; asks nothing."
+}

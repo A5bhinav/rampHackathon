@@ -1,0 +1,8 @@
+{
+  "subject": "new remittance info",
+  "sender": "accounts@cobalt.example",
+  "text": "pls update our remit info. new details to follow in a separate email, our bank is still\nfinalizing the account. dont release anything on inv 2291 until you hear from us",
+  "label": "change_request",
+  "vendor": "cobalt",
+  "note": "Terse, promises details in a follow-up with no numbers yet; still asks for destination change."
+}

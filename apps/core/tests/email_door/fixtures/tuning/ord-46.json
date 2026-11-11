@@ -1,0 +1,8 @@
+{
+  "subject": "Your invoice is ready",
+  "sender": "Billing <billing@cloudhost.example>",
+  "text": "Your November invoice (#CH-221904) is ready. Payment will be charged to your saved card.",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Hosted invoice."
+}

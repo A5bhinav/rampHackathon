@@ -157,33 +157,38 @@ async def test_each_bills_ramp_status_is_reported_before_while_held_and_after():
     assert "bill-2  (none)  APPROVAL_PENDING  (before: (none)  PAYMENT_NOT_INSTRUCTED)" in text
 
 
+def timeline(looks) -> list[tuple]:
+    return [(look.read, look.at, look.audit_hold, look.vendor_changes) for look in looks]
+
+
 async def test_each_read_back_shows_what_the_audit_log_the_vendor_and_the_bills_said():
-    # D10, for spec 0097 Q209: which part of Ramp's answer lags. Here the vendor's own `status`
-    # changes at once and the audit log three reads later (made up: the sandbox run will say).
+    # D10, for spec 0097 Q209. A vendor without `status` (as Ramp's document has it): the layer reads
+    # the audit log, which here shows each change on the third read (the fake's lag counts reads).
     fake = SandboxRamp()
     fake.lag = 3
-    fake.vendors[V]["status"] = "ACTIVE"
-
-    def handle(request: httpx.Request) -> httpx.Response:
-        response = fake.handle(request)
-        if request.url.path.endswith("/hold"):
-            fake.vendors[V]["status"] = "ON_HOLD"
-        elif request.url.path.endswith("/release"):
-            fake.vendors[V]["status"] = "ACTIVE"
-        return response
-
-    report = await checked(fake, handle=handle)
-    held = (("status", "ON_HOLD"),)
-    assert [(look.read, look.at, look.audit_hold, look.vendor_changes) for look in report.hold_looks] == [
-        (1, 0.0, False, held), (2, 1.0, False, held), (3, 2.0, True, held)]
-    assert [(look.read, look.at, look.audit_hold, look.vendor_changes) for look in report.release_looks] == [
-        (1, 0.0, True, ()), (2, 1.0, True, ()), (3, 2.0, False, ())]
+    report = await checked(fake)
+    assert timeline(report.hold_looks) == [(1, 0.0, False, ()), (2, 1.0, False, ()), (3, 2.0, True, ())]
+    assert timeline(report.release_looks) == [(1, 0.0, True, ()), (2, 1.0, True, ()), (3, 2.0, False, ())]
     unscheduled = (("bill-1", "PAYMENT_SCHEDULED", None), ("bill-2", "PAYMENT_NOT_INSTRUCTED", None))
     assert report.hold_looks[0].bills == unscheduled and report.release_looks[-1].bills == unscheduled
+    assert "  read 3  +2.0 s  audit log: no hold  vendor: as before the hold" in render(report).split("after the release")[1]
+
+
+async def test_with_the_vendors_status_the_read_backs_pass_at_once_and_the_audit_log_is_shown_apart():
+    # The sandbox, as the third run saw it: the vendor's `status` changes at once, the audit log lags.
+    # Since spec 0097 D5 the layer reads the status, so each read-back passes on its first read.
+    fake = SandboxRamp()
+    fake.lag = 2
+    fake.vendors[V]["status"] = "ACTIVE"
+    report = await checked(fake)
+    assert timeline(report.hold_looks) == [(1, 0.0, False, (("status", "ON_HOLD"),))], "held, the audit log not yet"
+    assert timeline(report.release_looks) == [(1, 0.0, True, ())], "released, the audit log still says held"
+    assert report.held_reads == 1 and report.cleared_reads == 1 and report.dates_back
+    assert report.second_hold == "already on: Ramp answered 400"
     text = render(report)
     assert ("  read 1  +0.0 s  audit log: no hold  vendor: status=ON_HOLD  "
             "bills: bill-1 PAYMENT_SCHEDULED (none), bill-2 PAYMENT_NOT_INSTRUCTED (none)") in text
-    assert "  read 3  +2.0 s  audit log: no hold  vendor: as before the hold" in text.split("after the release")[1]
+    assert "Ramp answered 400 \"already on hold\", which the layer reads as the hold being on" in text
 
 
 async def test_an_error_answer_to_a_bill_read_stays_ramps_error():

@@ -1,0 +1,8 @@
+{
+  "subject": "Leave coverage",
+  "sender": "Renee Okafor <rokafor@tallismfg.com>",
+  "text": "Team, I'm out next week. Please route all Acme and Cobalt invoices to Tom for coding, and redirect any approvals to Jamal. Back on the 23rd.\n\nRenee",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Workflow routing, not payment routing."
+}

@@ -1,0 +1,8 @@
+{
+  "subject": "Overpayment on 88102 - refund",
+  "sender": "Dana Whitfield <dwhitfield@acmefasteners.com>",
+  "text": "Hi Renee, we noticed 88102 was paid twice. We can either apply the credit to your next invoice or send a refund. If you'd like the refund, let me know the bank account you'd like it sent to on your end.\n\nDana",
+  "label": "ordinary",
+  "vendor": "acme",
+  "note": "Money flowing to the reader's company, not a change to the vendor's payments."
+}

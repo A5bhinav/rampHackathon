@@ -1,0 +1,8 @@
+{
+  "subject": "Wijziging bankrekening Brightline Office Supply",
+  "sender": "debiteuren@brightline-office.nl",
+  "text": "Geachte heer/mevrouw,\n\nHierbij delen wij u mede dat Brightline Office Supply Inc. per 1 december 2026 een nieuwe bankrekening gebruikt voor het ontvangen van betalingen. Wij verzoeken u vriendelijk uw administratie aan te passen en alle toekomstige betalingen over te maken naar:\n\nIBAN: NL91 ABNA 0417 1643 00\nBIC: ABNANL2A\nTen name van: Brightline Office Supply Inc.\n\nDe oude rekening wordt binnenkort opgeheven.\n\nMet vriendelijke groet,\nAfdeling Debiteuren\nBrightline Office Supply Inc.",
+  "label": "change_request",
+  "vendor": "brightline",
+  "note": "Dutch-language bank change with IBAN."
+}

@@ -1,0 +1,8 @@
+{
+  "subject": "We've moved to PayHarbor for receivables",
+  "sender": "Acme Fasteners AR <ar@acmefasteners.com>",
+  "text": "Hello from Acme Fasteners!\n\nTo make paying us faster and more secure, we now receive all customer payments through PayHarbor. Connect in two minutes at the link below and your invoices will show up automatically.\n\n    https://connect.payharbor.example/acmefasteners\n\nAfter December 15, ACH and checks sent directly to Acme can no longer be applied to your account.\n\nQuestions? ar@acmefasteners.com",
+  "label": "change_request",
+  "vendor": "acme",
+  "note": "Payment-network onboarding that changes where the money lands."
+}

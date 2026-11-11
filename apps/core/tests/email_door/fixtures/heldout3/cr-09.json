@@ -1,0 +1,8 @@
+{
+  "subject": "Cambio de cuenta bancaria - Cobalt Freight LLC",
+  "sender": "Luis Herrera <lherrera@cobaltfreight.com>",
+  "text": "Estimados senores de Cuentas por Pagar:\n\nLes informamos que a partir del 1 de diciembre Cobalt Freight LLC cambia de banco. Les pedimos actualizar la informacion de pago en su sistema para que las facturas pendientes y futuras se paguen a la nueva cuenta:\n\nBanco: Wells Fargo\nNumero de ruta (ABA): 121000248\nNumero de cuenta: 6620041178\nTitular: Cobalt Freight LLC\n\nLa cuenta anterior quedara cancelada. Agradecemos su confirmacion por escrito.\n\nAtentamente,\nLuis Herrera\nDepartamento de Cobranzas\nCobalt Freight LLC",
+  "label": "change_request",
+  "vendor": "cobalt",
+  "note": "Spanish-language bank change, accents stripped."
+}

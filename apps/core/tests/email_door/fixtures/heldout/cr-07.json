@@ -1,0 +1,8 @@
+{
+  "subject": "update to how we get paid",
+  "sender": "Dana Okafor <dokafor@cobalt.example>",
+  "text": "Greetings,\n\nWe are moving to a new treasury platform, so our incoming payments will arrive through\nvirtual accounts from now on. I will email the account details through our secure portal link\nbelow, please follow it and enter your vendor ID to receive them.",
+  "label": "change_request",
+  "vendor": "cobalt",
+  "note": "Redirect via portal link; no numbers, new payment destination."
+}

@@ -1,0 +1,8 @@
+{
+  "subject": "Please note",
+  "sender": "Beth Kowalski <beth@kowalski-cpa.example>",
+  "text": "My practice changed banks. The retainer for November should go to the new account, which is\nat Credit Suisse USA Private Bank, ending 7310. I will mail you a signed form.",
+  "label": "change_request",
+  "vendor": null,
+  "note": "Partial digits, form to follow by mail."
+}

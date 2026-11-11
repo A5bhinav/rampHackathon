@@ -46,7 +46,7 @@ None. The dashboard API is unchanged; its settings row for Ramp stays "not repor
   drops the kept token and is retryable, so the worker's next try logs in again. A failed login is
   a `RampError`: retryable after a network error, 429 or 5xx; not after a refusal. The secret and
   the token never appear in a log line or an error message.
-- **D5. Making a dataset.** `dialback-core new-dataset --ramp sandbox` (default `mock`). Refused
+- **D5. Making a dataset.** `dialback-core new-dataset --ramp sandbox` (default: what the server has, so `mock`, or `sandbox` with `DIALBACK_RAMP=sandbox`). Refused
   before the database is touched: a demo dataset on the sandbox, and a sandbox dataset on a server
   without sandbox credentials.
 - **D6. Webhooks.** Ramp signs each subscription with its own secret, and the core checks one

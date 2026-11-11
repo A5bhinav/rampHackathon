@@ -1,0 +1,8 @@
+{
+  "subject": "We've moved!",
+  "sender": "Cobalt Freight LLC <info@cobaltfreight.com>",
+  "text": "Please update your records: our headquarters has moved to 8200 Commerce Drive, Romeoville, IL 60446, phone 815-555-0100.\n\nPlease direct correspondence and legal notices to the new address. Remittance instructions remain the same as before.\n\nCobalt Freight LLC",
+  "label": "ordinary",
+  "vendor": "cobalt",
+  "note": "Address change explicitly excluding remittance."
+}

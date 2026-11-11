@@ -29,7 +29,7 @@ from ..settings import ConfigurationError, RampSandbox, _ramp_sandbox
 from .http import TokenBucket
 from .login import RampLogin
 from .port import RampError
-from .sandbox import RampSandboxAdapter
+from .sandbox import HELD_STATUS, NOT_HELD_STATUSES, RampSandboxAdapter
 
 NEEDED = ("vendors:read", "vendors:write", "bills:read", "bills:write", "audit_logs:read")
 REASON = "Dialback sandbox hold check: a test hold, released within a minute."
@@ -114,7 +114,7 @@ class Look:
     """D10: one read-back, as each part of Ramp's answer showed it."""
     read: int
     at: float  # seconds after Ramp answered the hold or release, when this read started
-    audit_hold: bool  # the audit log's newest hold event is a placement (the layer's reading)
+    audit_hold: bool  # the audit log's newest hold event is a placement (read on its own: spec 0097 D5)
     vendor_changes: tuple[tuple[str, str], ...]  # vendor fields that differ from before the hold
     bills: tuple[tuple[str, str | None, str | None], ...]  # (bill, status_summary, payment date)
 
@@ -134,7 +134,7 @@ class Report:
     login_scopes: tuple[str, ...]
     granted: tuple[str, ...] | None = None  # as Ramp's login answer listed them
     vendor_name: str = ""
-    second_hold: str = ""  # "", "accepted", or "refused: ..."
+    second_hold: str = ""  # "", "accepted", "already on: Ramp answered 400", or "refused: ..."
     refused: str = ""
     saved: dict[str, str | None] = dataclasses.field(default_factory=dict)  # unpaid bill: payment date before
     status_before: dict[str, str | None] = dataclasses.field(default_factory=dict)  # Ramp's status_summary (D9)
@@ -207,11 +207,16 @@ async def hold_check(sandbox: RampSandbox, guard: WriteGuard, http: httpx.AsyncC
     async def look(looks: list[Look]) -> tuple[Any, list[Any]]:
         """D10: one read of the vendor (and so the audit log) and its bills, as each part showed it."""
         at = clock() - written[0]
-        v = await layer.get_vendor(vendor_id)
+        v = await layer.get_vendor(vendor_id)  # the layer's reading, as the worker gets it
+        status = guard.vendor_raw.get("status")
+        if status == HELD_STATUS or (isinstance(status, str) and status in NOT_HELD_STATUSES):
+            audit = await layer._hold_id(vendor_id) is not None  # the layer read the status (spec 0097 D5)
+        else:
+            audit = bool(v.hold_id)  # the layer's reading was the audit log's
         bills = [b for b in await layer.list_bills_for_vendor(vendor_id) if b.id in r.saved]
         raw = guard.vendor_raw
         changes = tuple((k, _short(raw.get(k))) for k in sorted(set(raw) | set(base)) if raw.get(k) != base.get(k))
-        looks.append(Look(len(looks) + 1, at, bool(v.hold_id), changes,
+        looks.append(Look(len(looks) + 1, at, audit, changes,
                           tuple((b.id, guard.statuses.get(b.id), _day(b)) for b in bills)))
         return v, bills
 
@@ -236,7 +241,8 @@ async def hold_check(sandbox: RampSandbox, guard: WriteGuard, http: httpx.AsyncC
         if r.held_after is not None:  # the worker's retry places the hold again on a vendor already held
             try:
                 await layer.place_vendor_hold(vendor_id, REASON)
-                r.second_hold = "accepted"
+                answer = guard.writes[-1][2]  # Ramp's own answer: the layer may read a refusal as on (D5)
+                r.second_hold = "accepted" if answer < 300 else f"already on: Ramp answered {answer}"
             except RampError as exc:
                 r.second_hold = f"refused: {exc}"
     finally:  # D5: release whatever happened above, even a bug
@@ -310,6 +316,9 @@ def render(r: Report) -> str:
         lines.append("  the worker's read-back would pass")
     if r.second_hold == "accepted":
         lines.append("A second hold on the held vendor (the worker's retry sends one): Ramp accepted it")
+    elif r.second_hold.startswith("already on"):
+        lines.append(f"A second hold on the held vendor (the worker's retry sends one): {r.second_hold.removeprefix('already on: ')} "
+                     "\"already on hold\", which the layer reads as the hold being on, so a retry goes on to read it back")
     elif r.second_hold:
         lines.append(f"A second hold on the held vendor (the worker's retry sends one): Ramp REFUSED it "
                      f"({r.second_hold.removeprefix('refused: ')}); a worker retry after a slow read-back would fail")

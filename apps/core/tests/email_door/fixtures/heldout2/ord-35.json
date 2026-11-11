@@ -1,0 +1,8 @@
+{
+  "subject": "Audit confirmation request - Larkspur Industries / Cobalt Freight LLC",
+  "sender": "Confirmations Brandt Hollister LLP <confirmations@brandthollister.com>",
+  "text": "Dear Cobalt Freight LLC,\n\nIn connection with our audit of the financial statements of Larkspur Industries as of December 31, 2026, please confirm the balance owed to you by Larkspur Industries as of November 30, 2026, according to your records.\n\nPlease reply directly to us at confirmations@brandthollister.com, not to Larkspur Industries. Do not send payments or banking information to this address.\n\nClient authorization:\nLarkspur Industries, by Nina Alvarez, Treasury Manager\n\ncc: ap@larkspur-ind.com",
+  "label": "ordinary",
+  "vendor": "cobalt",
+  "note": "External auditor balance confirmation copied to AP; 'reply directly to us' is about correspondence, not money."
+}

@@ -7,13 +7,16 @@ a wrong one sends a case to a person, never a payment to a new account (R1, R7).
 from __future__ import annotations
 
 import datetime as dt
+import logging
 import re
 from typing import Any
 
 import httpx
 
 from .http import API, RampHttpAdapter
-from .port import RampAccount, RampAuditEvent, RampBill, RampError, RampHold, RampVendor
+from .port import RampAccount, RampAuditEvent, RampBill, RampError, RampHold, RampNotFound, RampVendor
+
+log = logging.getLogger(__name__)
 
 PAGE = 100  # Ramp's largest page
 PLACED, RELEASED = "Vendor placed on hold", "Vendor hold released"
@@ -21,6 +24,15 @@ PLACED, RELEASED = "Vendor placed on hold", "Vendor hold released"
 # sandbox answers 422 otherwise, as the probe's first run showed). The core only asks about vendors.
 VENDOR_RESOURCE = "Vendor / Merchant"
 RAMP_EVENT_NAMES = {"VENDOR_BANK_ACCOUNT_UPDATED": "Bill pay bank account updated"}  # the core's name: Ramp's (D4)
+# D5: the vendor's own (undocumented) status, which the sandbox updates at once; the audit log lags.
+# Ramp's help center names Active, Inactive, On hold, Pending and Unmanaged. Anything else: the audit log.
+HELD_STATUS = "ON_HOLD"
+NOT_HELD_STATUSES = frozenset({"ACTIVE", "INACTIVE", "PENDING", "UNMANAGED"})
+ALREADY_HELD = "BILL_PAY_7284"  # Ramp's code for "Vendor is already on hold"
+# D6: events for a vendor's bank account being added or changed. On Ramp a bank change doesn't move the
+# vendor's updated_at (seen on approval), so the poll asks the audit log too.
+BANK_EVENTS = ("Bank account updated", "Bill pay bank account updated",
+               "Bill pay accepted sync for bank account from vendor network")
 FOUR_DIGITS = re.compile(r"^[0-9]{4}$")
 OLDEST = dt.datetime.min.replace(tzinfo=dt.UTC)
 
@@ -40,7 +52,8 @@ def account_from(j: dict[str, Any], vendor_id: str) -> RampAccount:
     if not isinstance(last4, str) or not FOUR_DIGITS.match(last4):
         raise RampError(f"Ramp's account {j.get('id')} has no four last digits, so a change to it can't be checked")
     return RampAccount(id=j["id"], vendor_id=vendor_id, routing_number="", last4=last4, account_type=None,
-                       bank_name=None, is_active=j.get("status") == "active", created_at=None)
+                       bank_name=None, is_active=j.get("status") == "active", created_at=None,
+                       pending=j.get("status") == "pending_approval")  # spec 0093, D1
 
 
 def bill_from(j: dict[str, Any]) -> RampBill:
@@ -62,6 +75,10 @@ def audit_from(j: dict[str, Any], event_type: str) -> RampAuditEvent:
 
 
 class RampSandboxAdapter(RampHttpAdapter):
+    def __init__(self, *args: Any, watch_vendors: tuple[str, ...] = (), **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self._watch_vendors = watch_vendors
+
     def _error_detail(self, response: httpx.Response) -> str:
         """Ramp's error_v2: its code, id and explanation, so a refusal says what was wrong."""
         try:
@@ -73,7 +90,13 @@ class RampSandboxAdapter(RampHttpAdapter):
         return f" ({words}: {message})" if words or message else ""
 
     async def get_vendor(self, vendor_id: str) -> RampVendor:
-        return vendor_from(await self._request("GET", f"{API}/vendors/{vendor_id}"), await self._hold_id(vendor_id))
+        j = await self._request("GET", f"{API}/vendors/{vendor_id}")
+        status = j.get("status")
+        if status == HELD_STATUS:  # D5: Ramp gives a hold no id
+            return vendor_from(j, f"status:{HELD_STATUS}")
+        if isinstance(status, str) and status in NOT_HELD_STATUSES:
+            return vendor_from(j, None)
+        return vendor_from(j, await self._hold_id(vendor_id))  # no status, or one we don't know: D3
 
     async def _hold_id(self, vendor_id: str) -> str | None:
         """D3: Ramp's vendor has no hold field, so the newest hold or release event for it says."""
@@ -87,17 +110,48 @@ class RampSandboxAdapter(RampHttpAdapter):
 
     async def list_vendors_updated_since(self, since: dt.datetime | None) -> list[RampVendor]:
         params = {"page_size": PAGE} | ({"from_updated_at": since.isoformat()} if since else {})
-        return [vendor_from(v) for v in await self._all_pages("/vendors", params)]
+        vendors = [vendor_from(v) for v in await self._all_pages("/vendors", params)]
+        if since is None:
+            return vendors
+        # D6: a vendor whose bank account changed since then, though its updated_at didn't move.
+        events = await self._all_pages("/audit-logs/events", {"from_date": since.isoformat(),
+                                                              "event_types": ",".join(BANK_EVENTS), "page_size": PAGE})
+        listed = {v.id for v in vendors}
+        for e in events:
+            ref = e.get("primary_reference") or {}
+            vendor_id = ref.get("id")
+            if ref.get("resource_name") != VENDOR_RESOURCE or not vendor_id or vendor_id in listed:
+                continue
+            listed.add(vendor_id)
+            try:
+                vendors.append(vendor_from(await self._request("GET", f"{API}/vendors/{vendor_id}")))
+            except RampNotFound:  # merged or deleted: Ramp can't pay it
+                continue
+        for vendor_id in self._watch_vendors:  # spec 0102: the demo's vendors, whatever Ramp says changed
+            if vendor_id in listed:
+                continue
+            listed.add(vendor_id)
+            try:
+                vendors.append(vendor_from(await self._request("GET", f"{API}/vendors/{vendor_id}")))
+            except RampError as exc:  # the next poll reads it again; the bank events above can't be skipped like this
+                log.warning("RAMP_SANDBOX_WATCH_VENDORS names %s, which couldn't be read: %s", vendor_id, exc)
+        return vendors
 
     async def list_vendor_accounts(self, vendor_id: str) -> list[RampAccount]:
-        return [account_from(a, vendor_id) for a in await self._all_pages(f"/vendors/{vendor_id}/accounts", {"page_size": PAGE})]
+        params = {"page_size": PAGE, "include_pending": "true"}  # spec 0093, D1: changes waiting for review too
+        return [account_from(a, vendor_id) for a in await self._all_pages(f"/vendors/{vendor_id}/accounts", params)]
 
     async def list_bills_for_vendor(self, vendor_id: str) -> list[RampBill]:
         bills = [bill_from(b) for b in await self._all_pages("/bills", {"vendor_id": vendor_id, "page_size": PAGE})]
         return [b for b in bills if b.vendor_id == vendor_id]  # filter in code too, in case Ramp ignores vendor_id
 
     async def place_vendor_hold(self, vendor_id: str, reason: str) -> RampHold:
-        await self._request("POST", f"{API}/vendors/{vendor_id}/hold", json={"reason": reason}, empty_ok=True)
+        try:
+            await self._request("POST", f"{API}/vendors/{vendor_id}/hold", json={"reason": reason}, empty_ok=True)
+        except RampError as exc:
+            # D5: "Vendor is already on hold" is Ramp's word that it is on (a worker retry, a reconcile).
+            if ALREADY_HELD not in str(exc):
+                raise
         return RampHold(id="", vendor_id=vendor_id, placed_at=None)  # Ramp answers 202 or 204, with no hold id
 
     async def release_vendor_hold(self, vendor_id: str) -> None:

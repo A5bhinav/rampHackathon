@@ -1,0 +1,8 @@
+{
+  "subject": "Which account do you have for us?",
+  "sender": "Sheila Novak <snovak@brightlineoffice.com>",
+  "text": "Hi, doing some housekeeping. Can you tell me which bank account you have on file for Brightline? We've been shutting down older ones and I need to make sure you get moved over to the current one before yours gets rejected.\n\nThanks!\nSheila",
+  "label": "change_request",
+  "vendor": "brightline",
+  "note": "Probing for the on-file details, but explicitly says the reader will be moved to a different account."
+}

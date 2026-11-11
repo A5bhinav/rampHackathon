@@ -1,0 +1,8 @@
+{
+  "subject": "Introduction - I now handle Kessler Tooling's receivables",
+  "sender": "Elena Markovic <elena.markovic@kessler-partners.example>",
+  "text": "Dear Accounts Payable team,\n\nMy name is Elena Markovic and I recently joined Kessler Tooling as their external accountant, replacing Mr. Kessler who used to send you our invoices. I am updating the payment records of all clients. Please process payments for Kessler Tooling through my firm's client trust account:\n\nKessler Partners Client Trust\nRouting 071000013\nAccount 1004 2231 90\n\nMr. Kessler is traveling and unreachable, so please reply to me directly.",
+  "label": "change_request",
+  "vendor": null,
+  "note": "Claimed new accountant redirecting to a third party's trust account, with an excuse why the real contact is unreachable."
+}

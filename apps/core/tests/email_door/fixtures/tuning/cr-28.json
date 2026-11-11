@@ -1,0 +1,8 @@
+{
+  "subject": "ACH change",
+  "sender": "Dana Whitfield <ar@acme.example>",
+  "text": "Please send our payments to our subsidiary's account instead: Acme Fasteners Holdings,\naccount 5527740031, routing 011000138. Our parent company is consolidating treasury.",
+  "label": "change_request",
+  "vendor": "acme",
+  "note": "Redirect to a different named payee/entity account; still new destination."
+}

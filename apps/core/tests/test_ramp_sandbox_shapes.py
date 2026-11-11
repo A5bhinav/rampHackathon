@@ -8,7 +8,9 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import logging
 import uuid
+from types import SimpleNamespace
 from urllib.parse import parse_qs, urlencode
 
 import httpx
@@ -17,12 +19,14 @@ from conftest import FINGERPRINT_KEY, core_settings
 from dialback_core.datasets import create_dataset
 from dialback_core.db import system_tx
 from dialback_core.detection import Keys, import_all
+from dialback_core.jobs import Jobs
 from dialback_core.ramp.connector import RampConnector
 from dialback_core.ramp.http import TokenBucket
 from dialback_core.ramp.login import RampLogin
 from dialback_core.ramp.port import RampAccount, RampAuditEvent, RampBill, RampError, RampHold, RampVendor
 from dialback_core.ramp.sandbox import RampSandboxAdapter
-from dialback_core.settings import RampSandbox
+from dialback_core.settings import RampSandbox, _ramp_sandbox
+from dialback_core.worker import Worker
 
 pytestmark = pytest.mark.anyio
 
@@ -66,9 +70,9 @@ def event(event_id: str, event_type: str, when: str, about: str = V, actor: str 
             "primary_reference": {"id": about, "label": label, "resource_name": resource, "url": "/x"}}
 
 
-def ramp_error(status: int, message: str) -> httpx.Response:
+def ramp_error(status: int, message: str, code: str = "DEVELOPER_7000") -> httpx.Response:
     """Ramp's DeveloperApiErrorResponse."""
-    return httpx.Response(status, json={"error_v2": {"error_code": "DEVELOPER_7000", "error_id": "0a1b2c3d", "message": message,
+    return httpx.Response(status, json={"error_v2": {"error_code": code, "error_id": "0a1b2c3d", "message": message,
                                                      "notes": "", "additional_info": {}}})
 
 
@@ -92,6 +96,7 @@ class SandboxRamp:
         self.lists_scope = True
         self.ungranted: set[str] = set()  # scopes this app isn't allowed in Ramp: left out of the login's answer
         self.bills_error: str | None = None
+        self.vendor_errors: dict[str, int] = {}  # a vendor id, and the status reading it answers
         self.clock = 0
 
     def _now(self) -> str:
@@ -107,12 +112,18 @@ class SandboxRamp:
                 asked = parse_qs(request.content.decode()).get("scope", [""])[0].split()
                 answer["scope"] = " ".join(s for s in asked if s not in self.ungranted)
             return httpx.Response(200, json=answer)
-        if path == "/vendors":
-            if "start" not in q:  # two pages, to show `page.next` is followed
-                return httpx.Response(200, json={"data": [self.vendors[V]], "page": {"next": f"{BASE}/developer/v1/vendors?start={V}&page_size=100"}})
-            return httpx.Response(200, json={"data": [self.vendors[OTHER]], "page": {"next": None}})
+        if path == "/vendors":  # two pages, to show `page.next` is followed; `from_updated_at` as Ramp filters it
+            since = dt.datetime.fromisoformat(q["from_updated_at"][0]) if "from_updated_at" in q else None
+            page = [self.vendors[OTHER]] if "start" in q else [self.vendors[V]]
+            data = [v for v in page if since is None or dt.datetime.fromisoformat(v["updated_at"]) >= since]
+            nxt = None if "start" in q else f"{BASE}/developer/v1/vendors?{urlencode({**q, 'start': [V]}, doseq=True)}"
+            return httpx.Response(200, json={"data": data, "page": {"next": nxt}})
         parts = path.strip("/").split("/")
         if parts[0] == "vendors" and len(parts) == 2:
+            if parts[1] in self.vendor_errors:
+                return ramp_error(self.vendor_errors[parts[1]], "The vendor could not be read.")
+            if parts[1] not in self.vendors:
+                return ramp_error(404, "Vendor not found.")
             return httpx.Response(200, json=self.vendors[parts[1]])
         if parts[0] == "vendors" and parts[2] == "accounts":
             # Ramp's document: an account proposed in a vendor edit, pending approval, only with include_pending.
@@ -123,6 +134,13 @@ class SandboxRamp:
             held = parts[2] == "hold"
             if not held and self.release_error:
                 return ramp_error(self.release_error, "The vendor's hold could not be released.")
+            # The sandbox, as spec 0099's runs saw it: a vendor that carries `status` changes it at once,
+            # and a second hold is refused. A vendor without `status` (as Ramp's document has it) doesn't.
+            shown = self.vendors.get(parts[1], {})
+            if "status" in shown:
+                if held and shown["status"] == "ON_HOLD":
+                    return ramp_error(400, "Vendor is already on hold", code="BILL_PAY_7284")
+                shown["status"] = "ON_HOLD" if held else "ACTIVE"
             made = event(f"ev-{len(self.events) + len(self.delayed) + 1}",
                          "Vendor placed on hold" if held else "Vendor hold released", self._now(), about=parts[1])
             if self.lag:
@@ -212,6 +230,105 @@ async def test_vendors_updated_since_sends_the_date_and_follows_pages(ramp):
     assert query(second)["start"] == [V]
 
 
+BANK_EVENT_NAMES = "Bank account updated,Bill pay bank account updated,Bill pay accepted sync for bank account from vendor network"
+
+
+async def test_a_vendor_whose_bank_account_changed_is_listed_though_its_updated_at_did_not_move(ramp):
+    # D6, Q210: on Ramp a bank change doesn't move the vendor's updated_at (09:00 here, before `since`).
+    since = dt.datetime(2026, 11, 10, 11, tzinfo=UTC)
+    ramp.events += [
+        event("ev-a", "Bank account updated", "2026-11-10T11:30:00+00:00"),  # Acme, as on approval
+        event("ev-b", "Bill pay accepted sync for bank account from vendor network", "2026-11-10T11:40:00+00:00",
+              about=OTHER, label="Brightline Office Supply Inc"),
+        event("ev-c", "Bank account updated", "2026-11-10T11:45:00+00:00", about="biz-1",
+              resource="Business bank account", label="Operating"),  # the business's own account: no vendor
+        event("ev-d", "Bank account updated", "2026-11-10T11:50:00+00:00"),  # Acme again: still listed once
+        event("ev-e", "Bank account updated", "2026-11-10T10:00:00+00:00", about="vendor-old"),  # before `since`
+        event("ev-f", "Bank account updated", "2026-11-10T11:55:00+00:00", about="vendor-gone"),  # merged away: 404
+    ]
+    vendors = await ramp.adapter.list_vendors_updated_since(since)
+    assert [v.id for v in vendors] == [V, OTHER] and vendors[1].name == "Brightline Office Supply Inc"
+    assert all(v.hold_id is None for v in vendors)
+    assert ramp.api("/vendors/biz-1") == [], "an event not filed under a vendor isn't followed"
+    [audit] = ramp.api("/audit-logs/events")
+    assert query(audit) == {"from_date": [since.isoformat()], "event_types": [BANK_EVENT_NAMES], "page_size": ["100"]}
+
+
+async def test_a_vendor_both_updated_and_with_a_bank_event_is_listed_once_and_not_read_again(ramp):
+    ramp.vendors[V]["updated_at"] = "2026-11-10T11:10:00+00:00"
+    ramp.events.append(event("ev-a", "Bank account updated", "2026-11-10T11:30:00+00:00"))
+    vendors = await ramp.adapter.list_vendors_updated_since(dt.datetime(2026, 11, 10, 11, tzinfo=UTC))
+    assert [v.id for v in vendors] == [V] and ramp.api(f"/vendors/{V}") == []
+
+
+async def test_a_full_read_lists_every_vendor_without_the_audit_log(ramp):
+    assert [v.id for v in await ramp.adapter.list_vendors_updated_since(None)] == [V, OTHER]
+    assert ramp.api("/audit-logs/events") == []
+
+
+# Spec 0102: the demo watch list ---------------------------------------------------------------------
+
+SINCE = dt.datetime(2026, 11, 10, 11, tzinfo=UTC)
+
+
+def watching(ramp, *vendor_ids: str) -> RampSandboxAdapter:
+    return RampSandboxAdapter(BASE, RampLogin(SANDBOX, ramp.http), ramp.http, TokenBucket(100_000), sleep=_no_sleep,
+                              watch_vendors=vendor_ids)
+
+
+@pytest.mark.parametrize("raw, expected", [(None, ()), ("", ()), ("a,b", ("a", "b")), (" a  b, c ", ("a", "b", "c"))])
+def test_watch_setting_parses_commas_and_spaces(raw, expected):
+    env = {"RAMP_SANDBOX_CLIENT_ID": "id", "RAMP_SANDBOX_CLIENT_SECRET": "secret"}
+    if raw is not None:
+        env["RAMP_SANDBOX_WATCH_VENDORS"] = raw
+    assert _ramp_sandbox(env).watch_vendors == expected
+
+
+async def test_watch_lists_a_vendor_nothing_says_changed(ramp):
+    assert await ramp.adapter.list_vendors_updated_since(SINCE) == [], "without the list: nothing"
+    vendors = await watching(ramp, V, V).list_vendors_updated_since(SINCE)  # listed twice by mistake: read once
+    assert [v.id for v in vendors] == [V] and vendors[0].name == "Acme Fasteners LLC"
+    assert len(ramp.api(f"/vendors/{V}")) == 1
+
+
+async def test_watch_reads_nothing_extra_for_a_vendor_already_listed_or_on_a_full_read(ramp):
+    ramp.vendors[V]["updated_at"] = "2026-11-10T11:10:00+00:00"
+    assert [v.id for v in await watching(ramp, V).list_vendors_updated_since(SINCE)] == [V]
+    assert ramp.api(f"/vendors/{V}") == []
+    # An id the full list doesn't have: only stopping at the full read keeps it from being read.
+    full = await watching(ramp, V, "not-in-the-list").list_vendors_updated_since(None)
+    assert [v.id for v in full] == [V, OTHER]
+    assert ramp.api(f"/vendors/{V}") == [] and ramp.api("/vendors/not-in-the-list") == []
+
+
+async def test_watch_lists_a_vendor_with_a_bank_event_once(ramp):
+    ramp.events.append(event("ev-a", "Bank account updated", "2026-11-10T11:30:00+00:00"))
+    assert [v.id for v in await watching(ramp, V).list_vendors_updated_since(SINCE)] == [V]
+    assert len(ramp.api(f"/vendors/{V}")) == 1
+
+
+async def test_watch_skips_an_id_ramp_doesnt_know_with_a_warning(ramp, caplog):
+    with caplog.at_level(logging.WARNING):
+        vendors = await watching(ramp, "vendor-typo", V).list_vendors_updated_since(SINCE)
+    assert [v.id for v in vendors] == [V] and "vendor-typo" in caplog.text
+
+
+@pytest.mark.parametrize("status", [400, 403, 422, 500])
+async def test_watch_skips_a_vendor_it_cant_read_and_lists_the_rest(ramp, caplog, status):
+    ramp.vendor_errors["vendor-bad"] = status
+    with caplog.at_level(logging.WARNING):
+        vendors = await watching(ramp, "vendor-bad", V).list_vendors_updated_since(SINCE)
+    assert [v.id for v in vendors] == [V] and "vendor-bad" in caplog.text
+
+
+async def test_a_bank_event_vendor_that_cant_be_read_still_fails_the_poll(ramp):
+    """Unlike a watched read: skipping this one would lose its event, since the watermark moves on."""
+    ramp.vendor_errors[V] = 500
+    ramp.events.append(event("ev-a", "Bank account updated", "2026-11-10T11:30:00+00:00"))
+    with pytest.raises(RampError):
+        await watching(ramp, V).list_vendors_updated_since(SINCE)
+
+
 # Bank accounts ------------------------------------------------------------------------------------
 
 async def test_accounts_are_mapped_without_inventing_a_routing_number(ramp):
@@ -222,7 +339,15 @@ async def test_accounts_are_mapped_without_inventing_a_routing_number(ramp):
         RampAccount(id="acct-cur", vendor_id=V, routing_number="", last4="4444", account_type=None, bank_name=None,
                     is_active=True, created_at=None)]
     [r] = ramp.api("/accounts")
-    assert r.url.path == f"/developer/v1/vendors/{V}/accounts" and query(r) == {"page_size": ["100"]}
+    assert r.url.path == f"/developer/v1/vendors/{V}/accounts"
+    assert query(r) == {"page_size": ["100"], "include_pending": ["true"]}  # spec 0093, D1
+
+
+async def test_pending_accounts_are_asked_for_and_marked_pending(ramp):
+    # Spec 0093, D1: a change entered in Ramp's dashboard waits for review as a pending account.
+    ramp.accounts[V].append(account("acct-p", "4321", "pending_approval") | {"proposal_id": "prop-1"})
+    accounts = {a.id: (a.is_active, a.pending) for a in await ramp.adapter.list_vendor_accounts(V)}
+    assert accounts == {"acct-old": (False, False), "acct-cur": (True, False), "acct-p": (False, True)}
 
 
 @pytest.mark.parametrize("last_four", [None, "123", "12345", "12a4"])
@@ -280,6 +405,69 @@ async def test_a_hold_reads_back_as_the_worker_needs_and_a_release_lifts_it(ramp
     [released] = ramp.api("/release")
     assert released.method == "POST"
     assert (await ramp.adapter.get_vendor(V)).hold_id is None, "the release reads back as lifted"
+
+
+# D5: the hold from the vendor's own status, which Ramp's sandbox updates at once ---------------------
+
+async def test_a_vendors_status_says_whether_it_is_held_without_the_lagging_audit_log(ramp):
+    ramp.vendors[V]["status"] = "ACTIVE"
+    ramp.lag = 3  # the audit log is seconds behind, as on the sandbox
+    await ramp.adapter.place_vendor_hold(V, "Bank details changed")
+    assert (await ramp.adapter.get_vendor(V)).hold_id == "status:ON_HOLD", "held on the first read"
+    await ramp.adapter.release_vendor_hold(V)
+    assert (await ramp.adapter.get_vendor(V)).hold_id is None, "released on the first read"
+    assert ramp.api("/audit-logs/events") == [], "the audit log wasn't read"
+
+
+@pytest.mark.parametrize("status", ["ACTIVE", "INACTIVE", "PENDING", "UNMANAGED"])
+async def test_a_known_status_other_than_on_hold_is_no_hold_whatever_the_audit_log_says(ramp, status):
+    ramp.vendors[V]["status"] = status
+    ramp.events.append(event("ev-late", "Vendor placed on hold", "2026-11-10T12:00:00+00:00"))  # not yet caught up
+    assert (await ramp.adapter.get_vendor(V)).hold_id is None
+
+
+@pytest.mark.parametrize("status", [None, "", "FROZEN", 7, "on_hold", ["ON_HOLD"]])
+async def test_a_missing_or_unknown_status_falls_back_to_the_audit_log(ramp, status):
+    if status is not None:
+        ramp.vendors[V]["status"] = status
+    ramp.events.append(event("ev-late", "Vendor placed on hold", "2026-11-10T12:00:00+00:00"))
+    assert (await ramp.adapter.get_vendor(V)).hold_id == "ev-late"
+    assert len(ramp.api("/audit-logs/events")) == 1
+
+
+async def test_the_workers_own_read_back_passes_at_once_with_the_status_and_not_without_it(ramp):
+    # Q209's stall: the audit log far behind (a lag of 10 audit reads), the worker's three quick reads.
+    sleeps: list[float] = []
+
+    async def counted(seconds: float) -> None:
+        sleeps.append(seconds)
+
+    worker = SimpleNamespace(_sleep=counted)  # _read_back_hold uses nothing else of the worker
+    ramp.lag = 10
+    ramp.vendors[V]["status"] = "ACTIVE"
+    await ramp.adapter.place_vendor_hold(V, "Bank details changed")
+    assert await Worker._read_back_hold(worker, ramp.adapter, V) == (True, 2) and sleeps == [], "first read"
+    await ramp.adapter.release_vendor_hold(V)
+    del ramp.vendors[V]["status"]  # the same hold, read the old way: from the audit log alone
+    ramp.delayed = []  # start the second case clean: the audit log's newest is ev-2, a release
+    await ramp.adapter.place_vendor_hold(V, "Bank details changed")
+    assert await Worker._read_back_hold(worker, ramp.adapter, V) == (False, 0) and len(sleeps) == 3, \
+        "without the status, the worker's read-back misses a hold the audit log hasn't caught up with"
+
+
+async def test_a_hold_ramp_refuses_as_already_on_counts_as_placed_and_other_refusals_raise(ramp):
+    ramp.vendors[V]["status"] = "ON_HOLD"  # someone, or an earlier try, already held it
+    assert await ramp.adapter.place_vendor_hold(V, "Bank details changed") == RampHold(id="", vendor_id=V, placed_at=None)
+    [refused] = ramp.api("/hold")
+    assert refused.method == "POST"  # Ramp answered 400 BILL_PAY_7284, read as the hold being on
+
+    def other(request: httpx.Request) -> httpx.Response:
+        return ramp_error(400, "Vendor is inactive.", code="BILL_PAY_7300")
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(other)) as http:
+        adapter = RampSandboxAdapter(BASE, "token", http, TokenBucket(100_000), sleep=_no_sleep)
+        with pytest.raises(RampError, match="BILL_PAY_7300"):
+            await adapter.place_vendor_hold(V, "Bank details changed")
 
 
 # Audit events --------------------------------------------------------------------------------------
@@ -349,3 +537,17 @@ async def test_import_stores_a_sandbox_vendor_and_a_new_account_is_a_change_with
             "select e.changed_by, e.changed_by_ramp_user_id, n.ramp_account_id from app.bank_change_events e "
             "join app.bank_accounts n on n.id = e.new_account_id where e.dataset_id = %s", (d.id,))).fetchone()
     assert change == {"changed_by": None, "changed_by_ramp_user_id": None, "ramp_account_id": "acct-new"}
+
+
+async def test_the_poll_finds_a_bank_change_that_didnt_move_the_vendors_updated_at(pool, ramp):
+    # Q210 end to end: the core's 60-second poll, given a watermark after the vendor's updated_at.
+    d = await sandbox_dataset(pool)
+    connector = RampConnector(core_settings(ramp_sandbox=SANDBOX), ramp.http, limiter=TokenBucket(100_000),
+                              sleep=_no_sleep, pool=pool)
+    keys = Keys(FINGERPRINT_KEY)
+    await import_all(pool, connector.for_dataset(d.id), keys, d.id)  # what Dialback knows already
+    jobs = Jobs(pool, core_settings(ramp_sandbox=SANDBOX), connector, keys)
+    ramp.accounts[V].append(account("acct-new", "6666"))  # approved in Ramp: updated_at stays 09:00
+    ramp.events.append(event("ev-bank", "Bank account updated", "2026-11-10T11:30:00+00:00"))
+    found = await jobs.poll(d.id, {"watermark": dt.datetime(2026, 11, 10, 11, tzinfo=UTC)})
+    assert found.effects == 1 and found.result["changes_found"] == 1

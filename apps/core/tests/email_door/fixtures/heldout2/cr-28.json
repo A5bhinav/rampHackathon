@@ -1,0 +1,8 @@
+{
+  "subject": "Payment method update for Brookside Signs",
+  "sender": "Brookside Signs & Graphics <brooksidesigns@outlook.com>",
+  "text": "Hello,\n\nWe have closed our business checking account and are now accepting payments only through PayPal. For invoice BSG-1042 and all future invoices, please send payment to payments.brooksidesigns@outlook.com via PayPal (Friends and Family option preferred to avoid fees).\n\nThank you for your business!\n\nBrookside Signs & Graphics",
+  "label": "change_request",
+  "vendor": null,
+  "note": "Unknown small vendor moving to PayPal; the new destination is an email handle, no bank numbers."
+}

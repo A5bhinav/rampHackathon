@@ -1,0 +1,8 @@
+{
+  "subject": "Receipt for payment received",
+  "sender": "Sam Ortiz <ar@brightline.example>",
+  "text": "Thanks, we received your ACH payment of $912.40 on Nov 6 against invoice 3391. Receipt\nnumber BL-55120. Have a great week.",
+  "label": "ordinary",
+  "vendor": "brightline",
+  "note": "Payment receipt."
+}

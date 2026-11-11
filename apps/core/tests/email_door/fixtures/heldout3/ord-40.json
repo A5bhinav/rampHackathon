@@ -1,0 +1,8 @@
+{
+  "subject": "Your invoice is ready",
+  "sender": "Billing Dept <billing@invoice-center-online.com>",
+  "text": "Dear Customer,\n\nYour invoice #INV-7718923 for $4,920.00 is now available. Please open the attached document to view and pay.\n\n[Invoice_7718923.html]\n\nThank you.",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Generic phishing or malware lure. Suspicious, but it does not ask to change where any vendor is paid."
+}

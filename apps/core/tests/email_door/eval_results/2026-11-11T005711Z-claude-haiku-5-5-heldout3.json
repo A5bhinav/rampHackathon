@@ -1,0 +1,36 @@
+{
+  "set": "heldout3",
+  "model": "claude-haiku-5-5",
+  "flagger": "model",
+  "prompt_version": "v2",
+  "prompt_sha256": "168990eec3fdf1a23332ca8ff9c189c5570d20bbcf58964659aa9a51baf7ec30",
+  "emails": 110,
+  "change_requests_total": 35,
+  "change_requests_flagged": 35,
+  "change_requests_by_model": 35,
+  "ordinary_total": 70,
+  "ordinary_flagged": 0,
+  "ordinary_by_model": 0,
+  "failures": {},
+  "failed": {},
+  "missed": [],
+  "false_flags": [],
+  "calls": 110,
+  "input_tokens": 100237,
+  "output_tokens": 5663,
+  "cost_usd": 0.0128552,
+  "latency_p50_s": 0.8196453329874203,
+  "latency_p95_s": 1.5814609589870088,
+  "on_file_only": {
+    "cr-26.json": false,
+    "cr-27.json": false,
+    "cr-31.json": false
+  },
+  "heldout2_revised": true,
+  "excluded_after_heldout2_revision": {
+    "cr-04.json": true,
+    "cr-10.json": true
+  },
+  "bar_without_on_file_only": "PASS",
+  "bar_with_on_file_only": "FAIL"
+}

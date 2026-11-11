@@ -27,8 +27,9 @@ from psycopg.types.json import Jsonb
 from psycopg_pool import AsyncConnectionPool
 
 from .db import dataset_now, system_tx
-from .detection import Keys, sync_vendor
+from .detection import Keys, sync_vendors
 from .ramp import RampConnector, RampError, RampPort
+from .ramp.port import RampVendor
 from .settings import Settings
 
 log = logging.getLogger(__name__)
@@ -104,19 +105,17 @@ class Jobs:
 
     # The poller -------------------------------------------------------------------------------
 
-    async def _sync(self, ramp: RampPort, dataset_id: UUID, vendor_ids: list[str]) -> int:
-        found = 0
-        for vendor_id in vendor_ids:
-            changes = await sync_vendor(self.pool, ramp, self.keys, dataset_id, vendor_id, "poll")
-            found += sum(1 for c in changes if c.status == "applied")
-        return found
+    async def _sync(self, ramp: RampPort, dataset_id: UUID, vendors: list[RampVendor]) -> int:
+        """Spec 0100: each listed vendor once, five at a time; the first error is raised after all."""
+        results = await sync_vendors(self.pool, ramp, self.keys, dataset_id, vendors, "poll")
+        return sum(1 for changes in results for c in changes if c.status == "applied")
 
     async def poll(self, dataset_id: UUID, claimed: dict[str, Any]) -> JobResult:
         ramp = self.connector.for_dataset(dataset_id)
         started = dt.datetime.now(dt.UTC)  # Ramp's clock, not the dataset's: the watermark is compared with Ramp's updated_at
         since = claimed["watermark"]
         vendors = await ramp.list_vendors_updated_since(since)
-        found = await self._sync(ramp, dataset_id, [v.id for v in vendors])
+        found = await self._sync(ramp, dataset_id, vendors)
         mode = "full" if since is None else "incremental"
         return JobResult(effects=found, watermark=started - WATERMARK_OVERLAP,
                          result={"mode": mode, "vendors_checked": len(vendors), "changes_found": found})
@@ -124,7 +123,7 @@ class Jobs:
     async def full_sweep(self, dataset_id: UUID, claimed: dict[str, Any]) -> JobResult:
         ramp = self.connector.for_dataset(dataset_id)
         vendors = await ramp.list_vendors_updated_since(None)
-        found = await self._sync(ramp, dataset_id, [v.id for v in vendors])
+        found = await self._sync(ramp, dataset_id, vendors)
         return JobResult(effects=found, result={"vendors_checked": len(vendors), "changes_found": found})
 
     # Reconciliation (invariant I2) ----------------------------------------------------------

@@ -1,0 +1,8 @@
+{
+  "subject": "Where is payment for invoice 1702?",
+  "sender": "Dana Whitfield <ar@acme.example>",
+  "text": "Hi,\n\nCan you tell me when invoice 1702 will be paid? It was due last Friday and I do not see it\non our side yet. Thanks!",
+  "label": "ordinary",
+  "vendor": "acme",
+  "note": "Payment-status question."
+}
