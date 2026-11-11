@@ -1,7 +1,9 @@
 # 0090: One email can't veto a number
 
 **Owner:** Sami (in `packages/ledger`)  **Slice:** evidence  **Target day:** not set
-**Builds on:** spec 0079 (`sami/0079-guard`, #121). This lands after it, stacked on its branch.
+**Builds on:** spec 0079 (`sami/0079-guard`, #121). This lands after it, stacked on its branch once
+main is merged into that branch (the lab lives on main; the branch is 36 commits behind).
+**Status:** draft. Q153 and Q154 are open; the measured rule changes if Q153 is answered yes.
 
 ## Goal
 
@@ -24,23 +26,30 @@ lookalike pull for support, near-miss logic, ranking, settings.
 
 1. **A label against a number** is a visible sighting whose party isn't `vendor`, or whose role is
    `fax` in any case.
-2. **Support counts only the vendor's sightings.** Age, source types, ranking and the near-miss
-   "seen" read only sightings labeled the vendor's and not a fax. Today a sighting that says "the
-   bank's line" still counts as evidence for the number; the veto hid that.
+2. **Support counts only the vendor's sightings.** Age, source types and ranking read only sightings
+   labeled the vendor's and not a fax. Today a sighting that says "the bank's line" still counts as
+   evidence for the number; the veto hid that. The near-miss check's "which number is older" is
+   Q153 (proposed: today's, every visible sighting outside the change context in a counting
+   channel, labeled or not).
 3. **A label vetoes only when established.** The labels against a number veto it (reasons
    `not_vendor_party`, `fax_line`, as today) only if their documents span at least
    `min_source_types` (2) source types, and the earliest is at least `min_age_days` (90) before the
    request. A labeling document counts only if it is in a counting channel (today's `counts`), and
    is received at or before the request, is not the request, is not in its thread, is not under its
    subject within 30 days of the request, and is not from a lookalike sender. Those facts belong to
-   the document, so an attacker can't undo an honest label: the lookalike pull and duplicate ids
-   play no part here, and "the request" means `min(requested_cutoff, request.received_at)`.
+   the document, so the lookalike pull can't undo an honest label, and "the request" means
+   `min(requested_cutoff, request.received_at)`. (If an old lookalike email pulls the labeling
+   documents into the change context, the guard in rule 5 withholds the case, as spec 0079 does
+   today: the labeled number is still refused and nobody else is called.)
 4. **Weaker labels are ignored.** They neither veto nor support.
 5. **Spec 0079's guard stays.** `select()` calls the longest common prefix of the new rule on the
    case and on the case without the change context (0079's pre-context run, today's cutoff kept).
-6. **Kill switch:** `DIALBACK_LABEL_BAR` in `flags.py`, on by default, any unknown value on. Off,
-   the inner rule is `_select_v1`, giving spec 0079 exactly.
-7. **`rule_version`:** the next free name when this merges (spec 0079 has claimed v3).
+6. **Kill switch (my call):** `DIALBACK_LABEL_BAR` in `flags.py`, on by default, any unknown value
+   on. `DIALBACK_CONTEXT_GUARD=off` stays the full rollback to today's rule, whatever this flag says.
+   So there are three states, each with its own `rule_version` (spec 0047's rule): both on is this
+   spec; the label bar off is spec 0079 exactly (`ledger-select-v3`); the guard off is `ledger-select-v1`.
+7. **`rule_version`:** the next free name when this merges, for "both on" only (spec 0079 has
+   claimed v3). `active_rule_version()` names it under the same flags.
 
 ## What this changes
 
@@ -65,14 +74,24 @@ scratchpad's `umeasure/measure_w_plan.md`, rule W3):
   61 (today 29).
 - **Unchanged:** the 20 corpus outcomes and the demo picks (neither has a label against any number,
   so they can't test this). On all 441 label-free worlds the output is today's, field for field.
-- **Lab metamorphic checks (2000 pinned):** the label probe (I12) goes from 380 failures to 0, and
-  `M_lookalike_helped` stays 0. `M_shared_id_helped` goes from 230 to 263; every extra case is A5's
-  latent first-sorting duplicate id, which production can't reach (ids are primary keys).
+- **Lab metamorphic checks (2000 pinned), on the inner rule alone, not yet inside the guard:** the
+  label probe (I12) goes from 380 failures to 0 (this lab copy; spec 0079 counted 442 on a later
+  one), and `M_lookalike_helped` stays 0. `M_shared_id_helped` goes from 230 to 263, over the bar
+  set before the run; every extra case is A5's latent first-sorting duplicate id, which
+  production can't reach (ids are primary keys). Q154.
+- **A defect found by the builder check (Nov 10), not in the numbers above:** rule 2 as measured
+  also applied to the near-miss check. A real line whose oldest sightings carry a label (the stub
+  reader gives a plain "Tel:" line party `unknown`) then stops anchoring a planted number one
+  digit off it, and the planted number is called where today's rule calls nobody. It breaks spec
+  0021's properties 5 and 6 on hand-built worlds. Q153.
+- **Still to measure:** the final rule inside the guard, after Q153.
 
 ## Contract touched
 
-None: the same outcomes and reasons. `reasons.py`'s text for `not_vendor_party` and `fax_line` says
-the labels are established (and the web copy that repeats it).
+None (my call): the same outcomes and reasons, and the schema's reason descriptions stay true.
+`reasons.py`'s text changes: `not_vendor_party` and `fax_line` say the labels are established, and
+`too_few_source_types` says "seen as the vendor's" (a number seen in two channels, one calling it a
+bank's, now gets that reason). The web copy that repeats them follows.
 
 ## Acceptance
 
@@ -116,12 +135,20 @@ the labels are established (and the web copy that repeats it).
   ledger, so an attacker's earlier requests are history for later cases and could count as support
   for their number. Read in spec 0087, not run.
 - Showing ignored labels to the person on the case page (needs a contract field).
+- The stub reader's party `unknown` (a plain "Tel:" line) still counts as a label against, as
+  today. Treating it as neutral is a separate change.
 - The call side: line takeover (A7) and insiders.
 
 ## Open questions
 
 - **Q151, resolved:** the accepted cost (the last row). Sami, Nov 10.
 - **Q152, open:** should documents filed as any case's change request never count as support?
+- **Q153, open:** does the near-miss check keep today's "which number is older" (every clean
+  sighting, labeled or not)? Proposed yes: it keeps today's refusals of one-digit-off numbers,
+  including a vendor's main line next to its own fax, which is today's behavior. A yes is a third
+  fix after two (the plan's stop rule), so it is measured again before this spec is approved.
+- **Q154, open:** accept `M_shared_id_helped` rising from 230 to 263, all through A5's latent
+  duplicate ids, or fix A5 first?
 
 ## Commands
 
