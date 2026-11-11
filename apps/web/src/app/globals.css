@@ -1009,3 +1009,25 @@ ol.slots li.is-filled { animation: slot-in 360ms var(--ease) both; }
   .page-title h1 { white-space: normal; }
   .page-title-row { flex-wrap: wrap; }
 }
+
+/* Spec 0066, PR 2: the case page's cards fold to one line; the current station's card starts open. */
+.fold-card > summary { list-style: none; cursor: pointer; flex-wrap: nowrap; min-width: 0; }
+.fold-card > summary::-webkit-details-marker { display: none; }
+.fold-card > summary::after { content: ""; flex: none; width: 8px; height: 8px; margin-left: 4px; border-right: 1.5px solid var(--muted);
+  border-bottom: 1.5px solid var(--muted); transform: rotate(-45deg); transition: transform .15s; }
+.fold-card[open] > summary::after { transform: rotate(45deg); }
+.fold-card:not([open]) > summary { border-bottom: 0; }
+.fold-card > summary h2 { flex: none; }
+.fold-line { flex: 1 1 auto; min-width: 0; color: var(--muted); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fold-card > summary .card-meta { margin-left: 0; flex: none; }
+.fold-card > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.fold-links { margin: 0 0 8px; font-size: 13px; }
+.card-body.fold-links { padding-bottom: 0; }
+.case-main { gap: 12px; }
+.attempt-lines { list-style: none; margin: 0; padding: 12px 20px; border-bottom: 1px solid var(--line-soft); display: grid; gap: 6px;
+  font-size: 13px; color: var(--muted); }
+.attempt-lines li::before { content: "↺ "; }
+.show-checks > summary { cursor: pointer; font-size: 13px; color: var(--accent-ink, var(--accent)); margin: 8px 0; }
+.call-body:has(> .show-checks:not([open])) .chips { display: none; }
+.phone-pick { margin: 0; font-size: 12px; font-weight: 600; }
+@media (max-width: 720px) { .fold-line { display: none; } }

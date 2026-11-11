@@ -1,14 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ChainBadge, OutcomeBadge, StateBadge } from "@/components/badges";
-import { CallCard } from "@/components/call";
+import { ChainBadge, OutcomeBadge, StateBadge, outcomeOf } from "@/components/badges";
+import { CallBody } from "@/components/call";
 import { DecisionConsole } from "@/components/console";
 import { DecisionDetail } from "@/components/decision";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { CaseRail } from "@/components/flow";
 import { Icon } from "@/components/icons";
 import { PaymentPath } from "@/components/path";
-import { CardHead, Callout, PageHead } from "@/components/page";
+import { Callout, FoldCard, PageHead } from "@/components/page";
 import type { Alert, CaseDetail, Candidate, SelectionView } from "@/lib/api-types";
 import { AlertBanners } from "@/components/alerts";
 import { alertsForCase } from "@/lib/alerts";
@@ -18,6 +18,7 @@ import { phone, seenBefore, sourceLabel, split } from "@/lib/lineage";
 import { REFRESH_STATES, stations } from "@/lib/stations";
 import { canWatchCall } from "@/lib/live-call";
 import { stateLabel } from "@/lib/states";
+import { attemptRows, changeLine, decisionLine, holdLine, numberLine, openCard, trailLine } from "@/lib/case-cards";
 import { releaseAction, reviewAction } from "./actions";
 
 // Case detail and the action rail (specs 0009, 0036, 0041): the change, the hold, the number
@@ -56,6 +57,8 @@ export default async function CaseDetailPage({ params, searchParams }: {
   const nextDue = dueLabel(c.next_payment_date, now);
 
   const steps = stations(detail.timeline, c.state, decision?.outcome ?? null);
+  const open = openCard(steps);  // the card for the station the case is at starts open; the rest start closed
+  const attempts = attemptRows(detail.calls ?? []);
 
   return (
     <main className="case-page">
@@ -99,8 +102,21 @@ export default async function CaseDetailPage({ params, searchParams }: {
 
       <div className="case-grid">
         <div className="case-main">
-          <section className="card" aria-labelledby="change-h">
-            <CardHead marker="01" title="Change" id="change-h" meta={<>Detected via {change.detected_via}</>} />
+          <FoldCard id="decision-h" marker="05" title="Decision" open={open === "decision"}
+            line={decisionLine(decision, decision ? outcomeOf(decision.outcome).label : "") ?? "No decision yet"}
+            meta={decision ? <OutcomeBadge outcome={decision.outcome} /> : null}>
+            <div className="card-body">
+              {decision ? <DecisionDetail decision={decision} /> : (
+                <p className="muted">
+                  {["needs_review", "blocked"].includes(c.state) && lastStep
+                    ? <>Code made no decision for this version. The last step: {lastStep.summary}</>
+                    : "No decision yet for this version. Code decides once the call's answers are in; until then the hold stays on."}
+                </p>
+              )}
+            </div>
+          </FoldCard>
+
+          <FoldCard id="change-h" marker="01" title="Change" open={open === "change"} line={changeLine(change)}>
             <div className="card-body">
               <PaymentPath
                 bills={c.bills_held}
@@ -114,39 +130,33 @@ export default async function CaseDetailPage({ params, searchParams }: {
                 <dt>Entered by</dt><dd>{change.changed_by?.display_name ?? "Unknown (vendor-supplied or synced)"}</dd>
               </dl>
             </div>
-          </section>
+          </FoldCard>
 
-          <HoldCard detail={detail} now={now} />
-          <NumberCard view={view} path={path} />
+          <HoldCard detail={detail} now={now} open={open === "hold"} />
+          <NumberCard view={view} path={path} open={open === "number"} />
 
-          {(detail.calls ?? []).map((call) => (
-            <CallCard key={call.call_id} call={call} script={detail.call_script} decision={decision} total={detail.calls?.length ?? 0} watchHref={canWatchCall(detail.timeline) ? `${path}/call` : undefined} />
-          ))}
-          {detail.calls && detail.calls.length === 0 && c.state !== "open" ? (
-            <section className="card" aria-labelledby="call-none-h">
-              <CardHead marker="04" title="Call" id="call-none-h" />
+          {attempts.length ? (
+            <FoldCard id="call-h" marker="04" title="Call" open={open === "call"} line={attempts.find((a) => a.expanded)?.line}
+              meta={<span className="badge tone-muted">AI agent: collects answers only</span>}>
+              {attempts.some((a) => !a.expanded) ? (
+                <ul className="attempt-lines" aria-label="Earlier attempts">
+                  {attempts.filter((a) => !a.expanded).map((a) => <li key={a.call.call_id}>{a.line}{a.call.reason ? <span className="muted"> · {a.call.reason}</span> : null}</li>)}
+                </ul>
+              ) : null}
+              {attempts.filter((a) => a.expanded).map((a) => (
+                <CallBody key={a.call.call_id} call={a.call} script={detail.call_script} decision={decision} watchHref={canWatchCall(detail.timeline) ? `${path}/call` : undefined} />
+              ))}
+            </FoldCard>
+          ) : detail.calls && c.state !== "open" ? (
+            <FoldCard id="call-h" marker="04" title="Call" open={open === "call"} line="No call placed">
               <div className="card-body">
                 <p className="quiet-fill">No call has been placed for this case.{lastStep ? <> The last step: {lastStep.summary}</> : null}</p>
               </div>
-            </section>
+            </FoldCard>
           ) : null}
 
-          <section className="card" aria-labelledby="decision-h">
-            <CardHead marker="05" title="Decision" id="decision-h" meta={decision ? <OutcomeBadge outcome={decision.outcome} /> : null} />
-            <div className="card-body">
-              {decision ? <DecisionDetail decision={decision} /> : (
-                <p className="muted">
-                  {["needs_review", "blocked"].includes(c.state) && lastStep
-                    ? <>Code made no decision for this version. The last step: {lastStep.summary}</>
-                    : "No decision yet for this version. Code decides once the call's answers are in; until then the hold stays on."}
-                </p>
-              )}
-            </div>
-          </section>
-
-          <section className="card flush" aria-labelledby="timeline-h">
-            <CardHead marker="Record" title={<>Evidence trail <span className="count">{detail.timeline.length}</span></>} id="timeline-h"
-              meta={<Link href={`/d/${datasetId}/control/evidence`}>Open in Evidence</Link>} />
+          <FoldCard id="timeline-h" marker="Record" title="Evidence trail" className="flush" line={trailLine(detail.timeline.length, detail.chain)}>
+            <p className="card-body fold-links"><Link href={`/d/${datasetId}/control/evidence`}>Open in Evidence</Link></p>
             <div className="table-wrap">
               <table className="trail stack-sm">
                 <thead><tr><th className="num">#</th><th>Event</th><th>State</th><th>By</th><th>Time</th><th>Hash</th></tr></thead>
@@ -164,7 +174,7 @@ export default async function CaseDetailPage({ params, searchParams }: {
                 </tbody>
               </table>
             </div>
-          </section>
+          </FoldCard>
         </div>
 
         <aside className="case-actions" aria-label="Actions">
@@ -175,15 +185,14 @@ export default async function CaseDetailPage({ params, searchParams }: {
   );
 }
 
-function HoldCard({ detail, now }: { detail: CaseDetail; now: Date }) {
+function HoldCard({ detail, now, open }: { detail: CaseDetail; now: Date; open: boolean }) {
   const hold = detail.hold;
   const meta = !hold ? <span className="badge tone-muted">Placing</span>
     : hold.status === "failed" ? <span className="badge tone-bad">Not confirmed</span>
     : hold.confirmed_at ? <span className="badge tone-ok">Confirmed {brief(hold.confirmed_at)}</span>
     : <span className="badge tone-muted">{words(hold.status)}</span>;
   return (
-    <section className="card" aria-labelledby="hold-h">
-      <CardHead marker="02" title="Hold" id="hold-h" meta={meta} />
+    <FoldCard id="hold-h" marker="02" title="Hold" meta={meta} open={open} line={holdLine(hold, detail.case.bills_held)}>
       {hold ? (
         <>
           {hold.schedule.length > 0 ? (
@@ -223,18 +232,18 @@ function HoldCard({ detail, now }: { detail: CaseDetail; now: Date }) {
           </p>
         </div>
       )}
-    </section>
+    </FoldCard>
   );
 }
 
-function NumberCard({ view, path }: { view: SelectionView | null; path: string }) {
+function NumberCard({ view, path, open }: { view: SelectionView | null; path: string; open: boolean }) {
   if (!view) return null;  // the selection couldn't be read: the lineage page still can
   const s = view.selection;
   const pick = s ? split(s).pick : null;
   return (
-    <section className="card" aria-labelledby="number-h">
-      <CardHead marker="03" title="Number chosen" id="number-h" meta={<Link href={`${path}/lineage`}>View lineage →</Link>} />
+    <FoldCard id="number-h" marker="03" title="Number chosen" open={open} line={numberLine(view)}>
       <div className="card-body">
+        <p className="fold-links"><Link href={`${path}/lineage`}>View lineage →</Link></p>
         {!s ? <p className="muted">{view.notes.no_selection}</p> : !pick ? (
           <>
             <p><span className="badge tone-bad">No provable number</span></p>
@@ -255,7 +264,7 @@ function NumberCard({ view, path }: { view: SelectionView | null; path: string }
           </div>
         )}
       </div>
-    </section>
+    </FoldCard>
   );
 }
 

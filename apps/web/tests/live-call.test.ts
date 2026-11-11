@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import type { CaseDetail, SelectionView } from "../src/lib/api-types.ts";
-import { POLL_STATES, callStateResponse, canWatchCall, flowColumns, liveCallView, presentLinks } from "../src/lib/live-call.ts";
+import { POLL_STATES, callLength, callStateResponse, canWatchCall, flowColumns, liveCallView, phoneLines, presentLinks } from "../src/lib/live-call.ts";
 
 const selection = { selection: JSON.parse(readFileSync(new URL("../../../packages/contracts/examples/selection.picked.json", import.meta.url), "utf8")),
   reason_text: {}, notes: {} } as unknown as SelectionView;
@@ -158,10 +158,11 @@ test("flow mode: seven columns, each with its event's time, the core's summary a
   assert.equal(cols[3].summary, null);
 });
 
-test("entry points: Watch the call from number_resolved on; Present only on demo data with a case", () => {
+test("entry points: Watch the call once a call is placed (spec 0066); Present only on demo data with a case", () => {
   assert.equal(canWatchCall([tl("change_detected", "open"), tl("hold_confirmed", "held")] as never), false);
-  assert.equal(canWatchCall([tl("change_detected", "open"), tl("number_resolved", "calling")] as never), true);
-  assert.equal(canWatchCall([tl("number_resolved", "calling"), tl("change_detected", "held")] as never), false, "a new change starts over");
+  assert.equal(canWatchCall([tl("change_detected", "open"), tl("number_resolved", "calling")] as never), false, "a number alone isn't a call");
+  assert.equal(canWatchCall([tl("change_detected", "open"), tl("number_resolved", "calling"), tl("call_started", "calling")] as never), true);
+  assert.equal(canWatchCall([tl("call_started", "calling"), tl("change_detected", "held")] as never), false, "a new change starts over");
   const cases = [{ id: "old", opened_at: "2026-11-01T00:00:00Z" }, { id: "new", opened_at: "2026-11-09T00:00:00Z" }];
   assert.deepEqual(presentLinks("lab", cases, "d1"), []);
   assert.deepEqual(presentLinks("demo", [], "d1"), []);
@@ -213,4 +214,23 @@ test("the route: an expired session (core's redirect) is 401, not 502; 422 is 40
 
 test("the view carries the case version, so a client never keeps a number from an earlier change", () => {
   assert.equal(liveCallView(detail("calling"), selection).version, 1);
+});
+
+// Spec 0066, PR 2: an ended call shows its length, and the phone frame its status and whose number it is.
+test("an ended call's length; nothing for a call that took no measurable time", () => {
+  assert.equal(callLength("2026-11-10T09:48:18Z", "2026-11-10T09:49:36Z"), "01:18");
+  assert.equal(callLength("2026-11-10T09:48:18Z", "2026-11-10T09:48:18.400Z"), null, "the text line: no 00:00");
+  assert.equal(callLength("2026-11-10T09:48:18Z", null), null);
+  assert.equal(callLength(null, "2026-11-10T09:48:18Z"), null);
+});
+
+test("the phone frame: the call's status, and that the number is the Trust Ledger's pick", () => {
+  const v = (over: Record<string, unknown>) => ({ phase: "decided", status: "Decided", dialed: "(415) 555-0142", dialedIsPick: true,
+    startedAt: "2026-11-10T09:48:18Z", endedAt: "2026-11-10T09:49:36Z", result: "answers_recorded", ...over }) as never;
+  assert.deepEqual(phoneLines(v({})), { status: "Call ended · answers recorded · 01:18", pick: { tone: "ok", text: "The Trust Ledger's pick" } });
+  assert.deepEqual(phoneLines(v({ endedAt: "2026-11-10T09:48:18Z" })).status, "Call ended · answers recorded");
+  assert.deepEqual(phoneLines(v({ dialedIsPick: false })).pick, { tone: "bad", text: "Not the Trust Ledger's pick" });
+  assert.deepEqual(phoneLines(v({ phase: "on_call", status: "On the call", endedAt: null, result: null, dialedIsPick: null })),
+    { status: "On the call", pick: { tone: "ok", text: "The Trust Ledger's pick" } }, "before the report, the number shown is the pick itself");
+  assert.equal(phoneLines(v({ dialed: null, phase: "choosing", status: "Choosing a number", endedAt: null, result: null })).pick, null);
 });

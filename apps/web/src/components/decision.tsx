@@ -52,7 +52,7 @@ export function DecisionDetail({ decision }: { decision: DecisionInfo }) {
   );
 }
 
-/** Open when the checklist was run; folded when an earlier rule decided and every row is "not checked". */
+/** The Verified checklist, behind "Show the checks" (spec 0066). A link to a row's #rule- anchor opens it. */
 function Checklist({ decision, ran }: { decision: DecisionInfo; ran: boolean }) {
   const items = decision.checklist ?? [];
   const list = (
@@ -70,10 +70,11 @@ function Checklist({ decision, ran }: { decision: DecisionInfo; ran: boolean }) 
     </ul>
   );
   return (
-    <div className="rule-group">
+    <details className="fold show-checks rule-group">
+      <summary>{ran ? "Show the checks" : `Show the ${items.length} conditions, not checked`}</summary>
       <h3>The Verified checklist</h3>
       {decision.checklist_note ? <p className="muted sub">{decision.checklist_note}</p> : null}
-      {ran ? list : <details className="fold"><summary>Show the {items.length} conditions, not checked</summary>{list}</details>}
-    </div>
+      {list}
+    </details>
   );
 }

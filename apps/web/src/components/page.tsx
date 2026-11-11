@@ -53,6 +53,25 @@ export function CardHead({ marker, title, id, meta, as: H = "h2" }: {
   );
 }
 
+/** A card that collapses to its head and one line (spec 0066). A <details>, so it works without
+ *  JavaScript and a link to an id inside it still lands. Nothing interactive goes in the head. */
+export function FoldCard({ id, marker, title, line, meta, open, className, children }: {
+  id: string; marker?: string; title: React.ReactNode; line?: React.ReactNode; meta?: React.ReactNode;
+  open?: boolean; className?: string; children: React.ReactNode;
+}) {
+  return (
+    <details className={`card fold-card${className ? ` ${className}` : ""}`} open={open} aria-labelledby={id}>
+      <summary className="card-head">
+        {marker ? <span className="section-marker">{marker}</span> : null}
+        <h2 id={id}>{title}</h2>
+        {line ? <span className="fold-line">{line}</span> : null}
+        {meta ? <span className="card-meta">{meta}</span> : null}
+      </summary>
+      {children}
+    </details>
+  );
+}
+
 /** The callout: a quiet block for notes, notices, refusals and errors. */
 export function Callout({ tone = "neutral", title, icon, children, role, className = "" }: {
   tone?: "neutral" | "ok" | "warn" | "bad"; title?: React.ReactNode; icon?: React.ReactNode; children?: React.ReactNode;
