@@ -187,9 +187,10 @@ async def test_the_ledger_write_never_builds_the_configured_reader(door_world, m
     monkeypatch.setattr(ingest, "reader_for", refuse)
     row = await arrive(door_world)
     assert row["outcome"] == "case_opened"
-    found = await one(door_world.pool, "select array_agg(distinct extractor_version order by extractor_version) as v "
-                                       "from ledger.observations")
-    assert found["v"] == ["stub"], "the seed and the door both store the stub reader's version"
+    found = await one(door_world.pool, "select array_agg(distinct o.extractor_version) as v from ledger.observations o "
+                                       "join ledger.change_requests r on r.document_id = o.document_id where r.dataset_id = %s",
+                      door_world.demo_id)
+    assert found["v"] == ["stub"], "the email's change-request document stores the stub reader's version"
 
 
 async def test_a_duplicate_delivery_opens_nothing_new(door_world):
