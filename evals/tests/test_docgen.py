@@ -464,6 +464,27 @@ def test_another_seed_never_writes_to_the_committed_cases():
 
 # --- The stub report ---------------------------------------------------------------------------------
 
+def _recount(plans) -> tuple:
+    """The over-blocks by author and owner, and the wrong-role counts, recounted from ingest_all directly."""
+    from collections import Counter
+    by, roles, roles_right, fax, fax_right = Counter(), 0, 0, 0, 0
+    for plan in plans:
+        if not isinstance(plan, docgen.DocPlan):
+            continue
+        seen = {o["value_normalized"]: o for o in ingest_all([docgen.render(plan)], extractor_version=docgen.EXTRACTOR,
+                                                              reader=StubReader()).observations}
+        for author, n in docgen.numbers_with_authors(plan):
+            o = seen.get(n.e164)
+            if n.visibility != "visible" or o is None:
+                continue
+            if n.party == "vendor" and n.role is not None and o["party"] == "unknown":
+                by[f"{author}/{n.owner}"] += 1
+            if n.role is not None and o["role"] not in ("unknown", n.role):
+                right = o["party"] == n.party
+                roles, roles_right = roles + 1, roles_right + right
+                fax, fax_right = fax + (n.role == "fax"), fax_right + (n.role == "fax" and right)
+    return dict(sorted(by.items())), roles, roles_right, fax, fax_right
+
 def test_stub_report_has_every_count(tmp_path, capsys):
     from collections import Counter
 
@@ -484,6 +505,15 @@ def test_stub_report_has_every_count(tmp_path, capsys):
     # Roles: no check reads them, so the report counts them; a fax line labeled another role is no longer
     # refused as a fax line (A20 does this through "Office hours").
     assert body["wrong_roles"] >= body["fax_lines_labeled_another_role"] > 0
+    # The second review: a wrong role with the wrong party is already a G3 failure; one with the party right
+    # is seen by no check, and for a fax line that is the case that matters (no longer refused as a fax).
+    assert 0 < body["wrong_roles_with_the_party_right"] < body["wrong_roles"]
+    assert 0 < body["fax_lines_labeled_another_role_with_the_party_right"] < body["fax_lines_labeled_another_role"]
+    # The counts recompute from ingestion directly, outside the code that keeps the tally.
+    assert _recount(found.plans.values()) == (over["by_author_and_owner"], body["wrong_roles"],
+                                              body["wrong_roles_with_the_party_right"],
+                                              body["fax_lines_labeled_another_role"],
+                                              body["fax_lines_labeled_another_role_with_the_party_right"])
     # G7 also counts the worlds where change-context text refuses the case and nobody is called (A1's
     # fail-safe side), which I12 allows.
     assert body["g7_refused_no_call_worlds"] > 0

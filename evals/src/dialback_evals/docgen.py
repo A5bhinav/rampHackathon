@@ -517,6 +517,8 @@ class Tally:
     overblocks_by: Counter = dataclasses.field(default_factory=Counter)  # by "<author>/<owner>"
     wrong_roles: int = 0                           # a claimed role labeled another known role (no check reads roles)
     fax_relabeled: int = 0                         # of those, fax lines: no longer refused as a fax line
+    wrong_roles_party_right: int = 0               # of the wrong roles, those with the claimed party (no check sees)
+    fax_relabeled_party_right: int = 0             # of those, fax lines
     vendor_role_claims: Counter = dataclasses.field(default_factory=Counter)   # the over-block denominators
     g5_compared: int = 0
     g5_same: int = 0
@@ -648,6 +650,9 @@ def check_doc(plan: DocPlan, *, reader, ingest=None, checks: Iterable[str] = DOC
         if "G4" in checks and n.role is not None and o["role"] not in ("unknown", n.role):
             res.tally.wrong_roles += 1
             res.tally.fax_relabeled += n.role == "fax"
+            if o["party"] == n.party:                  # otherwise it is a G3 or G4 failure as well
+                res.tally.wrong_roles_party_right += 1
+                res.tally.fax_relabeled_party_right += n.role == "fax"
         if "G5" in checks:
             for variant in variants(plan, n, author):
                 moved = next(m for _, m in numbers_with_authors(variant) if m.e164 == n.e164)
@@ -947,6 +952,8 @@ def report(found: Run) -> dict:
         "overblocks": {**readable, "fax_lines_among_them": t.overblocks_fax,
                        "by_author_and_owner": dict(sorted(t.overblocks_by.items()))},
         "wrong_roles": t.wrong_roles, "fax_lines_labeled_another_role": t.fax_relabeled,
+        "wrong_roles_with_the_party_right": t.wrong_roles_party_right,
+        "fax_lines_labeled_another_role_with_the_party_right": t.fax_relabeled_party_right,
         "g5_stability": {"same": t.g5_same, "compared": t.g5_compared,
                          "rate": t.g5_same / t.g5_compared if t.g5_compared else None},
         "g6_compared": t.g6_compared,
@@ -971,8 +978,10 @@ def report_lines(body: dict) -> list[str]:
          "which the rule refuses anyway)"),
         ("over-blocks by author/owner (only vendor/vendor is the vendor's own text): "
          + ", ".join(f"{k} {v}" for k, v in o["by_author_and_owner"].items())),
-        (f"wrong roles (not gated): {body['wrong_roles']}, {body['fax_lines_labeled_another_role']} of them fax lines "
-         "labeled another role, so no longer refused as fax lines"),
+        (f"wrong roles (not gated): {body['wrong_roles']} ({body['fax_lines_labeled_another_role']} fax lines); "
+         f"{body['wrong_roles_with_the_party_right']} with the party right, which no check sees "
+         f"({body['fax_lines_labeled_another_role_with_the_party_right']} fax lines, no longer refused as fax lines), "
+         "the rest are G3 or G4 failures as well"),
         f"G5 stability: the same label on {g5['same']} of {g5['compared']} rewordings ({rate})",
         f"G6: {body['g6_compared']} original numbers compared with and without their quote",
         (f"G7: {body['g7_failing_worlds']} of {body['worlds']} worlds fail (the call moves); in "
