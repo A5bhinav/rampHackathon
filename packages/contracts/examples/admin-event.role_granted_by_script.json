@@ -1,0 +1,16 @@
+{
+  "v": 1,
+  "chain_id": "0b6f3c1e-8a2d-4f7b-9c1e-2d3f4a5b6c7d",
+  "event_id": "9c8b7a6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d",
+  "type": "role_granted",
+  "actor": {
+    "kind": "system",
+    "id": null
+  },
+  "occurred_at": "2026-11-11T16:00:00.000000Z",
+  "subject_user_id": "a9b8c7d6-e5f4-4321-8abc-def012345678",
+  "detail": {
+    "role": "admin"
+  },
+  "reason": "The first admin, granted by the team with scripts/db/add_user.py."
+}

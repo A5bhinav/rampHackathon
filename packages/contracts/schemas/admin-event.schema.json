@@ -1,0 +1,323 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dialback.dev/schemas/admin-event.schema.json",
+  "title": "AdminEvent",
+  "description": "The envelope appended to the organisation chain through audit.append_evidence() (spec 0095, R6). One per successful admin action; a refused action appends nothing. Built by app.admin_append(): by the app.admin_* functions for a signed-in admin (actor kind person), and by scripts/db/add_user.py for the team (actor kind system). dataset_id and case_id are never present. Owner: Abhi. Same hashing rules as evidence-event: numbers must be integers; never a full bank account number.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "v",
+    "chain_id",
+    "event_id",
+    "type",
+    "actor",
+    "occurred_at",
+    "subject_user_id",
+    "detail",
+    "reason"
+  ],
+  "properties": {
+    "v": {
+      "const": 1,
+      "description": "Envelope version."
+    },
+    "chain_id": {
+      "$ref": "evidence-event.schema.json#/$defs/Uuid",
+      "description": "The organisation chain (app.org_settings.chain_id), not a dataset's."
+    },
+    "event_id": {
+      "$ref": "evidence-event.schema.json#/$defs/Uuid"
+    },
+    "type": {
+      "$ref": "#/$defs/AdminEventType"
+    },
+    "actor": {
+      "description": "A signed-in admin, or the team's add_user.py script (system).",
+      "$ref": "evidence-event.schema.json#/$defs/Actor"
+    },
+    "occurred_at": {
+      "type": "string",
+      "description": "UTC, microsecond precision, as app.rfc3339() prints it.",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$"
+    },
+    "subject_user_id": {
+      "oneOf": [
+        {
+          "$ref": "evidence-event.schema.json#/$defs/Uuid"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "The person the action was about; null for demo actions."
+    },
+    "detail": {
+      "type": "object",
+      "description": "Type-specific; see the per-type schemas below."
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2000,
+      "description": "The admin's written reason."
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "enum": [
+              "role_granted",
+              "role_revoked"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "detail": {
+            "$ref": "#/$defs/RoleDetail"
+          },
+          "subject_user_id": {
+            "$ref": "evidence-event.schema.json#/$defs/Uuid"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "ramp_link_set"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "detail": {
+            "$ref": "#/$defs/RampLinkDetail"
+          },
+          "subject_user_id": {
+            "$ref": "evidence-event.schema.json#/$defs/Uuid"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "enum": [
+              "access_disabled",
+              "access_enabled"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "detail": {
+            "$ref": "#/$defs/EmptyDetail"
+          },
+          "subject_user_id": {
+            "$ref": "evidence-event.schema.json#/$defs/Uuid"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "demo_reset"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "detail": {
+            "$ref": "#/$defs/DemoResetDetail"
+          },
+          "subject_user_id": {
+            "type": "null"
+          },
+          "actor": {
+            "properties": {
+              "kind": {
+                "const": "person"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "demo_chaos"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "detail": {
+            "$ref": "#/$defs/DemoChaosDetail"
+          },
+          "subject_user_id": {
+            "type": "null"
+          },
+          "actor": {
+            "properties": {
+              "kind": {
+                "const": "person"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "demo_tamper"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "detail": {
+            "$ref": "#/$defs/DemoTamperDetail"
+          },
+          "subject_user_id": {
+            "type": "null"
+          },
+          "actor": {
+            "properties": {
+              "kind": {
+                "const": "person"
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "AdminEventType": {
+      "type": "string",
+      "enum": [
+        "role_granted",
+        "role_revoked",
+        "ramp_link_set",
+        "access_disabled",
+        "access_enabled",
+        "demo_reset",
+        "demo_chaos",
+        "demo_tamper"
+      ]
+    },
+    "Role": {
+      "type": "string",
+      "enum": [
+        "clerk",
+        "approver",
+        "auditor",
+        "admin"
+      ]
+    },
+    "RoleDetail": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "role"
+      ],
+      "properties": {
+        "role": {
+          "$ref": "#/$defs/Role"
+        }
+      }
+    },
+    "RampLinkDetail": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ramp_user_id",
+        "previous_ramp_user_id"
+      ],
+      "properties": {
+        "ramp_user_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 200,
+          "description": "The new link; null clears it."
+        },
+        "previous_ramp_user_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 200
+        }
+      }
+    },
+    "EmptyDetail": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {}
+    },
+    "DemoResetDetail": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "linked_clerk_user_id"
+      ],
+      "description": "Recorded before the reset runs, so the new dataset's id is not known yet.",
+      "properties": {
+        "linked_clerk_user_id": {
+          "oneOf": [
+            {
+              "$ref": "evidence-event.schema.json#/$defs/Uuid"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "DemoChaosDetail": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dataset_id",
+        "enabled"
+      ],
+      "properties": {
+        "dataset_id": {
+          "$ref": "evidence-event.schema.json#/$defs/Uuid"
+        },
+        "enabled": {
+          "type": "boolean"
+        }
+      }
+    },
+    "DemoTamperDetail": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dataset_id"
+      ],
+      "description": "Recorded before the row is edited; the dataset is the current demo.",
+      "properties": {
+        "dataset_id": {
+          "$ref": "evidence-event.schema.json#/$defs/Uuid"
+        }
+      }
+    }
+  }
+}

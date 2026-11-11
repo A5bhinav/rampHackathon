@@ -51,6 +51,7 @@ test("Control is offered to everyone on demo data, and to approvers and auditors
   assert.equal(canSeeControl([], "lab"), false);
   assert.equal(canSeeControl(["approver"], "dev"), true);
   assert.equal(canSeeControl(["auditor"], "lab"), true);
+  assert.equal(canSeeControl(["admin"], "dev"), true);
 });
 
 test("the old routes redirect to Control, keeping the dataset (and the query, which Next passes on)", async () => {

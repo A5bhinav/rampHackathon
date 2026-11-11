@@ -46,7 +46,7 @@ export function appOf(path: string): AppKey {
   return /^\/d\/[^/]+\/control(\/|$)/.test(path) ? "control" : "ap";
 }
 
-/** Control is offered to everyone on demo data, and to approvers and auditors elsewhere (spec 0063, Q1). */
+/** Control is offered to everyone on demo data, and to approvers, auditors and admins elsewhere (spec 0063 Q1, spec 0095). */
 export function canSeeControl(roles: readonly string[], kind: string): boolean {
-  return kind === "demo" || roles.includes("approver") || roles.includes("auditor");
+  return kind === "demo" || roles.includes("approver") || roles.includes("auditor") || roles.includes("admin");
 }

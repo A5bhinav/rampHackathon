@@ -2,9 +2,10 @@ import "server-only";
 import { redirect } from "next/navigation";
 import { sessionToken } from "./session";
 import type {
-  ActionResult, Alert, ApiError, BankChangeResult, CaseDetail, CaseState, CaseSummary, ChainStatus, Dataset, EvidenceLog, Me,
-  MailItem, SelectionView, VendorAccounts, VendorRisk,
+  ActionResult, AdminLog, Alert, ApiError, BankChangeResult, CaseDetail, CaseState, CaseSummary, ChainStatus, Dataset, DemoState,
+  EvidenceLog, MailItem, Me, PersonAdminView, Role, SelectionView, VendorAccounts, VendorRisk,
 } from "./api-types";
+import { ACCESS_OFF } from "./people";
 
 // The only way the dashboard talks to the core: server-side, with the signed-in user's
 // token, against packages/contracts/openapi/dialback.yaml. The browser never calls the core.
@@ -27,6 +28,7 @@ async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
   });
   if (response.status === 401) redirect("/sign-in?expired=1");
   const body = await response.json();
+  if (response.status === 403 && (body as ApiError).message === ACCESS_OFF) redirect("/access-off");  // spec 0095, D7
   if (!response.ok) throw new CoreError(response.status, body as ApiError);
   return body as T;
 }
@@ -62,4 +64,20 @@ export const core = {
     call<BankChangeResult>(`/api/datasets/${encodeURIComponent(datasetId)}/vendors/${encodeURIComponent(vendorId)}/bank-change`, { method: "POST", body: JSON.stringify(body) }),
   review: (caseId: string, body: { expected_version: number; action: "clear" | "block"; reason: string }) =>
     call<ActionResult>(`/api/cases/${caseId}/review`, { method: "POST", body: JSON.stringify(body) }),
+  // The admin's API (spec 0095). The database checks the role on every call.
+  people: () => call<{ people: PersonAdminView[] }>("/api/people").then((r) => r.people),
+  changeRole: (userId: string, body: { role: Role; grant: boolean; reason: string }) =>
+    call<PersonAdminView>(`/api/people/${encodeURIComponent(userId)}/roles`, { method: "POST", body: JSON.stringify(body) }),
+  changeRampLink: (userId: string, body: { ramp_user_id: string | null; reason: string }) =>
+    call<PersonAdminView>(`/api/people/${encodeURIComponent(userId)}/ramp-link`, { method: "POST", body: JSON.stringify(body) }),
+  changeAccess: (userId: string, body: { enabled: boolean; reason: string }) =>
+    call<PersonAdminView>(`/api/people/${encodeURIComponent(userId)}/access`, { method: "POST", body: JSON.stringify(body) }),
+  adminLog: () => call<AdminLog>("/api/admin/log?limit=50"),
+  demoState: () => call<DemoState>("/api/admin/demo"),
+  demoReset: (body: { link_clerk_user_id: string | null; reason: string }) =>
+    call<DemoState>("/api/admin/demo/reset", { method: "POST", body: JSON.stringify(body) }),
+  demoChaos: (body: { enabled: boolean; reason: string }) =>
+    call<DemoState>("/api/admin/demo/chaos", { method: "POST", body: JSON.stringify(body) }),
+  demoTamper: (body: { confirm: "break the chain"; reason: string }) =>
+    call<DemoState>("/api/admin/demo/tamper", { method: "POST", body: JSON.stringify(body) }),
 };

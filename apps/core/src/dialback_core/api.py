@@ -130,8 +130,14 @@ async def chain_status(conn: AsyncConnection, chain_id: UUID) -> dict[str, Any]:
 
 
 async def roles_of(conn: AsyncConnection) -> list[str]:
+    """The roles the signed-in person holds (not the ones admin implies)."""
     rows = await (await conn.execute("select role::text as role from app.user_roles where user_id = auth.uid() order by role")).fetchall()
     return [r["role"] for r in rows]
+
+
+def holds(roles: list[str], role: str) -> bool:
+    """An admin counts as every role, as app.has_role does (spec 0095, D1)."""
+    return role in roles or "admin" in roles
 
 
 def permissions(case: dict[str, Any], user: UUID, roles: list[str], approved_this_version: bool,
@@ -142,7 +148,7 @@ def permissions(case: dict[str, Any], user: UUID, roles: list[str], approved_thi
     reasons: list[str] = []
     is_changer = user in (case["changer_ids"] or [])
     is_reviewer = case["reviewed_by"] == user
-    approver = "approver" in roles
+    approver = holds(roles, "approver")
     awaiting = case["state"] == "awaiting_release"
     if is_changer:
         reasons.append("You entered this change, so you cannot release, reject or clear it (R5).")
@@ -405,7 +411,7 @@ async def _refusal(conn: AsyncConnection, case_id: UUID, user: UUID, message: st
         return problem(403, "forbidden", "You entered this change, so you cannot release, reject or clear it (R5)."
                        if user in (case["changer_ids"] or []) else "The rules refuse this action for you (R5): "
                        "the person who cleared the review cannot also approve the release.")
-    if case["state"] == "needs_review" and "approver" not in await roles_of(conn):
+    if case["state"] == "needs_review" and not holds(await roles_of(conn), "approver"):
         return problem(403, "forbidden", "Reviewing needs the approver role.")  # spec 0028
     return problem(409, "transition_refused", f"This case is {case['state'].replace('_', ' ')}, so that action is not available.")
 
@@ -481,7 +487,7 @@ async def change_access(conn: AsyncConnection, settings: Any, dataset: dict[str,
         return None, "Bank changes from the dashboard are for demo datasets only. On this dataset, changes come from Ramp."
     if dataset["retired_at"] is not None:
         return None, "This demo has been replaced by a newer one. Bank changes from the dashboard work only on the current demo."
-    if "clerk" not in await roles_of(conn):
+    if not holds(await roles_of(conn), "clerk"):
         return None, "Bank changes are entered by a clerk. Sign in as the demo clerk to make one."
     profile = await (await conn.execute("select ramp_user_id from app.user_profiles where user_id = auth.uid()")).fetchone()
     ramp_user = profile["ramp_user_id"] if profile else None

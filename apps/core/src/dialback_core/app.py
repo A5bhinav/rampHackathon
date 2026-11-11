@@ -11,10 +11,11 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from psycopg_pool import AsyncConnectionPool
 
+from .admin import router as admin_router
 from .api import router as api_router
 from .auth import TokenVerifier, verifier_from_settings
 from .calls import router as calls_router
-from .db import open_pool
+from .db import AccessOff, open_pool
 from .detection import Keys
 from .email_door.classifier import AnthropicClassifier, ChangeClassifier, anthropic_client
 from .email_door.resend import ResendClient
@@ -46,17 +47,20 @@ def email_classifier(settings: Settings) -> ChangeClassifier | None:
 
 def create_app(settings: Settings, pool: AsyncConnectionPool | None = None, connector: RampConnector | None = None,
                resolver: NumberResolver | None = None, caller: CallPlacer | None = None,
-               change_context: ChangeContext | None = None, verifier: TokenVerifier | None = None) -> FastAPI:
+               change_context: ChangeContext | None = None, verifier: TokenVerifier | None = None,
+               demo_mock: httpx.AsyncClient | None = None, owner_url: str | None = None) -> FastAPI:
     @contextlib.asynccontextmanager
     async def lifespan(app: FastAPI):
         http = httpx.AsyncClient(timeout=10.0)
-        stop, task, classifier, opened_pool = asyncio.Event(), None, None, False
+        stop, task, classifier, opened_pool, own_mock = asyncio.Event(), None, None, False, None
         try:   # whatever fails on the way up or down, everything opened here is closed
             if pool is None:
                 app.state.pool = await open_pool(settings.database_url)
                 opened_pool = True
             if connector is None:
                 app.state.connector = RampConnector(settings, http)
+            if demo_mock is None:  # the admin's demo commands talk to the Ramp mock, as `dialback-core demo` does
+                own_mock = app.state.demo_mock = httpx.AsyncClient(base_url=settings.ramp_base_url, timeout=15.0)
             if settings.run_worker:
                 classifier = email_classifier(settings)
                 worker = Worker(app.state.pool, settings, app.state.connector,
@@ -78,6 +82,8 @@ def create_app(settings: Settings, pool: AsyncConnectionPool | None = None, conn
                 if isinstance(classifier, AnthropicClassifier):
                     classifier.client.close()
                 await http.aclose()
+                if own_mock is not None:
+                    await own_mock.aclose()
                 if opened_pool:
                     await app.state.pool.close()
 
@@ -89,6 +95,14 @@ def create_app(settings: Settings, pool: AsyncConnectionPool | None = None, conn
         app.state.pool = pool
     if connector is not None:
         app.state.connector = connector
+    if demo_mock is not None:
+        app.state.demo_mock = demo_mock
+    app.state.owner_url = owner_url or settings.database_url  # the demo commands' owner connection (spec 0095, D9)
+    app.state.demo_warnings = []
+
+    @app.exception_handler(AccessOff)
+    async def access_off(_: Request, exc: AccessOff):
+        return JSONResponse({"code": "forbidden", "message": str(exc)}, status_code=403)
 
     @app.exception_handler(RequestValidationError)
     async def invalid_request(_: Request, exc: RequestValidationError):
@@ -108,6 +122,7 @@ def create_app(settings: Settings, pool: AsyncConnectionPool | None = None, conn
     app.include_router(email_router)
     app.include_router(calls_router)
     app.include_router(api_router)
+    app.include_router(admin_router)
 
     @app.get("/healthz")
     async def healthz():
