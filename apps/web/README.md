@@ -17,6 +17,7 @@ Show each case's evidence, take the release decision, and show the scorecard.
 | Release console | on case detail | A required reason, then approve or reject (and clear or block from review), sent with the version the person saw | Abhi | built |
 | Number lineage | `/d/[datasetId]/cases/[caseId]/lineage` (suggested) | The chosen number with its sources, every rejected number with its reason | Inesh | to build |
 | Trust Ledger (vendor risk) | `/d/[datasetId]/control/trust-ledger` (old `/risk` redirects, spec 0063) | Vendors whose number on file is provable, unproven, a near miss, or missing | Inesh | built |
+| Vendor history | `/d/[datasetId]/control/trust-ledger/[vendorId]` | One vendor as of now: status, the first-seen chart, every number with the ledger's reasons, and its documents with the text each number was read from (spec 0104) | Sami | built |
 | Call view | `/d/[datasetId]/calls/[callId]` (suggested) | The transcript with recorded answers, the recording, speech-guard trips | Sami | to build |
 | Scorecard | `/d/[datasetId]/scorecard` (suggested) | The latest run's gates, rates with intervals, results by attack class | Sami | to build |
 
