@@ -24,7 +24,7 @@ export const TOUR: TourStep[] = [
   { n: 6, target: "tamper", title: "Tamper",
     caption: "The team edits one evidence row by hand, behind the app's back. The chain check names the exact row that changed: an edit can't hide." },
   { n: 7, target: "lab", title: "The attack lab",
-    caption: "Scripted scams and legitimate-but-odd calls, replayed through the real pipeline and scored by code. The page shows only results a lab run computed; then follow one change through the whole flow.",
+    caption: "Scripted scams and legitimate-but-odd calls, played through the real call flow and decision rules and scored by code, then generated inputs thrown at the number-picking rule. The page shows only results a lab run computed; then follow one change through the whole flow.",
     action: { label: "Show the whole flow", to: "/tour/flow" } },
 ];
 

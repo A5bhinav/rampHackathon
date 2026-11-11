@@ -20,6 +20,7 @@ uv run lab reports --examples 2000 --seed 0   # call reports: frozen findings, t
 uv run lab docs --examples 1000 --seed 0      # documents: frozen cases, then G1 to G7 through ingestion (spec 0052)
 uv run lab docs --examples 1000 --seed 5      # another seed: held to the same list; cases go to evals/out
 uv run lab sweep                              # remove each decision rule: seen, or in UNREACHABLE.md
+uv run lab snapshot                           # one real run, written for the dashboard's scorecard page (spec 0101)
 cd evals && uv run pytest -q -m "not selection_gate and not report_gate and not docs_gate"   # the checks that must stay green
 ```
 

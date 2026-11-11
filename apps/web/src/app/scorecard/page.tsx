@@ -1,26 +1,26 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ScorecardEmpty } from "@/components/scorecard";
+import { LabResults } from "@/components/scorecard";
 import { PublicHeader } from "@/components/public-header";
 import { PageHead } from "@/components/page";
 
 export const metadata: Metadata = { title: "Dialback: scorecard" };
 
-// The scorecard (spec 0039). The attack lab (evals/) hasn't produced one, so this page has no
-// numbers: it says what the scorecard will show and links to what does exist.
+// The scorecard (specs 0039, 0101). Static: every result here was written by `lab snapshot` running
+// the real attack lab; the page only lays it out.
 export default function ScorecardPage() {
   return (
     <div className="public">
       <PublicHeader links={[{ href: "/", label: "Front door" }, { href: "/corpus", label: "Frozen test cases" }]} />
       <main>
-        <PageHead titleId="sc-h" title="Scorecard" lead="No lab run's scorecard is published to this page yet, so it shows no numbers." />
-        <p className="page-intro muted">The attack lab replays scams and legitimate-but-odd changes through the real pipeline, on a simulated clock,
-            and scores how often Dialback is fooled or wrongly blocks a real vendor. This page shows a run&apos;s numbers only once its
-            scorecard is published here: we don&apos;t display a result the system didn&apos;t compute.</p>
-        <ScorecardEmpty />
+        <PageHead titleId="sc-h" title="Scorecard" lead="One real run of the attack lab, failures included." />
+        <p className="page-intro muted">The attack lab plays scripted calls through the production call flow and decision rules, with the case and the
+            number set up by the script, and throws generated inputs at the number-picking rule. Everything below came from one run of the
+            lab, on the commit it names. No result here was typed in by hand.</p>
+        <LabResults />
         <section className="two-up">
           <div className="card">
-            <div className="card-head"><h2>What the scorecard will show</h2></div>
+            <div className="card-head"><h2>Still to come</h2></div>
             <ul className="card-body plain">
               <li>False Verified: attacks that ended Verified, with the upper bound of its rate, next to how many seed families the runs came from.</li>
               <li>False holds: legitimate changes that didn&apos;t end Verified.</li>
