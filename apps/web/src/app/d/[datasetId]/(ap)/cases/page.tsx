@@ -6,6 +6,7 @@ import { Callout, PageHead, Stats } from "@/components/page";
 import { RingMotif } from "@/components/ring-band";
 import type { EvidenceLog } from "@/lib/api-types";
 import { core } from "@/lib/core";
+import { needsYou as waitingOnYou } from "@/lib/queue";
 import { stationCounts, stationsFromEvidence } from "@/lib/stations";
 import { heldTotals } from "@/lib/overview";
 import { demoStory } from "@/lib/story";
@@ -30,8 +31,8 @@ export default async function CaseQueue({ params, searchParams }: {
   const now = datasetNow(dataset?.sim_now);
   const waiting = cases.filter((c) => NEEDS_A_PERSON.includes(c.state)).sort(bySoonestPayment);
   const working = cases.filter((c) => !NEEDS_A_PERSON.includes(c.state)).sort(bySoonestPayment);
-  const mine = await actionable(waiting);  // "Needs you": only what the signed-in person can act on (spec 0066)
-  const needsYou = waiting.filter((c) => mine.has(c.id)).length;
+  const perms = await actionable(waiting);  // "Needs you": only what the signed-in person can act on (spec 0066)
+  const needsYou = waitingOnYou(waiting, perms).length;
   const soon = cases.filter((c) => dueLabel(c.next_payment_date, now)?.soon).sort(bySoonestPayment);
   const unconfirmed = cases.filter((c) => c.hold_status === "failed").length;
   const held = heldTotals(cases);
@@ -79,8 +80,8 @@ export default async function CaseQueue({ params, searchParams }: {
           <p>No open cases. A case opens here when a vendor&apos;s bank details change in Ramp.{released.length ? " Released changes are listed below." : ""}</p>
         </div>
       ) : null}
-      {waiting.length > 0 ? <QueueTable id="waiting" title="Waiting on a person" cases={waiting} datasetId={datasetId} now={now} rails={rails} mine={mine} /> : null}
-      {working.length > 0 ? <QueueTable id="working" title="In progress" cases={working} datasetId={datasetId} now={now} rails={rails} mine={mine} /> : null}
+      {waiting.length > 0 ? <QueueTable id="waiting" title="Waiting on a person" cases={waiting} datasetId={datasetId} now={now} rails={rails} perms={perms} /> : null}
+      {working.length > 0 ? <QueueTable id="working" title="In progress" cases={working} datasetId={datasetId} now={now} rails={rails} perms={perms} /> : null}
 
       <div className="inbox-lower">
         <div className="inbox-lanes"><PaymentLanes cases={cases} now={now} datasetId={datasetId} /></div>

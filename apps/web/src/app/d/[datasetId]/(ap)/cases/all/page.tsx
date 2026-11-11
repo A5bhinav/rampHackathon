@@ -26,7 +26,7 @@ export default async function CasesPage({ params, searchParams }: {
   const now = datasetNow(dataset?.sim_now);
   const tab = TABS.find((t) => t.key === state) ?? TABS[0];
   const shown = all.filter(tab.test).sort(bySoonestPayment);
-  const mine = await actionable(shown);
+  const perms = await actionable(shown);
   const base = `/d/${datasetId}/cases/all`;
   return (
     <main className="inbox cases-all">
@@ -43,7 +43,7 @@ export default async function CasesPage({ params, searchParams }: {
         </nav>
         <span className="section-marker">Sorted by soonest payment</span>
       </div>
-      {shown.length ? <QueueTable id="cases" title={tab.label === "All" ? "Every case" : tab.label} cases={shown} datasetId={datasetId} now={now} rails={rails} mine={mine} />
+      {shown.length ? <QueueTable id="cases" title={tab.label === "All" ? "Every case" : tab.label} cases={shown} datasetId={datasetId} now={now} rails={rails} perms={perms} />
         : <div className="empty-card"><p>No cases here. A case opens when a vendor&apos;s bank details change in Ramp.</p></div>}
     </main>
   );
