@@ -1,0 +1,8 @@
+{
+  "subject": "Pay from Ohio entity",
+  "sender": "Martin Feld <mfeld@tallismfg.com>",
+  "text": "Renee, please pay this month's Cobalt invoices from the Ohio entity's account, not the Texas one. It's for the intercompany cleanup. Vendor side is the same.\n\nMartin",
+  "label": "ordinary",
+  "vendor": "cobalt",
+  "note": "Paying account changes, destination does not."
+}

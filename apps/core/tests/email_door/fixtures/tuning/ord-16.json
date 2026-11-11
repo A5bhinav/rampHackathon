@@ -1,0 +1,8 @@
+{
+  "subject": "Please send your W-9",
+  "sender": "AP Intake <ap@yardmaster.example>",
+  "text": "Welcome aboard as a customer. Before we issue any refunds we need a signed W-9 from your\ncompany. Please reply with a PDF.",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "W-9 request."
+}

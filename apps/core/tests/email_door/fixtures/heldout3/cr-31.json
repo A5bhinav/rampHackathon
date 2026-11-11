@@ -1,0 +1,8 @@
+{
+  "subject": "Order acknowledgment SO-77120 - Acme Fasteners",
+  "sender": "orders@acmefasteners.com",
+  "text": "Thank you for your order. This acknowledges PO 44-1203.\n\nSO-77120\nShip date: 11/18/2026\nShip via: UPS Ground\n\nLine  Item                 Qty    Price\n1     M10x60 socket cap    1,000  0.44\n2     M10 split washer     1,000  0.03\n\nEstimated total: 470.00 plus freight\n\n--\nAcme Fasteners LLC | 1400 Industrial Parkway, Cleveland OH 44114\nRemittance: ACH routing 026009593 acct 4471002983 | Net 30",
+  "label": "change_request",
+  "vendor": "acme",
+  "note": "ON-FILE-ONLY: order acknowledgment whose signature footer carries a bank account different from the one on file, with no mention of a change. Only comparison with the record reveals it."
+}

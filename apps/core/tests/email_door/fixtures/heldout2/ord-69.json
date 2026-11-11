@@ -1,0 +1,8 @@
+{
+  "subject": "Bank verification letter as requested",
+  "sender": "Margaret Ostrowski <m.ostrowski@acmefasteners.com>",
+  "text": "Hi Marcus,\n\nAs requested for your vendor audit, attached is a letter from JPMorgan Chase on bank letterhead confirming that account 000011112222 (routing 021000021) is held by Acme Fasteners LLC and is in good standing. These are the same details you already have on file; nothing has changed.\n\nBest,\nMargaret",
+  "label": "ordinary",
+  "vendor": "acme",
+  "note": "Bank verification letter for the on-file account, numbers in full; the format resembles a new-account letter."
+}

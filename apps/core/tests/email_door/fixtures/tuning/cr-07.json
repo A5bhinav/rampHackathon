@@ -1,0 +1,8 @@
+{
+  "subject": "Re: Invoice NG-7741 - payment instructions",
+  "sender": "Priya Nair <priya@northgate-logistics.example>",
+  "text": "Hello,\n\nPlease disregard the ACH details printed on the invoice. We have a new collection account\nand the details are in the attached letter on company letterhead. Kindly update your records\nbefore the next payment run.\n\nRegards,\nPriya Nair\nNorthgate Logistics\n\n> On Mon, Oct 12, Accounts Payable wrote:\n> Invoice NG-7741 is scheduled for Friday.",
+  "label": "change_request",
+  "vendor": null,
+  "note": "Reply in an invoice thread, details promised in an attached letter; unknown vendor."
+}

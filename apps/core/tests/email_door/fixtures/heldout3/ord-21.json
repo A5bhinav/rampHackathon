@@ -1,0 +1,8 @@
+{
+  "subject": "Friday run: callback log before any new bank accounts",
+  "sender": "Karen Liu <kliu@northgate-mfg.com>",
+  "text": "Team,\n\nBefore Friday's ACH run please make sure every vendor whose bank account was touched this month has a completed callback entry in the VM-7 log. Treasury will not release the batch otherwise. Currently missing: none, as far as I can see, but double-check Hollis and Kestrel since both were set up recently.\n\nAlso, reminder that we do not accept bank changes by email alone. If a vendor emails, send them the form and do the callback.\n\nKaren",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Internal process reminder referencing bank changes in general."
+}

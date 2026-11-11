@@ -1,0 +1,8 @@
+{
+  "subject": "Invoice 88213 - Acme Fasteners LLC",
+  "sender": "invoices@acmefasteners.com",
+  "text": "ACME FASTENERS LLC\n1400 Industrial Parkway, Suite 200, Cleveland OH 44114\n\nInvoice 88213\nDate: 10/12/2026\nDue: 11/11/2026\nBill to: Northgate Manufacturing Inc\nPO: 44-1176\n\nQty    Description                        Unit     Amount\n5000   M6x20 hex bolt, grade 8.8, zinc    0.11     550.00\n5000   M6 nylock nut                      0.05     250.00\n  10   Carton, 50 lb                      3.80      38.00\n                                          Total    838.00\n\nRemit by ACH:\nAcme Fasteners LLC\nJPMorgan Chase\nRouting 021000021\nAccount 000011112222\n\nRemit by check: PO Box 2210, Cleveland OH 44101\n\nThank you for your business.",
+  "label": "ordinary",
+  "vendor": "acme",
+  "note": "Routine invoice listing exactly the on-file account. Bank details present but nothing new."
+}

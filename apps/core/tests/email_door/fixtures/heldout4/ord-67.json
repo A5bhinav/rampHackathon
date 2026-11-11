@@ -1,0 +1,8 @@
+{
+  "subject": "Tina Marsh sent you a document to review and sign",
+  "sender": "DocuSign <dse@docusign.example>",
+  "text": "Tina Marsh sent you a document to review and sign.\n\nAcme Fasteners - Mutual NDA 2027\n\nREVIEW DOCUMENT\n\nDo not share this email. It contains a secure link.",
+  "label": "ordinary",
+  "vendor": "acme",
+  "note": ""
+}

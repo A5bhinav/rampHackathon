@@ -1,0 +1,8 @@
+{
+  "subject": "New vendor setup - Northwind Calibration",
+  "sender": "Ana Ruiz <aruiz@northwindcal.example>",
+  "text": "Hello,\n\nYour purchasing team asked us to get set up as a new vendor before our first job in December. Attached are our W-9 and vendor form. For payment:\n\nNorthwind Calibration Services\nHuntington National Bank\nRouting 044000024\nAccount 01882340091\n\nLet me know if you need anything else.\n\nAna Ruiz",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Borderline: first-time vendor setup. There is no existing payment stream being redirected."
+}

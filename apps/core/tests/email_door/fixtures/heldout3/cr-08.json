@@ -1,0 +1,8 @@
+{
+  "subject": "[SupplierHub] Banking information updated for Acme Fasteners LLC - approval required",
+  "sender": "SupplierHub Notifications <no-reply@supplierhub-notify.com>",
+  "text": "A supplier has submitted a change to their payment profile.\n\nSupplier: Acme Fasteners LLC (ID 10422)\nChange type: Bank account (ACH)\nSubmitted by: dcaruso@acmefasteners.com\nSubmitted: 2026-11-04 16:51 UTC\n\nPrevious: ****2222\nNew: ****7719 (Routing 026009593)\n\nThis change is pending your approval. Payments to this supplier will continue to use the previous account until approved.\n\nReview and approve: https://supplierhub-notify.com/approvals/10422\n\nThis is an automated message. Please do not reply.",
+  "label": "change_request",
+  "vendor": "acme",
+  "note": "Portal-notification wording rather than a person writing; still asks the reader to approve a new bank account for the vendor."
+}

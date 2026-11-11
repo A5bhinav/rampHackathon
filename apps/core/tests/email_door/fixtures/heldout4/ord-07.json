@@ -1,0 +1,8 @@
+{
+  "subject": "Acme request - do NOT update",
+  "sender": "Martin Feld <mfeld@tallismfg.com>",
+  "text": "Team, callback to Acme's controller on the number in the master file failed the check. They never requested a new account. Do NOT update the vendor record. Leave them on the account ending 2222 and keep paying there.\n\nTicket stays open for the security review.\n\nMartin",
+  "label": "ordinary",
+  "vendor": "acme",
+  "note": "Internal instruction to refuse a change."
+}

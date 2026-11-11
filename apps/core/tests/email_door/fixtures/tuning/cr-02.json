@@ -1,0 +1,8 @@
+{
+  "subject": "Updated banking details",
+  "sender": "Sam Ortiz <ar@brightline.example>",
+  "text": "We have moved our banking. Please pay the account ending 4821 from today.\nThank you",
+  "label": "change_request",
+  "vendor": "brightline",
+  "note": "Verbatim demo_seed.json vendors.brightline.request (span text joined by newlines); explicit move of banking, details only as last four digits."
+}

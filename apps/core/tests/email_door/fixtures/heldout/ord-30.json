@@ -1,0 +1,8 @@
+{
+  "subject": "Acme PO",
+  "sender": "Nina Park <nina@ourco.example>",
+  "text": "Please match the Acme PO to receiving before approving. The quantity is off by two cartons.",
+  "label": "ordinary",
+  "vendor": "acme",
+  "note": "Internal."
+}

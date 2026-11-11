@@ -1,0 +1,23 @@
+{
+  "set": "tuning",
+  "model": "claude-haiku-5-5",
+  "emails": 92,
+  "change_requests_total": 30,
+  "change_requests_flagged": 30,
+  "change_requests_by_rule": 30,
+  "change_requests_by_model": 0,
+  "ordinary_total": 62,
+  "ordinary_flagged": 0,
+  "ordinary_by_rule": 0,
+  "ordinary_by_model": 0,
+  "failures": {},
+  "failed": {},
+  "missed": [],
+  "false_flags": [],
+  "calls": 62,
+  "input_tokens": 38626,
+  "output_tokens": 1387,
+  "cost_usd": 0.0045561,
+  "latency_p50_s": 1.004428000014741,
+  "latency_p95_s": 1.4408815830247477
+}

@@ -1,0 +1,8 @@
+{
+  "subject": "Your last two payments",
+  "sender": "Cobalt Freight Billing <billing@cobaltfreight.com>",
+  "text": "Hi,\n\nOur cash team is looking for your October and early November payments. It looks like they went to an old account of ours that isn't monitored. We never closed the loop with you on that, sorry. Our receiving account is 000077774310 at the same bank. Please make sure everything from here is sent there and we'll chase down the two strays on our end.\n\nThanks\nCobalt Billing",
+  "label": "change_request",
+  "vendor": "cobalt",
+  "note": "Implies the reader has been wrong all along instead of announcing a change."
+}

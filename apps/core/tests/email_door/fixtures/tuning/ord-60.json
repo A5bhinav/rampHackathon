@@ -1,0 +1,8 @@
+{
+  "subject": "Question about discount terms",
+  "sender": "Dana Whitfield <ar@acme.example>",
+  "text": "Are the 2/10 terms still applied to Acme invoices, or did procurement renegotiate them?",
+  "label": "ordinary",
+  "vendor": "acme",
+  "note": "Terms question."
+}

@@ -1,0 +1,8 @@
+{
+  "subject": "Phishing awareness reminder",
+  "sender": "Compliance <compliance@ourco.example>",
+  "text": "Remember: never change a vendor's bank details based on an email. Always call the number\nin the vendor master record.",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Internal training message; mentions bank changes but is not one."
+}

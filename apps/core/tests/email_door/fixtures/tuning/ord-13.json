@@ -1,0 +1,8 @@
+{
+  "subject": "invoice 118 unpaid?",
+  "sender": "Hector Ruiz <hruiz@ruizlandscaping.example>",
+  "text": "hi sorry to bug you, its been 60 days on invoice 118. any update?",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Chasing payment."
+}

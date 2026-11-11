@@ -1,0 +1,8 @@
+{
+  "subject": "Invoice #14 - October services",
+  "sender": "Sam Whitaker <sam@whitakerconsulting.net>",
+  "text": "Hi AP,\n\nAttached is invoice #14 for October consulting hours (32.5 hours at $95/hr, $3,087.50). Same direct deposit as always, nothing has changed on my end.\n\nThanks!\nSam Whitaker\nWhitaker Consulting",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Contractor invoice mentioning direct deposit, explicitly unchanged. Mirror of cr-14."
+}

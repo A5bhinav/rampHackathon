@@ -1,0 +1,8 @@
+{
+  "subject": "Acme Fasteners is moving to electronic invoicing",
+  "sender": "accounting@acmefasteners.com",
+  "text": "Dear Customer,\n\nBeginning December 1, Acme Fasteners LLC invoices will be delivered through our new e-invoicing platform. Invoices will arrive from noreply@einvoice.acmefasteners.com as PDF attachments with the same layout as today.\n\nPlease add that address to your safe-sender list. Payment terms, remittance instructions and your account number are not changing.\n\nAcme Fasteners LLC",
+  "label": "ordinary",
+  "vendor": "acme",
+  "note": "Invoice delivery change with an explicit statement that remittance is unchanged."
+}

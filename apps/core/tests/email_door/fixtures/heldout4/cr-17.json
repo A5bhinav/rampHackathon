@@ -1,0 +1,8 @@
+{
+  "subject": "Action required: supplier profile change pending your approval",
+  "sender": "Supplier Network <no-reply@suppliernetwork.example>",
+  "text": "A change to a supplier profile is awaiting your review.\n\nSupplier:        Acme Fasteners LLC\nChange type:     Remit-To Bank Account\nCurrent value:   ****2222\nProposed value:  ****6104\nSubmitted by:    d.whitfield (supplier user)\nSubmitted on:    2026-11-09 22:14 UTC\n\nApprove or reject this change within 3 business days:\nhttps://suppliernetwork.example/approvals/88120\n\nThis is a system-generated message. Please do not reply.",
+  "label": "change_request",
+  "vendor": "acme",
+  "note": "Machine-generated approval request for a remit-to change."
+}

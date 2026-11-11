@@ -1,0 +1,8 @@
+{
+  "subject": "Re: PO 88213",
+  "sender": "Marisol Vega <mvega@brightline.example>",
+  "text": "Quick note: the account number on file for us is out of date. We've opened a new operating\naccount and need ACH payments to go there from now on. I'll send the account and routing\nnumbers once the bank finishes the paperwork, probably Thursday.\n\nMarisol",
+  "label": "change_request",
+  "vendor": "brightline",
+  "note": "Says on-file account is outdated and payments should go elsewhere; no numbers yet."
+}

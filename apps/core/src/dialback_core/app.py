@@ -17,6 +17,10 @@ from .auth import TokenVerifier, verifier_from_settings
 from .calls import router as calls_router
 from .db import AccessOff, open_pool
 from .detection import Keys
+from .email_door.classifier import AnthropicClassifier, ChangeClassifier, anthropic_client
+from .email_door.resend import ResendClient
+from .email_door.route import router as email_router
+from .flags import ClassifierMode, EmailMode
 from .ports import (
     CallPlacer,
     ChangeContext,
@@ -26,9 +30,19 @@ from .ports import (
     VoiceServiceClient,
 )
 from .ramp import RampConnector
-from .settings import Settings
+from .settings import ConfigurationError, Settings
 from .webhooks import router as webhooks_router
 from .worker import Worker
+
+
+def email_classifier(settings: Settings) -> ChangeClassifier | None:
+    """The email door's model (spec 0086, Task 6b), only with DIALBACK_EMAIL_CLASSIFIER=model. Otherwise
+    None: the rule alone flags, and no email text leaves Dialback."""
+    if settings.email_classifier is not ClassifierMode.MODEL:
+        return None
+    if not settings.anthropic_api_key:   # Settings.from_env refuses this too
+        raise ConfigurationError("ANTHROPIC_API_KEY is required when DIALBACK_EMAIL_CLASSIFIER=model")
+    return AnthropicClassifier(anthropic_client(settings.anthropic_api_key))
 
 
 def create_app(settings: Settings, pool: AsyncConnectionPool | None = None, connector: RampConnector | None = None,
@@ -38,32 +52,40 @@ def create_app(settings: Settings, pool: AsyncConnectionPool | None = None, conn
     @contextlib.asynccontextmanager
     async def lifespan(app: FastAPI):
         http = httpx.AsyncClient(timeout=10.0)
-        if pool is None:
-            app.state.pool = await open_pool(settings.database_url)
-        if connector is None:
-            app.state.connector = RampConnector(settings, http)
-        own_mock = None
-        if demo_mock is None:  # the admin's demo commands talk to the Ramp mock, as `dialback-core demo` does
-            own_mock = app.state.demo_mock = httpx.AsyncClient(base_url=settings.ramp_base_url, timeout=15.0)
-        stop, task = asyncio.Event(), None
-        if settings.run_worker:
-            worker = Worker(app.state.pool, settings, app.state.connector,
-                            resolver or LedgerResolver(settings.resolver_mode),
-                            caller or (VoiceServiceClient(settings.voice_base_url, settings.internal_api_token, http)
-                                       if settings.voice_base_url else NoVoiceService()),
-                            change_context=change_context)
-            task = asyncio.create_task(worker.run_forever(stop))
-        try:
+        stop, task, classifier, opened_pool, own_mock = asyncio.Event(), None, None, False, None
+        try:   # whatever fails on the way up or down, everything opened here is closed
+            if pool is None:
+                app.state.pool = await open_pool(settings.database_url)
+                opened_pool = True
+            if connector is None:
+                app.state.connector = RampConnector(settings, http)
+            if demo_mock is None:  # the admin's demo commands talk to the Ramp mock, as `dialback-core demo` does
+                own_mock = app.state.demo_mock = httpx.AsyncClient(base_url=settings.ramp_base_url, timeout=15.0)
+            if settings.run_worker:
+                classifier = email_classifier(settings)
+                worker = Worker(app.state.pool, settings, app.state.connector,
+                                resolver or LedgerResolver(settings.resolver_mode),
+                                caller or (VoiceServiceClient(settings.voice_base_url, settings.internal_api_token, http)
+                                           if settings.voice_base_url else NoVoiceService()),
+                                change_context=change_context,
+                                resend=ResendClient(settings.resend_api_key, http)
+                                if settings.email_mode is EmailMode.RESEND and settings.resend_api_key else None,
+                                classifier=classifier)
+                task = asyncio.create_task(worker.run_forever(stop))
             yield
         finally:
             stop.set()
-            if task:
-                await task
-            await http.aclose()
-            if own_mock is not None:
-                await own_mock.aclose()
-            if pool is None:
-                await app.state.pool.close()
+            try:
+                if task:
+                    await task
+            finally:
+                if isinstance(classifier, AnthropicClassifier):
+                    classifier.client.close()
+                await http.aclose()
+                if own_mock is not None:
+                    await own_mock.aclose()
+                if opened_pool:
+                    await app.state.pool.close()
 
     app = FastAPI(title="Dialback core", lifespan=lifespan)
     app.state.settings = settings
@@ -97,6 +119,7 @@ def create_app(settings: Settings, pool: AsyncConnectionPool | None = None, conn
         return JSONResponse({"code": code, "message": str(exc.detail)}, status_code=exc.status_code, headers=exc.headers)
 
     app.include_router(webhooks_router)
+    app.include_router(email_router)
     app.include_router(calls_router)
     app.include_router(api_router)
     app.include_router(admin_router)

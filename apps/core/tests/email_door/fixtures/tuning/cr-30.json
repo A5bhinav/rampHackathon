@@ -1,0 +1,8 @@
+{
+  "subject": "Re: Invoice 2188 - correction",
+  "sender": "Morgan Pryce <ar@cobalt.example>",
+  "text": "My apologies, the bank info on that invoice has a typo in the account. The right one is\n000077778880. Please use this one only.",
+  "label": "change_request",
+  "vendor": "cobalt",
+  "note": "Only one digit differs from the on-file account (000077778888); a correction that still redirects payments."
+}

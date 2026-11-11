@@ -1,0 +1,8 @@
+{
+  "subject": "Vacation notice",
+  "sender": "Priya Nair <priya@northgate-logistics.example>",
+  "text": "I am on leave until the 20th. Marcus is covering my invoices.",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "OOO."
+}

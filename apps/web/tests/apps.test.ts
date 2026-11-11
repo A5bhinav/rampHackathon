@@ -5,10 +5,10 @@ import { test } from "node:test";
 import config from "../next.config.ts";
 import { appOf, canSeeControl, isCurrent, navFor, switchTargets, pageCrumb } from "../src/lib/apps.ts";
 
-test("AP workspace lists Inbox, Cases and Vendors", () => {
+test("AP workspace lists Inbox, Cases, Vendors and Mail", () => {
   const nav = navFor("ap", "ds1");
   assert.deepEqual(nav.map((n) => [n.label, n.href]), [
-    ["Inbox", "/d/ds1/cases"], ["Cases", "/d/ds1/cases/all"], ["Vendors", "/d/ds1/vendors"],
+    ["Inbox", "/d/ds1/cases"], ["Cases", "/d/ds1/cases/all"], ["Vendors", "/d/ds1/vendors"], ["Mail", "/d/ds1/mail"],
   ]);
   assert.ok(nav.every((n) => !n.group));
 });

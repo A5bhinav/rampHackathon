@@ -1,0 +1,8 @@
+{
+  "subject": "Form W-8BEN-E for vendor registration",
+  "sender": "Hiroshi Tanaka <h.tanaka@tanaka-seiki.co.jp>",
+  "text": "Dear Larkspur Accounts Payable,\n\nAs requested for our vendor registration, please find attached our completed Form W-8BEN-E. Tanaka Seiki Co., Ltd. is a Japanese corporation claiming treaty benefits under the U.S.-Japan income tax treaty. Our Japanese corporate number is included in Part I, line 9b.\n\nPlease let me know if any additional documents are required.\n\nBest regards,\nHiroshi Tanaka\nAdministration Department\nTanaka Seiki Co., Ltd.",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Foreign-vendor tax form."
+}
