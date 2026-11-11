@@ -338,6 +338,45 @@ async def test_prepare_resets_then_loads_the_ledger_then_the_request_so_a_number
     assert await demo_case(demo, r.reset.dataset.id) is None, "no change yet: the clerk makes it in the dashboard"
 
 
+async def test_prepare_refuses_pdf_with_phone_before_it_resets(demo):
+    from dialback_core.demo import prepare
+    from dialback_ledger.demo import committed_pdfs
+    before = await fresh(demo)
+    with pytest.raises(DemoError, match="already in the PDFs"):
+        await prepare(demo.env, load_seed(SEED), {"clerk": demo.emails["clerk"]}, phones={"acme": TEAM}, requests=["acme"],
+                      today=TODAY, pdf=committed_pdfs())
+    current = await one(demo.pool, "select id from app.datasets where kind = 'demo' and retired_at is null order by created_at desc limit 1")
+    assert current["id"] == before.dataset.id, "a refused prepare leaves the current demo as it was"
+
+
+async def test_prepare_passes_pdf_through(demo):
+    # Spec 0092, D9: the history comes from the PDFs; the change request stays JSON (it's an email).
+    from dialback_core.demo import prepare
+    from dialback_ledger import demo as ledger_demo
+    from dialback_ledger.custody import document_sha256
+    from dialback_ledger.store import stored_id
+    from psycopg.rows import dict_row
+    r = await prepare(demo.env, load_seed(SEED), {"clerk": demo.emails["clerk"]}, phones={}, requests=["acme"], today=TODAY,
+                      pdf=ledger_demo.committed_pdfs())
+    ds = r.reset.dataset.id
+    acme = ledger_demo.load_seed()["vendors"]["acme"]
+    async with await psycopg.AsyncConnection.connect(demo.env.owner_url, row_factory=dict_row) as conn:
+        versions = await (await conn.execute("select distinct extractor_version as v from ledger.observations "
+                                             "where dataset_id = %s", (ds,))).fetchall()
+        request = await (await conn.execute("select sha256 from ledger.documents where id = %s",
+                                            (stored_id(ds, acme["request"]["id"]),))).fetchone()
+    assert {row["v"] for row in versions} == {"pdf-1/stub"}, "the history came from the PDFs"
+    assert request["sha256"] == document_sha256(acme["request"]), "the request is the seed's JSON, hashed as a page model"
+
+
+def test_the_pdf_argument_names_a_folder():
+    from dialback_core.main import _pdf_folder
+    from dialback_ledger.demo import committed_pdfs
+    assert _pdf_folder(None) is None
+    assert _pdf_folder("") == committed_pdfs()
+    assert _pdf_folder("/some/where") == Path("/some/where")
+
+
 async def test_prepare_checks_everything_before_it_resets(demo):
     from dialback_core.demo import prepare
     before = await fresh(demo)

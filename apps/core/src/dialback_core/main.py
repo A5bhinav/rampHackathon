@@ -6,7 +6,7 @@
     dialback-core retire-dataset --dataset <id>          hide a dataset; nothing is deleted
     dialback-core run-job --dataset <id> --job reconcile run poll, full_sweep, reconcile or verify_chain now
     dialback-core demo reset|change|tamper|status|chaos  one command per demo beat (spec 0011)
-    dialback-core demo prepare --link clerk=EMAIL [--phone acme=+1...]  reset, Trust Ledger, request email (spec 0077)
+    dialback-core demo prepare --link clerk=EMAIL [--phone acme=+1...] [--pdf [DIR]]  reset, Trust Ledger, request email (spec 0077)
 """
 from __future__ import annotations
 
@@ -16,6 +16,7 @@ import datetime as dt
 import json
 import logging
 import os
+from pathlib import Path
 from uuid import UUID
 
 import httpx
@@ -78,6 +79,14 @@ async def _retire(settings: Settings, dataset_id: UUID) -> None:
         await pool.close()
 
 
+def _pdf_folder(value: str | None) -> Path | None:
+    """`--pdf [DIR]`: absent is the JSON seed, bare is the committed PDFs, DIR is that folder (spec 0092)."""
+    if value is None:
+        return None
+    from dialback_ledger.demo import committed_pdfs  # here, so other commands never load the ledger's demo
+    return Path(value) if value else committed_pdfs()
+
+
 async def _demo(settings: Settings, args: argparse.Namespace) -> int:
     pool = await open_pool(settings.database_url, max_size=3)
     async with httpx.AsyncClient(base_url=settings.ramp_base_url, timeout=15.0) as mock, httpx.AsyncClient(timeout=10.0) as http:
@@ -98,7 +107,8 @@ async def _demo(settings: Settings, args: argparse.Namespace) -> int:
                 phones = dict(_pair("--phone", x) for x in args.phone)
                 door = args.email_door
                 requests = args.request or [r for r in ["acme"] if r not in door]
-                p = await demo.prepare(env, seed, links, phones=phones, requests=requests, email_door=door)
+                p = await demo.prepare(env, seed, links, phones=phones, requests=requests, email_door=door,
+                                       pdf=_pdf_folder(args.pdf))
                 for w in p.reset.warnings:
                     print(f"warning: {w}")
                 print(f"dataset {p.reset.dataset.id}\nlinked  {', '.join(p.reset.linked) or 'nobody'}")
@@ -172,6 +182,8 @@ def run() -> None:
                     help="vendors whose change-request email goes in (default: acme)")
     pr.add_argument("--email-door", action="append", default=[], metavar="REF",
                     help="vendors whose email door is turned on; the live email is their request, so none is loaded (repeatable)")
+    pr.add_argument("--pdf", nargs="?", const="", default=None, metavar="DIR",
+                    help="read the Trust Ledger's history from real PDFs: the committed ones, or those in DIR (spec 0092)")
     ch = dm.add_parser("change", help="beat 2: the vendor's seeded bank change")
     ch.add_argument("--vendor", required=True)
     ch.add_argument("--seed", default=str(demo.DEFAULT_SEED))

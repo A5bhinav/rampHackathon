@@ -1,15 +1,19 @@
 """Spec 0025: the demo's ledger seed and loader, on a real Postgres."""
 import asyncio
 import datetime as dt
+import hashlib
 import json
+import shutil
 import uuid
 
 import psycopg
 import pytest
+from dialback_evals.pdfrender import render_demo
 from dialback_ledger import demo, select_number
 from dialback_ledger.demo import DemoError, load, load_seed, request
 from dialback_ledger.llm_reader import for_the_model
 from dialback_ledger.reader import StubReader
+from dialback_ledger.store import stored_id
 from dialback_ledger.text import lines, visible_text
 from psycopg.rows import dict_row
 from test_llm_reader import http_error, like_the_stub, llm_reader, refusal
@@ -217,3 +221,98 @@ def test_a_retired_demo_dataset_is_refused(database_url):
     demo_dataset(database_url)                                                  # a newer reset retires it
     with pytest.raises(DemoError):
         run(load(database_url, phones={}, dataset_id=old["dataset_id"]))
+
+
+# --- demo load --pdf (spec 0092, D9) ------------------------------------------------------------------
+
+NOW = dt.datetime(2026, 10, 1, 18, 0, tzinfo=dt.UTC)
+TEAM = "+12065550188"  # fictional here; on the day, the operator types the team phone
+
+
+def stored(url: str, dataset_id) -> tuple[dict, list, set]:
+    """What a load wrote, with every id made comparable across datasets: documents by source id, without
+    their hashes; observations sorted; and the extractor versions."""
+    source = {str(stored_id(dataset_id, d["id"])): d["id"] for v in load_seed()["vendors"].values()
+              for d in [*v["documents"], v["request"]]}
+    with psycopg.connect(url, row_factory=dict_row) as c:
+        docs = c.execute("select id, kind, sha256, custody_channel, received_at, claimed_date, sender, thread_id, subject, "
+                         "parent_document_id from ledger.documents where dataset_id = %s", (dataset_id,)).fetchall()
+        obs = c.execute("select document_id, kind, value_normalized, role, party, quote, visibility, source_type, seen_at, "
+                        "extractor_version from ledger.observations where dataset_id = %s", (dataset_id,)).fetchall()
+    documents = {source[str(d["id"])]: {k: v for k, v in d.items() if k not in ("id", "parent_document_id")}
+                 | {"parent": source.get(str(d["parent_document_id"]))} for d in docs}
+    rows_ = sorted(((source[str(o["document_id"])], o["kind"], o["value_normalized"], o["role"], o["party"], o["quote"],
+                     o["visibility"], o["source_type"], o["seen_at"]) for o in obs), key=repr)
+    return documents, rows_, {o["extractor_version"] for o in obs}
+
+
+def without_hash(documents: dict) -> dict:
+    return {k: {f: v for f, v in d.items() if f != "sha256"} for k, d in documents.items()}
+
+
+def loaded(url: str, **kwargs) -> tuple[dict, list, set]:
+    d = demo_dataset(url)
+    run(load(url, dataset_id=d["dataset_id"], now=NOW, reader=StubReader(), **kwargs))
+    return stored(url, d["dataset_id"])
+
+
+def test_pdf_load_writes_the_same_observations(database_url):
+    json_docs, json_rows, json_versions = loaded(database_url, phones={})
+    pdf_docs, pdf_rows, pdf_versions = loaded(database_url, phones={}, pdf=demo.committed_pdfs())
+    assert json_rows and pdf_rows == json_rows
+    assert without_hash(pdf_docs) == without_hash(json_docs)
+    assert (json_versions, pdf_versions) == ({"stub"}, {"pdf-1/stub"})
+    for doc_id, d in pdf_docs.items():
+        file_hash = hashlib.sha256((demo.committed_pdfs() / f"{doc_id}.pdf").read_bytes()).hexdigest()
+        assert d["sha256"] == file_hash != json_docs[doc_id]["sha256"]
+
+
+def test_pdf_load_with_a_team_phone_matches_load_with_phone(database_url, tmp_path):
+    for name, data in render_demo({"acme": TEAM}).items():
+        (tmp_path / name).write_bytes(data)
+    want_docs, want_rows, _ = loaded(database_url, phones={"acme": TEAM})
+    got_docs, got_rows, _ = loaded(database_url, phones={}, pdf=tmp_path)
+    assert got_rows == want_rows and any(r[2] == TEAM for r in got_rows)
+    assert without_hash(got_docs) == without_hash(want_docs)
+
+
+def test_pdf_with_phone_is_refused():
+    with pytest.raises(DemoError, match="already in the PDFs"):
+        demo.check({"acme": TEAM}, [], pdf=demo.committed_pdfs())
+
+
+def test_the_load_command_refuses_pdf_with_phone(capsys):
+    assert demo.main(["demo", "load", "--pdf", "--phone", f"acme={TEAM}"]) == 2
+    assert "already in the PDFs" in capsys.readouterr().err
+
+
+def test_llm_with_a_pdf_dir_is_refused(monkeypatch, tmp_path):
+    # Spec 0049 D5: a team phone never reaches the model, and a folder given at run time may hold one.
+    monkeypatch.setenv("DIALBACK_READER", "llm")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "not-a-real-key")
+    for p in demo.committed_pdfs().glob("*.pdf"):
+        shutil.copy(p, tmp_path)
+    with pytest.raises(DemoError, match="team phone"):
+        demo.check({}, [], pdf=tmp_path)
+
+
+def test_llm_with_the_committed_pdfs_is_allowed(monkeypatch):
+    monkeypatch.setenv("DIALBACK_READER", "llm")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "not-a-real-key")
+    assert demo.check({}, [], pdf=demo.committed_pdfs()) == {}
+
+
+def test_a_missing_pdf_is_refused(tmp_path):
+    with pytest.raises(DemoError, match=load_seed()["vendors"]["acme"]["documents"][0]["id"]):
+        demo.check({}, [], pdf=tmp_path)
+
+
+def test_a_refused_pdf_rolls_back_the_load(database_url, tmp_path):
+    for p in demo.committed_pdfs().glob("*.pdf"):
+        shutil.copy(p, tmp_path)
+    last = load_seed()["vendors"]["cobalt"]["documents"][-1]["id"]
+    (tmp_path / f"{last}.pdf").write_bytes(b"not a PDF")
+    d = demo_dataset(database_url)
+    with pytest.raises(DemoError, match=last):
+        run(load(database_url, phones={}, dataset_id=d["dataset_id"], now=NOW, reader=StubReader(), pdf=tmp_path))
+    assert set(rows(database_url, d["dataset_id"]).values()) == {0}, "nothing was written"

@@ -200,21 +200,24 @@ def describe_email_door(refs: list[str], inbox_address: str | None) -> str | Non
 
 
 async def prepare(env: DemoEnv, seed: dict[str, Any], links: dict[str, str], *, phones: dict[str, str],
-                  requests: list[str], email_door: list[str] | None = None, today: dt.date | None = None) -> PrepareResult:
+                  requests: list[str], email_door: list[str] | None = None, today: dt.date | None = None,
+                  pdf: Path | None = None) -> PrepareResult:
     """One command before the dashboard's clerk makes a change (spec 0077): a fresh demo with the clerk
     linked, then the Trust Ledger's history (with any team phones), then each vendor's change-request
     email. The order matters: the selection rule trusts only what was recorded before the case opened,
     so the ledger and the email must be in before the bank change. Every check runs before the reset.
 
     `email_door` names vendors whose email door is turned on for this demo (app.datasets.email_door_vendors).
-    Their canned change-request email is not loaded: the live email is the request."""
+    Their canned change-request email is not loaded: the live email is the request.
+
+    With `pdf`, the Trust Ledger's history is read from the PDFs in that folder (spec 0092)."""
     from dialback_ledger import demo as ledger_demo  # the ledger's own demo commands
 
     _guard(env.settings)
     if "clerk" not in links:
         raise DemoError("prepare needs --link clerk=<email>: the dashboard's Ramp (mock) portal sends changes as that account")
     try:
-        e164 = ledger_demo.check(phones, requests)
+        e164 = ledger_demo.check(phones, requests, pdf=pdf)
     except ledger_demo.DemoError as exc:
         raise DemoError(str(exc)) from None
     email_door = list(email_door or [])
@@ -225,7 +228,7 @@ async def prepare(env: DemoEnv, seed: dict[str, Any], links: dict[str, str], *, 
         if ref in requests:
             raise DemoError(f"--email-door {ref} and --request {ref}: the live email is the request, so a vendor can't have both")
     result = await reset(env, seed, links, today=today)
-    loaded, sent = await load_ledger(env, result.dataset.id, e164, requests)
+    loaded, sent = await load_ledger(env, result.dataset.id, e164, requests, pdf=pdf)
     if email_door:
         async with system_tx(env.pool) as conn:
             rows = await (await conn.execute("select ramp_vendor_id, id from app.vendors where dataset_id = %s",
@@ -250,13 +253,14 @@ def check_ledger(phones: dict[str, str], requests: list[str]) -> dict[str, str]:
         raise DemoError(str(exc)) from None
 
 
-async def load_ledger(env: DemoEnv, dataset_id: UUID, e164: dict[str, str], requests: list[str]) -> tuple[dict, dict]:
+async def load_ledger(env: DemoEnv, dataset_id: UUID, e164: dict[str, str], requests: list[str],
+                      pdf: Path | None = None) -> tuple[dict, dict]:
     """prepare's second half: the Trust Ledger's history, then each vendor's change-request email.
     The dashboard's reset (spec 0095) runs it after linking the clerk through app.admin_set_ramp_link."""
     from dialback_ledger import demo as ledger_demo
 
     try:
-        loaded = await ledger_demo.load(env.owner_url, phones=e164, dataset_id=dataset_id)
+        loaded = await ledger_demo.load(env.owner_url, phones=e164, dataset_id=dataset_id, pdf=pdf)
         sent = {ref: await ledger_demo.request(env.owner_url, vendor=ref, dataset_id=dataset_id) for ref in requests}
     except ledger_demo.DemoError as exc:
         raise DemoError(f"the demo was reset ({dataset_id}) but the Trust Ledger refused: {exc}. "
