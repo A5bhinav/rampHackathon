@@ -24,12 +24,25 @@ export const TOUR: TourStep[] = [
   { n: 6, target: "tamper", title: "Tamper",
     caption: "The team edits one evidence row by hand, behind the app's back. The chain check names the exact row that changed: an edit can't hide." },
   { n: 7, target: "lab", title: "The attack lab",
-    caption: "Scripted scams and legitimate-but-odd calls, replayed through the real pipeline. The scorecard counts what passed and lists each known failure with its finding.",
+    caption: "Scripted scams and legitimate-but-odd calls, replayed through the real pipeline and scored by code. The page shows only results a lab run computed; then follow one change through the whole flow.",
     action: { label: "Show the whole flow", to: "/tour/flow" } },
 ];
 
 export function tourStep(raw: string): TourStep | undefined {
   return /^[1-7]$/.test(raw) ? TOUR[Number(raw) - 1] : undefined;
+}
+
+/** The beat to show: the URL's, else the one this browser tab last opened (kept until End the tour),
+ *  so a redirect that drops ?tour= (saving the change, Viewing as, a release) doesn't hide the card. */
+export function activeStep(fromUrl: string | null, stored: string | null): TourStep | undefined {
+  return tourStep(fromUrl ?? "") ?? tourStep(stored ?? "");
+}
+
+/** Acme's vendor id: from the Ramp mock's vendor list, else from one of its cases. */
+export function tourVendor(accounts: { vendors: { vendor_id: string; legal_name: string }[] } | null,
+  cases: readonly { vendor: { id: string; legal_name: string } }[], legalName: string): string | null {
+  return accounts?.vendors.find((v) => v.legal_name === legalName)?.vendor_id
+    ?? cases.find((c) => c.vendor.legal_name === legalName)?.vendor.id ?? null;
 }
 
 /** Where a beat's one button goes, or null when the beat has none. */

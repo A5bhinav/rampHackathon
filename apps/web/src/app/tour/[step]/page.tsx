@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { core } from "@/lib/core";
 import { sessionToken } from "@/lib/session";
 import { demoStory, newestDemo } from "@/lib/story";
-import { flowHref, tourCase, tourHref, tourStep, type TourIds } from "@/lib/tour";
+import { flowHref, tourCase, tourHref, tourStep, tourVendor, type TourIds } from "@/lib/tour";
 
 // /tour/N (specs 0039, 0066): opens beat N of the guided demo on the newest demo dataset, following
 // Acme's newest case: the one the presenter's change opened. /tour/flow is the last beat's button
@@ -26,8 +26,7 @@ async function tourIds(dataset: string): Promise<TourIds> {
     core.vendorAccounts(dataset).catch(() => null),  // no Ramp mock vendors: the change beat opens the vendor list
     core.allCases(dataset),
   ]);
-  const vendor = accounts?.vendors.find((v) => v.legal_name === acme)?.vendor_id
-    ?? cases.find((c) => c.vendor.legal_name === acme)?.vendor.id ?? null;
+  const vendor = tourVendor(accounts, cases, acme);
   return { dataset, vendor, kase: tourCase(cases, vendor) };
 }
 

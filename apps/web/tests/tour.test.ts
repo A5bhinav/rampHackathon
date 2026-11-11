@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { safeNext } from "../src/lib/story.ts";
-import { TOUR, flowHref, tourAction, tourCase, tourHref, tourStep } from "../src/lib/tour.ts";
+import { TOUR, activeStep, flowHref, tourAction, tourCase, tourHref, tourStep, tourVendor } from "../src/lib/tour.ts";
 
 test("seven beats, in the demo's order, each with a caption (spec 0066)", () => {
   assert.deepEqual(TOUR.map((s) => s.title), ["The change", "Which number", "The call", "Code decides", "A second person", "Tamper", "The attack lab"]);
@@ -45,6 +45,22 @@ test("each beat opens the real page for the case the presenter's change opened",
   assert.equal(flowHref(before), "/d/ds1/ramp/v1?tour=1");
   // No Acme in the Ramp mock at all: the vendor list.
   assert.equal(tourHref(TOUR[0], { dataset: "ds1", vendor: null, kase: null }), "/d/ds1/ramp?tour=1");
+});
+
+test("the card stays through redirects that drop ?tour= (saving the change, Viewing as, releasing)", () => {
+  assert.equal(activeStep("3", null)?.n, 3);
+  assert.equal(activeStep(null, "5")?.n, 5, "the beat this tab is on");
+  assert.equal(activeStep("2", "5")?.n, 2, "the URL wins");
+  assert.equal(activeStep(null, null), undefined);
+  assert.equal(activeStep(null, "8"), undefined, "nothing stale or invalid");
+});
+
+test("Acme's vendor: from the Ramp mock's vendor list, else from a case, else none", () => {
+  const accounts = { vendors: [{ vendor_id: "v1", legal_name: "Acme Fasteners LLC" }, { vendor_id: "v2", legal_name: "Cobalt Freight LLC" }] };
+  const cases = [{ vendor: { id: "v9", legal_name: "Acme Fasteners LLC" } }];
+  assert.equal(tourVendor(accounts, cases, "Acme Fasteners LLC"), "v1");
+  assert.equal(tourVendor(null, cases, "Acme Fasteners LLC"), "v9", "no vendor list: the case's vendor");
+  assert.equal(tourVendor(null, [], "Acme Fasteners LLC"), null);
 });
 
 test("the case is the one the change opened: the vendor's newest, by the Ramp mock page's own rule", () => {
