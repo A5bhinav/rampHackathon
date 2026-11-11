@@ -22,6 +22,11 @@ Specs: 0017 (voice slice lab), 0083 (generative selection pressure; 0033 before 
   G7 worlds moving the call, and 0 left with nobody called, so A1's 81 `lab-docs` entries came off
   the list (46 remain, all A19 and A20). With `DIALBACK_CONTEXT_GUARD=off` (today's rule) the same run
   still fails all 81, so the check can fail. The 81 frozen `g7-*` cases stay as regressions.
+  Spec 0091's fourth revision (Q162, Nov 11) closes the two paths its final review found: one fresh
+  email (even from the vendor's own domain) can't complete a veto with an old label and move the
+  call, since each counted label must itself be 90 days old; and a change request can't erase old
+  honest warnings by replying on their thread, since the thread and subject exclusions are gone (that
+  case is withheld for a person).
 - **Where:** `packages/ledger/src/dialback_ledger/select.py`, lines 169-172. The party and fax
   checks read every visible sighting, including those in the change context. Spec 0021 says the
   same thing in its acceptance list ("eligible only if every visible sighting is labeled the vendor's
@@ -65,7 +70,10 @@ Specs: 0017 (voice slice lab), 0083 (generative selection pressure; 0033 before 
 
 - **Status:** confirmed (read). Not probed by the lab (spec 0083, Q144).
 - **Fix status:** fixed by spec 0091 when it merges (`sami/label-bar`): that email isn't in a counting
-  channel, so its label can't be established.
+  channel, so its label can't be established. The fourth revision (Q162, Nov 11) also closes the
+  one-fresh-email path (a fresh label from the vendor's own domain doesn't count either: each counted
+  label must itself be 90 days old) and the request-thread path (an old honest label counts whatever
+  thread a later request replies on).
 - **What happens:** an email from an unrelated domain, outside the thread, that labels the real
   number someone else's also vetoes it.
 - **Open question:** whether such documents reach `select()` depends on how ingestion attaches
