@@ -2,8 +2,8 @@
 import datetime as dt
 import random
 
-from _world import SCHEMA, T0, at, calls, frozen, run, world
-from dialback_ledger.select import change_context_documents, near_miss
+from _world import SCHEMA, T0, at, calls, flags, frozen, run, world
+from dialback_ledger.select import RULE_VERSION, _select_rule, change_context_documents, near_miss
 from hypothesis import find, given, settings
 from hypothesis import strategies as st
 from jsonschema import Draft202012Validator
@@ -154,16 +154,31 @@ def test_a_source_inside_the_change_context_never_counts():
     assert run(world(rows))["outcome"] == "no_provable_number"
 
 
+def established(e164: str, **label) -> list[dict]:
+    """Spec 0091, rule 3: the same label in a contract and a listing, 200 and 150 days back. Two source
+    types, the earliest past min_age_days: established, so it vetoes as today."""
+    return [old(e164, "contract", days_before=200, **label), old(e164, "listing", days_before=150, **label)]
+
+
 def test_a_banks_or_customers_number_is_refused():
+    # Spec 0091: one labeled sighting is no longer support (rule 2) and, alone, no veto (rule 4). The
+    # number is still refused: the vendor's email is one source type.
     for party in ("bank", "customer", "unknown"):
         rows = [old(NUMBERS[0], "email"), old(NUMBERS[0], "contract", party=party)]
         out = run(world(rows))
         assert out["outcome"] == "no_provable_number", party
-        assert "not_vendor_party" in out["candidates"][0]["reasons"]
+        assert out["candidates"][0]["reasons"] == ["too_few_source_types"], party
+        # Established, the label refuses the number with today's reason.
+        out = run(world([old(NUMBERS[0], "email"), *established(NUMBERS[0], party=party)]))
+        assert out["outcome"] == "no_provable_number", party
+        assert "not_vendor_party" in out["candidates"][0]["reasons"], party
 
 
 def test_a_fax_line_is_refused():
     out = run(world([old(NUMBERS[0], "email"), old(NUMBERS[0], "contract", role="fax")]))
+    assert out["outcome"] == "no_provable_number"
+    assert out["candidates"][0]["reasons"] == ["too_few_source_types"]       # spec 0091, as above
+    out = run(world([old(NUMBERS[0], "email"), *established(NUMBERS[0], role="fax")]))
     assert out["outcome"] == "no_provable_number"
     assert "fax_line" in out["candidates"][0]["reasons"]
 
@@ -238,27 +253,48 @@ def test_conflicting_documents_with_one_id_count_against():
 
 
 def test_a_fax_label_in_any_case_is_a_fax():
+    # Spec 0091: a "FAX" sighting is a label against, so it isn't support (were it, the number would
+    # have two source types and be picked); established, it refuses the number as a fax line.
     out = run(world([old(NUMBERS[0], "email"), old(NUMBERS[0], "contract", role="FAX")]))
+    assert out["outcome"] == "no_provable_number"
+    assert out["candidates"][0]["reasons"] == ["too_few_source_types"]
+    out = run(world([old(NUMBERS[0], "email"), *established(NUMBERS[0], role="FAX")]))
+    assert out["outcome"] == "no_provable_number"
     assert "fax_line" in out["candidates"][0]["reasons"]
 
 
 
 # Spec 0079: the prefix property ------------------------------------------------------------------
 
-def prefix_holds(rule, w: dict) -> bool:
-    """What `rule` calls is a prefix of what the frozen copy of today's rule calls: the same numbers in
-    the same order, possibly cut short or empty."""
-    new, old = calls(rule(w)), calls(frozen(w))
+def inner_rule(w: dict) -> dict:
+    """The rule select() runs inside spec 0079's guard with both flags on: the label bar (spec 0091)."""
+    return _select_rule(**w, rule_version=RULE_VERSION, label_bar=True)
+
+
+def prefix_holds(rule, w: dict, baseline=inner_rule) -> bool:
+    """What `rule` calls is a prefix of what `baseline` calls on the case (spec 0091, rule 5: the inner
+    rule): the same numbers in the same order, possibly cut short or empty."""
+    new, old = calls(rule(w)), calls(baseline(w))
     return new == old[:len(new)]
 
+
+@settings(max_examples=400, deadline=None)
+@given(any_rows)
+def test_new_rule_is_a_prefix_of_the_inner_rule(rs):
+    w = world(rs)
+    with flags():
+        assert prefix_holds(run, w)
+        assert list(Draft202012Validator(SCHEMA).iter_errors(run(w))) == []
 
 
 @settings(max_examples=400, deadline=None)
 @given(any_rows)
 def test_new_rule_is_a_prefix_of_frozen_v1(rs):
+    # Spec 0079 alone (DIALBACK_LABEL_BAR=off): its own property, against the frozen copy, as before.
     w = world(rs)
-    assert prefix_holds(run, w)
-    assert list(Draft202012Validator(SCHEMA).iter_errors(run(w))) == []
+    with flags(bar="off"):
+        assert prefix_holds(run, w, frozen)
+        assert list(Draft202012Validator(SCHEMA).iter_errors(run(w))) == []
 
 
 @settings(max_examples=300, deadline=None)
@@ -278,25 +314,42 @@ def test_the_flag_off_is_the_frozen_copy(rs):
             os.environ["DIALBACK_CONTEXT_GUARD"] = before
 
 
-def skips_the_comparison(w: dict) -> dict:
+def skips_the_comparison(w: dict, rule=inner_rule) -> dict:
     """A rule that skips spec 0079's comparison and calls what the run without the change context
     calls: the context-blind fix FINDINGS A6 ruled out."""
-    today = frozen(w)
+    as_is = rule(w)
     context = {d.id for d in change_context_documents(**w)}
-    return frozen(w | {"documents": [d for d in w["documents"] if d.id not in context],
-                       "sightings": [s for s in w["sightings"] if s.document_id not in context],
-                       "requested_cutoff": at(today["cutoff"])})
+    return rule(w | {"documents": [d for d in w["documents"] if d.id not in context],
+                     "sightings": [s for s in w["sightings"] if s.document_id not in context],
+                     "requested_cutoff": at(as_is["cutoff"])})
 
 
 def test_the_prefix_check_fails_a_rule_that_skips_the_comparison():
-    # The check can fail: on A1's world (a bank label in the request's thread on the real line, a
-    # planted provable number), the rule that skips the comparison calls the real line, which today's
-    # rule wouldn't call first. And the property's own strategy finds such a world by itself.
+    # The check can fail, against the inner rule (spec 0091). On A3's world (an old copy of the real
+    # line in the request's thread, a planted provable number), the inner rule refuses the real line
+    # (R2) and calls the planted one; the rule that skips the comparison calls the real line, which the
+    # inner rule wouldn't call first. (A1's label no longer moves the inner rule's call.) And the
+    # property's own strategy finds such a world by itself.
+    a3 = [old(NUMBERS[0], ch, days_before=200) for ch in ("contract", "listing")]
+    a3 += [old(NUMBERS[3], ch, days_before=150) for ch in ("contract", "listing")]
+    a3 += [old(NUMBERS[0], "email", days_before=365, thread="req")]
+    with flags():
+        assert not prefix_holds(skips_the_comparison, world(a3))
+        assert prefix_holds(run, world(a3))
+        found = find(guarded_rows, lambda rs: not prefix_holds(skips_the_comparison, world(rs)),
+                     settings=settings(max_examples=1000, deadline=None, database=None, derandomize=True))
+        assert prefix_holds(run, world(found))
+    # Spec 0079 alone (DIALBACK_LABEL_BAR=off), against the frozen copy, as before: on A1's world (a
+    # bank label in the request's thread on the real line), skipping the comparison calls the real line.
     a1 = [old(NUMBERS[0], ch, days_before=200) for ch in ("contract", "listing")]
     a1 += [old(NUMBERS[3], ch, days_before=150) for ch in ("contract", "listing")]
     a1 += [old(NUMBERS[0], "email", days_before=0, thread="req", party="bank", role="unknown")]
-    assert not prefix_holds(skips_the_comparison, world(a1))
-    assert prefix_holds(run, world(a1))
-    found = find(guarded_rows, lambda rs: not prefix_holds(skips_the_comparison, world(rs)),
-                 settings=settings(max_examples=1000, deadline=None, database=None, derandomize=True))
-    assert prefix_holds(run, world(found))
+    def blind(w: dict) -> dict:
+        return skips_the_comparison(w, frozen)
+
+    with flags(bar="off"):
+        assert not prefix_holds(blind, world(a1), frozen)
+        assert prefix_holds(run, world(a1), frozen)
+        found = find(guarded_rows, lambda rs: not prefix_holds(blind, world(rs), frozen),
+                     settings=settings(max_examples=1000, deadline=None, database=None, derandomize=True))
+        assert prefix_holds(run, world(found), frozen)

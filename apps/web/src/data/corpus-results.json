@@ -1,6 +1,6 @@
 {
  "generated_by": "scripts/corpus/results.py",
- "rule_version": "ledger-select-v3",
+ "rule_version": "ledger-select-v4",
  "reason_text": {
   "first_seen_in_change_context": "Not provable: this number first appeared in the change request, its thread, a lookalike domain or after the request, which is where a fraudster's number would come from.",
   "too_few_source_types": "Not provable: it wasn't seen in at least two independent channels before the request (all email counts as one channel, and the old number on file never counts).",

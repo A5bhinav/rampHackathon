@@ -330,9 +330,11 @@ async def test_the_vendor_risk_list_says_when_a_person_is_needed(world, monkeypa
     from dialback_ledger.ingest import ingest_all
     from dialback_ledger.reader import StubReader
     from dialback_ledger.risk import STATUS_TEXT
-    from dialback_ledger.store import add_vendor_domain, write_ingest
+    from dialback_ledger.select import ChangeRequest, select
+    from dialback_ledger.store import add_vendor_domain, vendor_rows, write_ingest
     monkeypatch.delenv("DIALBACK_READER", raising=False)
     monkeypatch.delenv("DIALBACK_CONTEXT_GUARD", raising=False)
+    monkeypatch.delenv("DIALBACK_LABEL_BAR", raising=False)
     await import_all(world.pool, world.ramp, world.keys, world.dataset.id)
     now = dt.datetime.now(dt.UTC)
 
@@ -348,14 +350,23 @@ async def test_the_vendor_risk_list_says_when_a_person_is_needed(world, monkeypa
             doc("l1", "listing", 400, "Accounts receivable: (415) 555-0142"),
             doc("c2", "contract", 600, "Accounts receivable: (303) 555-0101"),
             doc("l2", "listing", 600, "Accounts receivable: (303) 555-0101"),
-            doc("lbl", "listing", 10, "Bank verification line: (303) 555-0101"),
-            doc("look", "email", 30, "Main: (303) 555-0177", sender="ar@acrne.example", thread="t-look", subject="Hello")]
+            # Established labels on the older number, pulled into the change context by an older
+            # lookalike (spec 0091, rule 3): the run without them would call it, so the rule withholds.
+            doc("lbl-c", "contract", 150, "Bank verification line: (303) 555-0101"),
+            doc("lbl-l", "listing", 120, "Bank verification line: (303) 555-0101"),
+            doc("look", "email", 160, "Main: (303) 555-0177", sender="ar@acrne.example", thread="t-look", subject="Hello")]
     async with world.pool.connection() as conn, conn.transaction():
         vendor = (await (await conn.execute("select id from app.vendors where dataset_id = %s order by legal_name limit 1",
                                             (world.dataset.id,))).fetchone())["id"]
         result = ingest_all(docs, extractor_version="t", reader=StubReader())   # spec 0049, decision 8
         await write_ingest(conn, dataset_id=world.dataset.id, vendor_id=vendor, result=result)
         await add_vendor_domain(conn, dataset_id=world.dataset.id, vendor_id=vendor, domain="acme.example")
+    async with world.pool.connection() as conn:   # the premise: with both flags on, the rule withholds, as the list runs it
+        at = dt.datetime.now(dt.UTC)
+        rows = await vendor_rows(conn, dataset_id=world.dataset.id, vendor_id=vendor, before=at)
+    premise = select(case_id=uuid.UUID(int=0), dataset_id=world.dataset.id, vendor_id=vendor, requested_cutoff=at, case_opened_at=at,
+                     request=ChangeRequest("", at, None, None, None), **rows)
+    assert premise["outcome"] == "withheld"
     body = await get(world, f"/api/datasets/{world.dataset.id}/vendor-risk", "clerk", RISK)
     (row,) = body["vendors"]
     assert row["status"] == "needs_person" and row["provable_number"] is None and row["number_on_file"] == "+14155550142"

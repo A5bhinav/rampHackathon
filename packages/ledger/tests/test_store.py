@@ -86,7 +86,7 @@ def test_gate_every_scenario_through_the_database(database_url, path):
     assert list(Draft202012Validator(SCHEMA).iter_errors(doc)) == []
     assert doc["outcome"] == truth["expected"]["outcome"]
     assert doc.get("e164") == truth["expected"]["pick"]
-    assert out["rule_version"] == RULE_VERSION == "ledger-select-v3"  # the real rule ran (spec 0079 renamed it), not the stub
+    assert out["rule_version"] == RULE_VERSION == "ledger-select-v4"  # the real rule ran (specs 0079, 0091 renamed it), not the stub
     assert (out.get("contact_point_id") is not None) == (truth["expected"]["pick"] is not None)
 
 

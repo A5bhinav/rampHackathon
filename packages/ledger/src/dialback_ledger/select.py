@@ -1,15 +1,18 @@
-"""ledger-select-v3: which number a case will call, or none (spec 0021, design §4; spec 0079).
+"""ledger-select-v4: which number a case will call, or none (spec 0021, design §4; specs 0079, 0091).
 
 Spec 0079's guard: the change context may cancel a call, but never move it to a different number.
-`select()` runs today's rule, `_select_v1` (ledger-select-v1, unchanged), twice: on the case as it is,
-and with the change context's documents and their sightings removed. It calls only the start the
-two call lists (the pick, then up to two alternates) share. When they disagree on the pick, nobody
-is called (`withheld`) and a person verifies. So it never calls a number today's rule wouldn't.
-DIALBACK_CONTEXT_GUARD=off runs `_select_v1` alone, for rollback.
+`select()` runs the inner rule twice: on the case as it is, and with the change context's documents
+and their sightings removed. It calls only the start the two call lists (the pick, then up to two
+alternates) share. When they disagree on the pick, nobody is called (`withheld`) and a person
+verifies. So it never calls a number the inner rule wouldn't call on the case.
 
-Spec 0091's label bar, `_select_rule(label_bar=True)` (`select()` doesn't run it yet): a label
-against a number (a visible sighting whose party isn't `vendor`, or whose role is `fax` in any case)
-is not support, and vetoes the number only when established: the labeling documents span
+The flags pick the inner rule, and each state names its own rule (spec 0091, rule 6):
+- both on (the default): the guard over the label bar, `_select_rule(label_bar=True)`, ledger-select-v4;
+- DIALBACK_LABEL_BAR=off: the guard over today's rule, `_select_v1`, spec 0079 exactly, ledger-select-v3;
+- DIALBACK_CONTEXT_GUARD=off: `_select_v1` alone, ledger-select-v1, whatever the label bar says (rollback).
+
+Spec 0091's label bar, `_select_rule(label_bar=True)`: a label against a number (a visible sighting
+whose party isn't `vendor`, or whose role is `fax` in any case) is not support, and vetoes the number only when established: the labeling documents span
 `min_source_types` source types and the earliest is `min_age_days` before the request. A labeling
 document counts only by its own facts (a counting channel, at or before the request, and not the
 request, its thread, its subject within `same_subject_window_days`, or a lookalike's), so a
@@ -39,11 +42,12 @@ from dataclasses import asdict, dataclass
 
 import rfc8785
 
-from .flags import context_guard
+from .flags import context_guard, label_bar
 from .lookalike import is_lookalike, sender_domain
 
-RULE_VERSION_V1 = "ledger-select-v1"   # today's rule, alone (the flag off)
-RULE_VERSION = "ledger-select-v3"      # spec 0079's guard. Q130: the next free name when it merges (0047 claimed v2)
+RULE_VERSION_V1 = "ledger-select-v1"     # today's rule, alone (DIALBACK_CONTEXT_GUARD=off)
+RULE_VERSION_GUARD = "ledger-select-v3"  # spec 0079's guard over today's rule (DIALBACK_LABEL_BAR=off). Q130
+RULE_VERSION = "ledger-select-v4"        # spec 0091: the guard over the label bar (both flags on, the default)
 NAMESPACE = uuid.UUID("0f4e2b8a-6c1d-4e3f-9a5b-7d2c1e0f3a64")
 SOURCE_TYPES = {"email", "contract", "vendor_portal", "listing", "paper_mail"}  # vendor_master never counts
 ROLES = {"main", "ar", "billing", "fax", "unknown"}
@@ -292,8 +296,12 @@ def _select_v1(*, rule_version: str = RULE_VERSION_V1, **case) -> dict:
 
 
 def active_rule_version() -> str:
-    """The rule `select()` runs under the current flag: today's alone when DIALBACK_CONTEXT_GUARD is off."""
-    return RULE_VERSION if context_guard() else RULE_VERSION_V1
+    """The rule `select()` runs under the current flags (spec 0091, rules 6 and 7): today's alone when
+    DIALBACK_CONTEXT_GUARD is off, whatever DIALBACK_LABEL_BAR says; otherwise the guard, over today's
+    rule when the label bar is off (spec 0079) and over the label bar when it is on."""
+    if not context_guard():
+        return RULE_VERSION_V1
+    return RULE_VERSION if label_bar() else RULE_VERSION_GUARD
 
 
 def _calls(out: dict) -> list[str]:
@@ -309,28 +317,33 @@ def select(*, case_id: uuid.UUID, dataset_id: uuid.UUID, vendor_id: uuid.UUID, v
     case = {"case_id": case_id, "dataset_id": dataset_id, "vendor_id": vendor_id, "vendor_domains": vendor_domains,
             "request": request, "requested_cutoff": requested_cutoff, "case_opened_at": case_opened_at,
             "documents": documents, "sightings": sightings, "settings": settings}
-    if not context_guard():
+    version = active_rule_version()                                      # the flags, read once per case
+    if version == RULE_VERSION_V1:
         return _select_v1(**case)                                       # decision 7: rollback only
-    today = _select_v1(**case, rule_version=RULE_VERSION)
-    if today["outcome"] != "picked":
-        return today                                                     # decision 3: nothing to call, as today
+
+    def rule(**kw) -> dict:                                              # the inner rule, named by the flags
+        return _select_rule(**kw, rule_version=version, label_bar=version == RULE_VERSION)
+
+    as_is = rule(**case)
+    if as_is["outcome"] != "picked":
+        return as_is                                                     # decision 3: nothing to call
     # Decision 2: the same case with every change-context document and its sightings removed. The
-    # request's record stays (R7 as before), and so does today's cutoff.
+    # request's record stays (R7 as before), and so does the cutoff of the case as it is.
     domains = tuple(d.strip().lower().rstrip(".") for d in vendor_domains)
     docs, cutoff, in_context = _frame(documents=documents, request=request, requested_cutoff=requested_cutoff,
                                       case_opened_at=case_opened_at, domains=domains, settings=settings)
     context = {d.id for d in docs.values() if in_context(d)}
-    before = _select_v1(**case | {"documents": [d for d in documents if d.id not in context],
-                                  "sightings": [s for s in sightings if s.document_id not in context],
-                                  "requested_cutoff": cutoff})
-    now, then = _calls(today), _calls(before)
+    before = rule(**case | {"documents": [d for d in documents if d.id not in context],
+                            "sightings": [s for s in sightings if s.document_id not in context],
+                            "requested_cutoff": cutoff})
+    now, then = _calls(as_is), _calls(before)
     agreed = 0
     while agreed < min(len(now), len(then)) and now[agreed] == then[agreed]:
         agreed += 1
     if agreed == 0:                                                      # decision 3: they disagree on the pick
-        out = {k: v for k, v in today.items() if k not in ("contact_point_id", "e164", "source_types", "alternates")}
+        out = {k: v for k, v in as_is.items() if k not in ("contact_point_id", "e164", "source_types", "alternates")}
         return out | {"outcome": "withheld", "reason": WITHHELD}
-    return today | {"alternates": today["alternates"][:agreed - 1]}      # the pick, and the agreed backups
+    return as_is | {"alternates": as_is["alternates"][:agreed - 1]}      # the pick, and the agreed backups
 
 
 def _jsonable(v):

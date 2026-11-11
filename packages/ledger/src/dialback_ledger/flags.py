@@ -25,6 +25,14 @@ def context_guard(env: Mapping[str, str] | None = None) -> bool:
     return value.strip().lower() != "off"
 
 
+def label_bar(env: Mapping[str, str] | None = None) -> bool:
+    """DIALBACK_LABEL_BAR (spec 0091, rule 6): does a label against a number need to be established to
+    veto it? On by default and for any unknown value; only `off` turns it off, which gives spec 0079's
+    rule exactly. DIALBACK_CONTEXT_GUARD=off still runs today's rule alone, whatever this says."""
+    value = (os.environ if env is None else env).get("DIALBACK_LABEL_BAR", "")
+    return value.strip().lower() != "off"
+
+
 def anthropic_api_key(env: Mapping[str, str] | None = None) -> str | None:
     """The LLM reader's key (spec 0049), or None when it's unset or blank."""
     value = (os.environ if env is None else env).get("ANTHROPIC_API_KEY", "").strip()

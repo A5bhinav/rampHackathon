@@ -10,7 +10,8 @@ from dialback_ledger.demo import load, load_seed
 from dialback_ledger.ingest import ingest_all
 from dialback_ledger.reader import StubReader
 from dialback_ledger.risk import STATUS_TEXT, risk_list
-from dialback_ledger.store import add_vendor_domain, write_ingest
+from dialback_ledger.select import ChangeRequest, select
+from dialback_ledger.store import add_vendor_domain, vendor_rows, write_ingest
 from psycopg.rows import dict_row
 from test_demo import demo_dataset
 from test_store import load as load_truth
@@ -71,10 +72,11 @@ ON_FILE = "+14155550142"
 
 
 def withheld_vendor(now: dt.datetime) -> list[dict]:
-    """The number on file is provable, and an older provable number was called a bank's line ten days
-    ago by a clean listing. A lookalike's email 30 days ago pulls the cutoff back past that listing, so
-    the change context now holds the label: the run without it would call the older number, and the
-    guard withholds (spec 0079)."""
+    """The number on file is provable, and an older provable number is called a bank's line by a clean
+    contract 150 days ago and a clean listing 120 days ago: established labels, so they veto it. A
+    lookalike's email 160 days ago pulls the cutoff back past both, so the change context now holds
+    them: the run without them would call the older number, and the guard withholds (spec 0079;
+    spec 0091, rule 3)."""
 
     def days(n: int) -> dt.datetime:
         return now - dt.timedelta(days=n)
@@ -84,14 +86,16 @@ def withheld_vendor(now: dt.datetime) -> list[dict]:
             source_doc("l1", "listing", days(400), ["Acme Fasteners", "Accounts receivable: (415) 555-0142"]),
             source_doc("c2", "contract", days(600), ["Master agreement: Acme", "Accounts receivable: (303) 555-0101"]),
             source_doc("l2", "listing", days(600), ["Acme Fasteners, east office", "Accounts receivable: (303) 555-0101"]),
-            source_doc("lbl", "listing", days(10), ["Acme Fasteners", "Bank verification line: (303) 555-0101"]),
-            source_doc("look", "email", days(30), ["Hello from Acme", "Main: (303) 555-0177"], sender="ar@acrne.example",
+            source_doc("lbl-contract", "contract", days(150), ["Payment terms: Acme", "Bank verification line: (303) 555-0101"]),
+            source_doc("lbl-listing", "listing", days(120), ["Acme Fasteners", "Bank verification line: (303) 555-0101"]),
+            source_doc("look", "email", days(160), ["Hello from Acme", "Main: (303) 555-0177"], sender="ar@acrne.example",
                        thread="t-look", subject="Hello")]
 
 
 def test_a_vendor_the_rule_withholds_needs_a_person(database_url, monkeypatch):
     monkeypatch.delenv("DIALBACK_READER", raising=False)
     monkeypatch.delenv("DIALBACK_CONTEXT_GUARD", raising=False)
+    monkeypatch.delenv("DIALBACK_LABEL_BAR", raising=False)
     v = new_vendor(database_url, "Acme Fasteners")
 
     async def go():
@@ -101,6 +105,14 @@ def test_a_vendor_the_rule_withholds_needs_a_person(database_url, monkeypatch):
                                                  reader=StubReader()))
             await add_vendor_domain(conn, dataset_id=v["dataset_id"], vendor_id=v["vendor_id"], domain="acme.example")
     asyncio.run(go())
+
+    async def premise():      # with both flags on, the rule withholds on this world, as risk_list runs it
+        async with await psycopg.AsyncConnection.connect(database_url, row_factory=dict_row) as conn:
+            now = dt.datetime.now(dt.UTC)
+            rows = await vendor_rows(conn, dataset_id=v["dataset_id"], vendor_id=v["vendor_id"], before=now)
+            return select(case_id=uuid.UUID(int=0), dataset_id=v["dataset_id"], vendor_id=v["vendor_id"], requested_cutoff=now,
+                          case_opened_at=now, request=ChangeRequest("", now, None, None, None), **rows)
+    assert asyncio.run(premise())["outcome"] == "withheld"
     (row,) = as_person(database_url, v["dataset_id"])
     assert row["status"] == "needs_person" and row["status_text"] == STATUS_TEXT["needs_person"]
     assert row["provable_number"] is None and row["number_on_file"] == ON_FILE

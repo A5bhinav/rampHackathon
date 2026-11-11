@@ -1,7 +1,9 @@
 """Builds select() inputs for the tests: hand-made worlds and the frozen corpus."""
+import contextlib
 import datetime as dt
 import importlib.util
 import json
+import os
 import sys
 import uuid
 from pathlib import Path
@@ -89,6 +91,26 @@ def frozen(w: dict) -> dict:
 def calls(out: dict) -> list[str]:
     """What a selection would call, in order: the pick, then its alternates (spec 0079's call list)."""
     return ([out["e164"]] if out.get("e164") else []) + [a["e164"] for a in out.get("alternates", [])]
+
+
+@contextlib.contextmanager
+def flags(guard: str | None = None, bar: str | None = None):
+    """DIALBACK_CONTEXT_GUARD and DIALBACK_LABEL_BAR for the block (None: unset, the default), then as
+    they were. A context manager rather than monkeypatch, so Hypothesis tests can use it too."""
+    names = {"DIALBACK_CONTEXT_GUARD": guard, "DIALBACK_LABEL_BAR": bar}
+    before = {name: os.environ.get(name) for name in names}
+
+    def put(values: dict) -> None:
+        for name, value in values.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value
+    try:
+        put(names)
+        yield
+    finally:
+        put(before)
 
 
 def source_doc(doc_id: str, channel: str, received: dt.datetime, lines: list[str], *, sender: str | None = None,

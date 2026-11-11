@@ -272,16 +272,17 @@ def _source(doc_id: str, channel: str, received: dt.datetime, *lines: str, **cus
 
 async def test_withheld_selection_goes_to_review(world, database_url, monkeypatch):
     # Spec 0079, decision 5: the core needs no change for withheld. The real ledger rule runs on
-    # FINDINGS A1 (the change request's own text calls the vendor's line a bank's; a planted number
-    # is provable), withholds, and the core treats the selection like no_provable_number: no call,
-    # its reason, and a person reviews.
+    # FINDINGS A3 (an old email in the change request's thread has the vendor's line, older than its
+    # other evidence; a planted number is provable), withholds, and the core treats the selection
+    # like no_provable_number: no call, its reason, and a person reviews.
     from dialback_core.timeline import summary
     from dialback_ledger.ingest import ingest_all
     from dialback_ledger.reader import StubReader
-    from dialback_ledger.select import WITHHELD
-    from dialback_ledger.store import add_vendor_domain, mark_change_request, write_ingest
+    from dialback_ledger.select import WITHHELD, ChangeRequest, select
+    from dialback_ledger.store import add_vendor_domain, mark_change_request, vendor_rows, write_ingest
     monkeypatch.delenv("DIALBACK_READER", raising=False)
     monkeypatch.delenv("DIALBACK_CONTEXT_GUARD", raising=False)
+    monkeypatch.delenv("DIALBACK_LABEL_BAR", raising=False)
     monkeypatch.setenv("DATABASE_URL", database_url)             # select_number opens its own connection
     await import_all(world.pool, world.ramp, world.keys, world.dataset.id)
     vendor = (await one(world.pool, "select id from app.vendors where dataset_id = %s and ramp_vendor_id = %s",
@@ -296,14 +297,24 @@ async def test_withheld_selection_goes_to_review(world, database_url, monkeypatc
         _source("real-listing", "listing", ago(200), "Acme Fasteners", "Accounts receivable: (415) 555-0142"),
         _source("planted-contract", "contract", ago(150), "Supply agreement: Acme", "Accounts receivable: (645) 555-0177"),
         _source("planted-listing", "listing", ago(150), "Acme Fasteners, west office", "Accounts receivable: (645) 555-0177"),
+        _source("old-copy", "email", ago(365), "Accounts receivable: (415) 555-0142", sender="ar@acme.example",
+                thread="thr-request", subject="Updated banking details"),
         _source("request", "email", now - dt.timedelta(hours=1), "Please update our bank details for future payments.",
-                "Bank verification line: (415) 555-0142", sender="ar@acme.example", thread="thr-request",
-                subject="Updated banking details")]
+                sender="ar@acme.example", thread="thr-request", subject="Updated banking details")]
     async with await psycopg.AsyncConnection.connect(database_url) as conn, conn.transaction():
         await write_ingest(conn, dataset_id=world.dataset.id, vendor_id=vendor,
                            result=ingest_all(sources, extractor_version="test", reader=StubReader()))
         await add_vendor_domain(conn, dataset_id=world.dataset.id, vendor_id=vendor, domain="acme.example")
         await mark_change_request(conn, dataset_id=world.dataset.id, vendor_id=vendor, document_id="request")
+    async with world.pool.connection() as conn:   # the premise: with both flags on, the rule withholds on this world
+        at = dt.datetime.now(dt.UTC)
+        rows = await vendor_rows(conn, dataset_id=world.dataset.id, vendor_id=vendor, before=at)
+    req = await one(world.pool, "select d.id, d.received_at, d.thread_id, d.subject, d.sender from ledger.change_requests r "
+                                "join ledger.documents d on d.id = r.document_id where r.dataset_id = %s and r.vendor_id = %s",
+                    world.dataset.id, vendor)
+    premise = select(case_id=uuid.UUID(int=0), dataset_id=world.dataset.id, vendor_id=vendor, requested_cutoff=at, case_opened_at=at,
+                     request=ChangeRequest(str(req["id"]), req["received_at"], req["thread_id"], req["subject"], req["sender"]), **rows)
+    assert premise["outcome"] == "withheld"
     world.worker.resolver = LedgerResolver(ResolverMode.LEDGER)  # the real resolver and the real rule
     await change_and_detect(world)
 
