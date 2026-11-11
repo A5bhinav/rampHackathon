@@ -3,6 +3,9 @@
 #
 #   scripts/demo/setup_sandbox_demo.sh [the current sandbox dataset's id, to retire it]
 #
+# With an id it's a fast reset (D5): the new dataset copies the old one's vendors and schedule
+# instead of reading every vendor from Ramp again, so it takes seconds and can't hit Ramp's rate limit.
+#
 # A fresh demo dataset on the sandbox, its vendors imported, and Asana, Salesforce and DocuSign in
 # the Trust Ledger with the team phone as the number the rule picks. The phone is read from the voice
 # service's DIALBACK_DIAL_ALLOWLIST (never printed, never committed). Reject any bank change still
@@ -33,7 +36,11 @@ if [[ -z "$dataset" ]]; then
   exit 1
 fi
 echo "dataset $dataset"
-railway ssh -s core -- dialback-core import-vendors --dataset "$dataset" 2>&1 | grep -v '^INFO:'
+if [[ -n "${1:-}" ]]; then
+  railway ssh -s core -- dialback-core copy-vendors --from "$1" --to "$dataset" 2>&1 | grep -v '^INFO:'
+else
+  railway ssh -s core -- dialback-core import-vendors --dataset "$dataset" 2>&1 | grep -v '^INFO:'
+fi
 railway ssh -s core -- dialback-ledger demo load --dataset "$dataset" --with-requests --like acme --no-request salesforce \
   --real-vendor "asana=$ASANA=Asana" --real-vendor "salesforce=$SALESFORCE=Salesforce" --real-vendor "docusign=$DOCUSIGN=DocuSign" \
   --phone "asana=$phone" --phone "salesforce=$phone" --phone "docusign=$phone" 2>&1 | grep -v '^INFO:'

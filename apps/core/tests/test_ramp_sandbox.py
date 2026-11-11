@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import datetime as dt
 import hashlib
 import hmac
 import logging
@@ -19,7 +20,7 @@ from conftest import MOCK_SECRET, core_settings
 from dialback_core.datasets import create_dataset
 from dialback_core.db import open_pool, system_tx
 from dialback_core.flags import RampMode
-from dialback_core.main import _email_door, _new_dataset
+from dialback_core.main import _copy_vendors, _email_door, _new_dataset
 from dialback_core.ramp.connector import MockRefused, RampConnector
 from dialback_core.ramp.http import RampHttpAdapter, TokenBucket
 from dialback_core.ramp.login import RampLogin
@@ -259,6 +260,45 @@ async def test_email_door_turns_on_only_named_vendors_of_a_current_demo(pool, da
     finally:
         async with system_tx(pool) as conn:
             await conn.execute("update app.datasets set retired_at = now() where id = any(%s)", ([demo_set.id, dev_set.id],))
+
+
+@pytest.mark.anyio
+async def test_copy_vendors_keeps_the_job_schedule_and_refuses_a_bad_target(pool, database_url, capsys):
+    """Spec 0103, D5: the new dataset picks up the old one's poll watermark and sweep time, so the
+    reset doesn't make the worker read every vendor again; and only into an empty, current dataset
+    on the same Ramp."""
+    settings = core_settings(database_url=database_url)
+    old, new, full = [await create_dataset(pool, "dev", f"test-{uuid.uuid4().hex[:8]}") for _ in range(3)]
+    sandbox = await sandbox_dataset(pool)
+    mark, swept = dt.datetime(2026, 11, 10, 7, tzinfo=dt.UTC), dt.datetime(2026, 11, 10, 6, tzinfo=dt.UTC)
+    async with system_tx(pool) as conn:
+        await conn.execute("insert into app.job_runs (dataset_id, job, last_started_at, watermark) values "
+                           "(%s, 'poll', %s, %s), (%s, 'full_sweep', %s, null)", (old.id, mark, mark, old.id, swept))
+        await conn.execute("insert into app.vendors (dataset_id, ramp_vendor_id, legal_name) values (%s, 'ven-a', 'A'), (%s, 'ven-b', 'B')",
+                           (old.id, full.id))
+    try:
+        with pytest.raises(SystemExit, match="two different"):
+            await _copy_vendors(settings, old.id, old.id)
+        with pytest.raises(SystemExit, match="already has vendors"):
+            await _copy_vendors(settings, old.id, full.id)
+        with pytest.raises(SystemExit, match="different Ramps"):
+            await _copy_vendors(settings, old.id, sandbox.id)
+        await _copy_vendors(settings, old.id, new.id)
+        assert "copied 1 vendors" in capsys.readouterr().out
+        async with system_tx(pool) as conn:
+            jobs = {r["job"]: r for r in await (await conn.execute(
+                "select job, last_started_at, watermark from app.job_runs where dataset_id = %s", (new.id,))).fetchall()}
+            names = [r["ramp_vendor_id"] for r in await (await conn.execute(
+                "select ramp_vendor_id from app.vendors where dataset_id = %s", (new.id,))).fetchall()]
+        assert names == ["ven-a"]
+        assert jobs["poll"]["watermark"] == mark and jobs["full_sweep"]["last_started_at"] == swept
+        async with system_tx(pool) as conn:
+            await conn.execute("update app.datasets set retired_at = now() where id = %s", (new.id,))
+        with pytest.raises(SystemExit, match="retired"):
+            await _copy_vendors(settings, old.id, new.id)
+    finally:
+        async with system_tx(pool) as conn:
+            await conn.execute("update app.datasets set retired_at = now() where id = any(%s)", ([old.id, new.id, full.id, sandbox.id],))
 
 
 def test_new_dataset_refuses_the_sandbox_without_credentials():

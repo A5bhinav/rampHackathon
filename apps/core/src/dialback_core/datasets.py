@@ -26,8 +26,7 @@ class Dataset:
 async def create_dataset(pool: AsyncConnectionPool, kind: str, label: str, sim_now: dt.datetime | None = None,
                          ramp: str = "mock") -> Dataset:
     """A new dataset and its chain. `sim_now` starts a lab dataset's clock (spec 0002, D2); `ramp` is
-    the Ramp it uses for good (spec 0096). The database refuses a demo on the sandbox, and a second
-    current sandbox dataset."""
+    the Ramp it uses for good (spec 0096). The database refuses a second current sandbox dataset."""
     if kind not in KINDS:
         raise ValueError(f"kind must be one of {KINDS}")
     if ramp not in RAMPS:

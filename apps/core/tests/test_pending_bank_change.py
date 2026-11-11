@@ -17,6 +17,7 @@ from conftest import FINGERPRINT_KEY, core_settings
 from dialback_core.db import system_tx
 from dialback_core.detection import Keys, import_all, sync_vendor
 from dialback_core.jobs import Jobs
+from dialback_core.main import _copy_vendors
 from dialback_core.ramp.connector import RampConnector
 from dialback_core.ramp.http import TokenBucket
 from test_ramp_sandbox_shapes import SANDBOX, SandboxRamp, V, _no_sleep, account, sandbox_dataset
@@ -31,7 +32,8 @@ async def world(pool):
         d = await sandbox_dataset(pool)
         connector = RampConnector(core_settings(ramp_sandbox=SANDBOX), http, limiter=TokenBucket(100_000),
                                   sleep=_no_sleep, pool=pool)
-        w = SimpleNamespace(fake=fake, pool=pool, d=d, port=connector.for_dataset(d.id), keys=Keys(FINGERPRINT_KEY))
+        w = SimpleNamespace(fake=fake, pool=pool, d=d, port=connector.for_dataset(d.id), keys=Keys(FINGERPRINT_KEY),
+                            connector=connector)
         yield w
 
 
@@ -180,3 +182,28 @@ async def test_one_pending_change_is_approved_into_one_account(world):
         account("acct-a", "4321"), account("acct-b", "4321")]
     [found] = await sync(world)
     assert found.ramp_account_id == "acct-b" and await changes(world) == ["acct-p", "acct-b"]
+
+
+async def test_a_reset_copies_what_the_old_dataset_knew(world, database_url):
+    """Spec 0103, D5: the fast reset copies the old dataset's vendors and Ramp accounts instead of reading
+    Ramp again, so the new dataset sees the same changes a fresh import would. An email door's requested
+    account (no Ramp id) is the old dataset's own and isn't copied."""
+    world.fake.accounts[V].append(pending("acct-p", "4321"))
+    await baseline(world)
+    async with system_tx(world.pool) as conn:
+        vendor = (await (await conn.execute("select id from app.vendors where dataset_id = %s and ramp_vendor_id = %s",
+                                            (world.d.id, V))).fetchone())["id"]
+        await conn.execute("insert into app.bank_accounts (dataset_id, vendor_id, routing_number, account_last4, account_fingerprint, "
+                           "is_current) values (%s, %s, '026009593', '9999', %s, false)", (world.d.id, vendor, "ab" * 32))
+    new = await sandbox_dataset(world.pool, "demo")  # the old one is retired first, as the setup script does
+    try:
+        await _copy_vendors(core_settings(database_url=database_url), world.d.id, new.id)
+        after = SimpleNamespace(**{**vars(world), "d": new, "port": world.connector.for_dataset(new.id)})
+        assert await mirror(after) == {"acct-old": (False, False), "acct-cur": (True, False), "acct-p": (False, True)}
+        assert await sync(after) == [], "what the old dataset knew is the baseline: no change"
+        world.fake.accounts[V].append(account("acct-n", "5555"))
+        [found] = await sync(after)
+        assert found.ramp_account_id == "acct-n" and found.case_id is not None, "a new account is still a change"
+    finally:
+        async with system_tx(world.pool) as conn:
+            await conn.execute("update app.datasets set retired_at = now() where id = %s", (new.id,))
