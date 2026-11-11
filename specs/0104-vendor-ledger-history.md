@@ -40,7 +40,7 @@ seen, by source" chart, and the vendor's documents with the exact text each numb
 
 - [ ] 1. `dialback_ledger.risk.vendor_ledger(conn, dataset_id, vendor_id)` returns `None` when the
       vendor isn't on that dataset as the caller sees it. Otherwise: `risk` equals the vendor's
-      `risk_list` row at the same `now`; `rule` holds `rule_version`, `rule_settings`, `as_of`,
+      `risk_list` row at the same `now` (a vendor with no documents yet reads `missing`); `rule` holds `rule_version`, `rule_settings`, `as_of`,
       `cutoff`, `outcome`, `candidates` (exactly `select()`'s), and `contact_point_id` and
       `alternates` when picked.
 - [ ] 2. `documents` lists every ledger document of the vendor on that dataset (D4), each with
@@ -65,6 +65,9 @@ seen, by source" chart, and the vendor's documents with the exact text each numb
 | 1, 2, 3, 5 | `packages/ledger/tests/test_risk.py::test_vendor_ledger_*` (real Postgres, as a person) |
 | 4 | `apps/core/tests/test_api.py::test_the_vendor_ledger_*` |
 | 6, 7 | `apps/web/tests/lineage.test.ts`, `apps/web/tests/vendor-ledger.test.ts` |
+
+The code lands in two PRs stacked on the contract PR, to stay under about 400 lines each: the
+ledger function and the endpoint (items 1 to 5), then the page (items 6 and 7).
 
 ## Out of scope
 
