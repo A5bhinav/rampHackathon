@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { lanePoints, phone, seenBefore, sourceLabel, split } from "../src/lib/lineage.ts";
+import { candidateBadge, lanePoints, noCallHead, phone, seenBefore, sourceLabel, split } from "../src/lib/lineage.ts";
 
 const example = (name: string) =>
   JSON.parse(readFileSync(new URL(`../../../packages/contracts/examples/selection.${name}.json`, import.meta.url), "utf8"));
@@ -65,4 +65,37 @@ test("lanePoints puts the cutoff after the minimum-age line, and years in order"
 test("lanePoints with no candidates has nothing to draw", () => {
   assert.equal(lanePoints({ ...example("picked"), candidates: [] }), null);
   assert.equal(lanePoints(null), null);
+});
+
+
+// Spec 0079: a withheld selection calls no one; a number is an alternate only if the selection names it.
+const PLANTED = "+16455550177";
+const kindsOf = (sel: ReturnType<typeof example>, e164: string) =>
+  [...new Set(lanePoints(sel)!.points.filter((p) => p.e164 === e164).map((p) => p.kind))];
+
+test("a withheld selection calls no one, and its eligible numbers are provable, not called", () => {
+  const sel = example("withheld");
+  const s = split(sel);
+  assert.equal(s.pick, null);
+  assert.deepEqual(s.alternates, []);
+  assert.deepEqual(s.uncalled.map((c) => c.e164), [PLANTED]);
+  assert.deepEqual(s.refused.map((c) => c.e164), ["+14155550142"]);
+  const planted = sel.candidates.find((c: { e164: string }) => c.e164 === PLANTED);
+  assert.deepEqual(candidateBadge(sel, planted), { word: "provable, not called", tone: "tone-warn" });
+  assert.deepEqual(kindsOf(sel, PLANTED), ["uncalled"], "never drawn as an alternate");
+  assert.deepEqual(noCallHead(sel), { title: "Withheld for a person", badge: "Withheld" });
+});
+
+test("a backup the rule cut is provable, not called, and the rest keep their words", () => {
+  const sel = example("picked");                       // pick +14155550142, alternate +14155550117
+  const cut = { ...sel, alternates: [] };
+  const backup = (x: typeof sel) => x.candidates.find((c: { e164: string }) => c.e164 === "+14155550117");
+  assert.equal(candidateBadge(sel, backup(sel)).word, "alternate 1");
+  assert.equal(candidateBadge(cut, backup(cut)).word, "provable, not called");
+  assert.deepEqual(split(cut).uncalled.map((c) => c.e164), ["+14155550117"]);
+  assert.deepEqual(kindsOf(sel, "+14155550117"), ["alternate"]);
+  assert.deepEqual(kindsOf(cut, "+14155550117"), ["uncalled"]);
+  assert.equal(candidateBadge(sel, sel.candidates.find((c: { e164: string }) => c.e164 === "+14155550142")).word, "chosen");
+  assert.equal(candidateBadge(sel, sel.candidates.find((c: { e164: string }) => c.e164 === "+14155550143")).word, "refused");
+  assert.deepEqual(noCallHead(example("no-provable-number")), { title: "No provable number", badge: "No provable number" });
 });

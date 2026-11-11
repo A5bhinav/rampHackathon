@@ -7,6 +7,7 @@ import datetime as dt
 import uuid
 from zoneinfo import ZoneInfo
 
+import psycopg
 import pytest
 from conftest import core_settings, make_world
 from contract import CONTRACTS
@@ -257,6 +258,73 @@ async def test_without_the_ledger_rule_no_number_is_provable_and_a_person_takes_
     assert alert["kind"] == "no_provable_number"
 
 
+def _page(*lines: str) -> list[dict]:
+    return [{"width": 612, "height": 792, "spans": [{"text": t, "x": 72, "y": 72 + 14 * i, "size": 10, "color": "#000000"}
+                                                     for i, t in enumerate(lines)]}]
+
+
+def _source(doc_id: str, channel: str, received: dt.datetime, *lines: str, **custody) -> dict:
+    """A source document in the corpus's shape, for the ledger's ingest_all."""
+    return {"id": doc_id, "kind": channel, "claimed_date": None, "header_date": None, "scan": False, "pages": _page(*lines),
+            "custody": {"channel": channel, "parent_document_id": None, "received_at": received.isoformat(),
+                        "sender": custody.get("sender"), "subject": custody.get("subject"), "thread_id": custody.get("thread")}}
+
+
+async def test_withheld_selection_goes_to_review(world, database_url, monkeypatch):
+    # Spec 0079, decision 5: the core needs no change for withheld. The real ledger rule runs on
+    # FINDINGS A1 (the change request's own text calls the vendor's line a bank's; a planted number
+    # is provable), withholds, and the core treats the selection like no_provable_number: no call,
+    # its reason, and a person reviews.
+    from dialback_core.timeline import summary
+    from dialback_ledger.ingest import ingest_all
+    from dialback_ledger.reader import StubReader
+    from dialback_ledger.select import WITHHELD
+    from dialback_ledger.store import add_vendor_domain, mark_change_request, write_ingest
+    monkeypatch.delenv("DIALBACK_READER", raising=False)
+    monkeypatch.delenv("DIALBACK_CONTEXT_GUARD", raising=False)
+    monkeypatch.setenv("DATABASE_URL", database_url)             # select_number opens its own connection
+    await import_all(world.pool, world.ramp, world.keys, world.dataset.id)
+    vendor = (await one(world.pool, "select id from app.vendors where dataset_id = %s and ramp_vendor_id = %s",
+                        world.dataset.id, world.refs["acme"]))["id"]
+    now = dt.datetime.now(dt.UTC)
+
+    def ago(days: int) -> dt.datetime:
+        return now - dt.timedelta(days=days)
+
+    sources = [
+        _source("real-contract", "contract", ago(200), "Master supply agreement: Acme", "Accounts receivable: (415) 555-0142"),
+        _source("real-listing", "listing", ago(200), "Acme Fasteners", "Accounts receivable: (415) 555-0142"),
+        _source("planted-contract", "contract", ago(150), "Supply agreement: Acme", "Accounts receivable: (645) 555-0177"),
+        _source("planted-listing", "listing", ago(150), "Acme Fasteners, west office", "Accounts receivable: (645) 555-0177"),
+        _source("request", "email", now - dt.timedelta(hours=1), "Please update our bank details for future payments.",
+                "Bank verification line: (415) 555-0142", sender="ar@acme.example", thread="thr-request",
+                subject="Updated banking details")]
+    async with await psycopg.AsyncConnection.connect(database_url) as conn, conn.transaction():
+        await write_ingest(conn, dataset_id=world.dataset.id, vendor_id=vendor,
+                           result=ingest_all(sources, extractor_version="test", reader=StubReader()))
+        await add_vendor_domain(conn, dataset_id=world.dataset.id, vendor_id=vendor, domain="acme.example")
+        await mark_change_request(conn, dataset_id=world.dataset.id, vendor_id=vendor, document_id="request")
+    world.worker.resolver = LedgerResolver(ResolverMode.LEDGER)  # the real resolver and the real rule
+    await change_and_detect(world)
+
+    case = await case_of(world)
+    assert case["state"] == "needs_review" and world.voice.placed == [], "nobody is called"
+    alert = await one(world.pool, "select kind from app.alerts where case_id = %s", case["id"])
+    assert alert["kind"] == "no_provable_number"
+    event = await one(world.pool, "select body_jcs::jsonb -> 'body' as body from audit.evidence_events "
+                                  "where case_id = %s and type = 'no_provable_number'", case["id"])
+    assert event["body"]["reason"] == WITHHELD
+    stored = await one(world.pool, "select outcome::text as outcome, contact_point_id, rule_version from ledger.number_selections "
+                                   "where id = %s", event["body"]["number_selection_id"])
+    assert stored["outcome"] == "withheld" and stored["contact_point_id"] is None
+    assert event["body"]["rule_version"] == stored["rule_version"]
+    # The case timeline says why, not "no number is provable".
+    assert summary("no_provable_number", event["body"], "system") == (
+        "The change request would change which phone number is called, so no call was made and a person must verify.")
+    assert summary("no_provable_number", {"reason": "No number met the rule."}, "system").startswith(
+        "No phone number for this vendor is provable")
+
+
 async def test_a_pre_dial_refusal_sends_the_case_to_a_person(world):
     world.voice.refuse = "not_on_dial_allowlist"
     await import_all(world.pool, world.ramp, world.keys, world.dataset.id)
@@ -378,17 +446,40 @@ async def test_a_change_context_failure_goes_to_a_person(world):
     assert alert["kind"] == "command_stuck" and "decide" in alert["message"]
 
 
-async def test_every_company_answer_must_match(world):
+# The clean call's decision, which test_a_bank_change_walks_all_the_way_to_release pins too.
+WITHOUT_THE_EXTRA_ANSWER = ("verified", [r.id for r in rules.VERIFIED])
+
+
+@pytest.mark.parametrize("extra", [None, "Globex Corporation"], ids=["without", "with-globex"])
+async def test_another_company_named_decides_as_the_call_would_without_it(world, extra):
+    """Spec 0082, D7b: another company named with no refusal word blocks nothing, so the same call
+    decides the same with or without it. The person who releases sees the answer."""
     await import_all(world.pool, world.ramp, world.keys, world.dataset.id)
     await change_and_detect(world)
     case = await case_of(world)
     call_id = world.voice.placed[0]["call_id"]
     answers = transit(call_id)
-    answers["answers"].append(answer("company_named", "Globex Corporation", 11))
+    if extra:
+        answers["answers"].append(answer("company_named", extra, 11))
     assert (await report(world, case["id"], call_id, answers=answers)).status_code == 204
     await world.worker.drain(world.dataset.id)
     decision = await one(world.pool, "select outcome, rules_fired from app.decisions where case_id = %s", case["id"])
-    assert decision["outcome"] == "needs_review" and "NR03_wrong_company" in decision["rules_fired"]
+    assert "NR03_wrong_company" not in decision["rules_fired"]
+    assert (decision["outcome"], list(decision["rules_fired"])) == WITHOUT_THE_EXTRA_ANSWER
+
+
+async def test_a_refusal_in_the_company_answer_goes_to_review(world):
+    """Spec 0082, D7a and D7b: a refusal word is the one company answer that still blocks (NR03)."""
+    await import_all(world.pool, world.ramp, world.keys, world.dataset.id)
+    await change_and_detect(world)
+    case = await case_of(world)
+    call_id = world.voice.placed[0]["call_id"]
+    answers = transit(call_id, company="Not Acme Fasteners, this is Globex")
+    assert (await report(world, case["id"], call_id, answers=answers)).status_code == 204
+    await world.worker.drain(world.dataset.id)
+    decision = await one(world.pool, "select outcome, rules_fired from app.decisions where case_id = %s", case["id"])
+    assert (decision["outcome"], list(decision["rules_fired"])) == ("needs_review", ["NR03_wrong_company"])
+    assert (await case_of(world))["state"] == "needs_review"
 
 
 async def test_without_the_ledgers_change_context_every_answer_is_unknown(world):
@@ -409,10 +500,11 @@ async def test_the_ledgers_change_context_counts_only_booleans(world, monkeypatc
     assert facts == ChangeFacts(offered_number_from_request=True), "a string 'no' is not False"
 
 
-def test_every_company_answer_must_match_and_an_unreadable_one_is_unknown():
+def test_a_refusal_in_any_company_answer_is_false_and_another_or_unreadable_one_is_unknown():
     from dialback_core.company import every_name_matches
     assert every_name_matches(["Acme Fasteners"], "Acme Fasteners LLC") is True
-    assert every_name_matches(["Acme Fasteners", "Globex"], "Acme Fasteners LLC") is False
+    assert every_name_matches(["Acme Fasteners", "Globex"], "Acme Fasteners LLC") is None, "spec 0082, D7b"
+    assert every_name_matches(["Acme Fasteners", "Not Acme, this is Globex"], "Acme Fasteners LLC") is False
     assert every_name_matches(["Acme Fasteners", "LLC"], "Acme Fasteners LLC") is None, "'LLC' alone names nobody"
     assert every_name_matches([], "Acme Fasteners LLC") is None
 

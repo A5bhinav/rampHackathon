@@ -2,9 +2,9 @@
 import datetime as dt
 import random
 
-from _world import SCHEMA, T0, at, run, world
-from dialback_ledger.select import near_miss
-from hypothesis import given, settings
+from _world import SCHEMA, T0, at, calls, frozen, run, world
+from dialback_ledger.select import change_context_documents, near_miss
+from hypothesis import find, given, settings
 from hypothesis import strategies as st
 from jsonschema import Draft202012Validator
 
@@ -27,16 +27,41 @@ context_row = row.flatmap(lambda r: st.sampled_from([r | {"thread": "req"}, r | 
 many = settings(max_examples=150, deadline=None)
 
 
+# The strategies above almost never give today's rule a pick (the review found none in 1000
+# derandomized draws), and spec 0079's guard acts only on a pick. These worlds do: two to four
+# provable numbers, none a near miss of another, plus change-context rows on them. Four, so a
+# change to how many backups are called (rank[1:3]) can't hide (the review's item 3).
+PROVABLE = ["+14155550142", "+16455550177", "+13035550101", "+19715550124"]
+clean = st.fixed_dictionaries({
+    "channel": st.sampled_from(["email", "contract", "vendor_portal", "listing", "paper_mail"]),
+    "days_before": st.integers(60, 1500), "visibility": st.just("visible"),
+    "role": st.sampled_from(["ar", "main", "billing"]), "party": st.just("vendor")})
+provable_number = st.tuples(st.sampled_from(PROVABLE), st.lists(clean, min_size=2, max_size=3)).map(
+    lambda t: [r | {"e164": t[0]} for r in t[1]])
+on_a_provable = st.tuples(context_row, st.sampled_from(PROVABLE + PROVABLE + NUMBERS[1:2])).map(lambda t: t[0] | {"e164": t[1]})
+guarded_rows = st.tuples(st.lists(provable_number, min_size=2, max_size=4, unique_by=lambda rs: rs[0]["e164"]),
+                         st.lists(on_a_provable, min_size=1, max_size=4),
+                         st.lists(row, max_size=2)).map(lambda t: [r for rs in t[0] for r in rs] + t[1] + t[2])
+any_rows = st.one_of(st.tuples(rows, st.lists(context_row, max_size=5)).map(lambda t: t[0] + t[1]), guarded_rows)
+
+
 def eligible(out: dict) -> set[str]:
     return {c["e164"] for c in out["candidates"] if c["eligible"]}
 
 
-@many
-@given(rows)
+@settings(max_examples=300, deadline=None)
+@given(any_rows)       # `rows` alone gives today's rule no pick, so the pick branches below need any_rows
 def test_the_result_is_always_a_valid_selection(rs):
     out = run(world(rs))
     assert list(Draft202012Validator(SCHEMA).iter_errors(out)) == []
-    assert (out["outcome"] == "picked") == bool(eligible(out))
+    # Spec 0079, decision 4: a withheld selection keeps today's eligible candidates and calls none, so
+    # "picked exactly when something is eligible" became three cases.
+    if out["outcome"] == "no_provable_number":
+        assert not eligible(out)
+    else:
+        assert eligible(out), out["outcome"]
+        if out["outcome"] == "picked":
+            assert out["e164"] == next(c["e164"] for c in out["candidates"] if c.get("rank") == 1)
 
 
 @many
@@ -215,3 +240,63 @@ def test_conflicting_documents_with_one_id_count_against():
 def test_a_fax_label_in_any_case_is_a_fax():
     out = run(world([old(NUMBERS[0], "email"), old(NUMBERS[0], "contract", role="FAX")]))
     assert "fax_line" in out["candidates"][0]["reasons"]
+
+
+
+# Spec 0079: the prefix property ------------------------------------------------------------------
+
+def prefix_holds(rule, w: dict) -> bool:
+    """What `rule` calls is a prefix of what the frozen copy of today's rule calls: the same numbers in
+    the same order, possibly cut short or empty."""
+    new, old = calls(rule(w)), calls(frozen(w))
+    return new == old[:len(new)]
+
+
+
+@settings(max_examples=400, deadline=None)
+@given(any_rows)
+def test_new_rule_is_a_prefix_of_frozen_v1(rs):
+    w = world(rs)
+    assert prefix_holds(run, w)
+    assert list(Draft202012Validator(SCHEMA).iter_errors(run(w))) == []
+
+
+@settings(max_examples=300, deadline=None)
+@given(any_rows)
+def test_the_flag_off_is_the_frozen_copy(rs):
+    # Decision 7: DIALBACK_CONTEXT_GUARD=off gives today's rule exactly, byte for byte, on any world.
+    import os
+    w = world(rs)
+    before = os.environ.get("DIALBACK_CONTEXT_GUARD")
+    os.environ["DIALBACK_CONTEXT_GUARD"] = "off"
+    try:
+        assert run(w) == frozen(w)
+    finally:
+        if before is None:
+            os.environ.pop("DIALBACK_CONTEXT_GUARD")
+        else:
+            os.environ["DIALBACK_CONTEXT_GUARD"] = before
+
+
+def skips_the_comparison(w: dict) -> dict:
+    """A rule that skips spec 0079's comparison and calls what the run without the change context
+    calls: the context-blind fix FINDINGS A6 ruled out."""
+    today = frozen(w)
+    context = {d.id for d in change_context_documents(**w)}
+    return frozen(w | {"documents": [d for d in w["documents"] if d.id not in context],
+                       "sightings": [s for s in w["sightings"] if s.document_id not in context],
+                       "requested_cutoff": at(today["cutoff"])})
+
+
+def test_the_prefix_check_fails_a_rule_that_skips_the_comparison():
+    # The check can fail: on A1's world (a bank label in the request's thread on the real line, a
+    # planted provable number), the rule that skips the comparison calls the real line, which today's
+    # rule wouldn't call first. And the property's own strategy finds such a world by itself.
+    a1 = [old(NUMBERS[0], ch, days_before=200) for ch in ("contract", "listing")]
+    a1 += [old(NUMBERS[3], ch, days_before=150) for ch in ("contract", "listing")]
+    a1 += [old(NUMBERS[0], "email", days_before=0, thread="req", party="bank", role="unknown")]
+    assert not prefix_holds(skips_the_comparison, world(a1))
+    assert prefix_holds(run, world(a1))
+    found = find(guarded_rows, lambda rs: not prefix_holds(skips_the_comparison, world(rs)),
+                 settings=settings(max_examples=1000, deadline=None, database=None, derandomize=True))
+    assert prefix_holds(run, world(found))

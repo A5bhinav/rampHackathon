@@ -11,7 +11,7 @@ from . import rules
 from .facts import CaseFacts
 from .last_four import LAST_FOUR_RESULTS
 
-ENGINE_VERSION = "decision-1.0.0"
+ENGINE_VERSION = "decision-1.1.0"  # 1.1.0: V05 retired, NR03 only for refusal words (spec 0082, D7b)
 
 # Sentences for ids earlier engine versions recorded, so their decisions still render.
 RETIRED = {
@@ -29,6 +29,8 @@ RETIRED = {
     "U02_same_person_not_checked": "Not checked by this engine version: whether one person gave both the confirmation and the digits.",
     "U03_offered_number_source_not_checked": "Not checked by this engine version: whether an offered number came from the change request.",
     "NR99_nothing_decided": "No rule could verify this change, so a person must review it.",
+    "V05_company_matches": "The person named this vendor.",                       # decision-1.0.0
+    "V05_company_matches_unmet": "The person did not clearly name this vendor.",  # decision-1.0.0
 }
 
 

@@ -1,6 +1,8 @@
 """Builds select() inputs for the tests: hand-made worlds and the frozen corpus."""
 import datetime as dt
+import importlib.util
 import json
+import sys
 import uuid
 from pathlib import Path
 
@@ -52,3 +54,37 @@ def corpus_world(truth_path: Path) -> tuple[dict, dict]:
                    "request": ChangeRequest(req.id, req.received_at, req.thread_id, req.subject, req.sender),
                    "requested_cutoff": ramp, "case_opened_at": ramp + dt.timedelta(hours=1),
                    "documents": docs, "sightings": sightings}
+
+
+def _frozen_module(name: str):
+    """A frozen copy in tests/fixtures/, as main had it when spec 0079 began."""
+    spec = importlib.util.spec_from_file_location(name, Path(__file__).parent / "fixtures" / f"{name}.py")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module  # dataclasses look their module up while the class is built
+    spec.loader.exec_module(module)
+    return module
+
+
+_frozen_module("lookalike_v1_frozen")       # the classifier select_v1_frozen imports by this name
+FROZEN = _frozen_module("select_v1_frozen")
+
+
+def frozen(w: dict) -> dict:
+    """The frozen copy of today's rule on a world (spec 0079's baseline)."""
+    return FROZEN.select(**w)
+
+
+def calls(out: dict) -> list[str]:
+    """What a selection would call, in order: the pick, then its alternates (spec 0079's call list)."""
+    return ([out["e164"]] if out.get("e164") else []) + [a["e164"] for a in out.get("alternates", [])]
+
+
+def source_doc(doc_id: str, channel: str, received: dt.datetime, lines: list[str], *, sender: str | None = None,
+               thread: str | None = None, subject: str | None = None) -> dict:
+    """A source document in the corpus's shape (corpus/README.md), for ingest_all."""
+    return {"id": doc_id, "kind": {"vendor_master": "vendor_master_record"}.get(channel, channel), "claimed_date": None,
+            "header_date": received.isoformat() if channel == "email" else None, "scan": False,
+            "custody": {"channel": channel, "parent_document_id": None, "received_at": received.isoformat(),
+                        "sender": sender, "subject": subject, "thread_id": thread},
+            "pages": [{"width": 612, "height": 792, "spans": [
+                {"text": t, "x": 72, "y": 72 + 14 * i, "size": 10, "color": "#000000"} for i, t in enumerate(lines)]}]}

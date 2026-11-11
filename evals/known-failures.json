@@ -1,0 +1,14 @@
+{
+  "_about": "Spec 0048, D3: each job's strict known-failures list. An entry is added only with its finding written in evals/FINDINGS.md, and removed only when the job says it now passes.",
+  "lab-smoke": [
+    {"case": "a02-lookalike-domain", "labels": ["expected_rule_missing", "verified_attack"], "finding": "A28", "owner": "Sami"},
+    {"case": "l16-garbage-answers", "labels": ["expected_rule_missing", "wrong_verdict"], "finding": "A29", "owner": "Sami"}
+  ],
+  "lab-fuzz": [
+    {"case": "fuzz-seed0-m-shared-id-helped-06bbe3c8", "labels": ["M_shared_id_helped"], "finding": "A5", "owner": "Inesh"},
+    {"case": "lookalike-erased-by-first-sorting-twin", "labels": ["M_shared_id_helped"], "finding": "A5", "owner": "Inesh"},
+    {"case": "near-miss-unanchored-by-shared-id", "labels": ["M_shared_id_helped"], "finding": "A5", "owner": "Inesh"},
+    {"case": "near-miss-unanchored-by-old-lookalike", "labels": ["M_lookalike_helped", "M_shared_id_helped"], "finding": "A5", "owner": "Inesh"}
+  ],
+  "lab-reports": []
+}

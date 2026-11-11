@@ -1,0 +1,26 @@
+# A look-alike company ("Acme Fastners LLC") that otherwise confirms cleanly. Since spec 0082 (D6, a
+# distinctive first word matches; D7b, a company answer no longer has to match) it verifies, a cost the
+# decision knowingly accepted: on lab-smoke's known-failures list, FINDINGS A28. Its expectation is unchanged.
+id: a02-lookalike-domain
+class: lookalike_domain
+is_attack: true
+customer_name: Northwind Traders
+vendor_name: Acme Fasteners
+expect_rule: NR03_wrong_company            # the defense under test (spec 0017, F4)
+caller:
+  consent: 'yes'
+  company: Acme Fastners LLC
+  company_is: other              # spec 0048, A4: a lookalike's misspelled name: another company
+  department: Accounts payable
+  name: Jordan Lee
+  role: AP clerk
+  change: 'yes'
+  last4_mode: keypad
+  last4: '4821'
+  answered_by: human
+facts:
+  dialed_eligible_number: true
+  new_last4: "4821"
+  dialed_number_is_pick: true
+  speaker_in_change_thread: false
+  offered_number_from_request: false

@@ -1,4 +1,13 @@
-"""ledger-select-v1: which number a case will call, or none (spec 0021, design §4).
+"""ledger-select-v3: which number a case will call, or none (spec 0021, design §4; spec 0079).
+
+Spec 0079's guard: the change context may cancel a call, but never move it to a different number.
+`select()` runs today's rule, `_select_v1` (ledger-select-v1, unchanged), twice: on the case as it is,
+and with the change context's documents and their sightings removed. It calls only the start the
+two call lists (the pick, then up to two alternates) share. When they disagree on the pick, nobody
+is called (`withheld`) and a person verifies. So it never calls a number today's rule wouldn't.
+DIALBACK_CONTEXT_GUARD=off runs `_select_v1` alone, for rollback.
+
+Today's rule, `_select_v1`:
 
 A pure function: sightings and their documents' custody in, a selection.schema.json document
 out. Code decides; no model output reaches here except role and party labels. A number needs
@@ -21,13 +30,16 @@ from dataclasses import asdict, dataclass
 
 import rfc8785
 
+from .flags import context_guard
 from .lookalike import is_lookalike, sender_domain
 
-RULE_VERSION = "ledger-select-v1"
+RULE_VERSION_V1 = "ledger-select-v1"   # today's rule, alone (the flag off)
+RULE_VERSION = "ledger-select-v3"      # spec 0079's guard. Q130: the next free name when it merges (0047 claimed v2)
 NAMESPACE = uuid.UUID("0f4e2b8a-6c1d-4e3f-9a5b-7d2c1e0f3a64")
 SOURCE_TYPES = {"email", "contract", "vendor_portal", "listing", "paper_mail"}  # vendor_master never counts
 ROLES = {"main", "ar", "billing", "fax", "unknown"}
 NO_REQUEST = "The change request isn't in the ledger, so the change context is unknown and no number is provable."
+WITHHELD = "The change request would change which number is called, so a person must verify."
 NO_PICK = ("No number was seen in at least {n} independent source types, at least {d} days before the change request "
            "and outside it, without being a near miss of an older number.")
 
@@ -133,9 +145,12 @@ def change_context_documents(*, vendor_domains: Iterable[str], request: ChangeRe
     return [d for d in docs.values() if in_context(d)]
 
 
-def select(*, case_id: uuid.UUID, dataset_id: uuid.UUID, vendor_id: uuid.UUID, vendor_domains: Iterable[str],
-           request: ChangeRequest | None, requested_cutoff: dt.datetime, case_opened_at: dt.datetime,
-           documents: Sequence[DocumentRef], sightings: Sequence[Sighting], settings: Settings = DEFAULT) -> dict:
+def _select_v1(*, case_id: uuid.UUID, dataset_id: uuid.UUID, vendor_id: uuid.UUID, vendor_domains: Iterable[str],
+               request: ChangeRequest | None, requested_cutoff: dt.datetime, case_opened_at: dt.datetime,
+               documents: Sequence[DocumentRef], sightings: Sequence[Sighting], settings: Settings = DEFAULT,
+               rule_version: str = RULE_VERSION_V1) -> dict:
+    """Today's rule, ledger-select-v1, unchanged (spec 0079, decision 1). `rule_version` only names the
+    rule in the output, its id and its inputs hash."""
     domains = tuple(d.strip().lower().rstrip(".") for d in vendor_domains)
     docs, cutoff, in_context = _frame(documents=documents, request=request, requested_cutoff=requested_cutoff,
                                       case_opened_at=case_opened_at, domains=domains, settings=settings)
@@ -210,14 +225,14 @@ def select(*, case_id: uuid.UUID, dataset_id: uuid.UUID, vendor_id: uuid.UUID, v
         candidates.append(c)
 
     rule_settings = {k: v for k, v in asdict(settings).items() if k != "established_days"}
-    inputs = {"rule_version": RULE_VERSION, "settings": asdict(settings), "domains": sorted(domains),
+    inputs = {"rule_version": rule_version, "settings": asdict(settings), "domains": sorted(domains),
               "request": asdict(request) if request else None, "requested_cutoff": requested_cutoff,
               "documents": sorted((asdict(d) for d in docs.values()), key=lambda d: d["id"]),
               "sightings": [asdict(s) for s in rows]}
     digest = hashlib.sha256(rfc8785.dumps(_jsonable(inputs))).hexdigest()
-    out = {"v": 1, "number_selection_id": str(uuid.uuid5(NAMESPACE, f"{case_id}:{RULE_VERSION}:{digest}")),
+    out = {"v": 1, "number_selection_id": str(uuid.uuid5(NAMESPACE, f"{case_id}:{rule_version}:{digest}")),
            "case_id": str(case_id), "dataset_id": str(dataset_id), "vendor_id": str(vendor_id),
-           "rule_version": RULE_VERSION, "rule_settings": rule_settings, "requested_cutoff": _utc(requested_cutoff),
+           "rule_version": rule_version, "rule_settings": rule_settings, "requested_cutoff": _utc(requested_cutoff),
            "cutoff": _utc(cutoff), "candidates": candidates, "inputs_sha256": digest}
     if rank:
         pick = rank[0]
@@ -229,6 +244,48 @@ def select(*, case_id: uuid.UUID, dataset_id: uuid.UUID, vendor_id: uuid.UUID, v
                 "reason": NO_REQUEST if request is None else NO_PICK.format(n=settings.min_source_types,
                                                                             d=settings.min_age_days)}
     return out
+
+
+def active_rule_version() -> str:
+    """The rule `select()` runs under the current flag: today's alone when DIALBACK_CONTEXT_GUARD is off."""
+    return RULE_VERSION if context_guard() else RULE_VERSION_V1
+
+
+def _calls(out: dict) -> list[str]:
+    """What a selection would call, in order: the pick, then its alternates."""
+    return ([out["e164"]] if out.get("e164") else []) + [a["e164"] for a in out.get("alternates", [])]
+
+
+def select(*, case_id: uuid.UUID, dataset_id: uuid.UUID, vendor_id: uuid.UUID, vendor_domains: Iterable[str],
+           request: ChangeRequest | None, requested_cutoff: dt.datetime, case_opened_at: dt.datetime,
+           documents: Sequence[DocumentRef], sightings: Sequence[Sighting], settings: Settings = DEFAULT) -> dict:
+    """Spec 0079: the change context may cancel a call, but never move it to a different number."""
+    vendor_domains = tuple(vendor_domains)                               # read three times below
+    case = {"case_id": case_id, "dataset_id": dataset_id, "vendor_id": vendor_id, "vendor_domains": vendor_domains,
+            "request": request, "requested_cutoff": requested_cutoff, "case_opened_at": case_opened_at,
+            "documents": documents, "sightings": sightings, "settings": settings}
+    if not context_guard():
+        return _select_v1(**case)                                       # decision 7: rollback only
+    today = _select_v1(**case, rule_version=RULE_VERSION)
+    if today["outcome"] != "picked":
+        return today                                                     # decision 3: nothing to call, as today
+    # Decision 2: the same case with every change-context document and its sightings removed. The
+    # request's record stays (R7 as before), and so does today's cutoff.
+    domains = tuple(d.strip().lower().rstrip(".") for d in vendor_domains)
+    docs, cutoff, in_context = _frame(documents=documents, request=request, requested_cutoff=requested_cutoff,
+                                      case_opened_at=case_opened_at, domains=domains, settings=settings)
+    context = {d.id for d in docs.values() if in_context(d)}
+    before = _select_v1(**case | {"documents": [d for d in documents if d.id not in context],
+                                  "sightings": [s for s in sightings if s.document_id not in context],
+                                  "requested_cutoff": cutoff})
+    now, then = _calls(today), _calls(before)
+    agreed = 0
+    while agreed < min(len(now), len(then)) and now[agreed] == then[agreed]:
+        agreed += 1
+    if agreed == 0:                                                      # decision 3: they disagree on the pick
+        out = {k: v for k, v in today.items() if k not in ("contact_point_id", "e164", "source_types", "alternates")}
+        return out | {"outcome": "withheld", "reason": WITHHELD}
+    return today | {"alternates": today["alternates"][:agreed - 1]}      # the pick, and the agreed backups
 
 
 def _jsonable(v):

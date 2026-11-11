@@ -543,6 +543,7 @@ details.fold summary { cursor: pointer; color: var(--accent); font-weight: 500; 
 .dot-key.is-pick, .lgraph-dot.is-pick { background: var(--brand-deep); }
 .dot-key.is-alternate, .lgraph-dot.is-alternate { background: var(--surface); border: 2px solid var(--muted); }
 .dot-key.is-refused, .lgraph-dot.is-refused { background: var(--fill-bad); }
+.dot-key.is-uncalled, .lgraph-dot.is-uncalled { background: var(--surface); border: 2px dashed var(--fill-warn); }
 .lgraph { display: grid; }
 .lgraph-row { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 16px; align-items: center; min-height: 34px; border-top: 1px solid var(--line-soft); }
 .lgraph-axis { border-top: 0; min-height: 24px; }

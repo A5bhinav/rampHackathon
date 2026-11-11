@@ -1,15 +1,16 @@
 // Pure helpers for the vendor risk list (specs 0026, 0032). Every sentence that explains a status comes
 // from the API's status_text, written by the ledger; these only pick a label and a colour.
 import { phone } from "./lineage.ts";
-export type RiskStatus = "near_miss" | "unproven" | "missing" | "provable";
+export type RiskStatus = "needs_person" | "near_miss" | "unproven" | "missing" | "provable";
 
-const ORDER: RiskStatus[] = ["near_miss", "unproven", "missing", "provable"];
+const ORDER: RiskStatus[] = ["needs_person", "near_miss", "unproven", "missing", "provable"];
 const TONE: Record<RiskStatus, string> = {
-  near_miss: "tone-bad", unproven: "tone-warn", missing: "tone-muted", provable: "tone-ok",
+  needs_person: "tone-bad", near_miss: "tone-bad", unproven: "tone-warn", missing: "tone-muted", provable: "tone-ok",
 };
+const LABEL: Partial<Record<RiskStatus, string>> = { needs_person: "needs a person" };  // spec 0079
 
 export function statusLabel(status: RiskStatus): string {
-  return status.replaceAll("_", " ");
+  return LABEL[status] ?? status.replaceAll("_", " ");
 }
 
 export function statusTone(status: RiskStatus): string {

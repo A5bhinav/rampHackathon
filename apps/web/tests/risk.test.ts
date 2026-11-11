@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { counts, statusLabel, statusTone } from "../src/lib/risk.ts";
 
-const row = (status: "near_miss" | "unproven" | "missing" | "provable") => ({ status });
+const row = (status: "needs_person" | "near_miss" | "unproven" | "missing" | "provable") => ({ status });
 
 test("each status has a label and a tone, worst in red", () => {
   assert.equal(statusLabel("near_miss"), "near miss");
@@ -15,9 +15,14 @@ test("each status has a label and a tone, worst in red", () => {
 });
 
 test("counts every status, in the API's worst-first order, zeros included", () => {
-  assert.deepEqual(counts([row("provable"), row("near_miss"), row("provable")]),
-    [["near_miss", 1], ["unproven", 0], ["missing", 0], ["provable", 2]]);
-  assert.deepEqual(counts([]).map(([, n]) => n), [0, 0, 0, 0]);
+  assert.deepEqual(counts([row("provable"), row("near_miss"), row("provable"), row("needs_person")]),
+    [["needs_person", 1], ["near_miss", 1], ["unproven", 0], ["missing", 0], ["provable", 2]]);
+  assert.deepEqual(counts([]).map(([, n]) => n), [0, 0, 0, 0, 0]);
+});
+
+test("a vendor the rule withholds reads as needing a person, in red (spec 0079)", () => {
+  assert.equal(statusLabel("needs_person"), "needs a person");
+  assert.equal(statusTone("needs_person"), "tone-bad");
 });
 
 test("a near miss marks the digits that differ, on the same formatting", async () => {

@@ -1,4 +1,4 @@
-# 0006: The decision rules (engine `decision-1.0.0`)
+# 0006: The decision rules (engine `decision-1.0.0`; `decision-1.1.0` since spec 0082 D7b)
 
 **Owner:** Abhi  **Partner:** Inesh  **Slice:** money path  **Target day:** Wed Nov 4 (the checkpoint)
 
@@ -39,7 +39,7 @@ The skeleton verified with three facts unchecked (U01–U03). This engine sends 
 | 1 | `NV02_digits_mismatch` | The digits are a `mismatch`, on this call or an earlier call that had consent. |
 | 1 | `NV03_digits_match_old_account` | The digits are `matches_old_account`, on this call or an earlier call that had consent. |
 | 1 | `NV04_offered_number_from_request` | The person offered a number first seen in the change request. |
-| 2 | `NR03_wrong_company` | Any recorded company doesn't match the vendor. |
+| 2 | `NR03_wrong_company` | A company answer holds a refusal word: the person says they are not with this vendor, or only work with it (spec 0082, D7a and D7b). Until `decision-1.1.0` it fired on any company that didn't match. |
 | 2 | `NR04_speaker_from_change_thread` | The speaker first appeared in the change thread. |
 | 2 | `NR05`–`NR08` | The digits are a near miss, not provided, ambiguous, or inconsistent. |
 | 2 | `NR09_change_unsure` | Any `unsure`. |
@@ -49,7 +49,7 @@ The skeleton verified with three facts unchecked (U01–U03). This engine sends 
 | 2 | `NR15_script_violation` | The script wasn't clean, or the speech guard tripped. |
 | 2 | `NR16_other_flag` | The `other` flag. |
 | 2 | `NR17_split_speakers` | Two or more names were given, or the `speaker_changed` flag. |
-| 2 | `NR18_contradictory_answers` | The change or role answers conflict. Conflicting company names are NR03, since every one must match. |
+| 2 | `NR18_contradictory_answers` | The change or role answers conflict. Company answers are not compared with each other: since spec 0082 D7b only a refusal word in any of them counts, as NR03. |
 | 2 | `NR19_earlier_call_concern` | An earlier call raised a flag, an `unsure`, a near-miss, ambiguous or inconsistent digits, or a consent `no`, or denied the change without having consent. |
 | 2 | `NR20_manual_answers` | `source="manual"`. |
 | 2 | `NR21_line_risk` | A line-risk signal (call forwarding, a SIM swap) is `True`. |
@@ -57,7 +57,7 @@ The skeleton verified with three facts unchecked (U01–U03). This engine sends 
 | 3 | `V02_outbound_dial` | The call was outbound, and the adapter confirmed the dialed number. |
 | 3 | `V03_live_person` | A person answered and gave answers. |
 | 3 | `V04_recording_consent` | Consent was `yes`, and it was the first answer. |
-| 3 | `V05_company_matches` | The person named this vendor. |
+| 3 | `V05_company_matches` | Retired by spec 0082 D7b (`decision-1.1.0`): the company answer is no longer required. Its sentences stay in `engine.RETIRED`. It was: the person named this vendor. |
 | 3 | `V06_speaker_identified` | The person gave a name and a role. |
 | 3 | `V07_right_person_confirmed` | The person said `yes`, and is known not to be from the change thread. |
 | 3 | `V08_digits_match` | The digits match the new account. |
@@ -82,7 +82,7 @@ Each is a JSON fixture in `packages/decision/tests/examples/`, and the attack la
 
 | # | Call | Outcome and rules |
 |---|---|---|
-| 1 | The ledger's number, outbound. Consent yes; "Acme Fasteners"; Jordan Lee, AR; yes; keypad 6666. | verified, V01–V12 |
+| 1 | The ledger's number, outbound. Consent yes; "Acme Fasteners"; Jordan Lee, AR; yes; keypad 6666. | verified, V01 to V12 without V05 (retired by spec 0082 D7b) |
 | 2 | An insider entered the change; the real vendor says "we changed nothing". | not_verified, NV01 |
 | 3 | The callee gives the old account's last four. | not_verified, NV03 |
 | 4 | "Call me on 415-555-0199", a number from the request. | not_verified, NV04 |
@@ -105,8 +105,9 @@ Each is a JSON fixture in `packages/decision/tests/examples/`, and the attack la
 | 19 | A new AR hire, not known from before the request. Strict mode → NR99 + S01_known_contact_unmet. Standard mode → verified. | needs_review / verified |
 | 20 | A flag `approve_now` (outside the enum), plus a "no". | needs_review, NR97 (beats NV01) |
 | 21 | A forwarded line. With the line signal → NR21. Without it → verified (the stated limit). | needs_review / verified |
+| 22 | Another company named with no refusal word ("This is Globex"), so `company_matches` is null; everything else clean (spec 0082, D7b). | verified |
 
-- [x] All 23 examples give exactly their outcome and rules.
+- [x] All 23 examples give exactly their outcome and rules. (Spec 0082 D7b added example 22, so there are now 24.)
 - [x] Every rule in the table has its own unit test, including the ones no example covers: NV02, NR01, NR03–NR05, NR07, NR11–NR13, NR16, NR19, NR98.
 - [x] Hypothesis property: `decide()` never raises, and never verifies without all of:
   - a match;

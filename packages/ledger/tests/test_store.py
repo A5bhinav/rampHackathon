@@ -9,6 +9,8 @@ import pytest
 from _world import ROOT, SCHEMA, at
 from dialback_ledger import change_context, select_number
 from dialback_ledger.ingest import ingest_all
+from dialback_ledger.reader import StubReader
+from dialback_ledger.select import RULE_VERSION
 from dialback_ledger.store import add_vendor_domain, mark_change_request, write_ingest
 from jsonschema import Draft202012Validator
 from psycopg.rows import dict_row
@@ -47,7 +49,7 @@ def open_case(url: str, v: dict) -> uuid.UUID:
 
 def load(url: str, v: dict, truth: dict, *, request: bool = True) -> None:
     docs = json.loads((ROOT / "corpus" / truth["documents"]).read_text())
-    result = ingest_all(docs, extractor_version="test")
+    result = ingest_all(docs, extractor_version="test", reader=StubReader())
 
     async def go():
         async with await psycopg.AsyncConnection.connect(url) as conn, conn.transaction():
@@ -84,7 +86,7 @@ def test_gate_every_scenario_through_the_database(database_url, path):
     assert list(Draft202012Validator(SCHEMA).iter_errors(doc)) == []
     assert doc["outcome"] == truth["expected"]["outcome"]
     assert doc.get("e164") == truth["expected"]["pick"]
-    assert out["rule_version"] == "ledger-select-v1"
+    assert out["rule_version"] == RULE_VERSION == "ledger-select-v3"  # the real rule ran (spec 0079 renamed it), not the stub
     assert (out.get("contact_point_id") is not None) == (truth["expected"]["pick"] is not None)
 
 
@@ -196,7 +198,7 @@ def _speaker_world(url, request_sender, thread_sender):
             _doc("thread-1", "email", 40, thread_sender, "inv-9", "Invoice 1009", ["Invoice attached."]),
             _doc("request", "email", 0, request_sender, "inv-9", "Re: Invoice 1009", ["We have moved our banking."])]
     v = new_vendor(url, "Speaker test")
-    result = ingest_all(docs, extractor_version="test")
+    result = ingest_all(docs, extractor_version="test", reader=StubReader())
 
     async def go():
         async with await psycopg.AsyncConnection.connect(url) as conn, conn.transaction():

@@ -2,6 +2,7 @@
 // number-picking rule on the frozen corpus. Nothing here runs the rule or judges a result; the
 // match verdicts and reasons are the script's and the ledger's.
 import data from "../data/corpus-results.json" with { type: "json" };
+import { phone } from "./lineage.ts";
 
 export type Planted = { e164: string; truth: string; sightings: number; channels: string[]; hidden: "all" | "some" | "none";
   first_seen_at: string | null; eligible: boolean; reasons: string[] };
@@ -26,6 +27,12 @@ export function groups(cases: readonly CorpusCase[]) {
 export function numberVerdict(p: Pick<Planted, "e164" | "eligible" | "reasons"> & { truth?: string }, pick: string | null): { word: string; tone: "ok" | "info" | "bad" } {
   if (p.e164 === pick) return p.truth === "poison" ? { word: "picked: the attacker's", tone: "bad" } : { word: "picked", tone: "ok" };
   return p.eligible ? { word: "eligible, not picked", tone: "info" } : { word: "refused", tone: "bad" };
+}
+
+/** What the rule did, in words: the number it calls, or why it calls none (withheld: spec 0079). */
+export function ruleResult(actual: CorpusCase["actual"]): string {
+  if (actual.pick) return phone(actual.pick);
+  return actual.outcome === "withheld" ? "withheld: a person verifies" : "no provable number";
 }
 
 /** Whether the rule picked a number the attacker planted, as the script recorded it. */
