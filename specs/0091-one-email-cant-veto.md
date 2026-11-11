@@ -1,11 +1,10 @@
 # 0091: One email can't veto a number
 
 **Owner:** Sami (in `packages/ledger`)  **Slice:** evidence  **Target day:** not set
-**Builds on:** spec 0079 (`sami/0079-guard`, #121). This lands after it, stacked on its branch once
-main is merged into that branch (the lab lives on main; the branch is 36 commits behind).
+**Builds on:** spec 0079 (`sami/0079-guard`, #121). This branch (`sami/label-bar`) carries both
+specs, with main merged in, and lands in place of #121, after the contract PR #120.
 **Status:** approved by Sami, Nov 10; the fourth revision of rule 3 approved Nov 11 (Q162). The rule
-below is that revision (prototype W5). The measured section below is still the third revision's (W4)
-until W5's numbers replace it.
+below is that revision (prototype W5), and so are the measured numbers.
 
 ## Goal
 
@@ -42,8 +41,8 @@ lookalike pull for support, near-miss logic, ranking, settings.
      `asked = min(requested_cutoff, request.received_at)`;
    - is not from a lookalike sender.
 
-   A fresh document fails the age test whoever sent it, and an old one counts whatever thread or
-   subject a later request uses. Established: the counted labels span at least `min_source_types`
+   With the production setting (90 days), a fresh document fails the age test whoever sent it, and
+   an old one counts whatever thread or subject a later request uses. Established: the counted labels span at least `min_source_types`
    (2) channels. Then the labels veto the number (reasons `not_vendor_party`, `fax_line`, as today).
    A case with no request has no established labels. (If an old lookalike email pulls the labeling
    documents into the change context, the guard in rule 5 withholds the case, as spec 0079 does
@@ -75,22 +74,47 @@ lookalike pull for support, near-miss logic, ranking, settings.
 vendor's records were already poisoned (K01), and today's rule calls 0177 there too without the
 warning. Sami, Nov 10: if the attacker's number is the most trusted, something else already failed.
 
-Measured (Nov 10; exploratory: one seed, fixture dates, random labels). This rule is prototype W4
-inside the guard; FINDINGS A4 and the session scratchpad's `umeasure/measure_w_plan.md` (each
-addendum written before its run) have the three earlier versions and why each changed.
-- **Picks a planted number where today's rule doesn't:** 37 of 2000 pinned generated draws (28
-  distinct; 18 unpinned), all that last row's shape, and 3 of the 4 A6 worlds.
-- **Calls nobody:** 743 of 2000 (today 816, 0079 948). Honest over-block rows that call nobody: 13 of
-  61 (today 29). Over-block planted rows that call the planted number: 8 (today 28, 0079 20).
-- **Unchanged:** the 20 corpus outcomes and the demo picks (neither has a label against any number,
-  so they can't test this). On all 441 label-free worlds the output is today's, field for field.
-  The builder check's near-miss worlds call nobody, as today, and spec 0021's suite fails only the
-  three tests listed below.
-- **Lab metamorphic checks (2000 pinned), on what ships:** the label probe (I12) goes from 380
-  failures to 0 (this lab copy; spec 0079 counted 442 on a later one), and `M_lookalike_helped`
-  stays 0. `M_shared_id_helped` goes from 230 (today and 0079) to 271, over the bar set before the
-  run. All 41 extra worlds come from a second document filed under an existing id (A5), which
-  production can't reach (ids are primary keys); none goes the other way. Q154.
+Measured (Nov 10 and 11). Each version's bars were written before its run (the session scratchpad's
+`umeasure/measure_w_plan.md`, addenda 1 to 7). Seed 0's numbers are exploratory; seeds 1 to 3 were
+never looked at while revising, and confirm them. "K1" is a world where the rule picks a planted
+number and today's rule doesn't.
+
+| Version | What changed | K1, seed 0 (2000 pinned) | Calls nobody | Why it was revised |
+|---|---|---|---|---|
+| W | weak labels are ignored | 49 (38 distinct) | 733 | a labeled sighting still counted as support |
+| W2 | support reads only the vendor's sightings | 37 (28) | 736 | a lookalike's pull undid honest labels |
+| W3 | a label is judged by its own document | 37 (28) | 736 | the near-miss anchor was lost (builder check) |
+| W4 | the near-miss check keeps today's first sighting | 37 (28) | 743 | one fresh email completed a veto; a request's thread undid warnings (final review) |
+| W5 | each counted label is 90+ days old; no request, thread or subject exclusions | 37 (28) | 743 | this spec |
+
+Today's rule calls nobody in 816 of those 2000, spec 0079 alone in 948.
+- **Fresh seeds 1, 2 and 3 (W5 inside the guard):** K1 is 14, 38 and 58. Every one is the accepted
+  shape: the planted number already outranks the real one, and only weak labels stood against it.
+  Calls nobody: 727, 765, 608 (today 808, 809, 664).
+- **The final review's two worlds:**
+  - One old "Tel:" line plus one fresh email calling the real line a fax: today and 0079 call the
+    planted number, this rule the real line.
+  - A request replying on an old warning's thread: today calls the real line, and W4 called the
+    planted one. This rule withholds, since 0079's guard compares with a run without the thread.
+- **Unchanged:**
+  - The 20 corpus outcomes and the demo picks. Neither has a label against any number.
+  - All 441 label-free worlds give today's output field for field.
+  - The builder check's near-miss worlds call nobody.
+  - Spec 0021's suite fails only the three tests listed below.
+  - Honest over-block rows calling nobody: 13 of 61 (today 29). Planted rows calling the planted
+    number: 8 (today 28).
+- **Lab metamorphic checks, on what ships (W5 inside the guard), seeds 0 to 3:**
+  - The label probe (I12) goes from 380, 497, 511 and 542 failures to 0.
+  - `M_lookalike_helped` stays 0.
+  - `M_shared_id_helped` goes from 230, 208, 240 and 213 to 271, 228, 263 and 265, all through
+    duplicate ids (A5, Q154).
+- **The scorecard's search** (`lab fuzz --search archive`, seed 0, 2000 examples, 1622 worlds):
+  - A1's label (`M_incontext_label_moved_pick`) flags 356 worlds on main (71391df) and 0 on this
+    branch (ca66b6c).
+  - `M_shared_id_helped` goes from 168 to 181.
+  - The branch adds `I1`, `I4` and `I5` on 9 duplicate-id worlds, listed under A5.
+- **Not compared:** draws without pinning changed when the measurement environment was rebuilt on
+  Nov 11, so the earlier unpinned figures aren't comparable.
 
 ## Contract touched
 
