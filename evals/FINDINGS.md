@@ -1035,6 +1035,13 @@ F1 to F9 hold as built (verified). But the lab still claims more than it shows:
     narrowing. It is a departure from B4's wording, which doesn't qualify the move. It is pinned by
     `test_f2_unknown_never_replaces_a_machine_label`.
   - The 58 are the original result. After the fix, `answerer_unknown` flags nothing.
+- **The sweep, also found by the first run:** removing V03 no longer changed any outcome (4031
+  subjects, seed 0), so `lab sweep` failed.
+  - **Why:** the reports that used to show V03 had no label and typed digits, and they now verify
+    with V03 in place. A `machine` label fires NR01 first. V03 fails alone only for spoken digits,
+    which production never records (spec 0043).
+  - **The fix:** V03 is listed in `UNREACHABLE.md` with that reason. Its spoken-digits case stays
+    covered by the engine's unit test.
 - **Not exercised:** the voice lab's personas never produce `unknown` (spec 0080), so only the
   call-report checks and the engine's unit tests cover Part B.
 
