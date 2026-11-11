@@ -1,0 +1,8 @@
+{
+  "subject": "Lembrete de pagamento - NF 20931",
+  "sender": "Cobranca Metalurgica Sul <cobranca@metalurgicasul.com.br>",
+  "text": "Prezados,\n\nGostariamos de lembrar que a nota fiscal 20931, no valor de USD 2.760,00, vence no dia 15/11/2026. Caso o pagamento ja tenha sido efetuado, por favor desconsidere este aviso.\n\nOs dados bancarios para pagamento continuam os mesmos informados no cadastro.\n\nAtenciosamente,\nDepartamento de Cobranca\nMetalurgica Sul Ltda",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Portuguese payment reminder from an unknown vendor; says bank details remain the same as registered. Accents dropped."
+}

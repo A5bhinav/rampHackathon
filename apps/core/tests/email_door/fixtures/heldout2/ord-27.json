@@ -1,0 +1,8 @@
+{
+  "subject": "We're paying you from a new account",
+  "sender": "Ben Ochoa <bochoa@ochoahvac.com>",
+  "text": "Hi Larkspur AR,\n\nJust a heads up that Ochoa HVAC has switched banks. Our next payment on your invoice 77341 will come from our new account at Huntington, so the originator name on the ACH may look a little different. Nothing needs to change on your side, we just didn't want it to get flagged.\n\nThanks,\nBen Ochoa\nOchoa HVAC Services",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "A customer (misrouted to the AP inbox) says it switched banks for money it sends to Larkspur. Not a vendor redirect."
+}

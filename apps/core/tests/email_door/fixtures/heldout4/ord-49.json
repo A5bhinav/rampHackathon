@@ -1,0 +1,8 @@
+{
+  "subject": "ERP go-live: vendor master migration",
+  "sender": "Finance Systems <finsys@tallismfg.com>",
+  "text": "Team,\n\nThe vendor master moves to the new ERP this weekend. All records, including bank accounts and remit-to addresses, will be migrated as is. No changes to vendor payment information are being made. Please do not enter vendor updates between Friday 5pm and Monday 8am.\n\nFinance Systems",
+  "label": "ordinary",
+  "vendor": null,
+  "note": ""
+}

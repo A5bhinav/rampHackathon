@@ -1,0 +1,8 @@
+{
+  "subject": "quick question on this month's payment",
+  "sender": "Tom Reyes <treyes@brightlineoffice.com>",
+  "text": "Hey Melissa,\n\nWould it be possible to send this month's payment for the October invoices to our other account instead of the usual one? We're moving some cash between accounts and it'd save us a transfer. It's our Wells Fargo account:\n\nRouting 121000248\nAcct 4410097726\n\nTotally fine to go back to the normal account after that. Let me know if that works!\n\nTom",
+  "label": "change_request",
+  "vendor": "brightline",
+  "note": "Phrased as a casual question and a one-time favor; it still asks to send a Brightline payment to a different account. Vendor identified only by the sender domain."
+}

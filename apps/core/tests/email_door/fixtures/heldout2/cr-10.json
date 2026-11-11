@@ -1,0 +1,8 @@
+{
+  "subject": "RE: RE: Invoice 88214 - short ship",
+  "sender": "Greg Hollis <ghollis@acmefasteners.com>",
+  "text": "Hi Priya,\n\nThanks for confirming, we'll issue the credit memo for the 400 missing pcs of the 3/8 hex bolts today, so you can short-pay 88214 by $212.00.\n\nOne more thing while I have you: we switched our banking over to a new bank last week. When you pay 88214 and anything going forward, please use:\n\nFirst Horizon Bank\nRouting 084000026\nAccount 1180 3345 902\n\nOur old account will be closed by month end.\n\nGreg\n\n-----Original Message-----\nFrom: Priya Shah <pshah@larkspur-ind.com>\nSent: Tuesday, November 3, 2026 10:41 AM\nTo: Greg Hollis <ghollis@acmefasteners.com>\nSubject: RE: Invoice 88214 - short ship\n\nGreg, receiving confirms we got 1,600 of the 2,000 bolts on PO 45518. Can you credit the difference? We'll hold 88214 until we hear back.\n\nPriya\n\n-----Original Message-----\nFrom: Greg Hollis <ghollis@acmefasteners.com>\nSent: Monday, November 2, 2026 4:05 PM\nTo: Priya Shah <pshah@larkspur-ind.com>\nSubject: Invoice 88214 - short ship\n\nHi Priya, attached is invoice 88214 for PO 45518. Let me know if you have any questions.",
+  "label": "change_request",
+  "vendor": "acme",
+  "note": "Bank change slipped into a routine short-shipment thread; subject line gives no hint."
+}

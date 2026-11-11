@@ -1,0 +1,8 @@
+{
+  "subject": "Change in accepted payment methods - effective January 1",
+  "sender": "Acme Fasteners Billing <billing@acmefasteners.com>",
+  "text": "Dear Customer,\n\nEffective January 1, 2027, Acme Fasteners LLC will no longer accept ACH or check payments. All invoices must be paid by virtual card through our payment processor, ClearRemit. Your company will receive an enrollment link from ClearRemit in the coming days; once enrolled, payments will be processed to ClearRemit's merchant account on our behalf.\n\nPlease stop sending ACH payments to our current account after December 31. Payments received by ACH after that date will be returned.\n\nThank you,\nAcme Fasteners Billing Department",
+  "label": "change_request",
+  "vendor": "acme",
+  "note": "Switch to virtual card through a third-party processor; no bank numbers, but money stops landing in the on-file account."
+}

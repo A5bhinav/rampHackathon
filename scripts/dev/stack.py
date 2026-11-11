@@ -168,9 +168,12 @@ async def seed(pool, settings: Settings) -> tuple[uuid.UUID, dict, dict]:
     async with httpx.AsyncClient(base_url=MOCK_URL, headers={"Authorization": f"Bearer {token}"}) as mock:
         refs = (await mock.post("/_mock/seed", json=seed_body(dataset.id))).raise_for_status().json()["refs"]
     users = {}
+    people = [("clerk", "Pat Clerk", "clerk", "clerk"), ("approver1", "Riley Approver", "approver", None),
+              ("approver2", "Sam Approver", "approver", None)]
+    if settings.ramp_sandbox:  # a needs-review case with no known author takes three: a reviewer and two releasers
+        people.append(("approver3", "Jordan Approver", "approver", None))
     async with system_tx(pool) as conn:
-        for key, name, role, ramp_ref in (("clerk", "Pat Clerk", "clerk", "clerk"), ("approver1", "Riley Approver", "approver", None),
-                                          ("approver2", "Sam Approver", "approver", None)):
+        for key, name, role, ramp_ref in people:
             uid = uuid.uuid4()
             await conn.execute("insert into app.user_profiles (user_id, display_name, ramp_user_id) values (%s, %s, %s)",
                                (uid, name, refs.get(ramp_ref) if ramp_ref else None))
@@ -206,12 +209,13 @@ async def bank_change(settings: Settings, dataset_id, vendor_id: str, account: s
 def core_settings(url: str, backoff: float = 1.0, jobs_every: int = 30, supabase_url: str | None = None,
                   sandbox: RampSandbox | None = None) -> Settings:
     s = SECRETS
+    watching = bool(sandbox and sandbox.watch_vendors)  # spec 0102, D3: a quick poll, and no sweep to hold it up
     # With a Supabase project (or scripts/dev/fake_supabase_auth.py), the core trusts only its
     # signing keys; otherwise the dashboard's dev sign-in secret (spec 0010).
     return Settings(database_url=url, ramp_mode=RampMode.MOCK, ramp_base_url=MOCK_URL, supabase_url=supabase_url,
                     ramp_sandbox=sandbox,
                     # Spec 0093, D4: on Ramp's sandbox a change waiting for review is found only by the sweep.
-                    full_sweep_interval_seconds=60 if sandbox else 86_400,
+                    full_sweep_interval_seconds=60 if sandbox and not watching else 86_400,
                     ramp_webhook_secret=s["RAMP_WEBHOOK_SECRET"].encode(), fingerprint_key=s["FINGERPRINT_KEY"].encode(),
                     mock_ramp_secret=s["MOCK_RAMP_SECRET"].encode(), digits_key=s["DIGITS_KEY"].encode(),
                     internal_api_token=s["INTERNAL_API_TOKEN"].encode(),
@@ -219,7 +223,7 @@ def core_settings(url: str, backoff: float = 1.0, jobs_every: int = 30, supabase
                     calling_window="00:00-23:59", calling_days="all",  # the evening demo (spec 0002, Q7)
                     command_backoff_seconds=backoff, worker_poll_seconds=0.3, run_worker=True,
                     # The poller and reconciliation (spec 0003), much more often than in production.
-                    poll_interval_seconds=jobs_every, reconcile_interval_seconds=jobs_every,
+                    poll_interval_seconds=5 if watching else jobs_every, reconcile_interval_seconds=jobs_every,
                     verify_interval_seconds=jobs_every)
 
 
@@ -253,11 +257,6 @@ async def run(url: str, args: argparse.Namespace) -> int:
         dev_users = ",".join(f"{uid}:{name}" for uid, name in users.values())
         print("\nThe walking skeleton is running.\n")
         print(f"  core      {CORE_URL}\n  ramp mock {MOCK_URL}\n  dataset   {dataset_id}\n")
-        if args.ramp_sandbox:
-            sandbox_id = await seed_sandbox(pool, settings)
-            print(f"  sandbox   {sandbox_id}  (Ramp's sandbox, {args.ramp_sandbox.base_url}; its vendors imported)")
-            print(f"  its cases http://localhost:3000/d/{sandbox_id}/cases, once the dashboard runs")
-            print("  A bank change entered in Ramp's dashboard opens a case within about a minute (spec 0093).\n")
         print("Start the dashboard in another terminal:\n")
         if args.supabase_url:
             print(f"  cd apps/web && CORE_URL={CORE_URL} SUPABASE_URL={args.supabase_url} \\")
@@ -266,6 +265,16 @@ async def run(url: str, args: argparse.Namespace) -> int:
         else:
             print(f"  cd apps/web && CORE_URL={CORE_URL} DIALBACK_AUTH_MODE=dev DIALBACK_JWT_SECRET={SECRETS['DIALBACK_JWT_SECRET']} \\")
             print(f"    DIALBACK_DEV_USERS='{dev_users}' pnpm dev\n")
+
+        if args.ramp_sandbox:
+            print("Loading the vendors from Ramp's sandbox; this takes a minute or so...", flush=True)
+            sandbox_id = await seed_sandbox(pool, settings)
+            watched = len(args.ramp_sandbox.watch_vendors)
+            print(f"  sandbox   {sandbox_id}  (Ramp's sandbox, {args.ramp_sandbox.base_url}; its vendors imported)")
+            print(f"  its cases http://localhost:3000/d/{sandbox_id}/cases, once the dashboard runs")
+            print(f"  Watching {watched} vendor(s): a bank change on one opens a case in seconds (spec 0102).\n" if watched else
+                  "  A bank change entered in Ramp's dashboard opens a case within about two minutes (specs 0093, 0100).\n",
+                  flush=True)
 
         if args.changes or args.smoke:
             # Four bank changes: Acme confirms (verified), Brightline's call is refused before

@@ -1,0 +1,8 @@
+{
+  "subject": "Re: Statement October",
+  "sender": "Accounting <accounting@acme-fasteners.example>",
+  "text": "Hi,\n\nWe are in the process of changing our bank and our accounting team will email the new\ninstructions this week. Until then please hold any payments to us. Once you receive them,\nthe new account replaces the current one for good.\n\nThanks,\nAcme AR",
+  "label": "change_request",
+  "vendor": "acme",
+  "note": "Hold payments and promised replacement account details; announces the change."
+}

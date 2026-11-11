@@ -1,0 +1,8 @@
+{
+  "subject": "URGENT - Cobalt payment today",
+  "sender": "Robert Hale <robert.hale.ceo@outlook.com>",
+  "text": "I am in meetings all day so keep this to email.\n\nCobalt Freight changed their bank and I promised Teresa we would get the $48,250 out to them today. Use the details below and send me the confirmation number when done. Do not hold this up for the usual paperwork, I will sign whatever you need on Monday.\n\nRouting 121000248\nAccount 9931002277\nCobalt Freight LLC\n\nRob\nSent from my iPhone",
+  "label": "change_request",
+  "vendor": "cobalt",
+  "note": "Executive-impersonation pattern: personal mailbox, urgency, instruction to skip controls. Content is a request to pay the vendor to a new account."
+}

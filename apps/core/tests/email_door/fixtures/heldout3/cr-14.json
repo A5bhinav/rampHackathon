@@ -1,0 +1,8 @@
+{
+  "subject": "RE: RE: RE: Invoice CF-20931 short pay",
+  "sender": "Teresa Vance <tvance@cobaltfreight.com>",
+  "text": "Karen,\n\nAgreed, we will issue a credit for the $212.40 accessorial and you can pay CF-20931 at $3,988.60. Thanks for working through it.\n\nTeresa\n\n> From: Karen Liu <kliu@northgate-mfg.com>\n> Sent: Friday, November 6, 2026 2:02 PM\n> To: Teresa Vance\n> Subject: RE: RE: Invoice CF-20931 short pay\n>\n> Teresa, the detention charge was not approved by our dock. Can you credit it and we pay the rest?\n>\n>> From: Teresa Vance\n>> Sent: Thursday, November 5, 2026 10:40 AM\n>> To: Karen Liu\n>> Subject: RE: Invoice CF-20931 short pay\n>>\n>> Hi Karen, I checked with the driver, the trailer sat for 3 hours and 10 minutes so the detention applies per our tariff.\n>>\n>> Separately, while I have you: we moved our banking to First Horizon last month, so when this one gets paid please use routing 084000026, account 3310022874, going forward for all Cobalt Freight payments. Our old Chase account is being closed.\n>>\n>> Teresa\n>>\n>>> From: Karen Liu\n>>> Sent: Wednesday, November 4, 2026 4:15 PM\n>>> To: Teresa Vance\n>>> Subject: Invoice CF-20931 short pay\n>>>\n>>> Hi Teresa, we are planning to short pay CF-20931 by $212.40 for the detention line. Please advise.",
+  "label": "change_request",
+  "vendor": "cobalt",
+  "note": "The bank change is a single paragraph two levels deep in a quoted dispute thread; the latest message is only about a credit."
+}

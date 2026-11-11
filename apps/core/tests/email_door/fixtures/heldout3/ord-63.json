@@ -1,0 +1,8 @@
+{
+  "subject": "Acme Fasteners statement - 11/09/2026",
+  "sender": "statements@acmefasteners.com",
+  "text": "ACME FASTENERS LLC\nCustomer statement for Northgate Manufacturing Inc\n\nInvoice   Date         Due          Amount    Balance\n88213     10/12/2026   11/11/2026   838.00    0.00\n88240     10/19/2026   11/18/2026   3,280.00  0.00\n88301     11/09/2026   12/09/2026   662.50    662.50\n\nTotal balance: 662.50 (current)\n\nRemit to: Acme Fasteners LLC, JPMorgan Chase, ABA 021000021, account 000011112222, or PO Box 2210, Cleveland OH 44101.",
+  "label": "ordinary",
+  "vendor": "acme",
+  "note": "Statement with on-file account."
+}

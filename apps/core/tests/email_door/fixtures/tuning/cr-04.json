@@ -1,0 +1,8 @@
+{
+  "subject": "Banking update",
+  "sender": "Dana Whitfield <ar@acme.example>",
+  "text": "Hi team,\n\nEffective immediately our remittance bank has changed. Please send all future\npayments for Acme Fasteners LLC to:\n\nBank: Harbor Mutual Savings\nABA: 026009593\nAcct #: 0004 8812 9031\n\nThe old account will be closed at the end of the month. Let me know once this is updated.\n\nDana",
+  "label": "change_request",
+  "vendor": "acme",
+  "note": "Explicit new bank with grouped digits and an odd label; clear change request."
+}

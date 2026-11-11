@@ -1,0 +1,8 @@
+{
+  "subject": "Credit memo CM-5512",
+  "sender": "Credit <credit@harlan-supply.example>",
+  "text": "Credit memo CM-5512 for $320.00 applied against invoice HS-8807.",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Credit memo."
+}

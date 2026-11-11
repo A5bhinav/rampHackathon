@@ -1,0 +1,8 @@
+{
+  "subject": "Vendor contract renewal",
+  "sender": "Legal <legal@ourco.example>",
+  "text": "The Holt Metals contract renews Jan 1. Let procurement know if you want to renegotiate terms.",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Internal legal."
+}

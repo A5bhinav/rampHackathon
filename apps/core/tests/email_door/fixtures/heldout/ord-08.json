@@ -1,0 +1,8 @@
+{
+  "subject": "Cobalt remittance received",
+  "sender": "ar@cobalt.example",
+  "text": "Remittance received for invoice 2301, thank you.",
+  "label": "ordinary",
+  "vendor": "cobalt",
+  "note": "Receipt."
+}

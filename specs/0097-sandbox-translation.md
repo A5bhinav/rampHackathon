@@ -198,7 +198,7 @@ None.
   Dialback notices (R1). Candidates, sandbox side: the layer's updated-since list also returns
   vendors with a `Bank account updated` event since then (the audit log, seconds behind, is fine
   for a one-minute poll); and, for a change still pending (no event, no `updated_at`), a sweep
-  every minute (95 vendors, one accounts read each, within Ramp's 100 requests per 10 seconds).
+  every minute (the sandbox has about 430 vendors, one accounts read each; spec 0100).
   Built for approved changes as D6: the core's poll now finds a new account on a vendor whose
   `updated_at` didn't move (`test_the_poll_finds_a_bank_change_*`). Not yet seen on the sandbox; a
   change still pending is Q205's.

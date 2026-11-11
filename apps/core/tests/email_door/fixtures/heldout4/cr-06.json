@@ -1,0 +1,8 @@
+{
+  "subject": "Small correction to our ACH form",
+  "sender": "Dana Whitfield <dwhitfield@acmefasteners.com>",
+  "text": "Hi Renee,\n\nEmbarrassing one. Our new AR clerk was reconciling and noticed the ACH form we sent you when we were set up had two digits transposed. I honestly don't know how it has worked this long. The right account is 000011118822, routing is fine. Could you correct it on your side before the next batch?\n\nSorry about that!\n\nDana Whitfield\nAcme Fasteners, LLC",
+  "label": "change_request",
+  "vendor": "acme",
+  "note": "Framed as fixing a typo, but moves payments to a different account number."
+}

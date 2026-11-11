@@ -1,0 +1,8 @@
+{
+  "subject": "Account verification result",
+  "sender": "Bank Validate <results@bankvalidate.example>",
+  "text": "Verification result for request 7718204\n\nVendor: Brightline Office Supply Inc\nRouting: 021000021\nAccount: 000044445555\nName match: YES\nAccount status: OPEN\n\nNo further action required.",
+  "label": "ordinary",
+  "vendor": "brightline",
+  "note": ""
+}

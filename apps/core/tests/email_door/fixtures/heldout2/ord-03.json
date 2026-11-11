@@ -1,0 +1,8 @@
+{
+  "subject": "Statement of account - Cobalt Freight LLC - November 2026",
+  "sender": "Cobalt Freight LLC <ar@cobaltfreight.com>",
+  "text": "STATEMENT OF ACCOUNT\nCobalt Freight LLC\nCustomer: Larkspur Industries\nStatement date: 11/01/2026\n\nInvoice    Date        Amount     Paid      Balance   Days\nCF-20981   09/14/2026  1,850.00   1,850.00  0.00\nCF-21144   10/02/2026  2,240.00   0.00      2,240.00  30\nCF-21390   10/19/2026  975.00     0.00      975.00    13\nCF-21502   10/28/2026  1,410.00   0.00      1,410.00  4\n\nTotal balance due: 4,625.00\nCurrent: 2,385.00   1-30: 2,240.00   31-60: 0.00   61+: 0.00\n\nACH remittance: JPMorgan Chase Bank, ABA 021000021, Acct 000077778888, Cobalt Freight LLC\nPlease send remittance detail to ar@cobaltfreight.com.",
+  "label": "ordinary",
+  "vendor": "cobalt",
+  "note": "Aging statement with the on-file account in full."
+}

@@ -7,6 +7,7 @@ a wrong one sends a case to a person, never a payment to a new account (R1, R7).
 from __future__ import annotations
 
 import datetime as dt
+import logging
 import re
 from typing import Any
 
@@ -14,6 +15,8 @@ import httpx
 
 from .http import API, RampHttpAdapter
 from .port import RampAccount, RampAuditEvent, RampBill, RampError, RampHold, RampNotFound, RampVendor
+
+log = logging.getLogger(__name__)
 
 PAGE = 100  # Ramp's largest page
 PLACED, RELEASED = "Vendor placed on hold", "Vendor hold released"
@@ -72,6 +75,10 @@ def audit_from(j: dict[str, Any], event_type: str) -> RampAuditEvent:
 
 
 class RampSandboxAdapter(RampHttpAdapter):
+    def __init__(self, *args: Any, watch_vendors: tuple[str, ...] = (), **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self._watch_vendors = watch_vendors
+
     def _error_detail(self, response: httpx.Response) -> str:
         """Ramp's error_v2: its code, id and explanation, so a refusal says what was wrong."""
         try:
@@ -120,6 +127,14 @@ class RampSandboxAdapter(RampHttpAdapter):
                 vendors.append(vendor_from(await self._request("GET", f"{API}/vendors/{vendor_id}")))
             except RampNotFound:  # merged or deleted: Ramp can't pay it
                 continue
+        for vendor_id in self._watch_vendors:  # spec 0102: the demo's vendors, whatever Ramp says changed
+            if vendor_id in listed:
+                continue
+            listed.add(vendor_id)
+            try:
+                vendors.append(vendor_from(await self._request("GET", f"{API}/vendors/{vendor_id}")))
+            except RampError as exc:  # the next poll reads it again; the bank events above can't be skipped like this
+                log.warning("RAMP_SANDBOX_WATCH_VENDORS names %s, which couldn't be read: %s", vendor_id, exc)
         return vendors
 
     async def list_vendor_accounts(self, vendor_id: str) -> list[RampAccount]:

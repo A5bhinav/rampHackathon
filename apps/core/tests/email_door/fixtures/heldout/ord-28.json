@@ -1,0 +1,8 @@
+{
+  "subject": "Delivery Status Notification (Delay)",
+  "sender": "System <mailer-daemon@mail.example>",
+  "text": "Your message to billing@tidewater.example is delayed. We'll keep trying for 48 hours.",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Bounce."
+}

@@ -1,0 +1,8 @@
+{
+  "subject": "Sub-account reference for Brightline receipts",
+  "sender": "Accounting <accounting@brightlineoffice.com>",
+  "text": "Hello,\n\nTo be clear up front, this is NOT a bank change. We remain with JPMorgan Chase, same routing number 021000021, and our legal name and tax ID are as you have them.\n\nAs part of a ledger reorganization, receipts from customers in your region are being booked to sub-account 000044449123. Please key that in place of the number ending 5555 for anything you pay after this week. Nothing else about how you pay us is different.\n\nRegards,\nBrightline Accounting",
+  "label": "change_request",
+  "vendor": "brightline",
+  "note": "Denies being a bank change while replacing the account number."
+}

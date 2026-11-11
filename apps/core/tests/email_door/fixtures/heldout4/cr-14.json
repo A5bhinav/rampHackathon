@@ -1,0 +1,8 @@
+{
+  "subject": "In re Acme Fasteners LLC, Case No. 26-11873 - Turnover of Receivables",
+  "sender": "Office of the Trustee <trustee.admin@hollowaytrustee.example>",
+  "text": "To Whom It May Concern:\n\nThe undersigned was appointed Chapter 7 Trustee of the bankruptcy estate of Acme Fasteners LLC. Pursuant to 11 U.S.C. 542(b), any entity that owes a debt that is property of the estate shall pay such debt to the Trustee.\n\nAccordingly, all sums presently due or that become due from you to the Debtor must be remitted to the estate account below, and not to the Debtor or its prior bank:\n\n    Estate of Acme Fasteners LLC, Holloway, Trustee\n    Metropolitan Commercial Bank\n    Routing 026013356\n    Account 5570012298\n\nSincerely,\nJ. Holloway, Chapter 7 Trustee",
+  "label": "change_request",
+  "vendor": "acme",
+  "note": "Borderline: a legal turnover demand. It directs a vendor's payments to a new payee and account, so labeled change_request."
+}

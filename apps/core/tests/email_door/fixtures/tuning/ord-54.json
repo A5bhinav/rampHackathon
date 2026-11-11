@@ -1,0 +1,8 @@
+{
+  "subject": "Fuel surcharge notice",
+  "sender": "Ted Nolan <ted@nolanfreight.example>",
+  "text": "Effective Nov 15 a fuel surcharge of 6.5 percent applies to all shipments.",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Rates."
+}

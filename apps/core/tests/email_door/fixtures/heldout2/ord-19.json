@@ -1,0 +1,8 @@
+{
+  "subject": "Please update where you send remittance advices",
+  "sender": "Jasmine Ortega <jortega@cobaltfreight.com>",
+  "text": "Hello,\n\nPlease update the email address you use for remittance advices for Cobalt Freight. Going forward, send them to remittance@cobaltfreight.com instead of ar@cobaltfreight.com. This is just for the payment detail emails so we can apply cash faster; please keep paying to the same bank account as always.\n\nThank you,\nJasmine Ortega\nBilling, Cobalt Freight LLC",
+  "label": "ordinary",
+  "vendor": "cobalt",
+  "note": "Borderline wording: 'update', 'remittance', 'going forward, send them to ... instead of'. It changes where the remittance advice email goes, not where money lands."
+}

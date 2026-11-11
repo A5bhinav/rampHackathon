@@ -1,0 +1,8 @@
+{
+  "subject": "Positive Pay Exception - action required by 2 PM",
+  "sender": "Treasury Alerts <alerts@wellsbank.example>",
+  "text": "You have 1 Positive Pay exception to decision by 2:00 PM ET.\n\nAccount: ****1177\nCheck: 10488\nPresented amount: $1,860.00\nIssued amount: $1,680.00\n\nDefault decision: RETURN",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Alarming bank alert on the reader's own account."
+}

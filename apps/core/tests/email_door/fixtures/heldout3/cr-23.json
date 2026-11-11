@@ -1,0 +1,8 @@
+{
+  "subject": "Fwd: txt from cobalt",
+  "sender": "Mike Torres <mtorres@northgate-mfg.com>",
+  "text": "fwding what their dispatcher texted me, can you update it\n\n---------- Forwarded message ----------\nFrom: +1 (901) 555-0177\nhey mike its ray at cobalt, tell ur AP our acct changed to 4400112233 at routing 121000248, same bank name on the acct. ok to pay the open ones there. thx",
+  "label": "change_request",
+  "vendor": "cobalt",
+  "note": "Text message relayed by an internal salesperson; informal and relayed second-hand."
+}

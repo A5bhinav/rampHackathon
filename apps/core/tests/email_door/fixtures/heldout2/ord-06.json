@@ -1,0 +1,8 @@
+{
+  "subject": "Refund for duplicate payment - order 77120",
+  "sender": "Helen Park <hpark@parkcabinetry.com>",
+  "text": "Hello,\n\nWe accidentally paid invoice 77120 twice (once by check, once by ACH). Your customer service rep said the overpayment of $3,250.00 would be refunded by ACH. Here are our bank details for the refund:\n\nPark Cabinetry Inc\nRouting 011000138\nAccount 4455667788\n\nPlease let me know once the refund is sent.\n\nThanks,\nHelen Park\nPark Cabinetry Inc",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "A customer giving its own bank details for a one-time refund. Contains routing and account numbers and 'send' language, but it is not a vendor redirecting its payments."
+}

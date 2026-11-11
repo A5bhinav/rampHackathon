@@ -1,0 +1,8 @@
+{
+  "subject": "Invoice 1041 - Pinecrest Janitorial Services",
+  "sender": "office@pinecrestjanitorial.com",
+  "text": "Pinecrest Janitorial Services LLC\nInvoice 1041\nService period: 11/16/2026 - 11/30/2026\nNightly cleaning, 900 Dock Rd, per agreement\n\nAmount due: $2,800.00\nDue: 12/15/2026\n\nPay by ACH: Huntington National Bank, routing 044000024, account 2211380419\nOr by check to 88 Grove St, Akron OH 44303\n\nThank you!",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "First invoice from a recently onboarded vendor; the bank details match the onboarding packet. Not a change."
+}

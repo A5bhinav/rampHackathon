@@ -1,0 +1,8 @@
+{
+  "subject": "Corrected remittance details",
+  "sender": "Brightline Billing <billing@brightline.example>",
+  "text": "The remittance details we emailed last week had the wrong digit in the account.\nThe right account is 000044445556. We are sorry for the confusion.",
+  "label": "change_request",
+  "vendor": "brightline",
+  "note": "One digit off on-file; corrected number redirects."
+}

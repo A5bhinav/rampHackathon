@@ -1,0 +1,8 @@
+{
+  "subject": "Cambio de cuenta bancaria - Distribuidora del Norte",
+  "sender": "Laura Castillo <lcastillo@distnorte.com.mx>",
+  "text": "Estimados,\n\nPor medio del presente les informamos que a partir del 1 de diciembre nuestra empresa recibira los pagos en una nueva cuenta bancaria. Les pedimos amablemente actualizar sus registros y realizar los pagos de las facturas pendientes y futuras a los siguientes datos:\n\nBanco: BBVA Mexico\nBeneficiario: Distribuidora del Norte SA de CV\nCLABE: 012180001234567897\nCuenta: 0123456789\n\nLa cuenta anterior quedara cancelada, por lo que cualquier deposito realizado a ella sera rechazado.\n\nQuedamos atentos a su confirmacion.\n\nSaludos cordiales,\n\nLaura Castillo\nCuentas por Cobrar\nDistribuidora del Norte SA de CV",
+  "label": "change_request",
+  "vendor": null,
+  "note": "Spanish-language bank change from an unknown Mexican vendor (CLABE). Accents dropped to keep the file ASCII."
+}

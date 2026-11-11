@@ -1,0 +1,8 @@
+{
+  "subject": "My payment details have changed",
+  "sender": "Carla Mendes <carla@mendes-translation.example>",
+  "text": "Hi, I'm a freelancer and I now get paid through a different bank. Can I send you my new\naccount letter? If you tell me which email to use, I'll send it today.",
+  "label": "change_request",
+  "vendor": null,
+  "note": "Asks how to send new account letter; announces change."
+}

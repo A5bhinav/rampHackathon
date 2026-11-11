@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { BRANCH, EDGES, MAIN, MAIN_EVENTS, PERSON_EVENTS } from "../src/lib/states.ts";
+import { BRANCH, EDGES, MAIN, MAIN_EVENTS, PERSON_EVENTS, actionNotice } from "../src/lib/states.ts";
 
 const ALL = ["open", "held", "calling", "retry_wait", "deciding", "awaiting_release", "needs_review", "blocked", "releasing", "released"];
 const doc = readFileSync(new URL("../../../docs/state-machine.md", import.meta.url), "utf8");
@@ -33,4 +33,23 @@ test("every edge is copied from the doc", () => {
   const key = (e: { from: string; event: string; to: string }) => `${e.from} ${e.event} ${e.to}`;
   assert.deepEqual(EDGES.map(key).sort(), rows.filter((r) => r.from !== "(new)").map(key).sort());
   for (const e of EDGES) assert.equal(e.person, PERSON_EVENTS.includes(e.event), key(e));
+});
+
+test("a person's only ways out of blocked are the two dismissals of an email case (spec 0090)", () => {
+  const moves = EDGES.filter((e) => e.from === "blocked" && e.person).map((e) => `${e.event} -> ${e.to}`).sort();
+  assert.deepEqual(moves, ["release_approved -> releasing", "release_co_approved -> blocked"]);
+});
+
+// The case page's sentence after an action (the redirect's ?done= and ?to=). Final review, ledger rows 254
+// and 283: a first dismissal (or a stale Approve click on a case that is now blocked) answers
+// awaiting_second_approver and leaves the case blocked; the page said "release" and "moved to blocked".
+test("a first dismissal reads as a dismissal and does not claim the case moved", () => {
+  const text = actionNotice("awaiting_second_approver", "blocked");
+  assert.equal(text, "The case is blocked, so your approval was recorded as a dismissal. A second, different approver must also dismiss it before the hold is lifted.");
+  assert.equal(actionNotice("awaiting_second_approver", "awaiting_release"),
+    "Your approval is recorded. A second approver must release this change. The case moved to ready to release.");
+  assert.equal(actionNotice("applied", "releasing"), "Done. The case moved to releasing hold.");
+  assert.equal(actionNotice("applied", undefined), "Done.");
+  assert.equal(actionNotice("not_a_status", "blocked"), null);
+  assert.equal(actionNotice(undefined, "blocked"), null);
 });

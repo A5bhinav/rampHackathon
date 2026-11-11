@@ -88,7 +88,8 @@ The `ramp-mock` URL uses Railway's reference variables (`${{service.VARIABLE}}`)
 | `RAMP_SANDBOX_CLIENT_ID`, `RAMP_SANDBOX_CLIENT_SECRET` | for sandbox datasets | The Ramp sandbox app's client credentials. Both or neither. Seal the secret (a service variable on the core, not a shared one) |
 | `RAMP_SANDBOX_BASE_URL` | no | Only `https://demo-api.ramp.com` (the default) is accepted, so these credentials never reach production Ramp |
 | `RAMP_SANDBOX_SCOPES` | no | Default `vendors:read vendors:write bills:read bills:write audit_logs:read`; a read-only app sets the three read scopes |
-| `DIALBACK_FULL_SWEEP_SECONDS` | for sandbox datasets | Set `60`. A bank change waiting for review in Ramp moves no timestamp and writes no event, so only the sweep finds it, and the case should open within a minute (spec 0093, D4). Default `86400` (once a day) |
+| `DIALBACK_FULL_SWEEP_SECONDS` | for sandbox datasets | Set `60`, unless the server has a watch list (next row). A bank change waiting for review in Ramp moves no timestamp and writes no event, so only the sweep finds it, and the case should open within about two minutes (specs 0093, 0100). Default `86400` (once a day) |
+| `RAMP_SANDBOX_WATCH_VENDORS` | demo only | Ramp vendor ids, separated by commas or spaces, read on every poll, so their bank changes are caught in seconds (spec 0102). Pair with `DIALBACK_POLL_SECONDS=5` and set `DIALBACK_FULL_SWEEP_SECONDS` to `86400` or unset it: jobs run one after another, so a `60` sweep would hold the poll to about once a minute. A pending change on any other vendor can then take up to a day to be found |
 | `RAMP_WEBHOOK_SECRET` | yes | Verifies `X-Ramp-Signature`; at least 16 characters |
 | `FINGERPRINT_KEY`, `FINGERPRINT_KEY_VERSION` | yes | Keyed fingerprints of bank accounts; at least 32 characters |
 | `DIGITS_KEY`, `DIGITS_KEY_VERSION` | yes | Keyed hash of spoken digits; at least 32 characters |
@@ -100,9 +101,28 @@ The `ramp-mock` URL uses Railway's reference variables (`${{service.VARIABLE}}`)
 | `DIALBACK_CALLING_TZ`, `DIALBACK_CALLING_WINDOW`, `DIALBACK_CALLING_DAYS` | no | Default `America/Los_Angeles`, `09:00-16:30`, `mon-fri` |
 | `DIALBACK_DEMO_CALLING_WINDOW` | no | Demo datasets only: `always` (default), `HH:MM-HH:MM` or `HH:MM-HH:MM mon-fri`, in `DIALBACK_CALLING_TZ`. An unreadable value stops the core at startup (spec 0011). |
 | `CORE_PUBLIC_URL` | no | The core's public address, e.g. `https://core-production.up.railway.app`. A `demo reset` subscribes the mock's webhooks to it; unset, the poller finds each demo change within `DIALBACK_POLL_SECONDS`. |
+| `DIALBACK_EMAIL` | no | `off` (default) or `resend`. With `resend` the core answers `POST /webhooks/email`; without it the route is a 404. |
+| `RESEND_API_KEY` | with `resend` | Resend's API key. Missing with `DIALBACK_EMAIL=resend`: the core refuses to start. |
+| `RESEND_WEBHOOK_SECRET` | with `resend` | The webhook's signing secret from Resend (`whsec_...`). Missing with `resend`: the core refuses to start. |
+| `DIALBACK_EMAIL_CLASSIFIER` | no | `rule` (default: the word rule alone flags an email, and no email text leaves Dialback) or `model` (a quarantined model alone decides the flag, pinned in `apps/core/src/dialback_core/email_door/classifier.py`, which sees the subject and text with every digit replaced by `#`). Any other value is `rule`. |
+| `ANTHROPIC_API_KEY` | with `model` | The email classifier's key. Missing with `DIALBACK_EMAIL_CLASSIFIER=model`: the core refuses to start. |
+| `DIALBACK_INBOX_ADDRESS` | no | The address vendors write to (shown on the public page) |
+| `DIALBACK_REPLY_FROM` | no | The sender of replies. Unset: replies are not configured and none is sent. |
+| `DIALBACK_BANK_CHANGES_URL` | no | The public page vendors are pointed to |
+| `DIALBACK_COMPANY_NAME` | no | Named in replies and on the public page; default `the company you're writing to` |
 | `DIALBACK_RUN_WORKER`, `DIALBACK_RUN_JOBS` | no | `0` turns either off |
 | `DIALBACK_POLL_SECONDS`, `DIALBACK_RECONCILE_SECONDS`, `DIALBACK_FULL_SWEEP_SECONDS`, `DIALBACK_VERIFY_SECONDS` | no | Job intervals; default 60, 300, 86400 and 300 |
 | `PORT`, `HOST` | no | Set by the image (8001; an empty `HOST` binds IPv4 and IPv6) |
+
+### The email door: Resend (spec 0085)
+
+Vendors email bank changes to an inbox; Resend receives the mail and POSTs a signed notice to the core. In Resend:
+
+1. Turn on receiving for the inbox's domain (Resend gives the MX record to add).
+2. Add a webhook for the `email.received` event to `https://<core>/webhooks/email`.
+3. Copy the webhook's signing secret (`whsec_...`) into `RESEND_WEBHOOK_SECRET` on the `core` service, set `RESEND_API_KEY`, and set `DIALBACK_EMAIL=resend`.
+
+The route verifies Resend's Svix signature over the raw body, stores the notice, and answers at once. It acts only on the current demo dataset: with no current demo it answers 503 and Resend retries.
 
 ### The voice service (specs 0029 and 0030)
 

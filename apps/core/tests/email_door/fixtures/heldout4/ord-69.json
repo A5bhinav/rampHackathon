@@ -1,0 +1,8 @@
+{
+  "subject": "New email addresses for Acme Fasteners",
+  "sender": "Dana Whitfield <dwhitfield@acme-fasteners.example>",
+  "text": "Hi all, we've moved email providers, so our addresses are now @acme-fasteners.example. The old addresses will forward through January. Please update your contacts. Nothing else about how you work with us is changing.\n\nDana",
+  "label": "ordinary",
+  "vendor": "acme",
+  "note": "Borderline: domain change is a common fraud precursor, but this email requests no payment change."
+}

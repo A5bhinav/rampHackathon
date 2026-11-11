@@ -21,6 +21,16 @@ class ResolverMode(StrEnum):
     LEDGER = "ledger"
 
 
+class EmailMode(StrEnum):
+    OFF = "off"          # safe: no email door
+    RESEND = "resend"
+
+
+class ClassifierMode(StrEnum):
+    RULE = "rule"    # safe: the word rule alone flags an email; no email text leaves Dialback
+    MODEL = "model"  # a quarantined model alone decides the flag (spec 0086, Sami's decision 12)
+
+
 def read_flag[E: StrEnum](name: str, kind: type[E], safe: E, environ: dict[str, str] | None = None) -> E:
     raw = (environ if environ is not None else os.environ).get(name)
     if raw is None:

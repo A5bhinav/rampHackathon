@@ -1,0 +1,8 @@
+{
+  "subject": "UPDATED INVOICE 88412 - please replace",
+  "sender": "Billing <billing@acmefasteners.com>",
+  "text": "Our earlier copy of 88412 had the wrong quantity on line 3. Please replace it with the attached, which supersedes the prior version. New total is $5,880.00. Nothing else is different.",
+  "label": "ordinary",
+  "vendor": "acme",
+  "note": "'Supersedes' refers to invoice content."
+}

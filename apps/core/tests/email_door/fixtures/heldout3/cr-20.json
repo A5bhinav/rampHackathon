@@ -1,0 +1,8 @@
+{
+  "subject": "New lockbox for check payments - Acme Fasteners",
+  "sender": "Acme Fasteners LLC <accounting@acmefasteners.com>",
+  "text": "Dear Customer,\n\nAcme Fasteners LLC has moved to a new bank-operated lockbox. Effective immediately, please mail all check payments to:\n\nAcme Fasteners LLC\nPO Box 790310\nSt. Louis, MO 63179-0310\n\nChecks sent to our Cleveland office or the prior PO Box 2210 will be forwarded, which can add up to three weeks before they are credited.\n\nACH customers: separate instructions will be sent next week.\n\nThank you,\nAcme Fasteners LLC",
+  "label": "change_request",
+  "vendor": "acme",
+  "note": "Borderline: a remit-to change for checks only. Labeled change_request because the lockbox is where checks (the money) land, and it also signals ACH instructions are about to change."
+}

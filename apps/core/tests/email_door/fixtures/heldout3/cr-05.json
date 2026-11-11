@@ -1,0 +1,8 @@
+{
+  "subject": "Acme Fasteners is now part of Titan Industrial Group",
+  "sender": "Customer Communications <noreply@titanindustrial.com>",
+  "text": "Dear Valued Customer,\n\nWe are pleased to announce that Titan Industrial Group has completed its acquisition of Acme Fasteners LLC. Your contacts, pricing and lead times are unchanged.\n\nWhat changes for you:\n\n- Invoices dated on or after December 1 will be issued by Titan Industrial Group Inc, EIN 84-3390117.\n- All remittances, including payment of open Acme Fasteners invoices, should be sent to Titan's lockbox or bank account. A W-9 and bank letter are attached.\n- Please update your supplier records to reflect the new legal entity name.\n\nTitan Industrial Group Inc\nRemit by ACH: Routing 091000019, Account 2210984477, U.S. Bank\nRemit by check: Titan Industrial Group Inc, Dept 3310, PO Box 86410, Minneapolis MN 55486\n\nQuestions may be directed to ar@titanindustrial.com.\n\nThank you for your continued partnership.",
+  "label": "change_request",
+  "vendor": "acme",
+  "note": "Merger announcement that moves the vendor's payments to the acquirer's account, including payment of existing Acme invoices."
+}

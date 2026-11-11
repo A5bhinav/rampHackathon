@@ -1,0 +1,8 @@
+{
+  "subject": "Duplicate payment on 88105",
+  "sender": "Denise Caruso <dcaruso@acmefasteners.com>",
+  "text": "Hi Karen,\n\nWe received two ACH payments of $1,275.00 for invoice 88105 (10/16 and 10/23). We have applied the second one as an unapplied credit on your account. You can short pay the next invoice by $1,275.00, or let me know if you would rather we send a refund check.\n\nDenise",
+  "label": "ordinary",
+  "vendor": "acme",
+  "note": "Overpayment handling."
+}
