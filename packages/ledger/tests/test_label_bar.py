@@ -126,6 +126,16 @@ def test_attacker_cannot_unestablish():
     assert at(out["cutoff"]) == T0 - dt.timedelta(days=160)
     assert "not_vendor_party" in reasons(out, X)
     assert out["e164"] == REAL
+    # Same subject: the listing, at 170 days under the request's subject, is older than the pulled
+    # cutoff but within the subject window of it, so it is in the change context. Rule 3 measures the
+    # window from the request (170 days, outside it), so the listing still counts and the labels establish.
+    w = world(x_labeled(listing_days=170, listing_subject="Updated banking details") + [look])
+    listing = next(d for d in w["documents"] if d.id == "x-label-listing")
+    out = inner(w)
+    assert listing.received_at < at(out["cutoff"]) == T0 - dt.timedelta(days=160)
+    assert "x-label-listing" in {d.id for d in change_context_documents(**w)}
+    assert "not_vendor_party" in reasons(out, X)
+    assert out["e164"] == REAL
 
 
 def test_a_label_under_the_request_subject_does_not_establish():
