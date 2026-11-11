@@ -17,6 +17,8 @@ Specs: 0017 (voice slice lab), 0083 (generative selection pressure; 0033 before 
 
 - **Status:** confirmed (ran), through real ingestion (`ingest_all` with the stub reader), then
   `select()` at default settings. Frozen as `planted-number-picked-after-in-thread-bank-label`.
+- **Fix status:** fixed by spec 0091 when it merges (`sami/label-bar`): a label in the change email
+  is ignored, so the real number is called.
 - **Where:** `packages/ledger/src/dialback_ledger/select.py`, lines 169-172. The party and fax
   checks read every visible sighting, including those in the change context. Spec 0021 says the
   same thing in its acceptance list ("eligible only if every visible sighting is labeled the vendor's
@@ -59,6 +61,8 @@ Specs: 0017 (voice slice lab), 0083 (generative selection pressure; 0033 before 
 ### A4. Labels from non-counting documents outside the change context also refuse a number
 
 - **Status:** confirmed (read). Not probed by the lab (spec 0083, Q144).
+- **Fix status:** fixed by spec 0091 when it merges (`sami/label-bar`): that email isn't in a counting
+  channel, so its label can't be established.
 - **What happens:** an email from an unrelated domain, outside the thread, that labels the real
   number someone else's also vetoes it.
 - **Open question:** whether such documents reach `select()` depends on how ingestion attaches
@@ -497,10 +501,10 @@ These are not reachable today, but each is frozen as a regression.
     - The pages were type-checked and unit-tested, but not looked at in a browser.
     - Properties 1 to 6 in `test_select_properties.py` still draw worlds where today's rule never
       picks, so their pick checks never run. That's spec 0021's, and was there before.
-- **Coordination with the lab:** when spec 0079 merges, A1's four known-failure entries start
-  passing, so `lab-fuzz` turns red until they come off the list. The lab's schema check also needs
-  the `withheld` outcome, and its selection invariants need to learn it. Whichever of the two
-  lands second makes those changes.
+- **Coordination with the lab:** done on `sami/label-bar` (spec 0091, Task 1), when main was merged
+  into spec 0079's branch. A1's four known-failure entries came off the list. The lab's schema check
+  reads the checkout's schema, which has `withheld`, and no invariant fired on the 146 withheld worlds
+  of the 2000 at seed 0, so no lab code changed for it.
 
 ### A26. An attacker's label can mark the vendor's real line opted out on every case
 
