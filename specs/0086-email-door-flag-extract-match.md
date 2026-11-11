@@ -153,6 +153,24 @@ Sami chose one Opus run after Haiku's FAIL. Written and committed before it ran.
 - **What kills it:** one in-bar miss, or 4 or more ordinary flagged. Then it is FAIL, with no further run.
 - **How to read a pass:** Opus is the second model tried on this set, chosen after seeing that Haiku failed it. Two attempts, both reported; a pass is weaker than a first-try pass, because picking the better of two on one set flatters it slightly.
 
+### Decision 12: the Opus result (heldout4, run once)
+
+`claude-opus-5-5`, prompt v2 (`168990eec3fdf1a2`). Run stamp `2026-11-11T042537Z`, result file in `eval_results/`.
+
+| Measure | Opus | Haiku (same set) | Bar |
+|---|---|---|---|
+| Change requests in the bar | 37/37 | 36/37 | all |
+| Ordinary emails flagged | 1/70 (ord-05) | 1/70 (ord-05) | at most 3 |
+| Failures (counted as not flagged) | none | none | |
+| ON-FILE-ONLY cr-38, cr-39, cr-40 (separate) | 0/3 | 0/3 | not in the bar |
+| All 40 change requests | 37/40 | 36/40 | not the bar |
+| The with-ON-FILE-ONLY line | FAIL | FAIL | not the bar |
+| The 74 emails not marked as near-copies | 22/22, 1/50 | 21/22, 1/50 | reported only |
+| Cost for 110 calls | $0.4546 | $0.0134 | |
+| Model-call latency p50, p95 | 2.11 s, 5.14 s | 0.98 s, 2.38 s | |
+
+**Result: PASS for Opus, on the pre-registered bar.** Caveats: Opus was the second model tried on this set, chosen after Haiku failed it, so two attempts are reported and the pass is a little weaker than a first-try pass. One run on 110 synthetic text-only emails. One-sided 95% bounds: recall at least 92% (37/37) and false flags at most 6.6% (1/70), for emails like these. The 3 silent on-file requests are still missed by design and depend on the on-file check. The difference between the models is one email, which one run cannot separate from chance.
+
 ### What the ledger gets, and what can still reach it (review fix round 5)
 
 The model's copy (`redact_for_model`) has no numeric characters at all (`str.isnumeric`, since Task 6b's fix round 1; before it, no `str.isdigit` characters). The ledger stores only rebuilt phone lines: `ledger_text` emits one line per kept phone, made of the words before it (letters, colons and apostrophes; nothing numeric) and the phone in phonenumbers' canonical form, and nothing else from the email. Rounds 2 to 4 masked the email's text in place for the ledger and each round's masking changed what the ledger's matcher read (masking created a phone where there was none; masking beside a kept phone hid it so a second phone, or a phone-shaped account, passed the stub reader's one-phone rule: `Ph 212-555-0199, 77777/(617) 555-0143x51826279-` stored 6175550143 and `Account (call 212-555-0199 to confirm): 7783110245x1` stored the account). The property test over 200 fixed seeds (phones in every format the rounds found, `(digits)` glue, extensions, `~` `|` and middle-dot joins, phone-shaped labeled and unlabeled accounts, CJK and fullwidth numerals, several phones per line) now checks that every line the stub reader would store is words plus exactly the digits of one phone the keep-decision kept, and its guard shows the same generator leaks through the stub reader on the original text.
