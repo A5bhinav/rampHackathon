@@ -259,6 +259,19 @@ async def test_an_unflagged_invoice_naming_another_account_is_a_silent_change(do
     assert case["detected_via"] == "email"
 
 
+async def test_a_model_that_says_no_does_not_stop_the_on_file_mismatch_check(door_world):
+    """Decision 12: the model alone decides the flag, but an email from a door vendor naming bank details that
+    differ from the account on file still opens a case."""
+    w = door_world
+    w.worker.classifier = FakeClassifier(False)
+    text = f"Hello from Cobalt Freight LLC. Our details:\nRouting {ROUTING}\nAccount {ACCOUNT}\n"
+    row = await arrive(w, sender=FROM_COBALT, subject="Cobalt Freight remittance", text=text)
+    assert len(w.worker.classifier.asked) == 1, "the model was asked, and said no"
+    assert (row["outcome"], row["flagged"], row["routing_number"], row["last4"]) == ("case_opened", True, ROUTING, "4821")
+    (case,) = await cases(w)
+    assert case["detected_via"] == "email"
+
+
 async def test_an_unflagged_invoice_naming_the_account_on_file_opens_nothing(door_world):
     w = door_world
     row = await arrive(w, sender=FROM_COBALT, subject="Invoice CF-88200", text=INVOICE.format(routing=ON_FILE[0], account=ON_FILE[1]))

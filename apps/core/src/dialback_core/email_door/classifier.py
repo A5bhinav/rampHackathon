@@ -1,4 +1,4 @@
-"""The email door's quarantined model, `DIALBACK_EMAIL_CLASSIFIER=rule+model` (spec 0086, Task 6b; design,
+"""The email door's quarantined model, `DIALBACK_EMAIL_CLASSIFIER=model` (spec 0086, Task 6b; design,
 "Flagging: the rule plus a model").
 
 A model with no tools reads one email's subject and text, with every numeral replaced by `#`
@@ -21,7 +21,7 @@ import httpx2
 from anthropic.types import Message
 from anthropic.types.beta import BetaMessage
 
-MODEL = "claude-opus-5-5"   # pinned here and nowhere else
+MODEL = "claude-haiku-5-5"   # pinned here and nowhere else (the production default; Opus is an explicit option)
 API_BASE_URL = "https://api.anthropic.com"   # pinned: no host setting can send email text elsewhere
 EFFORT = "medium"            # set explicitly; no `thinking` setting: Opus 5.5 always thinks, within max_tokens
 MAX_TOKENS = 8192            # thinking tokens count against it

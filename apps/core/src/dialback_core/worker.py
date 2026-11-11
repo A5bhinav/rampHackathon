@@ -128,7 +128,7 @@ class Worker:
                  classifier: ChangeClassifier | None = None) -> None:
         self.pool, self.settings, self.connector = pool, settings, connector
         self.resend = resend
-        self.classifier = classifier   # the email door's model, with DIALBACK_EMAIL_CLASSIFIER=rule+model only
+        self.classifier = classifier   # the email door's model, with DIALBACK_EMAIL_CLASSIFIER=model only
         self.resolver, self.caller, self.name, self._sleep = resolver, caller, name or unique_worker_name(), sleep
         self.change_context = change_context or LedgerChangeContext()
         self.keys = Keys(settings.fingerprint_key, settings.fingerprint_key_version)

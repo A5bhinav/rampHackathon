@@ -1,4 +1,4 @@
-"""Task 6c's evaluation script, on fakes and a tiny synthetic fixture directory in tmp_path. It never reads
+"""Tasks 6c and 6f's evaluation script (the model-decides flagger), on fakes and a tiny synthetic fixture directory in tmp_path. It never reads
 the real fixture directories and never reaches the network."""
 from __future__ import annotations
 
@@ -15,24 +15,25 @@ from dialback_core.email_door.classifier import ClassifierFailed, Verdict
 
 ASKS = "Hi team, we have changed our bank account. Please update your records."   # the rule flags this
 PLAIN = "Hi team, attached is invoice for October. Thanks!"                        # and not this
+ASKS2 = "We have changed our bank, please note."   # the fake model says yes to this
 SOFT = "Kindly route the remaining balance to Evergreen Mutual from now on. TEXTMARK"   # the model flags this
 BOOM = "Hi team, a note that makes the fake model fail. TEXTMARK"
 QUOTE = "QUOTEMARK from the model"
 
 
 class FakeModel:
-    """TEST DOUBLE for a ChangeClassifier: yes on 'Evergreen', ClassifierFailed on 'fail', else no."""
+    """TEST DOUBLE for a ChangeClassifier: yes on 'Evergreen' or 'changed our bank', ClassifierFailed on 'fail', else no."""
 
     input_tokens, output_tokens, calls = 0, 0, 0
 
     def classify(self, subject: str, text: str) -> Verdict:
         if "fail" in text:
             raise ClassifierFailed("timeout")
-        return Verdict(True, QUOTE) if "Evergreen" in text else Verdict(False, "")
+        return Verdict(True, QUOTE) if "Evergreen" in text or "changed our bank" in text else Verdict(False, "")
 
 
-def email(label: str, text: str) -> dict:
-    return {"subject": "SUBJMARK", "text": text, "label": label, "vendor": "VENDORMARK", "note": "NOTEMARK", "sender": "a@b"}
+def email(label: str, text: str, note: str = "NOTEMARK") -> dict:
+    return {"subject": "SUBJMARK", "text": text, "label": label, "vendor": "VENDORMARK", "note": note, "sender": "a@b"}
 
 
 def write(dir_: Path, emails: dict[str, dict]) -> None:
@@ -45,7 +46,7 @@ def write(dir_: Path, emails: dict[str, dict]) -> None:
 def fixtures(tmp_path):
     root = tmp_path / "fixtures"
     write(root / "tuning", {
-        "cr-01.json": email("change_request", ASKS),      # flagged by the rule
+        "cr-01.json": email("change_request", ASKS),      # flagged by the model
         "cr-02.json": email("change_request", SOFT),      # flagged by the model
         "cr-03.json": email("change_request", PLAIN),     # missed
         "ord-01.json": email("ordinary", PLAIN),
@@ -73,6 +74,26 @@ def heldout2(root: Path, *, cr36_flagged: bool, ordinary_flagged: int, missed_ot
     seal(root)
 
 
+def seal3(root: Path) -> None:
+    files = sorted((root / "heldout3").glob("*.json"))
+    (root / "heldout3.sha256").write_text(hashlib.sha256(b"".join(p.read_bytes() for p in files)).hexdigest() + "  -\n")
+
+
+def heldout3(root: Path, *, on_file_only_flagged: bool = False, cr04_flagged: bool = True, ordinary_flagged: int = 0,
+             missed_other: bool = False) -> None:
+    ofo = "ON-FILE-ONLY: SECRETNOTE the bank details come with no ask"
+    emails = {"cr-01.json": email("change_request", ASKS), "cr-04.json": email("change_request", ASKS if cr04_flagged else PLAIN),
+              "cr-10.json": email("change_request", ASKS),
+              "cr-20.json": email("change_request", ASKS if on_file_only_flagged else PLAIN, ofo),
+              "cr-21.json": email("change_request", ASKS, "An ordinary note ON-FILE-ONLY: later")}   # not at the start
+    if missed_other:
+        emails["cr-01.json"] = email("change_request", PLAIN)
+    for i in range(5):
+        emails[f"ord-{i:02d}.json"] = email("ordinary", SOFT if i < ordinary_flagged else PLAIN)
+    write(root / "heldout3", emails)
+    seal3(root)
+
+
 def evaluate(fixtures_dir, name="tuning", model_factory=FakeModel):
     return eval_flagger.evaluate_set(name, eval_flagger.load_set(fixtures_dir / eval_flagger.SETS[name]),
                                      model_factory(), model="claude-haiku-5-5", workers=4)
@@ -82,8 +103,8 @@ def test_counting_by_label_and_by_who_flagged(fixtures):
     r = evaluate(fixtures)
     assert (r["change_requests_flagged"], r["change_requests_total"]) == (2, 3)
     assert (r["ordinary_flagged"], r["ordinary_total"]) == (1, 3)
-    assert (r["change_requests_by_rule"], r["change_requests_by_model"]) == (1, 1)
-    assert (r["ordinary_by_rule"], r["ordinary_by_model"]) == (0, 1)
+    assert (r["change_requests_by_model"], r["ordinary_by_model"]) == (2, 1)
+    assert "change_requests_by_rule" not in r and r["flagger"] == "model"
     assert r["missed"] == ["cr-03.json"] and r["false_flags"] == ["ord-02.json"]
 
 
@@ -100,7 +121,8 @@ def test_a_failure_counts_as_not_flagged_and_is_tallied_by_reason(fixtures):
 
 def test_only_subject_text_and_label_are_loaded(fixtures):
     loaded = eval_flagger.load_set(fixtures / "tuning")
-    assert set(loaded["cr-01.json"]) == {"subject", "text", "label"}
+    assert set(loaded["cr-01.json"]) == {"subject", "text", "label", "on_file_only"}
+    assert loaded["cr-01.json"]["on_file_only"] is False
 
 
 def test_cost_and_latency_and_usage(fixtures):
@@ -134,7 +156,7 @@ def test_the_heldout2_bar_with_and_without_cr_36(tmp_path, cr36_flagged, ordinar
     assert r["bar_with_cr_36"] == ("PASS" if with_ else "FAIL")
 
 
-EXPECTED = {"tuning": (3, 3), "dev": (1, 1), "heldout2": (3, 5)}
+EXPECTED = {"tuning": (3, 3), "dev": (1, 1), "heldout2": (3, 5), "heldout3": (5, 5)}
 T0 = datetime(2026, 11, 10, 12, 30, 5, tzinfo=UTC)
 
 
@@ -158,7 +180,7 @@ def test_a_hash_mismatch_refuses_heldout2(tmp_path, capsys):
     assert not (tmp_path / "out").exists()
 
 
-def test_heldout2_runs_when_confirmed_and_sealed(tmp_path, capsys):
+def test_heldout2_runs_when_confirmed_and_hash_checked(tmp_path, capsys):
     heldout2(tmp_path, cr36_flagged=False, ordinary_flagged=1)
     assert run_main(tmp_path, tmp_path, "--sets", "heldout2", "--confirm-heldout2") == 0
     out = capsys.readouterr().out
@@ -193,9 +215,9 @@ def test_an_unexpected_error_is_tallied_by_type_and_counts_as_not_flagged(fixtur
             raise RuntimeError("EMAILTEXT leaked into an error")
 
     r = evaluate(fixtures, model_factory=Broken)
-    assert r["failures"] == {"unexpected:RuntimeError": 5}   # the five emails the rule leaves to the model
+    assert r["failures"] == {"unexpected:RuntimeError": 6}   # the model decides every email, so every email fails
     assert set(r["failed"].values()) == {"unexpected:RuntimeError"}
-    assert r["change_requests_flagged"] == 1 and r["ordinary_flagged"] == 0
+    assert r["change_requests_flagged"] == 0 and r["ordinary_flagged"] == 0
     assert "EMAILTEXT" not in json.dumps(r)
 
 
@@ -246,13 +268,93 @@ def test_sets_are_deduplicated(fixtures, tmp_path):
     assert len(list((tmp_path / "out").glob("*.json"))) == 2
 
 
-def test_heldout2_runs_once_per_model(tmp_path, capsys):
+def test_heldout2_is_exploratory_and_can_be_rerun_but_keeps_its_hash_check(tmp_path, capsys):
     heldout2(tmp_path, cr36_flagged=True, ordinary_flagged=0)
     assert run_main(tmp_path, tmp_path, "--sets", "heldout2", "--confirm-heldout2") == 0
     later = datetime(2026, 11, 11, tzinfo=UTC)
-    assert run_main(tmp_path, tmp_path, "--sets", "heldout2", "--confirm-heldout2", now=later) == 2
+    assert run_main(tmp_path, tmp_path, "--sets", "heldout2", "--confirm-heldout2", now=later) == 0
+    assert len(list((tmp_path / "out").glob("*-heldout2.json"))) == 2
+    seal(tmp_path, good=False)
+    assert run_main(tmp_path, tmp_path, "--sets", "heldout2", "--confirm-heldout2", now=datetime(2026, 11, 12, tzinfo=UTC)) == 2
+    assert "hash" in capsys.readouterr().err
+
+
+def test_every_result_file_records_the_flagger_mode(fixtures, tmp_path):
+    assert run_main(fixtures, tmp_path, "--sets", "tuning", "dev") == 0
+    for path in (tmp_path / "out").glob("*.json"):
+        assert json.loads(path.read_text())["flagger"] == "model"
+
+
+def test_heldout3_needs_its_own_confirm_flag_and_is_never_read_without_it(tmp_path, capsys):
+    heldout3(tmp_path)
+    assert run_main(tmp_path, tmp_path, "--sets", "heldout3") == 2
+    assert "--confirm-heldout3" in capsys.readouterr().err and not (tmp_path / "out").exists()
+    heldout2(tmp_path, cr36_flagged=True, ordinary_flagged=0)
+    assert run_main(tmp_path, tmp_path, "--sets", "heldout3", "--confirm-heldout2") == 2   # the other flag does not do
+
+
+def test_a_hash_mismatch_refuses_heldout3(tmp_path, capsys):
+    heldout3(tmp_path)
+    (tmp_path / "heldout3.sha256").write_text("0" * 64 + "  -\n")
+    assert run_main(tmp_path, tmp_path, "--sets", "heldout3", "--confirm-heldout3") == 2
+    assert "hash" in capsys.readouterr().err and not (tmp_path / "out").exists()
+
+
+def test_heldout3_runs_once_per_model(tmp_path, capsys):
+    heldout3(tmp_path)
+    assert run_main(tmp_path, tmp_path, "--sets", "heldout3", "--confirm-heldout3") == 0
+    later = datetime(2026, 11, 11, tzinfo=UTC)
+    assert run_main(tmp_path, tmp_path, "--sets", "heldout3", "--confirm-heldout3", now=later) == 2
     assert "already" in capsys.readouterr().err
-    assert run_main(tmp_path, tmp_path, "--sets", "heldout2", "--confirm-heldout2", "--model", "claude-opus-5-5", now=later) == 0
+    assert run_main(tmp_path, tmp_path, "--sets", "heldout3", "--confirm-heldout3", "--model", "claude-opus-5-5", now=later) == 0
+
+
+@pytest.mark.parametrize("ofo_flagged, ordinary_flagged, missed_other, without, with_", [
+    (False, 3, False, True, False),    # the ON-FILE-ONLY one missed: passes without it, fails with it
+    (True, 3, False, True, True),
+    (True, 4, False, False, False),    # too many ordinary
+    (True, 0, True, False, False),     # another change request missed
+])
+def test_the_heldout3_bar_without_and_with_the_on_file_only_requests(tmp_path, ofo_flagged, ordinary_flagged, missed_other, without, with_):
+    heldout3(tmp_path, on_file_only_flagged=ofo_flagged, ordinary_flagged=ordinary_flagged, missed_other=missed_other)
+    r = evaluate(tmp_path, "heldout3")
+    assert r["on_file_only"] == {"cr-20.json": ofo_flagged}   # reported separately, by file name only
+    assert "cr-20.json" not in r["missed"]
+    assert (r["change_requests_total"], r["ordinary_total"]) == (4, 5)   # cr-20 is not counted among them
+    assert r["bar_without_on_file_only"] == ("PASS" if without else "FAIL")
+    assert r["bar_with_on_file_only"] == ("PASS" if with_ else "FAIL")
+    assert r["heldout2_revised"] is False and r["excluded_after_heldout2_revision"] == {}
+
+
+def test_cr_04_and_cr_10_leave_the_heldout3_bar_only_after_a_heldout2_revision(tmp_path):
+    heldout3(tmp_path, on_file_only_flagged=True, cr04_flagged=False)
+    plain = evaluate(tmp_path, "heldout3")
+    assert plain["missed"] == ["cr-04.json"] and plain["bar_without_on_file_only"] == "FAIL"
+    emails = eval_flagger.load_set(tmp_path / "heldout3")
+    r = eval_flagger.evaluate_set("heldout3", emails, FakeModel(), model="claude-haiku-5-5", workers=2, heldout2_revised=True)
+    assert r["missed"] == [] and r["change_requests_total"] == 2
+    assert r["excluded_after_heldout2_revision"] == {"cr-04.json": False, "cr-10.json": True}
+    assert r["heldout2_revised"] is True and r["bar_without_on_file_only"] == "PASS"
+
+
+def test_heldout3_reports_on_file_only_without_any_note_text(tmp_path, capsys):
+    heldout3(tmp_path, on_file_only_flagged=True)
+    assert run_main(tmp_path, tmp_path, "--sets", "heldout3", "--confirm-heldout3", "--heldout2-revised") == 0
+    out = capsys.readouterr()
+    (path,) = (tmp_path / "out").glob("*-heldout3.json")
+    blob = out.out + out.err + path.read_text()
+    assert "ON-FILE-ONLY (separate)" in out.out and "cr-20.json" in blob
+    for secret in ("SECRETNOTE", "NOTEMARK", "TEXTMARK", "SUBJMARK", "no ask", "later"):
+        assert secret not in blob
+    assert json.loads(path.read_text())["flagger"] == "model"
+
+
+def test_only_a_note_that_starts_with_the_marker_counts(tmp_path):
+    write(tmp_path / "s", {"a.json": email("change_request", PLAIN, "ON-FILE-ONLY: x"),
+                           "b.json": email("change_request", PLAIN, "see ON-FILE-ONLY: x"),
+                           "c.json": email("change_request", PLAIN, "on-file-only: x")})
+    loaded = eval_flagger.load_set(tmp_path / "s")
+    assert [loaded[f]["on_file_only"] for f in ("a.json", "b.json", "c.json")] == [True, False, False]
 
 
 def test_the_composition_is_checked_before_any_call(fixtures, tmp_path, capsys):
@@ -275,7 +377,7 @@ def test_an_unknown_label_is_an_error(tmp_path):
 
 
 def test_heldout2_composition_is_forty_change_requests_with_cr_36_and_seventy_ordinary():
-    assert eval_flagger.EXPECTED == {"tuning": (30, 62), "dev": (35, 65), "heldout2": (40, 70)}
+    assert eval_flagger.EXPECTED == {"tuning": (30, 62), "dev": (35, 65), "heldout2": (40, 70), "heldout3": (40, 70)}
 
 
 def test_nul_bytes_are_stripped_as_production_does(tmp_path):

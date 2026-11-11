@@ -35,12 +35,12 @@ from .worker import Worker
 
 
 def email_classifier(settings: Settings) -> ChangeClassifier | None:
-    """The email door's model (spec 0086, Task 6b), only with DIALBACK_EMAIL_CLASSIFIER=rule+model. Otherwise
+    """The email door's model (spec 0086, Task 6b), only with DIALBACK_EMAIL_CLASSIFIER=model. Otherwise
     None: the rule alone flags, and no email text leaves Dialback."""
-    if settings.email_classifier is not ClassifierMode.RULE_AND_MODEL:
+    if settings.email_classifier is not ClassifierMode.MODEL:
         return None
     if not settings.anthropic_api_key:   # Settings.from_env refuses this too
-        raise ConfigurationError("ANTHROPIC_API_KEY is required when DIALBACK_EMAIL_CLASSIFIER=rule+model")
+        raise ConfigurationError("ANTHROPIC_API_KEY is required when DIALBACK_EMAIL_CLASSIFIER=model")
     return AnthropicClassifier(anthropic_client(settings.anthropic_api_key))
 
 

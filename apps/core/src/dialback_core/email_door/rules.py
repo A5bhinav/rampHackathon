@@ -152,16 +152,15 @@ class FlagDecision:
 
 
 def flag_email(subject: str, text: str, html_text: str, classifier: ChangeClassifier | None) -> FlagDecision:
-    """Whether the email asks to change where a vendor's payments go: the rule OR a quarantined model
-    (Sami's decision 11). The rule reads the subject with the text part, and with the HTML part's text;
-    when it flags, the model is not asked. Otherwise a configured classifier gets redact_for_model's
-    copies only (no numerals) of the subject, and model_text(text, html_text). The model can add a flag,
-    never remove the rule's. A ClassifierFailed propagates, so the inbox retries the email (R7). A missing
-    part (None) reads as empty."""
+    """Whether the email asks to change where a vendor's payments go. With a classifier, the quarantined
+    model alone decides (Sami's decision 12): it gets redact_for_model's copies only (no numerals) of the
+    subject, and model_text(text, html_text); the word rule is not consulted. A ClassifierFailed
+    propagates, so the inbox retries the email (R7). With no classifier, the rule decides, reading the
+    subject with the text part, and with the HTML part's text. A missing part (None) reads as empty."""
     subject, text, html_text = subject or "", text or "", html_text or ""
-    if flag(subject, text).flagged or (html_text != text and flag(subject, html_text).flagged):
-        return FlagDecision(True, "rule", None)
     if classifier is None:
+        if flag(subject, text).flagged or (html_text != text and flag(subject, html_text).flagged):
+            return FlagDecision(True, "rule", None)
         return FlagDecision(False, "none", None)
     verdict = classifier.classify(redact_for_model(subject), model_text(text, html_text))
     if verdict.change_request:

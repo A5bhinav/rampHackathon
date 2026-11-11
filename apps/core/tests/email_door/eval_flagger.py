@@ -1,11 +1,16 @@
-"""Task 6c: evaluate the email door's combined flagger (the rule OR the model) on the labeled emails.
+"""Tasks 6c and 6f: evaluate the email door's flagger on the labeled emails. Since Sami's decision 12 the model
+alone decides (flag_email with a classifier; the word rule is not consulted).
 
 A command-line script, not a test (pytest collects only test_*.py). It spends money and needs Anthropic
 credentials, so a person runs it, one set at a time, as the spec's pre-registered procedure says:
 
     cd apps/core && uv run python tests/email_door/eval_flagger.py --model claude-haiku-5-5 --sets tuning dev
 
-The sealed set needs `--sets heldout2 --confirm-heldout2` and runs only after its hash checks out.
+heldout2 is exploratory now (it needs `--confirm-heldout2` and a matching hash, and may be rerun). The sealed set
+is heldout3: `--sets heldout3 --confirm-heldout3`, once per model, only after its hash checks out. Add
+`--heldout2-revised` when any prompt revision was judged on heldout2: cr-04 and cr-10 then leave heldout3's bar
+and are reported separately. Change requests whose note starts `ON-FILE-ONLY:` are reported separately on
+heldout3 (the note's first characters are read to find them; no note text is ever printed or stored).
 Only counts and file names are printed or written: never the key, an email's text, a subject, a note, a
 vendor, or the model's quote.
 """
@@ -33,14 +38,18 @@ from dialback_core.email_door.rules import flag_email
 
 FIXTURES = Path(__file__).parent / "fixtures"
 OUT_DIR = Path(__file__).parent / "eval_results"
-SETS = {"tuning": "tuning", "dev": "heldout", "heldout2": "heldout2"}   # set name -> fixture directory
+SETS = {"tuning": "tuning", "dev": "heldout", "heldout2": "heldout2", "heldout3": "heldout3"}   # set name -> fixture directory
 DEFAULT_MODEL = "claude-haiku-5-5"
 MODELS = ("claude-haiku-5-5", "claude-opus-5-5")
-EXPECTED = {"tuning": (30, 62), "dev": (35, 65), "heldout2": (40, 70)}   # (change requests incl. cr-36, ordinary)
+EXPECTED = {"tuning": (30, 62), "dev": (35, 65), "heldout2": (40, 70), "heldout3": (40, 70)}   # (change requests incl. cr-36, ordinary)
 TELEMETRY_VAR = "ANTHROPIC_OPEN_TELEMETRY_TRACES_CONTENT_MODE"
 WORKERS = 4
 MAX_ORDINARY_FLAGGED = 3
 CR_36 = "cr-36.json"   # reported separately on heldout2
+REVISED_EXCLUDED = ("cr-04.json", "cr-10.json")   # leave heldout3's bar when heldout2 informed a prompt revision
+ON_FILE_ONLY = "ON-FILE-ONLY:"   # a change request's note starts with this when only the on-file check can catch it
+FLAGGER = "model"   # the flagger evaluated: the model alone decides (decision 12)
+SEALED = ("heldout3",)   # once per model, behind --confirm-<name>
 PRICES_PER_MILLION = {"claude-haiku-5-5": (0.10, 0.50), "claude-opus-5-5": (4.0, 20.0)}   # (input, output) USD
 
 
@@ -49,8 +58,8 @@ class EvalError(Exception):
 
 
 def read_set(directory: Path) -> tuple[dict[str, dict], str]:
-    """Each fixture's subject, text and label, and nothing else (never the note or the vendor), with NUL
-    bytes stripped as production does, plus the sha256 of the bytes read (the sealed-set check hashes
+    """Each fixture's subject, text and label, and whether its note starts with ON-FILE-ONLY: (a boolean; the
+    note itself is never kept), with NUL bytes stripped as production does, plus the sha256 of the bytes read (the sealed-set check hashes
     exactly what is run)."""
     out, blob = {}, b""
     for path in sorted(directory.glob("*.json")):
@@ -59,7 +68,8 @@ def read_set(directory: Path) -> tuple[dict[str, dict], str]:
         raw = json.loads(data)
         if raw["label"] not in ("change_request", "ordinary"):
             raise EvalError(f"{path.name} has a label that is neither change_request nor ordinary")
-        out[path.name] = {"subject": strip_nul(raw["subject"]), "text": strip_nul(raw["text"]), "label": raw["label"]}
+        out[path.name] = {"subject": strip_nul(raw["subject"]), "text": strip_nul(raw["text"]), "label": raw["label"],
+                           "on_file_only": str(raw.get("note", "")).startswith(ON_FILE_ONLY)}
     return out, hashlib.sha256(blob).hexdigest()
 
 
@@ -109,7 +119,7 @@ class TimedClassifier:
 
 
 def evaluate_set(name: str, emails: dict[str, dict], classifier: ChangeClassifier, *, model: str,
-                 workers: int = WORKERS) -> dict:
+                 workers: int = WORKERS, heldout2_revised: bool = False) -> dict:
     timed = TimedClassifier(classifier)
 
     def one(item: tuple[str, dict]) -> tuple[str, bool, str]:
@@ -132,8 +142,12 @@ def evaluate_set(name: str, emails: dict[str, dict], classifier: ChangeClassifie
     def is_cr(f: str) -> bool:
         return emails[f]["label"] == "change_request"
 
-    # On heldout2, cr-36 is reported on its own and left out of the change-request counts.
+    # On heldout2, cr-36 is reported on its own and left out of the change-request counts. On heldout3, the
+    # ON-FILE-ONLY change requests are, and so are cr-04 and cr-10 when heldout2 informed a prompt revision.
     separate = {CR_36} if name == "heldout2" and CR_36 in emails else set()
+    on_file_only = {f for f in emails if name == "heldout3" and is_cr(f) and emails[f]["on_file_only"]}
+    revised = {f for f in REVISED_EXCLUDED if name == "heldout3" and heldout2_revised and f in emails and is_cr(f)}
+    separate |= on_file_only | revised
     crs = [f for f in sorted(emails) if is_cr(f) and f not in separate]
     ords = [f for f in sorted(emails) if not is_cr(f)]
     assert len(crs) + len(ords) + len(separate) == len(emails)
@@ -141,11 +155,11 @@ def evaluate_set(name: str, emails: dict[str, dict], classifier: ChangeClassifie
     by = lambda f, who: outcomes[f] == (True, who) 
     in_tokens, out_tokens = getattr(classifier, "input_tokens", 0), getattr(classifier, "output_tokens", 0)
     result = {
-        "set": name, "model": model, "emails": len(emails),
+        "set": name, "model": model, "flagger": FLAGGER, "emails": len(emails),
         "change_requests_total": len(crs), "change_requests_flagged": sum(map(flagged, crs)),
-        "change_requests_by_rule": sum(by(f, "rule") for f in crs), "change_requests_by_model": sum(by(f, "model") for f in crs),
+        "change_requests_by_model": sum(by(f, "model") for f in crs),
         "ordinary_total": len(ords), "ordinary_flagged": sum(map(flagged, ords)),
-        "ordinary_by_rule": sum(by(f, "rule") for f in ords), "ordinary_by_model": sum(by(f, "model") for f in ords),
+        "ordinary_by_model": sum(by(f, "model") for f in ords),
         "failures": dict(sorted(failures.items())), "failed": dict(sorted(failed.items())),
         "missed": [f for f in crs if not flagged(f)], "false_flags": [f for f in ords if flagged(f)],
         "calls": getattr(classifier, "calls", 0), "input_tokens": in_tokens, "output_tokens": out_tokens,
@@ -159,6 +173,14 @@ def evaluate_set(name: str, emails: dict[str, dict], classifier: ChangeClassifie
         result["cr_36"] = {"flagged": cr36_flagged}
         result["bar_without_cr_36"] = "PASS" if without else "FAIL"          # the pre-registered bar
         result["bar_with_cr_36"] = "PASS" if without and cr36_flagged else "FAIL"
+    if name == "heldout3":
+        ok_ordinary = result["ordinary_flagged"] <= MAX_ORDINARY_FLAGGED
+        without = not result["missed"] and ok_ordinary
+        result["on_file_only"] = {f: flagged(f) for f in sorted(on_file_only)}
+        result["heldout2_revised"] = heldout2_revised
+        result["excluded_after_heldout2_revision"] = {f: flagged(f) for f in sorted(revised)}
+        result["bar_without_on_file_only"] = "PASS" if without else "FAIL"   # the pre-registered bar
+        result["bar_with_on_file_only"] = "PASS" if without and all(flagged(f) for f in on_file_only) else "FAIL"
     return result
 
 
@@ -166,11 +188,9 @@ def table(r: dict) -> str:
     cost = "unknown" if r["cost_usd"] is None else f"${r['cost_usd']:.4f}"
     lat = lambda v: "n/a" if v is None else f"{v:.2f}s" 
     lines = [
-        f"== {r['set']} ({r['model']}) ==",
-        (f"change requests flagged {r['change_requests_flagged']}/{r['change_requests_total']} "
-         f"(rule {r['change_requests_by_rule']}, model {r['change_requests_by_model']})"),
-        (f"ordinary flagged        {r['ordinary_flagged']}/{r['ordinary_total']} "
-         f"(rule {r['ordinary_by_rule']}, model {r['ordinary_by_model']})"),
+        f"== {r['set']} ({r['model']}, flagger: {r['flagger']}) ==",
+        f"change requests flagged {r['change_requests_flagged']}/{r['change_requests_total']}",
+        f"ordinary flagged        {r['ordinary_flagged']}/{r['ordinary_total']}",
         f"failures (counted as not flagged): {r['failures'] or 'none'}",
         f"failed by file: {r['failed'] or 'none'}",
         f"missed: {r['missed'] or 'none'}",
@@ -182,6 +202,11 @@ def table(r: dict) -> str:
         lines += [f"{CR_36} (separate): {'flagged' if r['cr_36']['flagged'] else 'NOT flagged'}",
                   f"bar without {CR_36} (the pre-registered bar): {r['bar_without_cr_36']}",
                   f"bar with {CR_36}: {r['bar_with_cr_36']}"]
+    if "on_file_only" in r:
+        lines += [f"ON-FILE-ONLY (separate): flagged {sum(r['on_file_only'].values())}/{len(r['on_file_only'])}: {r['on_file_only'] or 'none'}",
+                  f"cr-04 and cr-10 excluded after a heldout2 revision: {r['excluded_after_heldout2_revision'] or 'none'}",
+                  f"bar without the ON-FILE-ONLY ones (the pre-registered bar): {r['bar_without_on_file_only']}",
+                  f"bar with them: {r['bar_with_on_file_only']}"]
     return "\n".join(lines)
 
 
@@ -199,6 +224,9 @@ def main(argv: list[str] | None = None, *, fixtures: Path = FIXTURES, out_dir: P
     parser.add_argument("--model", choices=MODELS, default=DEFAULT_MODEL)
     parser.add_argument("--sets", nargs="+", choices=sorted(SETS), default=["tuning", "dev"])
     parser.add_argument("--confirm-heldout2", action="store_true")
+    parser.add_argument("--confirm-heldout3", action="store_true")
+    parser.add_argument("--heldout2-revised", action="store_true",
+                        help="a prompt revision was judged on heldout2: cr-04 and cr-10 leave heldout3's bar")
     args = parser.parse_args(argv)
     sets = list(dict.fromkeys(args.sets))
     expected = expected or EXPECTED
@@ -209,14 +237,13 @@ def main(argv: list[str] | None = None, *, fixtures: Path = FIXTURES, out_dir: P
             raise EvalError(f"{TELEMETRY_VAR} would put email text in trace spans; unset it (or use metadata)")
         loaded = {}
         for name in sets:
-            if name == "heldout2":
-                if not args.confirm_heldout2:
-                    raise EvalError("heldout2 is sealed and runs once: pass --confirm-heldout2 to run it")
-                if list(out_dir.glob(f"*-{safe_model}-heldout2.json")):
-                    raise EvalError(f"a heldout2 result for {args.model} already exists in {out_dir.name}; it runs once")
+            if name in ("heldout2", "heldout3") and not getattr(args, f"confirm_{name}"):
+                raise EvalError(f"{name} is held back: pass --confirm-{name} to run it")
+            if name in SEALED and list(out_dir.glob(f"*-{safe_model}-{name}.json")):
+                raise EvalError(f"a {name} result for {args.model} already exists in {out_dir.name}; it runs once")
             emails, digest = read_set(fixtures / SETS[name])
-            if name == "heldout2" and digest != (fixtures / "heldout2.sha256").read_text().split()[0]:
-                raise EvalError("the heldout2 hash does not match heldout2.sha256; refusing to run")
+            if name in ("heldout2", "heldout3") and digest != (fixtures / f"{name}.sha256").read_text().split()[0]:
+                raise EvalError(f"the {name} hash does not match {name}.sha256; refusing to run")
             check_composition(name, emails, expected[name])
             loaded[name] = emails
         classifier = make_classifier(args.model)
@@ -228,7 +255,7 @@ def main(argv: list[str] | None = None, *, fixtures: Path = FIXTURES, out_dir: P
     for name in sets:
         # Totals are per classifier instance, so each set's usage is the difference.
         before = (getattr(classifier, "input_tokens", 0), getattr(classifier, "output_tokens", 0), getattr(classifier, "calls", 0))
-        result = evaluate_set(name, loaded[name], classifier, model=args.model)
+        result = evaluate_set(name, loaded[name], classifier, model=args.model, heldout2_revised=args.heldout2_revised)
         result["input_tokens"] -= before[0]
         result["output_tokens"] -= before[1]
         result["calls"] -= before[2]

@@ -94,33 +94,30 @@ def load_tuning() -> dict[str, dict]:
 
 # The combined flag ----------------------------------------------------------------------------------
 
-def test_the_model_can_add_a_flag_but_never_remove_the_rules():
+def test_with_a_classifier_the_model_alone_decides_and_the_rule_is_not_consulted():
     emails = load_tuning()
     rule_flags = {name: flag(e["subject"], e["text"]).flagged for name, e in emails.items()}
     assert 0 < sum(rule_flags.values()) < len(emails)   # both kinds are present, so the check can fail
     for name, e in emails.items():
         no = flag_email(e["subject"], e["text"], "", FakeClassifier(Verdict(False, "")))
         yes = flag_email(e["subject"], e["text"], "", FakeClassifier(Verdict(True, "the quote")))
-        if rule_flags[name]:
-            assert no == yes == FlagDecision(True, "rule", None), name
-        else:
-            assert no == FlagDecision(False, "none", None), name
-            assert yes == FlagDecision(True, "model", "the quote"), name
+        assert no == FlagDecision(False, "none", None), name   # even where the rule would flag
+        assert yes == FlagDecision(True, "model", "the quote"), name   # and where it would not
 
 
-def test_the_model_is_asked_only_when_the_rule_says_no():
+def test_the_model_is_asked_every_time_even_when_the_rule_would_flag():
     model = FakeClassifier(Verdict(False, ""))
-    assert flag_email("Bank details", ASKS, "", model) == FlagDecision(True, "rule", None)
-    assert model.calls == []
-    assert flag_email("October invoice", PLAIN, "", model) == FlagDecision(False, "none", None)
+    assert flag_email("Bank details", ASKS, "", model) == FlagDecision(False, "none", None)
     assert len(model.calls) == 1
+    assert flag_email("October invoice", PLAIN, "", model) == FlagDecision(False, "none", None)
+    assert len(model.calls) == 2
 
 
-def test_the_rule_reads_the_html_part_too():
+def test_the_model_reads_the_html_part_too_and_the_rule_does_not_decide():
     for text, html in ((PLAIN, ASKS), (ASKS, PLAIN)):
         model = FakeClassifier(Verdict(False, ""))
-        assert flag_email("October invoice", text, html, model) == FlagDecision(True, "rule", None)
-        assert model.calls == []
+        assert flag_email("October invoice", text, html, model) == FlagDecision(False, "none", None)
+        assert len(model.calls) == 1
 
 
 def test_without_a_classifier_the_rule_decides_alone():
@@ -134,8 +131,9 @@ def test_a_classifier_failure_propagates(reason):
     with pytest.raises(ClassifierFailed) as err:
         flag_email("October invoice", PLAIN, "", model)
     assert err.value.reason == reason
-    # The rule's flag never waits on the model: a failing model is not even asked.
-    assert flag_email("October invoice", ASKS, "", model) == FlagDecision(True, "rule", None)
+    # The rule's opinion does not spare the email: the model is asked, and its failure propagates.
+    with pytest.raises(ClassifierFailed):
+        flag_email("October invoice", ASKS, "", model)
 
 
 def test_the_model_sees_no_numeral_however_the_email_writes_them():
@@ -205,8 +203,9 @@ def test_missing_parts_read_as_empty():
     model = FakeClassifier(Verdict(False, ""))
     assert flag_email("October invoice", PLAIN, None, model) == FlagDecision(False, "none", None)
     assert flag_email(None, None, None, model) == FlagDecision(False, "none", None)
-    assert flag_email("October invoice", None, ASKS, model) == FlagDecision(True, "rule", None)
-    assert model.calls == [("October invoice", redact_for_model(PLAIN)), ("", "")]
+    assert flag_email("October invoice", None, ASKS, model) == FlagDecision(False, "none", None)
+    assert model.calls == [("October invoice", redact_for_model(PLAIN)), ("", ""),
+                           ("October invoice", model_text("", ASKS))]
 
 
 # The classifier's fixed constants -------------------------------------------------------------------
@@ -223,7 +222,7 @@ def test_the_schema_and_the_system_prompt_are_fixed_constants():
     assert "Every digit in the email was replaced with #" in prompt
     assert "a short exact quote from the email that shows the request" in prompt
     assert "empty when change_request is false" in prompt
-    assert MODEL == "claude-opus-5-5"
+    assert MODEL == "claude-haiku-5-5"
 
 
 def test_the_model_is_pinned_in_one_place():
@@ -235,7 +234,7 @@ def test_the_model_is_pinned_in_one_place():
 
 def test_the_request_is_pinned():
     client = FakeAnthropic(message(reply(False, "")))
-    AnthropicClassifier(client).classify("October invoice", "Please find the invoice attached.")
+    AnthropicClassifier(client, model="claude-opus-5-5").classify("October invoice", "Please find the invoice attached.")
     (sent,) = client.calls
     assert set(sent) == {"model", "max_tokens", "system", "messages", "output_config", "betas", "fallbacks"}
     assert sent["model"] == "claude-opus-5-5" and sent["max_tokens"] == 8192
@@ -253,14 +252,14 @@ def test_the_request_is_pinned():
 def test_a_good_reply_parses_into_a_verdict():
     for text, verdict in ((reply(True, "send future payments to our new bank"), Verdict(True, "send future payments to our new bank")),
                           (reply(False, ""), Verdict(False, ""))):
-        assert AnthropicClassifier(FakeAnthropic(message(text))).classify("Subject", "Text") == verdict
+        assert AnthropicClassifier(FakeAnthropic(message(text)), model="claude-opus-5-5").classify("Subject", "Text") == verdict
 
 
 def test_after_a_fallback_only_the_serving_models_answer_is_read():
     declined = [{"type": "text", "text": '{"change_req'},
                 {"type": "fallback", "from": {"model": MODEL}, "to": {"model": "claude-opus-5"},
                  "trigger": {"type": "refusal", "category": "cyber"}}]
-    got = AnthropicClassifier(FakeAnthropic(message(reply(True, "our new bank"), before=declined))).classify("S", "T")
+    got = AnthropicClassifier(FakeAnthropic(message(reply(True, "our new bank"), before=declined)), model="claude-opus-5-5").classify("S", "T")
     assert got == Verdict(True, "our new bank")
 
 
@@ -306,7 +305,7 @@ FAILURES = [
 def test_every_failure_is_one_typed_error_without_email_text(what, outcome, reason, caplog):
     caplog.set_level(logging.DEBUG)
     with pytest.raises(ClassifierFailed) as err:
-        AnthropicClassifier(FakeAnthropic(outcome)).classify("Bank update", EMAIL_TEXT)
+        AnthropicClassifier(FakeAnthropic(outcome), model="claude-opus-5-5").classify("Bank update", EMAIL_TEXT)
     exc = err.value
     assert exc.reason == reason
     assert exc.__cause__ is None and exc.__context__ is None   # no SDK error or decode error rides along
@@ -323,7 +322,7 @@ def test_every_failure_is_one_typed_error_without_email_text(what, outcome, reas
 def test_input_with_a_numeral_is_refused_before_any_call(subject, text):
     client = FakeAnthropic(message(reply(False, "")))
     with pytest.raises(ClassifierFailed) as err:
-        AnthropicClassifier(client).classify(subject, text)
+        AnthropicClassifier(client, model="claude-opus-5-5").classify(subject, text)
     assert err.value.reason == "schema" and client.calls == []
     assert "0001" not in str(err.value)
 
@@ -332,7 +331,7 @@ def test_the_sdk_loggers_stay_quiet():
     names = ("anthropic", "anthropic._base_client", "httpx2", "httpcore2")
     for name in names:
         logging.getLogger(name).setLevel(logging.DEBUG)
-    model = AnthropicClassifier(FakeAnthropic(message(reply(False, ""))))
+    model = AnthropicClassifier(FakeAnthropic(message(reply(False, ""))), model="claude-opus-5-5")
     assert {logging.getLogger(n).level for n in names} == {logging.WARNING}
     for name in names:
         logging.getLogger(name).setLevel(logging.DEBUG)
@@ -344,7 +343,7 @@ def test_the_sdk_loggers_stay_quiet():
 
 def sdk_classifier(handler, retries: int | None = None) -> AnthropicClassifier:
     client = anthropic_client("sk-ant-test-only", http_client=httpx2.Client(transport=httpx2.MockTransport(handler)))
-    return AnthropicClassifier(client if retries is None else client.with_options(max_retries=retries))
+    return AnthropicClassifier(client if retries is None else client.with_options(max_retries=retries), model="claude-opus-5-5")
 
 
 def api_body(text: str) -> dict:
@@ -404,28 +403,28 @@ ENV = {"DATABASE_URL": "postgresql://x", "RAMP_BASE_URL": "http://ramp", "RAMP_W
        "INTERNAL_API_TOKEN": "i" * 24, "DIALBACK_JWT_SECRET": "j" * 32}
 
 
-def test_the_flag_defaults_to_the_rule_and_rule_and_model_needs_an_anthropic_key():
+def test_the_flag_defaults_to_the_rule_and_model_needs_an_anthropic_key():
     assert Settings.from_env(ENV).email_classifier is ClassifierMode.RULE
-    for unknown in ("", "model", "llm", "rule+llm", "rule,model"):
+    for unknown in ("", "rule+model", "llm", "rule+llm", "rule,model"):
         assert Settings.from_env(ENV | {"DIALBACK_EMAIL_CLASSIFIER": unknown}).email_classifier is ClassifierMode.RULE
     for missing in ({}, {"ANTHROPIC_API_KEY": ""}, {"ANTHROPIC_API_KEY": "   "}):
         with pytest.raises(ConfigurationError, match="ANTHROPIC_API_KEY"):
-            Settings.from_env(ENV | {"DIALBACK_EMAIL_CLASSIFIER": "rule+model"} | missing)
+            Settings.from_env(ENV | {"DIALBACK_EMAIL_CLASSIFIER": "model"} | missing)
     key = "sk-ant-test-only-value"
-    on = Settings.from_env(ENV | {"DIALBACK_EMAIL_CLASSIFIER": " Rule+Model ", "ANTHROPIC_API_KEY": key})
-    assert on.email_classifier is ClassifierMode.RULE_AND_MODEL and on.anthropic_api_key == key
+    on = Settings.from_env(ENV | {"DIALBACK_EMAIL_CLASSIFIER": " Model ", "ANTHROPIC_API_KEY": key})
+    assert on.email_classifier is ClassifierMode.MODEL and on.anthropic_api_key == key
     assert key not in repr(on)
     assert Settings.from_env(ENV | {"ANTHROPIC_API_KEY": key}).anthropic_api_key is None   # the rule alone keeps no key
 
 
-def test_the_worker_gets_the_model_only_with_rule_and_model():
+def test_the_worker_gets_the_model_only_with_model():
     assert email_classifier(core_settings()) is None
     assert email_classifier(core_settings(anthropic_api_key="sk-ant-test-only")) is None
-    model = email_classifier(core_settings(email_classifier=ClassifierMode.RULE_AND_MODEL, anthropic_api_key="sk-ant-test-only"))
+    model = email_classifier(core_settings(email_classifier=ClassifierMode.MODEL, anthropic_api_key="sk-ant-test-only"))
     assert isinstance(model, AnthropicClassifier)
     assert str(model.client.base_url).rstrip("/") == "https://api.anthropic.com" and model.client.timeout == 30.0
     with pytest.raises(ConfigurationError, match="ANTHROPIC_API_KEY"):
-        email_classifier(core_settings(email_classifier=ClassifierMode.RULE_AND_MODEL))
+        email_classifier(core_settings(email_classifier=ClassifierMode.MODEL))
     assert Worker(None, core_settings(), None, None, None, classifier=model).classifier is model
     assert Worker(None, core_settings(), None, None, None).classifier is None
 
@@ -472,7 +471,7 @@ def record_opened(monkeypatch) -> list[Opened]:
 @pytest.mark.anyio
 async def test_the_lifespan_closes_what_it_opened_when_the_classifier_cannot_be_built(monkeypatch):
     opened = record_opened(monkeypatch)
-    settings = core_settings(run_worker=True, email_classifier=ClassifierMode.RULE_AND_MODEL)   # and no key
+    settings = core_settings(run_worker=True, email_classifier=ClassifierMode.MODEL)   # and no key
     app = create_app(settings, connector=object())
     with pytest.raises(ConfigurationError, match="ANTHROPIC_API_KEY"):
         async with app.router.lifespan_context(app):
@@ -526,17 +525,20 @@ def test_haiku_uses_the_plain_endpoint_without_betas_or_fallbacks():
     assert sent["output_config"] == {"effort": "medium", "format": {"type": "json_schema", "schema": SCHEMA}}
 
 
-def test_the_default_model_keeps_the_beta_request():
+def test_the_default_model_is_haiku_on_the_plain_endpoint_and_opus_keeps_the_beta_request():
     client = FakeBothEndpoints(message(reply(False, "")))
     AnthropicClassifier(client).classify("S", "T")
+    assert client.calls == [] and client.plain_calls[0]["model"] == MODEL == "claude-haiku-5-5"
+    client = FakeBothEndpoints(message(reply(False, "")))
+    AnthropicClassifier(client, model="claude-opus-5-5").classify("S", "T")
     assert client.plain_calls == []
     (sent,) = client.calls
-    assert sent["model"] == MODEL == "claude-opus-5-5"
+    assert sent["model"] == "claude-opus-5-5"
     assert sent["betas"] == ["server-side-fallback-2026-07-01"] and sent["fallbacks"] == "default"
 
 
 def test_token_usage_accumulates_over_successful_calls():
-    model = AnthropicClassifier(FakeBothEndpoints(message(reply(False, ""))))
+    model = AnthropicClassifier(FakeBothEndpoints(message(reply(False, ""))), model="claude-opus-5-5")
     assert (model.input_tokens, model.output_tokens, model.calls) == (0, 0, 0)
     model.classify("S", "T")
     model.classify("S", "T")
@@ -544,7 +546,7 @@ def test_token_usage_accumulates_over_successful_calls():
 
 
 def test_a_failed_call_adds_no_usage():
-    model = AnthropicClassifier(FakeBothEndpoints(anthropic.APIConnectionError(request=httpx2.Request("POST", "https://x"))))
+    model = AnthropicClassifier(FakeBothEndpoints(anthropic.APIConnectionError(request=httpx2.Request("POST", "https://x"))), model="claude-opus-5-5")
     with pytest.raises(ClassifierFailed):
         model.classify("S", "T")
     assert (model.input_tokens, model.output_tokens, model.calls) == (0, 0, 0)

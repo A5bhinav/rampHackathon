@@ -38,7 +38,7 @@ The reply (PR 5), the mail list and case page additions (PR 6), dismissing a blo
 - A second change on an open case is matched by the ledger against the first request only (`store.py::_inputs` reads the request recorded before the case opened), so a phone first seen in a later email is not a candidate at all. Safe (never picked), but the lineage panel does not list it.
 - An orphaned change request: when the ledger write commits and the case transaction then fails, the email is `failed` with no case, but its document stays the vendor's latest change request, and a later Ramp-detected case for that vendor would adopt it as its change context.
 - `on_file_mismatch` (a silent change) has no stored reason yet: the row shows only `flagged`. Recording why an email was flagged needs a contract change in its own PR.
-- The model call (`DIALBACK_EMAIL_CLASSIFIER=rule+model`, up to 30 s per attempt) runs while the inbox's claim transaction holds a pooled connection, so slow model calls can tie up connections.
+- The model call (`DIALBACK_EMAIL_CLASSIFIER=model`, up to 30 s per attempt) runs while the inbox's claim transaction holds a pooled connection, so slow model calls can tie up connections.
 - An account labeled more than 1,000,000 characters into a part, whose digits also appear as a phone in the first 50,000, would still reach the ledger as that phone. Larger reach costs time on every email.
 
 ## Commands

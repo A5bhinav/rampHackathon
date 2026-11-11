@@ -86,7 +86,7 @@ async def process_inbound_emails(pool: AsyncConnectionPool, settings: Settings, 
     """Fetch and record the stored Resend deliveries (all datasets, or one). Returns how many were finished.
 
     Any error on one email counts a try for that email only; it never stops the others or the rest of the tick.
-    `classifier` is the email door's model (DIALBACK_EMAIL_CLASSIFIER=rule+model), else None.
+    `classifier` is the email door's model (DIALBACK_EMAIL_CLASSIFIER=model), else None.
     """
     handled, claimed, seen = 0, 0, set()
     while claimed < limit:  # every claimed row counts, so a tick's work is bounded whatever the fetches do

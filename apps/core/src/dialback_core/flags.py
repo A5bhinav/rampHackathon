@@ -27,8 +27,8 @@ class EmailMode(StrEnum):
 
 
 class ClassifierMode(StrEnum):
-    RULE = "rule"                  # safe: the word rule alone flags an email; no email text leaves Dialback
-    RULE_AND_MODEL = "rule+model"  # the rule OR a quarantined model (spec 0086, Sami's decision 11)
+    RULE = "rule"    # safe: the word rule alone flags an email; no email text leaves Dialback
+    MODEL = "model"  # a quarantined model alone decides the flag (spec 0086, Sami's decision 12)
 
 
 def read_flag[E: StrEnum](name: str, kind: type[E], safe: E, environ: dict[str, str] | None = None) -> E:
