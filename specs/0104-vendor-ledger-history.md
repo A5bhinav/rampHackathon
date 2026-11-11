@@ -38,6 +38,16 @@ seen, by source" chart, and the vendor's documents with the exact text each numb
   (reasons.py). Labels and empty states are the page's. "Provable" or "not provable", never "safe".
 - **D6. Reuse.** The lane chart and the every-number table move from the case lineage page into a
   shared component; the case page looks the same.
+- **D7. Each dot at its own source's date (vendor page).** The chart has drawn every dot of a number
+  at the number's overall first-seen date, in every lane, although its caption says "first sighting
+  in that source": so a number's dots stack in one column, and the vendor master dot sits at the
+  first counting date. The vendor page places each dot at the number's earliest visible sighting in
+  a document of that channel received by the cutoff (the vendor master channel is the "vendor
+  master" lane), from the documents the endpoint returns: no contract change. Limits: an email from
+  outside the vendor's domains still dates the email dot (the rule doesn't count it); with more
+  than 500 documents the oldest are missing, and a lane with none falls back to the number's
+  first-seen date. Two numbers first seen in one document still share a spot; the chosen dot is
+  drawn last, so it is the one that shows.
 
 ## Acceptance
 
@@ -58,7 +68,8 @@ seen, by source" chart, and the vendor's documents with the exact text each numb
 - [ ] 6. The page `/d/[datasetId]/control/trust-ledger/[vendorId]` shows the vendor's status badge
       and `status_text`, the lane chart and every-number table with `reason_text` sentences, and the
       documents with their observations and quotes as plain text. Each Trust Ledger row links to it.
-      An unknown vendor shows the not-found page.
+      An unknown vendor shows the not-found page. Each chart dot sits at that number's first
+      sighting in that source (D7): Acme's vendor master dot at its vendor master record's date.
 - [ ] 7. The lineage helpers take the as-of-now run (`split`, `lanePoints`), and the case lineage
       page's tests pass unchanged.
 
@@ -93,6 +104,11 @@ counts as change context or doesn't count; paging past 500 documents.
   On this page the rule runs as of now with no request, so the page labels its cutoff "the cutoff"
   while the reasons beside it say "the request". The page shows them as written. Should the ledger
   add as-of-now wordings, or one wording that reads right in both places?
+- **Q224:** The case lineage page draws the same chart with the same caption, which is false there
+  too: the selection has no per-source dates, so each number's dots sit at its overall first-seen
+  date. Either change that page's caption to say what it shows, or add per-source first-seen dates
+  to the selection contract (`Candidate`) first, then draw them. Not chosen here; the case page is
+  unchanged until this is answered.
 
 ## Commands
 
