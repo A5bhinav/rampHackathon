@@ -1,0 +1,8 @@
+{
+  "subject": "URGENT - change of payment account",
+  "sender": "Sam Ortiz <sortiz@brightline-office.example>",
+  "text": "URGENT.\n\nBrightline Office Supply Inc is switching banks this week and our old account is frozen.\nDo NOT pay the open invoices to the old account. Wire to the new one today:\nRouting 121000248 / Account 5530-7781-02\n\nPlease confirm by return email asap.",
+  "label": "change_request",
+  "vendor": "brightline",
+  "note": "Urgent, tells AP not to pay old account; lookalike sender domain is a fraud signal but the label is about content."
+}

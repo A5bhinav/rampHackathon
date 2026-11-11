@@ -1,0 +1,8 @@
+{
+  "subject": "Acme expense approval",
+  "sender": "Marc Lopez <marc@ourco.example>",
+  "text": "Approved. Go ahead and pay Acme per terms. No changes to their details, same as last time.",
+  "label": "ordinary",
+  "vendor": "acme",
+  "note": "Internal with 'no changes' phrasing."
+}

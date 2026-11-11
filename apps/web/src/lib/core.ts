@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { sessionToken } from "./session";
 import type {
   ActionResult, AdminLog, Alert, ApiError, BankChangeResult, CaseDetail, CaseState, CaseSummary, ChainStatus, Dataset, DemoState,
-  EvidenceLog, Me, PersonAdminView, Role, SelectionView, VendorAccounts, VendorRisk,
+  EvidenceLog, MailItem, Me, PersonAdminView, Role, SelectionView, VendorAccounts, VendorRisk,
 } from "./api-types";
 import { ACCESS_OFF } from "./people";
 
@@ -40,6 +40,9 @@ export const core = {
   me: () => call<Me>("/api/me"),
   datasets: () => call<{ datasets: Dataset[] }>("/api/datasets").then((r) => r.datasets),
   evidence: (datasetId: string) => call<EvidenceLog>(`/api/datasets/${datasetId}/evidence`),
+  /** What the email door did with each inbound email, newest first. No body, no full account number. */
+  mail: (datasetId: string) =>
+    call<{ items: MailItem[] }>(`/api/datasets/${encodeURIComponent(datasetId)}/mail`).then((r) => r.items),
   chain: (datasetId: string) => call<ChainStatus>(`/api/datasets/${datasetId}/chain`),
   alerts: (datasetId: string) => call<{ alerts: Alert[] }>(`/api/datasets/${datasetId}/alerts`).then((r) => r.alerts),
   vendorRisk: (datasetId: string) =>

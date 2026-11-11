@@ -1,0 +1,8 @@
+{
+  "subject": "Vendor master cleanup - missing fields",
+  "sender": "Jen Park <jpark@northgate-mfg.com>",
+  "text": "Karen,\n\nRan the vendor master report. Records with missing or stale fields:\n\n- Hollis Landscaping: no W-9 on file\n- Kestrel IT Consulting: 1099 flag not set\n- Pinecrest Janitorial: COI expiry blank\n- 14 inactive vendors with bank accounts still populated (list attached) - do we purge the bank fields or just inactivate?\n\nLet me know how you want to handle the bank fields on inactive records.\n\nJen",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Internal housekeeping that mentions bank fields in the vendor master, with no request to change any vendor's destination."
+}

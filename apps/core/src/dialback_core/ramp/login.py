@@ -28,6 +28,7 @@ class RampLogin:
         self._http, self._clock = http, clock
         self._token: str | None = None
         self._renew_at = 0.0
+        self.granted: tuple[str, ...] | None = None  # the scopes Ramp's last login answer listed, if it listed any
         self._lock = asyncio.Lock()
 
     async def token(self) -> str:
@@ -54,4 +55,6 @@ class RampLogin:
             token, lifetime = str(body["access_token"]), float(body["expires_in"])
         except (ValueError, KeyError, TypeError):
             raise RampError("Ramp login: the answer carried no token", retryable=False) from None
+        scope = body.get("scope")
+        self.granted = tuple(scope.split()) if isinstance(scope, str) and scope.strip() else None
         return token, started + lifetime - RENEW_BEFORE_SECONDS

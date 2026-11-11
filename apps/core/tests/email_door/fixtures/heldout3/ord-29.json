@@ -1,0 +1,8 @@
+{
+  "subject": "Open enrollment and direct deposit reminders",
+  "sender": "Northgate HR <hr@northgate-mfg.com>",
+  "text": "All employees,\n\nOpen enrollment closes November 20. Also a reminder that direct deposit changes for payroll are made only through Workday self-service, never by emailing HR or Finance. If you receive an email asking you to confirm or change your direct deposit, report it to IT.\n\nNorthgate HR",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Internal HR announcement; mentions direct deposit changes only as something not to request by email."
+}

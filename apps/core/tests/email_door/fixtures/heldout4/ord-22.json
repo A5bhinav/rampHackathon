@@ -1,0 +1,8 @@
+{
+  "subject": "Your mailbox password expires today",
+  "sender": "Microsoft 365 Admin <admin@m365-alerts.example>",
+  "text": "Your password for rokafor@tallismfg.com expires today. To keep your current password, verify your account immediately:\n\nhttps://m365-alerts.example/verify\n\nFailure to verify will result in account suspension.",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Credential phish, no payment instruction."
+}

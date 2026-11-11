@@ -1,0 +1,8 @@
+{
+  "subject": "Webinar: Stopping business email compromise",
+  "sender": "Webinar <webinars@treasuryhub.example>",
+  "text": "Join our experts to learn how fraudsters change vendor bank details and how to verify\nrequests safely. Register free.",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Contains BEC vocabulary but is a webinar ad; a good false-positive trap."
+}

@@ -1,0 +1,8 @@
+{
+  "subject": "Reconciliation request",
+  "sender": "Pam Ito <pam@ito-accounting.example>",
+  "text": "Could you send a ledger export of everything you show open for us, so we can reconcile before year end?",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Recon request."
+}

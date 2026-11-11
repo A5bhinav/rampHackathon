@@ -1,0 +1,8 @@
+{
+  "subject": "Request to revise payment terms",
+  "sender": "Margaret Ostrowski <m.ostrowski@acmefasteners.com>",
+  "text": "Hi Melissa,\n\nAs we discussed at the last review, we'd like to propose moving Larkspur's terms from Net 30 to Net 20 starting with January invoices, in exchange for holding 2026 pricing on the stainless line through Q1. Payment method and bank details stay as they are.\n\nLet me know if you need anything formal from us, or if this needs to go through procurement.\n\nThanks,\nMargaret",
+  "label": "ordinary",
+  "vendor": "acme",
+  "note": "Payment-terms change (when, not where); explicitly keeps method and bank."
+}

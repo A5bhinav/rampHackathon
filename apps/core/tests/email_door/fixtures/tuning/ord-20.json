@@ -1,0 +1,8 @@
+{
+  "subject": "New in Ramp: October release notes",
+  "sender": "Ramp <news@ramp.example>",
+  "text": "We shipped bill pay improvements, faster approvals and a new vendor directory. See what is new.",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Product newsletter."
+}

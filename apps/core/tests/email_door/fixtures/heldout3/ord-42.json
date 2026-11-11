@@ -1,0 +1,8 @@
+{
+  "subject": "Payment received - thank you",
+  "sender": "billing@cobaltfreight.com",
+  "text": "Hi,\n\nConfirming receipt of $9,204.25 by ACH on 11/06 into our account ending 7888, applied to CF-20802, CF-20844 and CF-20931 (net of the $212.40 credit). Your account is current.\n\nCobalt Freight Billing",
+  "label": "ordinary",
+  "vendor": "cobalt",
+  "note": "Receipt confirmation referencing the on-file account."
+}

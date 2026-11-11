@@ -1,0 +1,8 @@
+{
+  "subject": "PO 90417 issued",
+  "sender": "Purchasing <po@ourco.example>",
+  "text": "PO 90417 to Silverline HVAC for $2,500 has been issued. Invoice against this PO number.",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Internal PO."
+}

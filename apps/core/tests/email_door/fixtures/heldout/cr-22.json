@@ -1,0 +1,8 @@
+{
+  "subject": "Re: remittance",
+  "sender": "Sam Ortiz <ar@brightline.example>",
+  "text": "Per my previous email (which you may not have received) the payments for Brightline Office\nSupply Inc must go to the new bank. Please call me at 312-555-0190 to verify the\naccount number, as I prefer not to send it by email.",
+  "label": "change_request",
+  "vendor": "brightline",
+  "note": "Details by phone to a number in the email."
+}

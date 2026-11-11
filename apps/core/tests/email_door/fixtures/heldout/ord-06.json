@@ -1,0 +1,8 @@
+{
+  "subject": "Receipt 20118",
+  "sender": "Dana Whitfield <ar@acme.example>",
+  "text": "Acme Fasteners LLC acknowledges payment of $2,310.50 received Nov 8. Many thanks.",
+  "label": "ordinary",
+  "vendor": "acme",
+  "note": "Receipt."
+}

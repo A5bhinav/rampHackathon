@@ -1,0 +1,8 @@
+{
+  "subject": "Receipt from Daily Grind Cafe",
+  "sender": "Square <receipts@squareup-mail.example>",
+  "text": "Total $14.50. Paid with Mastercard ending 0097.",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Card receipt."
+}

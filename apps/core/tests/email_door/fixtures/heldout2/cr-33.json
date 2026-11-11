@@ -1,0 +1,8 @@
+{
+  "subject": "Correction to our account number",
+  "sender": "Greg Hollis <ghollis@acmefasteners.com>",
+  "text": "Hi,\n\nJust a quick note - this is NOT a change of bank. We're still at Chase, same routing number (021000021). It looks like the account number on our original setup form had a typo. The correct account number is 000011112299, not the one ending 2222. Please correct it in your system so our next payment doesn't get rejected.\n\nThanks,\nGreg\nAcme Fasteners",
+  "label": "change_request",
+  "vendor": "acme",
+  "note": "Adversarial framing: explicitly says 'NOT a change of bank' and calls it a typo fix, same routing, but the account number differs from on file (ends 2299 vs 2222), so money would land somewhere new."
+}

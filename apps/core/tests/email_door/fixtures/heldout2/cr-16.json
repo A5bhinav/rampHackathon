@@ -1,0 +1,8 @@
+{
+  "subject": "Aenderung unserer Bankverbindung",
+  "sender": "Buchhaltung Kessler Logistik <buchhaltung@kessler-logistik.de>",
+  "text": "Sehr geehrte Damen und Herren,\n\nhiermit teilen wir Ihnen mit, dass sich unsere Bankverbindung geaendert hat. Bitte ueberweisen Sie ab sofort alle offenen und zukuenftigen Rechnungsbetraege ausschliesslich auf das folgende Konto:\n\nKontoinhaber: Kessler Logistik GmbH\nBank: Commerzbank AG\nIBAN: DE89 3704 0044 0532 0130 00\nBIC: COBADEFFXXX\n\nUnsere bisherige Bankverbindung wird zum 30.11.2026 aufgeloest.\n\nBitte bestaetigen Sie uns kurz die Aenderung in Ihrem System.\n\nMit freundlichen Gruessen\n\nSabine Krueger\nBuchhaltung\nKessler Logistik GmbH",
+  "label": "change_request",
+  "vendor": null,
+  "note": "German-language bank change from an unknown vendor; umlauts transliterated (ae, oe, ue, ss) to keep ASCII."
+}

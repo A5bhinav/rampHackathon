@@ -1,0 +1,8 @@
+{
+  "subject": "Updated certificate of insurance",
+  "sender": "Acme Fasteners LLC <info@acmefasteners.com>",
+  "text": "Hello, attached is Acme Fasteners' renewed certificate of insurance (general liability and auto) for the 12/1/2026 to 12/1/2027 policy period, listing Larkspur Industries as certificate holder. Please forward to whoever tracks vendor insurance.\n\nThank you,\nAcme Fasteners",
+  "label": "ordinary",
+  "vendor": "acme",
+  "note": "Vendor compliance document ('updated')."
+}

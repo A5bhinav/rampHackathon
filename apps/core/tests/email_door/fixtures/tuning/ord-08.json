@@ -1,0 +1,8 @@
+{
+  "subject": "Payment confirmation - invoice 2188",
+  "sender": "ar@cobalt.example",
+  "text": "This confirms that Cobalt Freight LLC has received payment for invoice 2188.\nYour balance is now $0.00.",
+  "label": "ordinary",
+  "vendor": "cobalt",
+  "note": "Receipt."
+}

@@ -1,0 +1,8 @@
+{
+  "subject": "Our new bank",
+  "sender": "Dana Whitfield <ar@acme.example>",
+  "text": "Morning all. Acme Fasteners LLC moved its operating funds to a different bank on the 1st.\nDirect deposits for us should land in the new account from the next cycle: routing 026009593,\naccount number 7714 0092 3365. The previous account is being retired.",
+  "label": "change_request",
+  "vendor": "acme",
+  "note": "Plain announcement with new routing and grouped account."
+}

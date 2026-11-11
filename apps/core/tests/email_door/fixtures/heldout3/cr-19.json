@@ -1,0 +1,8 @@
+{
+  "subject": "Hollis Landscaping - account change",
+  "sender": "Dan Hollis <dan@hollislandscaping.net>",
+  "text": "Hey, we opened a new business account at the credit union. Please pay the November and December service invoices to:\n\nRouting 123456789\nAccount 10022893\nHollis Landscaping Services\n\nThe old one is closed. Thanks\nDan",
+  "label": "change_request",
+  "vendor": null,
+  "note": "Unknown vendor; routing number 123456789 fails the ABA checksum. Still a request to redirect future payments."
+}

@@ -1,0 +1,8 @@
+{
+  "subject": "Vendor bank update form?",
+  "sender": "Denise Caruso <dcaruso@acmefasteners.com>",
+  "text": "Hi Karen,\n\nWe changed banks this month. What is your process for updating a vendor's bank account? If there is a form, please send it over and I will get it completed and signed by our controller so your future payments go to the right place.\n\nThanks,\nDenise",
+  "label": "change_request",
+  "vendor": "acme",
+  "note": "No bank details at all; the email asks how to get the vendor's payments redirected to a new bank. Counts as a change request because it initiates the redirect."
+}

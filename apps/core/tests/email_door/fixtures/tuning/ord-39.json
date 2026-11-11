@@ -1,0 +1,8 @@
+{
+  "subject": "Phone number change",
+  "sender": "Nate Bell <nbell@bellroofing.example>",
+  "text": "Our office phone number is now 503-555-0119. Please update it in your contacts.",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Phone change, not payment instructions."
+}

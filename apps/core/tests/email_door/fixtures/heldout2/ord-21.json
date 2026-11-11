@@ -1,0 +1,8 @@
+{
+  "subject": "Security awareness: spot the fake vendor email (2 min read)",
+  "sender": "Larkspur IT Security <itsecurity@larkspur-ind.com>",
+  "text": "Team,\n\nLast month two of our peer companies lost a combined $410,000 to fake vendor emails. Here is an example of the kind of message we have been seeing, with the sender details removed:\n\n-----\nSubject: Updated banking information\nHi, we have changed banks due to an audit. Please send all payments for open invoices to our new account at the bank below and confirm by return email. Our phones are down so email is the best way to reach us today.\n-----\n\nSigns this is fake: the urgency, the excuse for not taking calls, and the request to change payment details by email.\n\nWhat to do: forward suspicious messages to phishing@larkspur-ind.com and do not reply. AP staff: follow the callback procedure in the vendor master policy for every bank change, no exceptions.\n\nThanks,\nIT Security",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Internal security training that embeds a sample fraudulent bank-change email. Nothing is being requested of AP except caution."
+}

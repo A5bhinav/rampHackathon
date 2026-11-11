@@ -1,0 +1,8 @@
+{
+  "subject": "Updated payment info",
+  "sender": "Sam Ortiz <ar@brightline.example>",
+  "text": "Per our conversation, we are no longer accepting payments at the account on file. Please\nmail checks to our new remit-to address and wire further payments to the account on the\nletter I sent you.",
+  "label": "change_request",
+  "vendor": "brightline",
+  "note": "References a prior conversation and a letter, no specifics."
+}

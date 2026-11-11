@@ -1,0 +1,8 @@
+{
+  "subject": "Our bank merger - no action needed",
+  "sender": "Cobalt Freight LLC <ar@cobaltfreight.com>",
+  "text": "Hello,\n\nYou may have read that our bank's parent company is completing a merger this quarter. We have confirmed with the bank that our routing number (021000021) and account number (000077778888) will remain exactly the same after the merger, and incoming ACH and wire payments will continue to post normally.\n\nNo action is needed on your part. Please do not update anything in your system for Cobalt Freight.\n\nThank you,\nCobalt Freight Accounts Receivable",
+  "label": "ordinary",
+  "vendor": "cobalt",
+  "note": "Bank-merger notice that explicitly keeps the on-file routing and account (given in full)."
+}

@@ -1,0 +1,8 @@
+{
+  "subject": "Acme remit to",
+  "sender": "Dana Whitfield <ar@acme.example>",
+  "text": "Dear Accounts Payable,\nPlease be informed that\nAcme Fasteners LLC\nhas opened a new\ncollection account.\nBank: Meridian Trust\nRouting: 011000138\nAccount No: 0000 1111 7777\nKindly update.",
+  "label": "change_request",
+  "vendor": "acme",
+  "note": "HTML-to-text with a line break nearly every few words."
+}

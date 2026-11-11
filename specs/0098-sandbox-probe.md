@@ -41,7 +41,7 @@ None.
   - Every account Ramp has for the vendor, read with `include_pending=true` (Ramp's document: it
     adds "bank accounts proposed in vendor edits that are pending approval", and such an account
     "gets a new id when it is approved"): id, last four, Ramp's `status`, `proposal_id`. The layer's
-    own read stays as it is.
+    own read stayed as it was; since spec 0093 (D1) it reads pending accounts too.
   - Events across the whole business since `--since` hours ago (default 24): `GET
     /audit-logs/events` with `from_date` and no `object_id`, so nothing filed under another
     reference is missed. Filtered here, not by `event_types`, so an event name we didn't guess
@@ -63,7 +63,7 @@ None.
 - [x] `--list` shows vendors with unpaid bills, most first, with ids and active accounts; leaves
       out vendors with none; stops at the limit; reads only.
 - [x] A bank account pending approval is listed with its status and proposal id; the layer's view
-      is unchanged.
+      was unchanged (until spec 0093, D1, which adds pending accounts to it).
 - [x] Events in the window, from anywhere in the business, are shown when D7 says so (a bank or
       approval type, or a mention of the vendor), newest first, and others are not;
       the request has `from_date` and no `object_id`; `--since` sets the window.

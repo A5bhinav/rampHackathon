@@ -1,0 +1,8 @@
+{
+  "subject": "New email for invoices",
+  "sender": "Hannah Lee <hannah@leeinteriors.example>",
+  "text": "From now on invoices will come from billing@leeinteriors.example. Same bank details, same terms.",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Sender change; bank unchanged."
+}

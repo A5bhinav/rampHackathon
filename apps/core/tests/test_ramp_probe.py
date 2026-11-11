@@ -154,7 +154,8 @@ async def test_pending_accounts_are_listed_with_their_status_and_the_layers_view
     f = await findings_from(fake)
     assert f.all_accounts == [("acct-old", "2222", "pending_deletion", None), ("acct-cur", "4444", "active", None),
                               ("acct-proposed", "6666", "pending_approval", "prop-1")]
-    assert [a.id for a in f.accounts] == ["acct-old", "acct-cur"], "the layer still reads without include_pending"
+    # Spec 0098 D7 left the layer's read as it was; spec 0093 D1 then made the layer read pending accounts too.
+    assert [a.id for a in f.accounts] == ["acct-old", "acct-cur", "acct-proposed"]
     text = render(f)
     assert "acct-proposed" in text and "pending_approval" in text and "prop-1" in text
 

@@ -1,0 +1,8 @@
+{
+  "subject": "Acme Fasteners LLC: new ACH coordinates",
+  "sender": "Accounts Receivable <ar@acme.example>",
+  "text": "New ACH coordinates for Acme Fasteners LLC are listed below:\n\n Bank Name ......... Cascade Federal\n Routing ........... 123000848\n Acct. Number ...... 3310662001\n Effective ......... immediately\n\nThis supersedes all prior instructions.",
+  "label": "change_request",
+  "vendor": "acme",
+  "note": "Template with dotted leaders; says supersedes prior instructions."
+}

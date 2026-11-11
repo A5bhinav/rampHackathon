@@ -1,0 +1,8 @@
+{
+  "subject": "Need your W9",
+  "sender": "Procurement <procurement@bluepeak-co.example>",
+  "text": "To finish setting up your account we need your W-9. Reply with a PDF or upload it via our portal.",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "W-9."
+}

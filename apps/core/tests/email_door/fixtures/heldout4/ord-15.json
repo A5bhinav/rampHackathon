@@ -1,0 +1,8 @@
+{
+  "subject": "Your new account manager",
+  "sender": "Tina Marsh <tmarsh@acmefasteners.com>",
+  "text": "Hi Marcus,\n\nI'm taking over your account from Luis, who's moved to the Southeast territory. I'd love to set up a quick call to learn what you need for 2027 and go over your account. Does Thursday work?\n\nBest,\nTina Marsh\nAccount Manager, Acme Fasteners",
+  "label": "ordinary",
+  "vendor": "acme",
+  "note": "New account manager; 'account' is a customer relationship."
+}

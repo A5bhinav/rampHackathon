@@ -1,0 +1,8 @@
+{
+  "subject": "Invoice 1771 dispute",
+  "sender": "Dana Whitfield <ar@acme.example>",
+  "text": "We shipped what was on the PO, but I see you short-paid by $120. Please review.",
+  "label": "ordinary",
+  "vendor": "acme",
+  "note": "Dispute."
+}

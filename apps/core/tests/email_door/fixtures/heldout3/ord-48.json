@@ -1,0 +1,8 @@
+{
+  "subject": "Thanksgiving week shipping schedule",
+  "sender": "orders@acmefasteners.com",
+  "text": "Dear Customer,\n\nAcme Fasteners will be closed Thursday November 26 and Friday November 27. Orders received after noon on Wednesday will ship Monday November 30. Our accounting office will also be closed; payment postings will resume on the 30th.\n\nHappy Thanksgiving,\nAcme Fasteners LLC",
+  "label": "ordinary",
+  "vendor": "acme",
+  "note": "Holiday notice."
+}

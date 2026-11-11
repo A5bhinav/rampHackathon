@@ -1,0 +1,8 @@
+{
+  "subject": "Black Friday deals for your office",
+  "sender": "Marketing <promo@staples-business.example>",
+  "text": "Up to 40% off desks and chairs. Shop now.",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Promo."
+}

@@ -40,6 +40,7 @@ class RampAccount:
     bank_name: str | None
     is_active: bool
     created_at: dt.datetime | None
+    pending: bool = False        # Ramp's sandbox: a change waiting for review (spec 0093); the mock never sets it
 
 
 @dataclass(frozen=True)

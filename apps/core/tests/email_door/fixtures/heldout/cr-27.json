@@ -1,0 +1,8 @@
+{
+  "subject": "Fwd: Cobalt - bank letter",
+  "sender": "Morgan Pryce <ar@cobalt.example>",
+  "text": "See the letter below.\n\nForwarded below:\n\nFrom: Cobalt Treasury <treasury@cobalt.example>\nSubject: Bank letter\n\nDear partners, Cobalt Freight LLC is changing its principal bank. Please direct payments to\nthe account details enclosed in the attached PDF, effective Nov 15.",
+  "label": "change_request",
+  "vendor": "cobalt",
+  "note": "Forward; details in attachment."
+}
