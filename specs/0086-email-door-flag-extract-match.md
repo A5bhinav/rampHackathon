@@ -93,10 +93,11 @@ Version 5 fails the held-out bar on recall. Per the stop rule, at most two revis
 | v1 | 2026-11-11T003936Z | 30/30 | 0/62 | 35/35 | 2/65 | 39/39 | 4/70 |
 | v2 | 2026-11-11T004244Z | 30/30 | 0/62 | 35/35 | 0/65 | 39/39 | 0/70 |
 | v2 (repeat) | 2026-11-11T004419Z | 30/30 | 0/62 | 35/35 | 0/65 | 39/39 | 0/70 |
+| v2 (audit's run) | 2026-11-11T034257Z | 30/30 | 0/62 | 35/35 | 0/65 | 39/39 | 0/70 |
 
 No failures in any run; heldout2's cr-36 (reported separately) was not flagged in any run. v1's six false flags: two customers giving their own account for a refund (heldout2 ord-06, ord-39), a brand-new vendor setup (ord-38), a vendor's new outbound account with "keep paying us as today" (ord-25), a hypothetical process question (dev ord-36) and a declined-card notice (dev ord-47). Root cause in v1: its first line said every sender "was written by, or claims to be from, one of the company's vendors". v2 (revision 1 of at most 2, pre-registered before it ran) says the sender may be anyone, defines the request as paying a vendor somewhere new in place of where the company pays it today, and lists five example exclusions. The exclusions were drawn from these six false flags, so v2's zero false flags here are exploratory, not evidence; the check that could have failed here was recall, which held. Because v2 was judged on heldout2, heldout3 runs with `--heldout2-revised` (cr-04 and cr-10 reported separately), as pre-registered.
 
-### Decision 12: the confirmatory run (Task 6f, heldout3, once)
+### Decision 12: the heldout3 run (Task 6f, once; exploratory, see the correction below)
 
 Stated in the ledger before it started: Haiku (`claude-haiku-5-5`), prompt v2 (`prompt_sha256` starts `168990eec3fdf1a2`), `--confirm-heldout3 --heldout2-revised`, the pre-registered bar. Run stamp `2026-11-11T005711Z`, result file in `eval_results/`.
 
@@ -107,9 +108,23 @@ Stated in the ledger before it started: Haiku (`claude-haiku-5-5`), prompt v2 (`
 | Failures (counted as not flagged) | none | |
 | ON-FILE-ONLY cr-26, cr-27, cr-31 (separate) | 0/3 flagged | not in the bar |
 | cr-04, cr-10 (separate, after the heldout2 revision) | 2/2 flagged | not in the bar |
+| All 40 change requests | 37/40 flagged | not the bar |
+| The with-ON-FILE-ONLY line | FAIL | not the bar |
 | Cost, latency | $0.0129 for 110 calls; p50 0.82 s, p95 1.58 s | |
 
-**Result: PASS (confirmed).** This is the only confirmed flagger result; every number above this section is exploratory. Caveats: one run of one model on one sealed set of 110 synthetic emails written by a coding agent (not real fraud mail); with 0 of 70 false flags the one-sided 95% upper bound on the false-flag rate is still about 4.2%, and with 35 of 35 the one-sided 95% lower bound on recall is about 92%. The three ON-FILE-ONLY requests carry no wording that gives them away, and the model did not flag them, as expected: an email door case for them depends on the door's on-file mismatch check, which unit and door tests cover but which was not run on these three emails.
+**Result: met the bar, but exploratory, not confirmed.** Correction after an independent audit: heldout3 was not cleanly sealed. The agent that checked its labels read all 110 emails, and its report to the session that later wrote prompt v2 listed the ordinary emails by category, including refunds and new-vendor onboarding, which are two of v2's five exclusions. That report had left the session's working context by the time v2 was written, and each exclusion traces to a logged false flag on dev or heldout2, but influence cannot be ruled out. heldout3 must not be used to confirm anything further, for any model. The re-test below replaces it. Every number above this section is exploratory too. Caveats: one run of one model on one sealed set of 110 synthetic emails written by a coding agent (not real fraud mail); with 0 of 70 false flags the one-sided 95% upper bound on the false-flag rate is still about 4.2%, and with 35 of 35 the one-sided 95% lower bound on recall is about 92%. The three ON-FILE-ONLY requests carry no wording that gives them away, and the model did not flag them, as expected: an email door case for them depends on the door's on-file mismatch check, which unit and door tests cover but which was not run on these three emails.
+
+### Decision 12: the re-test (heldout4, pre-registered before the set exists)
+
+Written and committed before the set was written or any run.
+
+- **Question:** does Haiku (`claude-haiku-5-5`) with prompt v2, frozen at `prompt_sha256` `168990eec3fdf1a2...`, meet the bar on emails that did not exist when v2 was frozen?
+- **Why this is clean where heldout3 was not:** the set is written after v2 is frozen, so its contents cannot have shaped v2. The agents that write and check it report only counts and file names, never what an email says. No prompt change is allowed after it is written.
+- **Set:** `heldout4`, 40 change requests and 70 ordinary emails, written by a fresh agent that never sees the prompt or the classifier. `cr-38`, `cr-39` and `cr-40` are fixed in advance as the ON-FILE-ONLY requests, and no others may be. Sealed by sha256 before any run.
+- **Bar (unchanged from heldout3):** every change request flagged except those three, and at most 3 of 70 ordinary emails flagged. A failure counts as not flagged. Nothing else is excluded.
+- **What kills it:** one in-bar change request missed, or 4 or more ordinary emails flagged. Then the result is FAIL, reported as FAIL, with no prompt revision and no re-run unless Sami decides.
+- **Run:** once. Reported with the bar, the with-ON-FILE-ONLY line and the count over all 40.
+- **What it cannot show:** one run on synthetic text-only emails. It says nothing about real mail, HTML parts or attackers who have read the prompt.
 
 ### What the ledger gets, and what can still reach it (review fix round 5)
 
