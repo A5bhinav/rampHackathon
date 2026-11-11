@@ -195,6 +195,26 @@ def _doc(doc_id, channel, days_ago, sender=None, thread=None, subject=None, line
                                                              for i, t in enumerate(lines)]}]}
 
 
+def test_change_context_treats_an_unconfirmed_number_as_never_seen(database_url):
+    # Spec 0092: `unconfirmed_digits_only`, like `hidden_text_only`: the number was never confirmed where a person could see it.
+    truth = truth_of("P01")
+    v = new_vendor(database_url, "unconfirmed context")
+    load(database_url, v, truth)
+    doc = _doc("unconfirmed-doc", "contract", 200, lines=("AR: 415-555-0188",))
+    doc["pages"][0]["spans"][0]["legible"] = False
+    result = ingest_all([doc], extractor_version="test", reader=StubReader())
+    assert [o["visibility"] for o in result.observations] == ["unverified"]
+
+    async def go():
+        async with await psycopg.AsyncConnection.connect(database_url) as conn, conn.transaction():
+            await write_ingest(conn, dataset_id=v["dataset_id"], vendor_id=v["vendor_id"], result=result)
+    run(go())
+    case = open_case(database_url, v)
+    assert run(change_context(case_id=case, dataset_id=v["dataset_id"], vendor_id=v["vendor_id"],
+                              cutoff=at(truth["ramp_change_at"]), speaker_names=(), offered_numbers=("415-555-0188",),
+                              database_url=database_url)) == {}
+
+
 def _speaker_world(url, request_sender, thread_sender):
     """A vendor proven by a contract and email, and a request in a thread with one earlier message."""
     docs = [_doc("contract", "contract", 900, lines=["Accounts receivable: (415) 555-0142"]),

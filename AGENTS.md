@@ -76,7 +76,7 @@ second owner (the partner) who reviews it.
 | End-to-end smoke run (the demo-smoke CI job) | `uv run python scripts/dev/stack.py --smoke` |
 | Rehearse the demo beats (reset, change, release, tamper) on the local stack | `uv run python scripts/dev/demo_rehearsal.py` |
 | Demo commands (core shell) | `dialback-core demo reset [--link clerk=<email>]`, `demo change --vendor acme [--unknown]`, `demo tamper --yes-break-the-chain`, `demo status`, `demo chaos on\|off` |
-| Demo ledger (after `demo reset`; team phone given at run time, never committed) | `dialback-ledger demo load [--phone acme=+1...]`, then before each `demo change`: `dialback-ledger demo request --vendor acme`. From real PDFs (spec 0092): `dialback-ledger demo load --pdf [DIR]` |
+| Demo ledger (after `demo reset`; team phone given at run time, never committed) | `dialback-ledger demo load [--phone acme=+1...]`, then before each `demo change`: `dialback-ledger demo request --vendor acme`. From real PDFs (spec 0092; needs Tesseract 5 on the machine): `dialback-ledger demo load --pdf [DIR]` |
 | Read a real PDF: each line with its visibility, and the phone numbers code found; labels and stores nothing (spec 0092) | `dialback-ledger read-pdf FILE` |
 | Get the demo ready for a clerk's change in the dashboard: reset, Trust Ledger, request email, in that order (spec 0077) | `dialback-core demo prepare --link clerk=<email> [--phone acme=+1...] [--pdf [DIR]]`; hosted, with the team phone read from the voice allowlist: `scripts/demo/prepare_hosted.sh <clerk email>` |
 | Dashboard checks | `cd apps/web && pnpm check:api && pnpm typecheck && pnpm build` |

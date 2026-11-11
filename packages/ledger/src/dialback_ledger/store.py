@@ -223,7 +223,7 @@ async def change_context(*, case_id: UUID, dataset_id: UUID, vendor_id: UUID, cu
     answers = []
     for raw in offered_numbers:
         c = by_number.get(_e164(raw) or "")
-        if c is None or "hidden_text_only" in c["reasons"]:
+        if c is None or {"hidden_text_only", "unconfirmed_digits_only"} & set(c["reasons"]):
             answers.append(None)                     # the ledger never saw it where a person could
         else:
             answers.append("first_seen_in_change_context" in c["reasons"])

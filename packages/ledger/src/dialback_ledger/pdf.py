@@ -15,6 +15,9 @@ Characters group into lines by baseline, in x order, and a line splits into span
 the class changes (D2), so a span never mixes classes. Whitespace takes its neighbours' class: it has no ink
 to see, and it must not break a hidden number apart. A span whose class the page model can't otherwise
 express carries `ink: false`, so `visibility.classify` never reads a hidden span as visible.
+
+Every phone number still visible then has to pass the legibility check (`legibility.py`, D10a), on the pixels; a span
+holding one that fails carries `legible: false`, and is `unverified`.
 """
 from __future__ import annotations
 
@@ -35,6 +38,9 @@ import pypdfium2 as pdfium
 import pypdfium2.raw as pdfium_c
 from pdfminer.pdftypes import resolve1
 
+from . import legibility
+from .candidates import find_phones
+from .text import Line
 from .visibility import NEAR_WHITE, TINY_POINTS, classify
 
 READER_VERSION = "1"            # extractor_version is "pdf-<this>/<labeler>" (D5)
@@ -336,9 +342,41 @@ def _page(plumber_page, pdfium_page, deadline: float) -> dict:
     for i, k in cls.items():
         if k is None:
             cls[i] = "visible"          # whitespace: its class comes from its neighbours (_runs)
-    spans = [_span(chars, run, k, crop, width, height)
-             for line in _lines(chars) for seg in _segments(chars, line) for k, run in _runs(chars, seg, cls)]
+    runs = [(k, run) for line in _lines(chars) for seg in _segments(chars, line) for k, run in _runs(chars, seg, cls)]
+    spans = [_span(chars, run, k, crop, width, height) for k, run in runs]
+    _check_legibility(chars, runs, spans, pdfium_page, crop, float(plumber_page.height), deadline)
     return {"width": round(width, 3), "height": round(height, 3), "spans": spans}
+
+
+def _check_legibility(chars: Sequence[dict], runs, spans: list[dict], pdfium_page, crop, page_height: float,
+                      deadline: float) -> None:
+    """D10a: a span holding a phone number a person couldn't read is `unverified`, on the page PDFium renders."""
+    paired: dict[int, tuple] | None = None
+    for (k, run), span in zip(runs, spans):
+        if k != "visible":
+            continue
+        numbers = find_phones([Line(span["text"], "visible", 0, 0)])
+        if not numbers:
+            continue
+        if paired is None:
+            solid = [i for i, ch in enumerate(chars) if not _text(ch).isspace()]
+            paired = _align(chars, solid, _pdfium_chars(pdfium_page)) or {}
+        offsets, at = {}, 0
+        for i in run:
+            offsets[i] = at
+            at += len(_text(chars[i]))
+        for number in numbers:
+            digits = [i for i in run if number.start <= offsets[i] < number.end and _text(chars[i]).isdigit()]
+            if not digits or any(i not in paired or paired[i][1] is None for i in digits):
+                span["legible"] = False
+                break
+            verdict = legibility.assess(pdfium_page, crop, page_height, [paired[i][2] for i in digits],
+                                        {paired[i][1] for i in digits}, "".join(_text(chars[i]) for i in digits), deadline)
+            if time.monotonic() > deadline:
+                raise PdfRefused("too_slow")
+            if not verdict:
+                span["legible"] = False
+                break
 
 
 def _refuse_page(plumber_page, pdfium_page) -> None:
@@ -387,6 +425,7 @@ def read_pdf(data: bytes) -> list[dict]:
         raise PdfRefused("unparseable")
     if len(data) > MAX_BYTES:
         raise PdfRefused("too_big")
+    legibility.require_ocr()
     with _hard_limit(TIME_LIMIT_SECONDS):
         return _read(bytes(data), time.monotonic() + TIME_LIMIT_SECONDS)
 

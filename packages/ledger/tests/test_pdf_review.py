@@ -229,7 +229,8 @@ def test_a_rotated_number_is_never_visible():
 
 @pytest.mark.parametrize("shape, want", [("#8f8f8f", "no_ink"), ("#909090", "visible")], ids=["15_levels", "16_levels"])
 def test_the_ink_threshold_is_sixteen_levels(shape, want):
-    assert classes(pdf_of([span(N, color="#808080", under=shape)])) == [(N, want)]
+    # Words, not a number: this pins D3's ink rule, and D10a would judge a number's contrast separately.
+    assert classes(pdf_of([span("Accounts", color="#808080", under=shape)])) == [("Accounts", want)]
 
 
 def test_the_smallest_allowed_text_has_ink():
