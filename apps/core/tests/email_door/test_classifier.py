@@ -513,7 +513,8 @@ async def test_the_lifespan_closes_what_it_opened_when_the_classifier_cannot_be_
     with pytest.raises(ConfigurationError, match="ANTHROPIC_API_KEY"):
         async with app.router.lifespan_context(app):
             pass
-    assert len(opened) == 2 and all(o.closed for o in opened)   # the HTTP client and the pool
+    # The HTTP client, the pool, and the Ramp-mock client main's admin work (spec 0095) opens for its demo commands.
+    assert len(opened) == 3 and all(o.closed for o in opened)
 
 
 @pytest.mark.anyio
@@ -534,7 +535,7 @@ async def test_the_lifespan_closes_the_classifier_even_when_the_worker_failed(mo
     with pytest.raises(RuntimeError, match="the worker failed"):
         async with app.router.lifespan_context(app):
             pass
-    assert sdk.closed and len(opened) == 2 and all(o.closed for o in opened)
+    assert sdk.closed and len(opened) == 3 and all(o.closed for o in opened)   # as above, with the demo-mock client
 
 
 # The model switch and token usage (Task 6c) -----------------------------------------------------------
