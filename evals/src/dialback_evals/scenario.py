@@ -53,8 +53,10 @@ class CallerBehavior:
     hang_up_at: str | None = None
     silent: bool = False
     # The author's judgment of what the caller said at the company question (spec 0048, A4): `vendor`
-    # (names this vendor), `other` (another company, a negation, a reseller, a correction) or `partial`
-    # (part of the name). The oracle reads this, never production's company check.
+    # (names this vendor), `other` (another company, a negation, a reseller, a correction, nonsense),
+    # `partial` (part of the name) or `unclear` (names no company at all, such as "The company"; spec 0082,
+    # D7b). A garbled name is judged by what the caller said ("acne" for "Acme" is `partial`). The oracle
+    # reads this, never production's company check.
     company_is: str | None = None
 
 
@@ -103,7 +105,7 @@ _KEYS = frozenset({"id", "class", "is_attack", "customer_name", "vendor_name", "
 _CALLER_KEYS = frozenset({"consent", "company", "company_is", "department", "name", "role", "change", "last4_mode",
                           "last4", "answered_by", "inject", "inject_phase", "offer_other_number", "hang_up_at",
                           "silent"})
-COMPANY_TRUTHS = frozenset({"vendor", "other", "partial"})
+COMPANY_TRUTHS = frozenset({"vendor", "other", "partial", "unclear"})
 _FACT_KEYS = frozenset({"dialed_eligible_number", "new_last4", "old_last4", "dialed_number_is_pick",
                         "speaker_in_change_thread", "offered_number_from_request", "line_risk", "direction"})
 _PHASES = frozenset(p.name for p in Phase)

@@ -1,4 +1,7 @@
 # Nonsense answers: the company named is not this vendor, so nothing verifies (R7).
+# Since spec 0082 D7b a company answer with neither the vendor's name nor a refusal word no longer blocks,
+# and nothing else rejects nonsense (A24), so this verifies on the keypad digits: a cost the decision
+# knowingly accepted, on lab-smoke's known-failures list, FINDINGS A29. Its expectation is unchanged.
 id: l16-garbage-answers
 class: legit_odd_contact
 is_attack: false

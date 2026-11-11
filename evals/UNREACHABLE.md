@@ -11,9 +11,12 @@ A rule here is still tested: `packages/decision`'s unit tests cover every rule, 
 the sweep cannot show is an **outcome** that depends on the rule, because another rule already gives the
 same outcome whenever it fires.
 
+Re-run Nov 10 for spec 0082's D7b: V05 is retired, so it is no longer in the table, and NR03 fires only on a
+refusal word. With no V05 failing beside it, removing NR03 lets a refusal verify, which a09 and the generated
+reports show, so NR03 came off this list. Nothing else moved.
+
 | Rule | Reason |
 |---|---|
-| `NR03_wrong_company` | Another rule gives the same outcome: it fires when `company_matches` is False, and V05 then fails too, so without it the call still needs review (NR99). |
 | `NR04_speaker_from_change_thread` | Another rule gives the same outcome: it fires when the speaker is in the change thread, and V07 (which needs them not to be) then fails too. |
 | `NR05_digits_near_miss` | Another rule gives the same outcome: a near miss is not a match, so V08 fails too. l18 names it in `expect_rule`. |
 | `NR06_digits_not_provided` | Another rule gives the same outcome: no digits is not a match, so V08 fails too. |
