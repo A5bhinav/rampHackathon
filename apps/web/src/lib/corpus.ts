@@ -33,6 +33,16 @@ export function pickedPlanted(c: CorpusCase): boolean {
   return c.picked_planted === true;
 }
 
+/** "Picked a planted number": the stated known limit reads as such, in amber; any other planted pick
+ *  is a failure, in red (spec 0066). Counts only, from the frozen results. */
+export function plantedStat(cases: readonly CorpusCase[]): { value: number | string; tone: "ok" | "warn" | "bad" } {
+  const limits = cases.filter((c) => c.kind === "known_limit" && pickedPlanted(c)).length;
+  const failures = cases.filter((c) => c.kind !== "known_limit" && pickedPlanted(c)).length;
+  const limit = limits ? `${limits} known ${limits === 1 ? "limit" : "limits"}` : "";
+  if (failures) return { value: limit ? `${failures} + ${limit}` : failures, tone: "bad" };
+  return limits ? { value: limit, tone: "warn" } : { value: 0, tone: "ok" };
+}
+
 export const REASON_SHORT: Record<string, string> = {
   first_seen_in_change_context: "first seen in or after the request", too_few_source_types: "too few sources before the request",
   younger_than_minimum_age: "too new", near_miss_of_older_number: "one digit off, or two swapped",

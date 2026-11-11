@@ -19,6 +19,7 @@ import { phone, seenBefore, sourceLabel, split } from "@/lib/lineage";
 import { REFRESH_STATES, currentVersion, stations } from "@/lib/stations";
 import { canWatchCall } from "@/lib/live-call";
 import { stateLabel } from "@/lib/states";
+import { canAct } from "@/lib/queue";
 import { attemptRows, changeLine, decisionLine, holdLine, numberLine, openCard, trailLine } from "@/lib/case-cards";
 import { releaseAction, reviewAction } from "./actions";
 
@@ -280,7 +281,7 @@ function ActionRail({ detail, path, datasetId, firstApproval, lastStepSummary }:
   detail: CaseDetail; path: string; datasetId: string; firstApproval: CaseDetail["releases"][number] | undefined; lastStepSummary?: string;
 }) {
   const { case: c, change, decision, permissions: can, hold } = detail;
-  const consoles = can.can_approve || can.can_reject || can.can_review;
+  const consoles = canAct(can);  // the inbox's "Needs you" uses this same rule (lib/queue)
   const need = c.unknown_changer ? 2 : 1;
   const approvals = detail.releases.filter((r) => r.action === "approve" && r.case_version === c.version).length;
   const releasedBy = detail.releases.find((r) => r.action === "approve" && r.case_version === c.version);

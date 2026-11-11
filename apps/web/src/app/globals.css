@@ -1032,3 +1032,7 @@ ol.slots li.is-filled { animation: slot-in 360ms var(--ease) both; }
 .call-body:has(> .show-checks:not([open])) .chips { display: none; }
 .phone-pick { margin: 0; font-size: 12px; font-weight: 600; }
 @media (max-width: 720px) { .fold-line { display: none; } }
+
+/* Spec 0066, PR 3: the station strip says what its counts are. */
+.rail-card .rail-title { margin: 0 0 12px; font-family: var(--mono, inherit); font-size: 11px; font-weight: 500; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--muted); }
