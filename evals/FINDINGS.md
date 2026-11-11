@@ -1233,6 +1233,18 @@ nothing on the page.
 page with local OCR and marks it `unverified` when the digits differ. The test then turns red, and this comes off the
 list. Until then, a digital PDF's digits are only as honest as its font.
 
+### H2. A small patch inside a digit changes it, and the ink rule can't tell
+
+**Confirmed (ran).** `evals/tests/test_pdf_tricks.py::test_digit_patch`, on the strict list as `lab-pdf` /
+`digit-patch`.
+
+White rectangles over the left side of an 8, between its bars, leave a 3 on the page, while the text layer still
+says 8. The ink rule needs a digit's visible ink to reach most of its glyph's rows and columns, which stops a cover
+or clip that leaves only a sliver (Nov 11 review, C2), but a patch this small leaves ink in every row and column. So
+the ledger records the 8 as visible. Only reading the pixels can tell, which is Part B's pixel check (D14).
+
+Found by reasoning from the review's C2, then planted. Other small-patch shapes are the same limit.
+
 ## E. Process and housekeeping
 
 - `.superpowers/` (the plan ledger and logs) is not git-ignored. Stage files by name.
