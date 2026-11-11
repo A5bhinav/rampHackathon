@@ -66,3 +66,23 @@ test("lanePoints with no candidates has nothing to draw", () => {
   assert.equal(lanePoints({ ...example("picked"), candidates: [] }), null);
   assert.equal(lanePoints(null), null);
 });
+
+// Spec 0104: the vendor page draws the rule as of now, which has no case, request or stored selection.
+const asOfNow = (name: string) => {
+  const { rule_version, rule_settings, requested_cutoff, cutoff, outcome, contact_point_id, alternates, candidates } = example(name);
+  return { rule_version, rule_settings, as_of: requested_cutoff, cutoff, outcome, contact_point_id, alternates, candidates };
+};
+
+test("split and lanePoints take the rule as of now exactly as they take a stored selection", () => {
+  for (const name of ["picked", "no-provable-number"]) {
+    assert.deepEqual(split(asOfNow(name)), split(example(name)));
+    assert.deepEqual(lanePoints(asOfNow(name)), lanePoints(example(name)));
+  }
+});
+
+test("seenBefore names what the cutoff is", () => {
+  const cutoff = "2026-11-03T16:05:31.000000Z";
+  assert.equal(seenBefore("2023-02-14T18:20:03.000000Z", cutoff, "the cutoff"), "3 years before the cutoff");
+  assert.equal(seenBefore(cutoff, cutoff, "the cutoff"), "with the cutoff");
+  assert.equal(seenBefore("2026-11-04T00:00:00Z", cutoff, "the cutoff"), "after the cutoff");
+});

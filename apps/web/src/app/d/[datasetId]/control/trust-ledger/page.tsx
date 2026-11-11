@@ -1,8 +1,10 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PageHead, Stats } from "@/components/page";
 import { CoreError, core } from "@/lib/core";
 import { phone } from "@/lib/lineage";
 import { counts, digitMarks, shares, statusLabel, statusTone, type RiskStatus } from "@/lib/risk";
+import { ledgerHref } from "@/lib/vendor-ledger";
 
 const STRIPE = { near_miss: "is-bad", unproven: "is-warn", missing: "", provable: "is-ok" } as const;
 
@@ -33,7 +35,7 @@ export default async function RiskPage({ params }: { params: Promise<{ datasetId
               <tbody>
                 {vendors.map((v) => (
                   <tr key={v.vendor_id} className={STRIPE[v.status]}>
-                    <td><strong className="vendor-name">{v.legal_name}</strong><div className="muted sub cell-note">{v.status_text}</div></td>
+                    <td><Link className="vendor-link" href={ledgerHref(datasetId, v.vendor_id)}>{v.legal_name}</Link><div className="muted sub cell-note">{v.status_text}</div></td>
                     <td><span className={`badge ${statusTone(v.status)}`}>{statusLabel(v.status)}</span></td>
                     <td className="mono nowrap">{v.number_on_file ? <OnFile number={v.number_on_file} provable={v.status === "near_miss" ? v.provable_number : null} /> : "—"}</td>
                     <td className="mono nowrap">{v.provable_number ? phone(v.provable_number) : "—"}</td>
