@@ -175,6 +175,14 @@ None.
   sandbox, 2026-11-10 (fourth hold-check run):** the hold and the release each read back on the
   first read (2.4 and 2.9 seconds, the length of that read), while the audit log showed neither yet;
   the second hold's 400 read as on; the date came back. One vendor, one run: confirmed, not general.
+- **Q210, the biggest gap found:** on Ramp, a bank change doesn't move the vendor's `updated_at`
+  (seen: neither the request nor the approval did). The core's 60-second poll asks for vendors
+  updated since its last run (`list_vendors_updated_since`), so it never sees a bank change; only
+  the full sweep does, once a day by default. A payment to the new account could go out before
+  Dialback notices (R1). Candidates, sandbox side: the layer's updated-since list also returns
+  vendors with a `Bank account updated` event since then (the audit log, seconds behind, is fine
+  for a one-minute poll); and, for a change still pending (no event, no `updated_at`), a sweep
+  every minute (95 vendors, one accounts read each, within Ramp's 100 requests per 10 seconds).
 - **Q207:** Ramp issued a token for a scope the app isn't allowed (`bills:write`) and refused only
   the call (HTTP 403). The core's login doesn't compare what Ramp granted with what it needs, so a
   sandbox dataset missing `bills:write` would hold and call normally, then fail every release when
