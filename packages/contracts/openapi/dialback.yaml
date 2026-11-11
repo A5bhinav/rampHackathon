@@ -167,6 +167,61 @@ paths:
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /api/datasets/{dataset_id}/mail:
+    get:
+      operationId: listMail
+      summary: The mail Dialback received for this dataset, newest first (email door)
+      description: |
+        One row per stored inbound email, newest first, at most 200. A row says what Dialback did
+        with the email (`outcome`), whether a reply went out (`reply`), the red flags it noticed,
+        and the vendor and case it led to, if any. The routing number and last four are shown when
+        the email gave a new account; a full account number never appears (ADR-8). The email body
+        is never returned.
+      parameters:
+        - $ref: '#/components/parameters/DatasetId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    maxItems: 200
+                    items: { $ref: '#/components/schemas/MailItem' }
+              example:
+                items:
+                  - id: 2
+                    received_at: '2026-11-10T15:04:05Z'
+                    sender: ar@acme-supply.example
+                    subject: Updated remittance details
+                    flagged: false
+                    outcome: no_vendor
+                    reply: not_flagged
+                    red_flags: []
+                    vendor: null
+                    case_id: null
+                    routing_number: null
+                    last4: null
+                  - id: 1
+                    received_at: '2026-11-10T14:58:41Z'
+                    sender: billing@acme-suppIy.example   # deliberate lookalike (a capital I for the l): keep it, it shows lookalike_domain
+                    subject: Our bank account has changed
+                    flagged: true
+                    outcome: case_opened
+                    reply: sent
+                    red_flags: [lookalike_domain, reply_to_differs]
+                    vendor: { id: 3f6a9d2e-8b14-4c7a-a5e0-1d2c3b4a5f60, legal_name: Acme Supply Co }
+                    case_id: 7b1e4c2a-5d3f-4a8e-9c61-2f0d8b7a4e15
+                    routing_number: '026009593'
+                    last4: '0001'
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   /api/datasets/{dataset_id}/vendors/{vendor_id}/bank-change:
     post:
       operationId: changeVendorBankAccount
@@ -523,6 +578,68 @@ components:
         routing_number: { type: string }
         last4: { type: string, pattern: '^[0-9]{4}$' }
 
+    MailOutcome:
+      description: >-
+        What Dialback did with one inbound email. `pending` until it has been handled. `ramp_case_open`:
+        the vendor's unfinished case has a change that did not come by email, so the email changed nothing
+        (its `case_id` names that case).
+      type: string
+      enum: [pending, not_flagged, door_off, not_demo_vendor, no_vendor, several_vendors, no_routing_number, no_account_number, same_as_on_file, repeat_request, case_opened, joined_case, ramp_case_open, failed]
+
+    ReplyStatus:
+      description: Whether the reply to the sender went out, and if not, why.
+      type: string
+      enum: [not_flagged, sent, not_configured, unauthenticated, suppressed, rate_limited, failed]
+
+    RedFlag:
+      description: A reason an email looks like fraud. Decided by code, never by a model.
+      type: string
+      enum: [lookalike_domain, sender_off_domain, reply_to_differs, sender_unauthenticated, unknown_phone]
+
+    EmailInfo:
+      description: The email that started a case. Never its body.
+      type: object
+      additionalProperties: false
+      required: [sender, subject, received_at, red_flags]
+      properties:
+        sender: { type: string }
+        subject: { type: [string, 'null'] }
+        received_at: { $ref: '#/components/schemas/Timestamp' }
+        red_flags:
+          type: array
+          items: { $ref: '#/components/schemas/RedFlag' }
+
+    MailItem:
+      description: One inbound email and what Dialback did with it. No body field, ever.
+      type: object
+      additionalProperties: false
+      required: [id, received_at, sender, subject, flagged, outcome, reply, red_flags, vendor, case_id, routing_number, last4]
+      properties:
+        id: { type: integer }
+        received_at: { $ref: '#/components/schemas/Timestamp' }
+        sender: { type: string }
+        subject: { type: [string, 'null'] }
+        flagged: { type: boolean, description: Whether the email asks to change bank details. }
+        outcome: { $ref: '#/components/schemas/MailOutcome' }
+        reply: { $ref: '#/components/schemas/ReplyStatus' }
+        red_flags:
+          type: array
+          items: { $ref: '#/components/schemas/RedFlag' }
+        vendor:
+          oneOf:
+            - type: object
+              additionalProperties: false
+              required: [id, legal_name]
+              properties:
+                id: { $ref: '#/components/schemas/Uuid' }
+                legal_name: { type: string }
+            - type: 'null'
+        case_id:
+          oneOf: [{ $ref: '#/components/schemas/Uuid' }, { type: 'null' }]
+        routing_number: { type: [string, 'null'] }
+        last4:
+          oneOf: [{ type: string, pattern: '^[0-9]{4}$' }, { type: 'null' }]
+
     ChangeInfo:
       type: object
       additionalProperties: false
@@ -536,6 +653,9 @@ components:
         changed_by:
           oneOf: [{ $ref: '#/components/schemas/Person' }, { type: 'null' }]
         unknown_changer: { type: boolean }
+        email:
+          description: For a case an email opened (`detected_via` email), the email; otherwise absent or null. Optional.
+          oneOf: [{ $ref: '#/components/schemas/EmailInfo' }, { type: 'null' }]
 
     HoldInfo:
       type: object
@@ -797,6 +917,7 @@ components:
         can_approve: { type: boolean }
         can_reject: { type: boolean }
         can_review: { type: boolean }
+        can_dismiss: { type: boolean, description: Whether the signed-in user may dismiss this case. Optional. }
         reasons:
           description: Why an action is not offered, one templated sentence each.
           type: array
