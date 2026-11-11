@@ -85,6 +85,10 @@ counts as change context or doesn't count; paging past 500 documents.
   Keep, or move both to the dataset's clock?
 - **Q222:** Should the page mark the documents the rule treats as change context (a lookalike
   sender) or doesn't count (email from outside the vendor's domains)? That needs ledger sentences.
+- **Q223:** `reason_text` sentences say "before the request" (for example `too_few_source_types`).
+  On this page the rule runs as of now with no request, so the page labels its cutoff "the cutoff"
+  while the reasons beside it say "the request". The page shows them as written. Should the ledger
+  add as-of-now wordings, or one wording that reads right in both places?
 
 ## Commands
 
