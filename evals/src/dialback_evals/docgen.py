@@ -310,28 +310,30 @@ def draw_docs(*, examples: int, seed: int) -> list[DocPlan]:
     return [_draw_doc(rng, f"doc-s{seed}-{i:05d}") for i in range(examples)]
 
 
-def world_count(examples: int) -> int:
-    """How many G7 worlds a run of `examples` documents draws: one for every ten."""
-    return max(1, examples // 10)
+def layouts() -> list[tuple[str, str]]:
+    """Every phrasing and placement the generator can render together (102 today)."""
+    return [(p, pl) for p in PHRASINGS for pl in PLACEMENTS if PHRASINGS[p].form in PLACEMENT_FORMS[pl]]
 
 
-def _mentions(rng: random.Random, pool: list[tuple[str, str]], count: int) -> tuple[NumberPlan, ...]:
-    """Numbers in the attacker's change-context text, each a distinct number from `pool` with its owner."""
-    return tuple(_number(rng, e164, owner, "attacker") for e164, owner in rng.sample(pool, min(count, len(pool))))
+# The paths a change-context mention can take: the request email itself, a reply in its thread, a
+# follow-up after it in a thread of its own, and an email from a lookalike sender the day before.
+PATHS = ("request", "reply", "after", "lookalike")
 
 
-def _draw_world(rng: random.Random, world_id: str, planted: bool) -> WorldPlan:
+def _draw_world(rng: random.Random, world_id: str, planted: bool, phrasing: str, placement: str) -> WorldPlan:
+    """One G7 world: the vendor's own records, a planted provable number or not, and change-context text
+    that mentions the vendor's real number once, visibly, as `phrasing` in `placement`. The request also
+    names a fresh attacker number (first seen there, so never callable). Everything else is drawn."""
     real_area, planted_area, fresh_area = rng.sample(WORLD_AREA_CODES, 3)
     real, planted_number, fresh = (f"+1{a}55501{rng.randrange(100):02d}" for a in (real_area, planted_area, fresh_area))
     days = lambda n: dt.timedelta(days=n)
     docs = []
     for k, channel in enumerate(rng.sample(sorted(RECORD_KIND), rng.randint(2, 4))):   # the vendor's own records
-        phrasing = rng.choice(VENDOR_RECORD_PHRASINGS)
-        n = NumberPlan(real, "vendor", *claim(phrasing, "vendor"), phrasing, "label_number", rng.choice(list(FORMATS)),
+        record = rng.choice(VENDOR_RECORD_PHRASINGS)
+        n = NumberPlan(real, "vendor", *claim(record, "vendor"), record, "label_number", rng.choice(list(FORMATS)),
                        "visible")
         docs.append(DocPlan(f"{world_id}-rec{k}", RECORD_KIND[channel], "vendor", channel, None, None, None,
                             (T0 - days(rng.randint(200, 600))).isoformat(), (rng.choice(FILLER),), (n,)))
-    pool = [(real, "vendor"), (fresh, "attacker")]
     if planted:   # a provable number: 2 counting channels, at least 90 days old, labeled the vendor's
         lead = rng.randint(100, 180)
         for k, channel in enumerate(("contract", "listing")):
@@ -339,27 +341,37 @@ def _draw_world(rng: random.Random, world_id: str, planted: bool) -> WorldPlan:
                            "label_number", rng.choice(list(FORMATS)), "visible")
             docs.append(DocPlan(f"{world_id}-plant{k}", RECORD_KIND[channel], "attacker", channel, None, None, None,
                                 (T0 - days(lead)).isoformat(), (rng.choice(FILLER),), (n,)))
-        pool.append((planted_number, "attacker"))
+    mention = NumberPlan(real, "vendor", *claim(phrasing, "attacker"), phrasing, placement, rng.choice(list(FORMATS)),
+                         "visible")
+    path = rng.choice(PATHS)
+    request_numbers = [_number(rng, fresh, "attacker", "attacker")] + ([mention] if path == "request" else [])
+    rng.shuffle(request_numbers)
     request = f"{world_id}-req"
     docs.append(DocPlan(request, "change_request_email", "attacker", "email",
                         rng.choice(("ar@acme.example", "ar@acrne.example")), "req", SUBJECT["change_request_email"],
-                        T0.isoformat(), tuple(rng.sample(REQUEST_FILLER, 2)), _mentions(rng, pool, rng.randint(0, 3))))
-    for k in range(rng.randint(0, 2)):   # follow-ups, each in the change context by one path
-        sender, thread, when, subject = rng.choice((
-            ("ar@other.example", "req", T0 + dt.timedelta(minutes=10), "Re: Updated banking details"),   # a reply
-            ("ar@acme.example", f"{world_id}-t{k}", T0 + dt.timedelta(minutes=20), "One more thing"),  # after it
-            ("ar@acrne.example", f"{world_id}-t{k}", T0 - days(1), "Payment contact"),                  # a lookalike
-        ))
-        docs.append(DocPlan(f"{world_id}-f{k}", "email_body", "attacker", "email", sender, thread, subject,
-                            when.isoformat(), (rng.choice(FILLER),), _mentions(rng, pool, rng.randint(1, 2))))
+                        T0.isoformat(), tuple(rng.sample(REQUEST_FILLER, 2)), tuple(request_numbers)))
+    if path != "request":   # the mention's own email, in the change context by that path
+        sender, thread, when, subject = {
+            "reply": ("ar@other.example", "req", T0 + dt.timedelta(minutes=10), "Re: Updated banking details"),
+            "after": ("ar@acme.example", f"{world_id}-t0", T0 + dt.timedelta(minutes=20), "One more thing"),
+            "lookalike": ("ar@acrne.example", f"{world_id}-t0", T0 - days(1), "Payment contact"),
+        }[path]
+        docs.append(DocPlan(f"{world_id}-f0", "email_body", "attacker", "email", sender, thread, subject,
+                            when.isoformat(), (rng.choice(FILLER),), (mention,)))
     return WorldPlan(world_id, planted, real, request, (VENDOR_DOMAIN,), T0.isoformat(),
                      (T0 + dt.timedelta(hours=1)).isoformat(), tuple(docs))
 
 
-def draw_worlds(*, count: int, seed: int) -> list[WorldPlan]:
-    """`count` G7 world plans at `seed`; exactly half (the even ones) hold a planted provable number."""
+def draw_worlds(*, seed: int) -> list[WorldPlan]:
+    """G7's sweep (decision 5): for every phrasing and placement, one world with a planted provable number
+    and one without, whose change context mentions the real number in that layout; so exactly half the
+    worlds are planted, and which layouts fail G7 doesn't depend on the seed. The rest is drawn at `seed`."""
     rng = random.Random(f"dialback-docgen:worlds:{seed}")
-    return [_draw_world(rng, f"world-s{seed}-{i:04d}", planted=i % 2 == 0) for i in range(count)]
+    out: list[WorldPlan] = []
+    for phrasing, placement in layouts():
+        for planted in (True, False):
+            out.append(_draw_world(rng, f"world-s{seed}-{len(out):04d}", planted, phrasing, placement))
+    return out
 
 
 # --- Fictional numbers ------------------------------------------------------------------------------
@@ -781,10 +793,10 @@ class Run:
 
 
 def run(*, examples: int, seed: int, reader, rule=None) -> Run:
-    """Check every plan in the seed's fixed sample: `examples` documents with G1 to G6, and
-    `world_count(examples)` worlds with G7. Nothing stops at the first failure (FINDINGS B3)."""
+    """Check every plan in the seed's fixed sample: `examples` documents with G1 to G6, and G7's sweep of
+    worlds (two per layout). Nothing stops at the first failure (FINDINGS B3)."""
     docs = draw_docs(examples=examples, seed=seed)
-    worlds = draw_worlds(count=world_count(examples), seed=seed)
+    worlds = draw_worlds(seed=seed)
     result = check_docs(docs, reader=reader)
     found = [v for w in worlds for v in check_world(w, reader=reader, rule=rule)]
     result.tally.worlds, result.tally.worlds_planted = len(worlds), sum(w.planted for w in worlds)

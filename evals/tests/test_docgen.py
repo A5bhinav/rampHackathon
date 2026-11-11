@@ -26,7 +26,7 @@ def _docs() -> tuple[docgen.DocPlan, ...]:
 
 @lru_cache(maxsize=1)
 def _worlds() -> tuple[docgen.WorldPlan, ...]:
-    return tuple(docgen.draw_worlds(count=docgen.world_count(EXAMPLES), seed=SEED))
+    return tuple(docgen.draw_worlds(seed=SEED))
 
 
 # --- Shape, round trip, coverage ---------------------------------------------------------------------
@@ -318,6 +318,29 @@ def test_g7_blames_only_the_labels_that_move_the_call(_today_rule):
     found = sorted(v.pattern for v in docgen.check_world(world, reader=StubReader()))
     assert found == ["G7/bank_verification_line/label_number", "G7/main/number_label"]
 
+
+def test_g7_sweeps_every_layout_of_the_real_number():
+    # G7's worlds are a sweep, not a sample: every phrasing and placement the generator renders is the change
+    # context's one visible mention of the vendor's real number, once with a planted provable number and once
+    # without. So G7's patterns are the same at every seed (the fresh review found 8 of 81 at seed 0 and 14
+    # to 16 unlisted ones at seeds 1 to 3 when the worlds were drawn at random).
+    from collections import Counter
+    layouts = [(p, pl) for p in docbank.PHRASINGS for pl in docbank.PLACEMENTS
+               if docbank.PHRASINGS[p].form in docbank.PLACEMENT_FORMS[pl]]
+    assert len(layouts) == 102
+    swept = Counter()
+    for world in _worlds():
+        context = [d for d in world.documents if not d.id.split("-")[-1].startswith(("rec", "plant"))]
+        mentions = [n for d in context for _, n in docgen.numbers_with_authors(d) if n.e164 == world.real]
+        assert len(mentions) == 1 and mentions[0].visibility == "visible", world.id
+        assert not any(n.e164 != world.real and n.owner != "attacker" for d in context
+                       for _, n in docgen.numbers_with_authors(d)), world.id   # no other mention can refuse a call
+        swept[(mentions[0].phrasing, mentions[0].placement, world.planted)] += 1
+    assert swept == Counter({(p, pl, planted): 1 for p, pl in layouts for planted in (True, False)})
+    found = [sorted({v.pattern for w in docgen.draw_worlds(seed=s) for v in docgen.check_world(w, reader=StubReader())})
+             for s in (0, 1, 2)]
+    assert found[0] and found[0] == found[1] == found[2]
+
 @pytest.mark.docs_gate
 def test_checks_on_the_stub():
     # G1 to G7 on the stub at seed 0 with 1000 documents (and every frozen case): every failing pattern is on
@@ -333,26 +356,41 @@ def test_checks_on_the_stub():
     assert verdict.problems == [], "\n".join(verdict.problems)
     assert known.missing_findings(entries, (ROOT / "evals" / "FINDINGS.md").read_text(encoding="utf-8")) == []
     tally = found.result.tally                                     # every check ran on the whole sample
-    assert tally.documents == EXAMPLES and tally.worlds == docgen.world_count(EXAMPLES)
+    assert tally.documents == EXAMPLES and tally.worlds == 2 * len(docgen.layouts())
     assert tally.visible_numbers > 1000 and tally.g5_compared > 1000 and tally.g6_compared > 100
+
 
 # --- Known failures by pattern (decision 6) ----------------------------------------------------------
 
 SMALL = 40   # a small run for the known-failures tests; the gate runs 1000
 
 
+def _frozen_copy(tmp_path) -> Path:
+    """A copy of the committed frozen cases, so a run here shrinks only what no committed case shows yet
+    (shrinking every G7 pattern into an empty folder takes about 30 seconds a run)."""
+    import shutil
+    out = tmp_path / "frozen"
+    if not out.exists():
+        out.mkdir()
+        for case in sorted(FROZEN.glob("*/case.json")):
+            shutil.copytree(case.parent, out / case.parent.name)
+    return out
+
+
 def _lab_docs(tmp_path, entries: list[dict], capsys) -> tuple[int, str]:
     from dialback_evals.cli import main
     listed = tmp_path / "known.json"
     listed.write_text(json.dumps({"lab-docs": entries}))
-    code = main(["docs", "--examples", str(SMALL), "--seed", str(SEED), "--out", str(tmp_path / "frozen"),
+    code = main(["docs", "--examples", str(SMALL), "--seed", str(SEED), "--out", str(_frozen_copy(tmp_path)),
                  "--known-failures", str(listed), "--report", str(tmp_path / "report.json")])
     return code, capsys.readouterr().out
 
 
-def _failing_now() -> list[str]:
+def _failing_now(tmp_path) -> list[str]:
+    """What a small run fails now: its sample's patterns and its frozen cases' (lab docs holds both)."""
     run = docgen.run(examples=SMALL, seed=SEED, reader=StubReader())
-    return sorted({v.pattern for v in run.violations})
+    frozen = docgen.rerun_frozen(_frozen_copy(tmp_path), reader=StubReader())
+    return sorted({v.pattern for v in run.violations} | {p for _, patterns, _ in frozen for p in patterns})
 
 
 def _entry(pattern: str, finding: str = "A19") -> dict:
@@ -361,7 +399,7 @@ def _entry(pattern: str, finding: str = "A19") -> dict:
 
 
 def test_unlisted_pattern_turns_red(tmp_path, capsys):
-    failing = _failing_now()
+    failing = _failing_now(tmp_path)
     assert len(failing) >= 2                              # the stub fails some patterns even in a small run
     code, out = _lab_docs(tmp_path, [_entry(p) for p in failing], capsys)
     assert code == 0, out                                 # every failure listed, every listed one failing
@@ -371,7 +409,7 @@ def test_unlisted_pattern_turns_red(tmp_path, capsys):
 
 
 def test_listed_pattern_that_passes_turns_red(tmp_path, capsys):
-    failing = _failing_now()
+    failing = _failing_now(tmp_path)
     passing = "G3/main/table_row"                         # the stub never labels a table row's number
     assert passing not in failing
     code, out = _lab_docs(tmp_path, [_entry(p) for p in [*failing, passing]], capsys)
@@ -408,10 +446,10 @@ def test_stub_report_has_every_count(tmp_path, capsys):
     g5 = body["g5_stability"]
     assert 0 < g5["same"] < g5["compared"] and g5["rate"] == g5["same"] / g5["compared"]
     assert body["patterns"] == dict(sorted(Counter(v.pattern for v in found.violations).items()))
-    assert body["documents"] == 200 and body["worlds"] == docgen.world_count(200) and body["g6_compared"] > 0
+    assert body["documents"] == 200 and body["worlds"] == 2 * len(docgen.layouts()) and body["g6_compared"] > 0
     # lab docs prints it and writes it.
     path = tmp_path / "report.json"
-    main(["docs", "--examples", "200", "--seed", str(SEED), "--out", str(tmp_path / "frozen"), "--known-failures",
+    main(["docs", "--examples", "200", "--seed", str(SEED), "--out", str(_frozen_copy(tmp_path)), "--known-failures",
           "none", "--report", str(path)])
     out = capsys.readouterr().out
     assert json.loads(path.read_text()) == json.loads(json.dumps(body))
