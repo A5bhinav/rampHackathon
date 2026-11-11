@@ -1,6 +1,6 @@
 # 0092: Real PDFs and scans: render them, read them back
 
-**Owner:** Sami (the reader is in `packages/ledger`, the renderer in `evals`)  **Slice:** evidence  **Target day:** not set (Q156)
+**Owner:** Sami (the reader is in `packages/ledger`, the renderer in `evals`)  **Slice:** evidence  **Target day:** Part A now, for the Nov 19 final; Part B after it (Q156)
 
 ## Goal
 
@@ -29,8 +29,9 @@ It serves:
 - **R9 and ADR-4:** document text is data, and models read while code decides. No model's
   transcription becomes a phone number on its own.
 - **ADR-14:** PDFs are read locally with per-character checks, and scans go to Claude's vision
-  input. Part B amends ADR-14 (Q158): a scan's text comes from local OCR, and the vision call
-  only confirms its phone digits.
+  input. Part B amends ADR-14 (Q158, Sami, Nov 11): a scan's text comes from local OCR, and the
+  vision call only confirms its phone digits. Part B's first PR updates ADR-14's row in
+  `docs/adr/README.md`.
 - **The visibility rule:** hidden values are kept, marked, and never eligible (`select.py` counts
   only `visible` sightings).
 
@@ -379,17 +380,18 @@ Part B:
 
 ## Open questions
 
-- **Q156:** the target day. Is this meant for the Nov 19 live final (code freeze was Nov 8)?
-  - **Part A alone is enough for real PDFs in the demo.** D9 already covers the team phone.
-  - **A yes means:** Part A lands after the freeze, the core image gains pdfplumber, and Part B
-    waits until after the final.
-- **Q157:** API spend for Part B's vision calls.
+- **Q156, resolved (Sami, Nov 11): Part A now.** That means real PDFs in the Nov 19 final's
+  demo. So:
+  - Part A lands after the Nov 8 freeze;
+  - the core image gains pdfplumber;
+  - D9 covers the team phone;
+  - Part B waits until after the final.
+- **Q157, open until Part B starts:** API spend for Part B's vision calls.
   - **The held-out run:** 4 profiles x 200 documents x 3 runs = 2,400 page calls.
   - **Development:** 4 profiles x 1,000 documents x however many tuning passes `C_MIN` and the
     line-match floor take.
-- **Q158:** amending ADR-14 so that a scan's text comes from local OCR and the vision call only
-  confirms phone digits (D12, D13). The two-reading rule is from the Nov 11 conversation. Which
-  reading becomes the text layer is this spec's call.
+- **Q158, resolved (Sami, Nov 11):** local OCR supplies a scan's text, and the vision call only
+  confirms phone digits (D12, D13). ADR-14 is amended accordingly.
 - **Q159:** should `text.py` join the cells on one baseline into one line? It would change the
   page-model path and spec 0052's results too, so it's a spec of its own.
 
