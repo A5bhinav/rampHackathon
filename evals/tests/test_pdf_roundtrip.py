@@ -7,12 +7,12 @@ from __future__ import annotations
 import functools
 
 import pytest
-from _sources import all_documents, corpus_documents
+from _sources import corpus_documents, round_trip_documents
 from dialback_evals.pdfrender import TRICKS, expected_visibility, render_pdf
-from dialback_ledger import pdf
+from dialback_ledger import legibility, pdf
 from dialback_ledger.visibility import classify
 
-SOURCES = all_documents()
+SOURCES = round_trip_documents()
 AR = {"text": "AR direct: (415) 555-0142", "x": 72, "y": 100, "size": 10, "color": "#000000"}
 PLANTED = [(f"planted-{trick}", {"id": f"planted-{trick}", "kind": "contract", "pages": [{"width": 612, "height": 792, "spans": [
     {"text": "Main: 206.555.0117", "x": 72, "y": 86, "size": 10, "color": "#000000"}, AR | {"trick": trick}]}]})
@@ -118,6 +118,8 @@ def test_lab_docs_patterns_match(monkeypatch):
     frozen = ROOT / "evals" / "docs-generated"
     page_model = docgen.run(examples=1000, seed=0, reader=StubReader())
     page_model_frozen = docgen.rerun_frozen(frozen, reader=StubReader())
+    # This test is about the path, over more than 10,000 documents. Tesseract's own bar is the round trip above.
+    monkeypatch.setattr(legibility, "_read_matches", lambda image, expected, timeout: True)
     real = ledger_ingest.ingest_all
     calls = {"check_doc": 0, "bridge": 0}
 

@@ -145,7 +145,9 @@
     {"check": "G7", "phrasing": "verify_with_bank", "placement": "table_row", "finding": "A1", "owner": "Inesh"}
   ],
   "lab-pdf": [
-    {"case": "glyph-swap", "labels": ["text_layer_disagrees_with_glyphs"], "finding": "H1", "owner": "Sami"},
-    {"case": "digit-patch", "labels": ["a_patch_changes_a_digit"], "finding": "H2", "owner": "Sami"}
+    {"case": "link_border_over_the_number_in_quartz", "labels": ["covered_only_in_another_viewer"], "finding": "H3", "owner": "Sami"},
+    {"case": "link_style_border_over_the_number_in_quartz", "labels": ["covered_only_in_another_viewer"], "finding": "H3", "owner": "Sami"},
+    {"case": "cover_nested_past_pdfiums_limit_in_mupdf", "labels": ["covered_only_in_another_viewer"], "finding": "H3", "owner": "Sami"},
+    {"case": "image_with_no_data_is_black_in_mupdf", "labels": ["covered_only_in_another_viewer"], "finding": "H3", "owner": "Sami"}
   ]
 }
