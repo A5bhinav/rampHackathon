@@ -56,10 +56,8 @@ export function liveCallView(detail: CaseDetail, selection: SelectionView | null
 
   // The recorded answers, slot by slot in the script's order, numbered by the turn they came from.
   const answers = call?.result === "answers_recorded" || phase === "decided" ? call?.answers ?? [] : [];
-  // An older script asked name and role in one question (the helper folds the role into the name);
-  // when the script asks the role on its own, each slot keeps only its own answers.
-  const separate = new Set((script?.questions ?? []).map((q) => q.slot));
-  const asked = conversation(script, answers).asked.map((a) => ({ ...a, answers: separate.has("speaker_role") ? a.answers.filter((x) => x.slot === a.slot) : a.answers }));
+  // conversation() lists the role under the name only for an older script with no role question.
+  const asked = conversation(script, answers).asked;
   const firstTurn = (a: (typeof asked)[number]) => (a.answers.length ? Math.min(...a.answers.map((x) => x.turn_id)) : null);
   const answeredByTurn = asked.filter((a) => a.answers.length).sort((a, b) => firstTurn(a)! - firstTurn(b)!).map((a) => a.slot);
   const slots: LiveSlot[] = asked.map((a) => {

@@ -53,6 +53,18 @@ test("the conversation follows the script; answers sit under their question, ext
   assert.deepEqual(turns.extra.map((x) => (x as { slot: string }).slot), ["flag"]);
 });
 
+test("a script that asks the role on its own lists each answer once, under its own question", () => {
+  // Today's script (spec 0034 D2): the name and the role are two questions.
+  const script = { disclosure: "Hi", note: "n", questions: [
+    { slot: "recording_consent", wording: "ok?" }, { slot: "speaker_name", wording: "May I have your name?" },
+    { slot: "speaker_role", wording: "And what's your role there?" }, { slot: "account_last4", wording: "digits?" }] };
+  const turns = conversation(script as never, [a("speaker_role", "AR manager", 5), a("flag", "opt_out", 6),
+    a("recording_consent", "yes", 1), a("speaker_name", "Jordan", 4)]);
+  assert.deepEqual(turns.asked.map((q) => [q.slot, q.answers.map((x) => (x as { turn_id: number }).turn_id)]),
+    [["recording_consent", [1]], ["speaker_name", [4]], ["speaker_role", [5]], ["account_last4", []]]);
+  assert.deepEqual(turns.extra.map((x) => (x as { slot: string }).slot), ["flag"]);
+});
+
 test("script checks read as words, and only a clean value is ok", () => {
   const rows = checkRows({ disclosure_first: true, answers_grounded: false, agent_spoke_account_digits: false,
     new_number_accepted: true, policy_violations: 0, speech_guard_trips: 2 });
