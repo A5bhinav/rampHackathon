@@ -257,12 +257,10 @@
     }
   },
   "l22-legit-company-unclear": {
-    "hash": "1cea7bc267910e53a7dc2b9db6a69078eb8ecc7045553f56e2a34baa47ed3918",
+    "hash": "b3510541e8e726d7b7dafb0edcae7c4370c53d7604143d07f23bd16496630bc3",
     "required": {
-      "verdict_must_be": null,
-      "verdict_must_not_be": [
-        "verified"
-      ]
+      "verdict_must_be": "verified",
+      "verdict_must_not_be": []
     }
   },
   "l23-legit-speaker-unknown": {

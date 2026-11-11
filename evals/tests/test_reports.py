@@ -125,11 +125,17 @@ def test_reference_matcher_passes_f3():
     found = reports.check_f3(_sample("reachable") + _sample("contract"), matcher=reports.strict_match)
     assert found.violations == []
     assert found.vendor_answers > 0
+    # Since spec 0082 D7b, F3 gates only the refusal classes, so the other classes' labels are checked here:
+    # the strict matcher reads none of them as the vendor, and each class is drawn (review fix, Nov 10).
+    for cls in ("other", "other_containing_vendor", "correction"):
+        assert sum(found.per_class.get(cls, {}).values()) > 0, f"{cls} is drawn"
+        assert found.per_class[cls]["true"] == 0, f"strict_match read a {cls} phrase as the vendor"
 
 
 def _added(found_broken, found_production) -> list:
-    """What a double adds over production on the same reports. Production already fails F1 (FINDINGS A10),
-    so a double "failing" F1 proves nothing unless it fails where production does not."""
+    """What a double adds over production on the same reports. Production can fail a check itself (it failed
+    F1 until spec 0082, FINDINGS A10), so a double "failing" it proves nothing unless it fails where production
+    does not."""
     return sorted({(i, lab) for i, labs in found_broken.violations for lab in labs}
                   - {(i, lab) for i, labs in found_production.violations for lab in labs})
 
@@ -138,26 +144,29 @@ def test_each_check_catches_its_broken_double():
     reach, contract = _sample("reachable"), _sample("contract")
     # F1: a decide() whose V07 accepts "unsure" and whose NR09 is turned off.
     assert _added(reports.check_f1(reach, decide=reports.doubles.v07_accepts_unsure_nr09_off), reports.check_f1(reach))
-    # F2: one double per move, each letting that move's less certain value through. Where production
-    # already fails a move the same way (company_negation: production accepts "Not Acme, this is Globex",
-    # FINDINGS A10), the check is shown failing on production itself and the double has nothing to add.
-    # A move production can't record from a reachable report (a second answer, answers after a refused
-    # consent; review fix 4) is shown on the contract-only domain, where it applies.
+    # F2: one double per move, each letting that move's less certain value through. A move production can't
+    # record from a reachable report (a second answer, answers after a refused consent; review fix 4) is shown
+    # on the contract-only domain, where it applies. No rule holds back another company since spec 0082 D7b (it
+    # is unknown, and NR03 reads only refusals), so company_other is shown on a decide() whose NR03 also fires
+    # on a match, as a company check that read the vendor's own name as a refusal would.
     missed, on_production = [], []
     for move in reports.MOVES:
+        double = (reports.doubles.nr03_fires_on_a_match if move == "company_other"
+                  else reports.doubles.lets_through(move))
         for cases in ((contract,) if move in reports.CONTRACT_MOVES else (reach, contract)):
             production = reports.check_f2(cases, moves=(move,))
             if production.violations:
                 on_production.append(move)
                 break
-            if _added(reports.check_f2(cases, decide=reports.doubles.lets_through(move), moves=(move,)), production):
+            if _added(reports.check_f2(cases, decide=double, moves=(move,)), production):
                 break
         else:
             missed.append(move)
     assert missed == [], missed
-    assert set(on_production) <= {"company_negation"}, on_production   # anything else is a new finding
-    # F3: a company check that accepts any answer containing the vendor's name fails it; production may
-    # fail it the same way (that is A10), and the strict reference matcher passes it (the next test but one).
+    # Production used to fail company_negation (FINDINGS A10); it flags a negation now (spec 0082, D7a).
+    assert on_production == [], on_production                          # anything here is a new finding
+    # F3: a company check that accepts any answer containing the vendor's name fails it (it accepts a negation
+    # that names the vendor), and the strict reference matcher passes it (the next test but one).
     assert reports.check_f3(reach, matcher=reports.doubles.contains_vendor_name).violations
 
 
@@ -185,26 +194,61 @@ def test_findings_are_frozen_and_rerun(tmp_path):
 
 # ---- spec 0048 review fix 1: F1's label names the condition that failed ---------------------------------
 
+def _without_nr03(facts):
+    with reports._table(skip=("NR03_wrong_company",)):
+        return reports.dialback_decision.decide(facts)
+
+
 def test_f1_labels_name_the_failed_condition():
     base = reports.honest()
     assert reports.unconfirmed(base) == [] and reports.run(base).decision.outcome == "verified"
     negated = reports.with_company(base, "Not Acme Fasteners, this is Globex Logistics", "negation")
     assert reports.unconfirmed(negated) == ["company=negation"]
-    assert reports.check_f1([negated]).violations == [(0, ["F1:company=negation"])]      # production verifies it (A10)
+    assert reports.check_f1([negated]).violations == []                    # production flags it (spec 0082, D7a)
+    assert reports.check_f1([negated], decide=_without_nr03).violations == [(0, ["F1:company=negation"])]
     stale = reports.with_case(base, pick_current=False)
     assert reports.unconfirmed(stale) == ["pick=stale"]
     assert reports.check_f1([stale]).violations == []                                      # production refuses it (V01)
 
 
-def test_the_known_failures_list_names_only_company_classes_for_f1():
-    # Review fix 1 lists only A10's three F1 conditions; review fix 5's near-variants add two more company
-    # classes production accepts though they don't name the vendor (A8's longer company name, and a past
-    # connection, A10's root cause). No other F1 condition is ever listed, so any other F1 failure is red.
+@pytest.mark.parametrize(("said", "cls", "condition"), [
+    ("This is Globex Logistics", "other", []),                             # another company, no refusal word (D7b)
+    ("Acme Fasteners Supply Co", "other_containing_vendor", []),
+    ("Acme", "partial", []),
+    ("Ackme Fasteners", "vendor_typo", []),
+    ("Acme Fasteners? No, Globex Logistics", "correction", []),           # no refusal word: D9's accepted cost
+    ("Acme Fasteners, sorry, I mean Globex Logistics", "correction", ["company=correction"]),   # "I mean" (D7a)
+    ("We're not Acme Fasteners, sorry.", "negation", ["company=negation"]),
+    ("We distribute for Acme Fasteners", "reseller", ["company=reseller"]),
+    ("I was at Acme Fasteners until last year", "past_connection", ["company=past_connection"]),
+])
+def test_f1_asks_for_no_refusal_word_in_the_company_answer(said, cls, condition):
+    # Sami, Nov 10 (spec 0082, D7b): F1's "the company answer names the vendor" becomes "no refusal word in the
+    # company answer", judged by the generator's truth. Production verifies the first five and flags the rest.
+    from dialback_evals.phrasebank import CLASSES
+    case = reports.with_company(reports.honest(), said, CLASSES[cls], cls)
+    assert reports.unconfirmed(case) == condition
+    assert (reports.run(case).decision.outcome == "verified") == (not condition)
+    assert reports.check_f1([case]).violations == []
+
+
+def _without_company(case):
+    return reports.with_case(case, answers=tuple(a for a in case.answers if a["slot"] != "company_named"),
+                             truth={**case.truth, "company": [], "company_class": []})
+
+
+def test_f1_no_longer_asks_for_a_company_answer():
+    # D7b: a missing company answer does not block, so it is not a condition of an honest confirmation either.
+    dropped = _without_company(reports.honest())
+    assert reports.unconfirmed(dropped) == [] and reports.run(dropped).decision.outcome == "verified"
+
+
+def test_the_known_failures_list_names_no_f1_condition():
+    # Review fix 1 listed only company conditions for F1 (A8 and A10). Spec 0082 resolves both by design (D7a
+    # flags a refusal; D7b stops asking for the vendor's name), so no F1 condition is listed: any F1 failure is red.
     from dialback_evals import known
     entries = known.load(ROOT / "evals" / "known-failures.json")["lab-reports"]
-    f1 = {(label, e.finding) for e in entries for label in e.labels if label.startswith("F1")}
-    assert f1 == {("F1:company=negation", "A10"), ("F1:company=correction", "A10"), ("F1:company=reseller", "A10"),
-                  ("F1:company=other_containing_vendor", "A8"), ("F1:company=past_connection", "A10")}
+    assert {(label, e.finding) for e in entries for label in e.labels if label.startswith("F1")} == set()
 
 
 def _bugged(bug):
@@ -252,8 +296,10 @@ def test_planted_call_facts_bugs_turn_lab_reports_red(bug, code, tmp_path, monke
     assert main(["reports", "--examples", "2000", "--seed", "0", "--out", str(out),
                  "--known-failures", str(ROOT / "evals" / "known-failures.json")]) == code
     if bug == "first_company_answer_only":
-        printed = capsys.readouterr().out
-        assert "future-state findings (not gated): F1:company=other" in printed
+        # Spec 0082, D7b: only a refusal changes the company fact now, so the bug shows when a second company
+        # answer refuses (the contract-only generator draws one) and it is read past.
+        future = next(line for line in capsys.readouterr().out.splitlines() if "future-state findings" in line)
+        assert "F1:company=negation" in future.split(": ", 2)[-1].split(", ")
 
 
 
@@ -323,14 +369,77 @@ def test_the_phrase_bank_has_near_variants_with_known_truths():
 
 def test_f3_counts_are_reported_per_phrase_class():
     found = reports.check_f3(_sample("reachable") + _sample("contract"))
-    per = found.per_class
+    per = found.per_class                                     # class -> {"true": n, "unknown": n, "false": n}
     assert {"vendor", "vendor_typo", "vendor_singular", "other", "other_containing_vendor", "past_connection",
             "negation", "reseller", "correction", "partial"} <= set(per)
-    assert all(0 <= acc <= total and total > 0 for acc, total in per.values())
-    # Production's word-subset check gets these wrong, so F3 now measures something: it rejects a vendor's
-    # name with a typo or in the singular, and accepts another company whose name holds the vendor's.
-    assert per["vendor_typo"][0] == 0 and per["vendor_singular"][0] == 0
-    assert per["other_containing_vendor"][0] == per["other_containing_vendor"][1]
-    assert per["other"][0] == 0                               # a plain other company is still refused
-    labels = {lab for _, labs in found.violations for lab in labs}
-    assert "F3_company_accepted_other_containing_vendor" in labels    # the bar is unchanged: other is never accepted
+    assert all(set(counts) == {"true", "unknown", "false"} and sum(counts.values()) > 0 for counts in per.values())
+    # Spec 0082 on the bank: a refusal is False (D7a); a short name, a singular and another company whose name
+    # holds the vendor's are matches (D6); a typo is unknown (D8: nothing fuzzy), which blocks nothing (D7b); a
+    # correction refuses only in its "I mean" form.
+    for cls in ("negation", "reseller", "past_connection"):
+        assert per[cls]["true"] == per[cls]["unknown"] == 0, cls
+    for cls in ("partial", "vendor_singular", "other_containing_vendor"):
+        assert per[cls]["unknown"] == per[cls]["false"] == 0, cls
+    assert per["vendor_typo"]["true"] == per["vendor_typo"]["false"] == 0
+    assert per["correction"]["true"] > 0 and per["correction"]["false"] > 0 and per["correction"]["unknown"] == 0
+    assert per["other"]["false"] == 0 and per["other"]["unknown"] > 0
+
+
+def _always(value):
+    return lambda named, legal_name, trade_names=(): value
+
+
+def test_f3_gates_only_refusals_and_each_must_be_false():
+    # Sami, Nov 10 (spec 0082, D7b): F3 gates only negation, reseller and past connection, and each must be False
+    # (unknown lets a refusal through as surely as True); every other class is reported, not gated.
+    cases = _sample("reachable") + _sample("contract")
+    refusals = {"F3_company_refusal_missed_negation", "F3_company_refusal_missed_reseller",
+                "F3_company_refusal_missed_past_connection"}
+    for value in (None, True):
+        assert {lab for _, labs in reports.check_f3(cases, matcher=_always(value)).violations for lab in labs} \
+            == refusals, value
+    assert reports.check_f3(cases, matcher=_always(False)).violations == []
+    assert reports.check_f3(cases).violations == []                     # production flags every refusal
+
+
+def test_over_blocking_counts_only_false():
+    # Spec 0082, D10 as amended for D7b: only False blocks, so over-blocking counts the names-the-vendor answers
+    # that come out False; those that come out unknown are counted apart. Other-company acceptance counts the
+    # answers naming someone else that come out True.
+    cases = _sample("reachable")
+    unknown, false, true = (reports.check_f3(cases, matcher=_always(v)) for v in (None, False, True))
+    assert unknown.vendor_answers == false.vendor_answers > 0
+    assert (unknown.vendor_rejected, unknown.vendor_unknown) == (0, unknown.vendor_answers)
+    assert (false.vendor_rejected, false.vendor_unknown) == (false.vendor_answers, 0)
+    assert true.other_accepted == true.other_answers > 0 and unknown.other_accepted == false.other_accepted == 0
+    assert unknown.other_unknown == unknown.other_answers and true.other_unknown == false.other_unknown == 0
+    production = reports.check_f3(cases)
+    assert production.vendor_rejected == 0                              # no answer naming the vendor is flagged
+
+
+def test_f2_never_replaces_a_refusal():
+    # Spec 0082, D7b: a company answer that refuses is evidence against the change (NR03), and replacing it with
+    # another company may help, as dropping a flag may (spec 0048, B4). The move doesn't apply to it; moving to a
+    # negation still does, and both apply to the vendor's name.
+    from dialback_evals.phrasebank import CLASSES
+    base = reports.honest()
+    for said, cls in (("We're a reseller for Acme Fasteners", "reseller"),
+                      ("Acme Fasteners, sorry, I mean Globex Logistics", "correction")):
+        refusing = reports.with_company(base, said, CLASSES[cls], cls)
+        assert reports.MOVES["company_other"](refusing) is None, cls
+        assert reports.run(reports.with_company(refusing, "Globex Logistics", "other")).decision.outcome == "verified"
+        assert reports.MOVES["company_negation"](refusing) is not None
+    assert reports.MOVES["company_other"](base) is not None and reports.MOVES["company_negation"](base) is not None
+
+
+def test_f2_retires_the_company_moves_spec_0082_makes_moot():
+    # A short name is a match (D6), and the oracle expects a legit caller who gives one to verify, so moving to it
+    # is not less certainty. The company answer is no longer a confirming answer (D7b), so dropping it is not
+    # dropping one: with everything else clean the call verifies without it, and where it was out of order (before
+    # consent, NR02) dropping it helps, as dropping evidence against may (spec 0048, B4).
+    assert set(reports.RETIRED_MOVES) == {"company_partial", "drop_company"}
+    assert not set(reports.RETIRED_MOVES) & set(reports.MOVES)
+    early = reports.with_case(reports.honest(), answers=tuple({**a, "turn_id": 0} if a["slot"] == "company_named" else a
+                                                              for a in reports.honest().answers))
+    assert reports.run(early).decision.rules_fired == ("NR02_no_recording_consent",)
+    assert reports.run(_without_company(early)).decision.outcome == "verified"

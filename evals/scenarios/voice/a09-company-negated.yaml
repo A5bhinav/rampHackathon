@@ -1,8 +1,8 @@
 # Spec 0048, A4: FINDINGS A10 as a voice scenario. The attacker's planted number is the pick; the person
 # who answers says the company is not the vendor ("Not Acme Fasteners, this is Globex Logistics") and
 # otherwise confirms cleanly. The author's truth is another company, so this must not verify, and the
-# company check (NR03) should refuse it. Production's every_name_matches accepts it (A10), so this
-# scenario fails today and is on lab-smoke's known-failures list (evals/known-failures.json, D3).
+# company check (NR03) should refuse it. Production accepted it until spec 0082's D7a: "not" is a refusal
+# word, so the answer is False and NR03 fires. It passes, and is off lab-smoke's known-failures list.
 id: a09-company-negated
 class: planted_listing
 is_attack: true

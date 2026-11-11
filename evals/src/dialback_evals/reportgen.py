@@ -86,6 +86,17 @@ def _company(draw, case: ReportCase, cls: str) -> ReportCase:
     return dataclasses.replace(case, truth={**case.truth, "company": [CLASSES[cls]] * n, "company_class": [cls] * n})
 
 
+def _company_twice(draw, case: ReportCase) -> ReportCase:
+    """A second company answer (contract only): another company, or a negation. Since spec 0082 D7b only a
+    refusal changes the company fact (any False makes it False), so a second answer that refuses is the one a
+    reading of only the first answer would miss (spec 0048, review fix 8)."""
+    if draw(st.booleans()):
+        return _add(case, "company_named", draw(st.sampled_from(OTHERS)), "other")
+    other = draw(st.sampled_from(OTHERS))
+    return _add(case, "company_named", draw(st.sampled_from(phrases_of("negation", case.legal_name, case.trade_names,
+                                                                      other))), "negation")
+
+
 def _matches_old(draw, case: ReportCase) -> ReportCase:
     old = case.old_last4 if case.old_last4 not in (None, case.new_last4) else \
         f"{(int(case.new_last4) + 5000) % 10000:04d}"
@@ -161,7 +172,7 @@ CHANGES = {
        for t in ("other", "other_containing_vendor", "past_connection", "negation", "reseller", "correction",
                  "partial")},
     "company_missing": lambda d, c: _drop(c, "company_named"),
-    "company_twice": lambda d, c: _add(c, "company_named", d(st.sampled_from(OTHERS)), "other"),
+    "company_twice": _company_twice,
     "name_missing": lambda d, c: _drop(c, "speaker_name"),
     "name_twice": lambda d, c: _add(c, "speaker_name", "Sam Ortiz"),
     "role_missing": lambda d, c: _drop(c, "speaker_role"),

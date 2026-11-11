@@ -43,8 +43,9 @@ The defects come from `evals/FINDINGS.md` on `sami/attack-lab-generative`, as of
 - **D2. Keys, in the relay.** The relay handles these because `step` never reads a clock (spec 0012).
   - Digits collect until `#`. There is no auto-submit at four.
   - `*` empties what is typed and emits a new `KeypadReset` event.
-  - If digits are in hand and no key comes for 5 seconds, the entry is submitted as if `#` were
-    pressed. The 5 seconds is my call (Q78).
+  - If digits are in hand and no key comes for 10 seconds, the entry is submitted as if `#` were
+    pressed. Sami raised this from 5 to 10 seconds on Nov 9, because a caller may pause mid-entry to
+    find the rest of the digits (Q78).
   - The relay keeps at most 16 keys and drops further digits. The entry is still submitted, and
     the policy refuses it.
   - A spoken turn or a silence still clears a partial entry, as today.
@@ -136,7 +137,7 @@ None:
   |---|---|
   | `4 8 2 1 #` | records 4821 |
   | `4 8 * 4 8 2 1 #` | records 4821, the start-over line plays once, and no re-ask is used |
-  | `4 8 2 1`, then 5 seconds with no key | records 4821 |
+  | `4 8 2 1`, then 10 seconds with no key | records 4821 |
   | `4 8 #` | re-asked once |
   | `4 8 #` then `4 8 #` | finishes with no digits (NR06) |
   | `4 8 2 1 5 #` | re-asked once |
@@ -190,7 +191,7 @@ None:
 
 None open. Sami approved the spec and every call in it as written on Nov 9:
 
-- **Q78, resolved:** submit after 5 seconds with no key.
+- **Q78, resolved:** submit after 10 seconds with no key (raised from 5 on Nov 9: a caller may pause mid-entry to find the rest of the digits).
 - **Q79, resolved:** a second unclear on the digits question finishes the call with no digits
   (NR06). Consent and the change question end `failed`, which leads to a redial.
 - **Q80, resolved:** a model error becomes `unclear` (D7), revising spec 0015's safe values.

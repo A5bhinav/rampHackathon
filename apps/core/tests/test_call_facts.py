@@ -64,9 +64,13 @@ def test_earlier_calls_are_the_others_of_this_generation():
 
 def test_the_company_matches_a_trade_name():
     assert call_facts(_report(), CASE, GENERATION, CONTEXT).company_matches is True
-    other = [*ANSWERS[:1], _answer("company_named", "Globex Logistics", 3), *ANSWERS[2:]]
-    assert call_facts(_report(answers={"schema_version": "call-answers/v0", "call_id": CALL, "answers": other}),
-                      CASE, GENERATION, CONTEXT).company_matches is False
+
+    def said(company):
+        answers = [*ANSWERS[:1], _answer("company_named", company, 3), *ANSWERS[2:]]
+        return call_facts(_report(answers={"schema_version": "call-answers/v0", "call_id": CALL, "answers": answers}),
+                          CASE, GENERATION, CONTEXT).company_matches
+    assert said("Globex Logistics") is None, "spec 0082, D7b: another company is unknown, not a refusal"
+    assert said("Not Acme Supply, this is Globex") is False, "a refusal word is False (NR03)"
 
 
 def test_the_report_and_the_context_carry_through():

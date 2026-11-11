@@ -140,6 +140,20 @@ These are not reachable today, but each is frozen as a regression.
 
 ### A10. The company check accepts a negated name, or another company named elsewhere on the call
 
+- **Resolved by design (spec 0082, D7a and D7b; Sami, Nov 10).** A negation, a reseller, a past
+  connection and the "I mean" correction now hold a refusal word, so the answer is False and NR03 sends
+  the case to a person (D7a). What still passes: a correction with no refusal word ("Acme? No,
+  Globex") and another company named outright are accepted on purpose (D7b, D9). Another company
+  named at a later question (the role, name or department) also passes; D7b doesn't address that case,
+  and it was never checked on main either. The person who releases sees the answers on the call record.
+  - **The lab now:** a09 passes without its expectation changing (NR03 fires), and every A10 entry is
+    off the known-failures list. F1 asks for no refusal in the company answer, and F3 gates only
+    negation, reseller and past connection, each of which must be False (C14).
+  - **Measured** (seed 0, 2000 reports per domain, both domains, the same reports before and after,
+    exploratory: D7a's word list was chosen after reading this bank): negations True 133 of 133 before,
+    False 133 after; resellers 85 of 85 to False 85; past connections 111 of 111 to False 111;
+    corrections True 109 of 109 before, 61 True and 48 False (the "I mean" ones) after.
+
 - **Status:** confirmed (ran), through the voice lab with the `ScriptedAgent`, Nov 9 (voice
   re-review); re-run on origin/main da057f8 through `policy.step`, `every_name_matches` and `decide`
   with both the `ScriptedAgent` and the live `ClaudeAgent` (fake model; the company phase never calls
@@ -187,11 +201,8 @@ These are not reachable today, but each is frozen as a regression.
     accepted, a different company sharing the vendor's first word ("Acme Fastening Co") 3 of 36,
     and short partial names ("Acme") 36 of 36, which 0082 accepts on purpose;
   - typos still 0 of 12 (no fuzzy matching).
-- **Decided (Sami, Nov 10): demote the company check, but keep a flag for a clear mismatch.** Naming
-  the vendor stops being required to verify, so a short or garbled name ("Acme", "acne") no longer
-  blocks. An answer with a refusal word (D7a above) still goes to review. Being built in another chat.
-  When it lands, the lab must change with it: F1's company condition, F3's bar, the known-failures
-  entries for A8 and A10 (including a09), the oracle's company expectation and the sweep.
+- **Decided (Sami, Nov 10), and now built:** see "Resolved by design" at the top of this item, and C14
+  for the lab changes that came with it.
 
 ### A11. The scripted agent's yes/no reading disagrees with the policy's
 
@@ -219,7 +230,8 @@ These are not reachable today, but each is frozen as a regression.
     model error also records "no", so a garbled "yes" ends the call as consent refused;
   - the change question: "unsure", so NR09 sends it to a person;
   - the last four with no digits heard: `dont_know` or `refused`, so NR06;
-  - company, name, role: the words are kept as heard, and a garbled company is unknown (no V05).
+  - company, name, role: the words are kept as heard, and a garbled company is unknown (no V05). Since
+    spec 0082 D7b, unknown blocks nothing (V05 is retired), so a garbled company is no longer a cost.
 - **Keep:** a wrong answer must never be re-asked (it would tell an attacker they were wrong and let
   them guess), and the voice service cannot know a wrong answer anyway: the digits are compared in
   the core after the call. Only "could not tell" should earn one more try.
@@ -271,6 +283,12 @@ These are not reachable today, but each is frozen as a regression.
 
 ### A8. The company-name check accepts names that contain the vendor's
 
+- **Resolved by design (spec 0082, D7b; Sami, Nov 10).** The company answer no longer has to name the
+  vendor, so another company passes whether the check reads it as a match ("Acme Fasteners Holdings":
+  True) or not ("This is Globex": unknown); neither blocks. The open question below is answered: yes,
+  it passes (D9 lists it as an accepted cost). Its known-failures entry is off. The lab still reports
+  each case where production reads another company as the vendor (the scorecard's company findings,
+  and F3's per-class counts: 156 of 156 such answers True, before and after, seed 0).
 - **Status:** reported (voice-lab review); not yet evaluated.
 - **What happens:** production's `every_name_matches` (`apps/core/src/dialback_core/company.py`)
   accepts "Acme Fasteners Holdings", "Acme Fasteners LLC" and "This is Acme Fasteners" for Acme
@@ -501,6 +519,41 @@ These are not reachable today, but each is frozen as a regression.
 - **Where to fix:** store a case's refusal reasons with the selection, not on the vendor-wide
   contact point, or never let change-context reasons set the vendor-wide status. That's in
   `packages/ledger` (Inesh).
+
+### A28. A look-alike company name verifies (spec 0082's accepted cost; a02)
+
+- **Status:** confirmed (ran), Nov 10, `lab run --split voice` on `sami/company-demote`. On lab-smoke's
+  known-failures list (owner Sami, whose decision it is).
+- **What happens:** a02's caller names "Acme Fastners LLC" for the vendor "Acme Fasteners", confirms
+  cleanly and types the new account's last four. Production reads the answer as a match: "acme" is a
+  distinctive first word (spec 0082, D6). Without D6 it would be unknown, which blocks nothing (D7b). So
+  the attack verifies. Before spec 0082 the word sets differed, the answer was False, and NR03 sent it to
+  review.
+- **The cost, accepted on purpose (D7b, D9):** on a phone the look-alike sounds like the real name, and a
+  fraudster knows the vendor's name anyway (spec 0082's Goal), so the company answer was a weak defense
+  here. The attack still needs the new account's last four on the keypad (V08), a call that reaches the
+  attacker on the number the rule picked, and a person to release (R5), who sees the answer on the call
+  record.
+- **Where it could close:** line-takeover detection (NR21, spec 0044) and known contacts (S01), as spec
+  0082's Goal says, or Sami revisiting D7b. a02 keeps its expectation (NR03, never verified); it is
+  listed with `expected_rule_missing` and `verified_attack`.
+
+### A29. Nonsense answers with the right digits verify (spec 0082's accepted cost; l16)
+
+- **Status:** confirmed (ran), Nov 10, the same run. On lab-smoke's known-failures list (owner Sami).
+- **What happens:** l16's caller answers "banana purple seven" at the company question and "asdf",
+  "zzz" and "qwerty" at the department, name and role questions, says yes to consent and the change, and
+  types the new account's last four. The company answer has no vendor name and no refusal word, so it is
+  unknown, which blocks nothing since D7b; V06 takes "zzz" as a name and "qwerty" as a role (any grounded
+  text counts, A24). So it verifies. Before D7b the answer was False and NR03 sent it to review.
+- **The cost:** the company answer was the only check that read a nonsense call. R7 says unclear
+  answers fail closed; D7b decides that an unclear company answer blocks nothing, so for the free-text
+  answers R7 now rests on V06 and grounding, which accept any words the caller said (A24). The digits
+  must still match the new account, and a person still releases (R5) and sees the answers.
+- **Where it could close:** V06 or the policy refusing a non-name (A24; `packages/decision`, Abhi, or
+  `packages/policy`, Sami), or Sami revisiting D7b for answers with no readable name. l16 keeps its
+  expectation (must not verify; NR03), so the oracle keeps failing a legit change on `other` (nonsense)
+  where production no longer does; it is listed with `expected_rule_missing` and `wrong_verdict`.
 
 ## B. The fuzz lab (spec 0083)
 
@@ -895,6 +948,72 @@ F1 to F9 hold as built (verified). But the lab still claims more than it shows:
 - **Left:** `coverage.py` imports private names from `invariants.py`; the oracle's import test
   checks direct imports only; a fresh checkout needs `uv sync` before `lab` runs; the numbering test
   (D1); B5's ranking catch is still marginal at seed 3.
+
+### C14. The lab after spec 0082 demoted the company check (Nov 10)
+
+- **Status:** built on `sami/company-demote`, run locally, not yet reviewed by a fresh session. Each
+  change follows from the decision (Sami's lab instructions, Nov 10), not from a result.
+- **F1** asks for no refusal word in the company answer, per answer, by the generator's truth
+  (`phrasebank.refuses`: negation, reseller, past connection, and the "I mean" correction). A missing
+  company answer is no longer a condition.
+- **F3** gates only negation, reseller and past connection, each of which must be False (unknown lets a
+  refusal through too). Every class is reported as True, unknown and False counts. Over-blocking counts
+  False only (spec 0082, D10 as amended); other-company acceptance is printed too.
+- **F2**, which Sami's list didn't name, but which the decision broke:
+  - `company_other` never replaces a refusal: a refusal is the company answer's only evidence against
+    the change now. No rule reads another company now, so its double is NR03 firing on a match. This
+    is a deviation from spec 0048 B4, which lists "the company answer to another company" as a move
+    that must never help: B4's allowance is for *dropping* evidence against the change, and this is a
+    replacement. It follows from D7b point 3 (another company named passes).
+  - `company_partial` and `drop_company` are retired: a short name is a match (D6), and the company
+    answer is no longer a confirming answer (D7b).
+  - Two attempts: the first kept both moves, with a refusal exemption. `drop_company` then flagged 20
+    contract-only reports whose company answer was recorded before consent (NR02): dropping it verified.
+    That was the check being too strong, not a product defect.
+  - **Open (Sami):** spec 0048 is now stale in three places:
+    - B4 still lists the two retired moves, and lists `company_other` without the refusal narrowing;
+    - its F1 wording still asks for the company answer to name the vendor;
+    - its F3 wording still gates every class.
+  - **Open (Sami), latent:** F1 now accepts another company named (D7b), but the oracle still fails a
+    legit change whose company truth is `other`. No legit "another company named outright" scenario
+    exists today, so nothing shows it yet.
+- **The generator:** the contract-only `company_twice` adds a negation half the time. Otherwise the
+  planted "first company answer only" bug no longer shows at all: only a refusing second answer changes
+  the fact now. It shows as `F1:company=negation`, future-state. The reachable sample is unchanged; the
+  contract sample shifts (2,884 names-the-vendor answers instead of 2,920 at seed 0).
+- **The oracle:** a legit caller whose truth is `partial` or the new `unclear` must verify; l22 does.
+  `other` still fails closed (A29). The scorecard's company findings are another company read as the
+  vendor (True: a02), or an answer the author says is fine flagged False.
+- **The sweep:** V05 is gone, and NR03 is now seen (a09 and reachable reports), so it left
+  `UNREACHABLE.md`.
+- **Measured, D10** (seed 0, 2000 reports per domain, both domains, the same reports before and after,
+  drawn with the old generator; exploratory):
+  - over-blocking, False: 533 of 2,920 before (18.3%), 0 after. Not True (D10's first definition): 533
+    before, 332 after (11.4%), every one a typo, which is unknown and blocks nothing.
+  - other-company acceptance, True: 594 of 820 before (every refusal and correction was True, A10), 225
+    after. Counting unknown too, which passes since D7b: 594 before, 443 after. That is 226 plain other
+    companies that now pass, and 329 refusals and 48 "I mean" corrections that are now flagged.
+  - With the new generator, which `lab reports` now uses (re-run after merging main, Nov 10): 241 of
+    868 answers naming someone else read as the vendor (27.8%), and 175 more unknown, which pass too.
+    The denominators differ from the before-and-after above because the contract sample changed.
+- **Known failures now:** lab-smoke lists a02 (A28) and l16 (A29); lab-reports lists nothing; lab-fuzz
+  is unchanged.
+- **D7a extended (Sami, Nov 10, after the code review):**
+  - The additions: "don't" (as a phrase, since "Don" is a first name), "doesn't", "didn't", the
+    apostrophe-free spellings (isnt, arent, wasnt, werent, dont, doesnt, didnt), "no longer", "wrong
+    number" and "different company".
+  - **Not measured here:** the phrase bank has none of these phrases, so only `test_company.py` pins
+    them, and the lab's numbers above are unchanged.
+  - **Not added:** an outsourced AP firm ("We handle AP for Acme"). Its words are everyday words. It
+    still passes, as a match: "acme" is a distinctive first word (D6), so it is True.
+  - **The cost rose** (the commit's review): everyday contractions now count, so conversational repair
+    goes to review ("Sorry, I didn't catch that, this is Acme"; pinned in `test_company.py`), as do "No,
+    you don't have the wrong number, this is Acme" and a colleague's "Jim's no longer here". All fail
+    closed.
+  - **Then added (Sami, Nov 10):** "ain't", "haven't", "hasn't", "hadn't" and their no-apostrophe
+    spellings. "Ain't" and "haven't" are phrases, since "Ain" and "Haven" are names and "New Haven" is
+    a place. Not measured here either, and they add to the cost above ("I haven't got that invoice,
+    this is Acme" goes to review).
 
 ## D. Red teaming
 

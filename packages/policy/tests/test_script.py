@@ -70,6 +70,13 @@ def test_every_fixed_line_passes_the_guard() -> None:
              REASK, START_OVER, KEYPAD_ONLY]                      # spec 0043's lines too (R4)
     lines += [QUESTIONS[p].wording(SCRIPT) for p in ORDER]
     lines += [f"{REASK} {line}" for line in (KEYPAD_ONLY, *[QUESTIONS[p].wording(SCRIPT) for p in ORDER])]
+    # Spec 0051: the digits check-in, and "Thanks." before each question asked again after a check-in.
+    import dialback_policy.script as script_module
+    from dialback_policy.step import CALLBACK_TIME_QUESTION
+
+    lines += [script_module.TAKE_YOUR_TIME, script_module.THANKS]
+    lines += [f"{script_module.THANKS} {line}" for line in (CALLBACK_TIME_QUESTION,
+                                                             *[QUESTIONS[p].wording(SCRIPT) for p in ORDER])]
     for line in lines:
         assert check(line, ctx).ok, line
 
