@@ -1,4 +1,4 @@
-# 0090: One email can't veto a number
+# 0091: One email can't veto a number
 
 **Owner:** Sami (in `packages/ledger`)  **Slice:** evidence  **Target day:** not set
 **Builds on:** spec 0079 (`sami/0079-guard`, #121). This lands after it, stacked on its branch once
