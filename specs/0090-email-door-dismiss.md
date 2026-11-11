@@ -41,7 +41,15 @@ existing `POST /api/cases/{case_id}/release` with `action=approve`.
       case a Ramp change opened or joined; a Ramp change since the case opened; a changed or
       ambiguous account on file; the changer; the reviewer who cleared the case; the first
       dismisser acting as the second, also straight through `apply_case_event`.
-- [ ] `release_case` on every other state behaves exactly as before.
+- [ ] `release_case` on every other state behaves exactly as before, except the backstop below.
+- [ ] Backstop (final review finding C1, `0016_email_ramp_mix.sql`): `first_approver` and
+      `four_eyes` also refuse when the case's current change came in by email and
+      `app.case_email_only(case)` is false
+      (`app.email_release_refused(case)`). A case verifies its current change, so such a case could
+      otherwise be released while Ramp pays an account the call never verified. The email door never
+      makes one (spec 0087, `ramp_case_open`); this catches a bug or another writer. It also refuses an
+      email case whose vendor had no account on file (rule A), which keeps that hold on (fail closed).
+      Every other `eval_guard` branch is exactly 0015's, `reject` is unchanged, and no transition changes.
 - [ ] `docs/state-machine.md` shows the two new `blocked` moves.
 - [ ] (Task 14) `permissions.can_dismiss` is true only for an approver on a blocked email-only case
       who is not in `app.blocked_approvers(case)`; the timeline reads "Dismissed by {name}: Ramp never changed,
@@ -72,8 +80,9 @@ existing `POST /api/cases/{case_id}/release` with `action=approve`.
 |---|---|
 | 1 to 5 | `supabase/tests/017_email_dismiss.sql` (blocks 13 to 15: paths A, B, C; block 16: a forged evidence row) |
 | 6 | `supabase/tests/002_case_machine.sql`, `008_release_replay.sql`, `014_review_needs_approver.sql` (unchanged, still pass) |
-| 7 | `scripts/db/test.sh` redraws it; the diff is in the PR |
-| 8 | `apps/core/tests/test_email_door.py::test_a_not_verified_email_case_is_dismissed_by_two_people_and_the_hold_lifts`, `apps/web/tests/states.test.ts` |
+| 7 | `supabase/tests/018_email_ramp_mix.sql` (blocks 1 to 5 refused, including 4b where only `four_eyes`'s new check refuses; blocks 6 to 9 are controls that still release or reject) |
+| 8 | `scripts/db/test.sh` redraws it; the diff is in the PR |
+| 9 | `apps/core/tests/test_email_door.py::test_a_not_verified_email_case_is_dismissed_by_two_people_and_the_hold_lifts`, `apps/web/tests/states.test.ts` |
 
 ## Stated limits (for Abhi)
 
@@ -99,7 +108,8 @@ existing `POST /api/cases/{case_id}/release` with `action=approve`.
 
 1. **A vendor with no account on file.** An email case for a vendor with no current account
    (`old_account_id` null) is never email only, so it stays blocked. Lifting the hold there pays
-   nothing anyway; refusing is the fail-closed choice. Confirm.
+   nothing anyway; refusing is the fail-closed choice. Since the C1 backstop, a Verified one also
+   stays in `awaiting_release` with the hold on, because its approvals are refused. Confirm.
 2. (Settled) Approvals made before the case was blocked do not count; see "An approval made while
    blocked".
 

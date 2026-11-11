@@ -231,7 +231,8 @@ Consequences, all through existing behavior:
   every change on that case came by email. When the case has any change that did not (a clerk's change
   in Ramp opened or joined it), the email writes nothing and is listed `ramp_case_open`, linked to the
   case. A case verifies its current change, so otherwise the call would verify the email's account while
-  Ramp pays the clerk's (R1).
+  Ramp pays the clerk's (R1). As a backstop, the approvals refuse a case whose current change came by
+  email while the case is not email only (spec 0090).
 - If a clerk also types the change into Ramp (0077) while the case is open, Ramp detection joins the
   same case the same way.
 - 0077's "one bank change a minute per demo dataset" check counts `bank_change_events`, so an email
