@@ -47,6 +47,26 @@ async def _new_dataset(settings: Settings, kind: str, label: str, sim_now: str |
         await pool.close()
 
 
+async def _email_door(settings: Settings, dataset_id: UUID, ramp_vendors: list[str]) -> None:
+    """Spec 0103, D4: turn the email door on for these vendors of a current demo dataset, by Ramp id."""
+    pool = await open_pool(settings.database_url, max_size=2)
+    try:
+        async with system_tx(pool) as conn:
+            dataset = await (await conn.execute("select 1 from app.datasets where id = %s and kind = 'demo' and retired_at is null",
+                                                (dataset_id,))).fetchone()
+            if dataset is None:
+                raise SystemExit(f"refused: {dataset_id} is not a current demo dataset")
+            rows = await (await conn.execute("select id, ramp_vendor_id from app.vendors where dataset_id = %s and ramp_vendor_id = any(%s)",
+                                             (dataset_id, ramp_vendors))).fetchall()
+            missing = sorted(set(ramp_vendors) - {r["ramp_vendor_id"] for r in rows})
+            if missing:
+                raise SystemExit(f"refused: not imported into this dataset: {', '.join(missing)}")
+            await conn.execute("update app.datasets set email_door_vendors = %s where id = %s", ([r["id"] for r in rows], dataset_id))
+        print(f"email door on for {len(rows)} vendor(s)")
+    finally:
+        await pool.close()
+
+
 async def _import(settings: Settings, dataset_id: UUID) -> None:
     pool = await open_pool(settings.database_url, max_size=3)
     async with httpx.AsyncClient(timeout=10.0) as http:
@@ -160,6 +180,9 @@ def run() -> None:
                     help="the Ramp this dataset uses, for good (default: the mock, or the sandbox with DIALBACK_RAMP=sandbox)")
     for name in ("import-vendors", "retire-dataset"):
         sub.add_parser(name).add_argument("--dataset", type=UUID, required=True)
+    ed = sub.add_parser("email-door", help="turn the email door on for these vendors of a current demo dataset")
+    ed.add_argument("--dataset", type=UUID, required=True)
+    ed.add_argument("--ramp-vendor", action="append", required=True, metavar="RAMP_VENDOR_ID")
     rj = sub.add_parser("run-job")
     rj.add_argument("--dataset", type=UUID, required=True)
     rj.add_argument("--job", choices=JOBS, required=True)
@@ -202,6 +225,8 @@ def run() -> None:
         asyncio.run(_import(settings, args.dataset))
     elif args.cmd == "retire-dataset":
         asyncio.run(_retire(settings, args.dataset))
+    elif args.cmd == "email-door":
+        asyncio.run(_email_door(settings, args.dataset, args.ramp_vendor))
     elif args.cmd == "run-job":
         asyncio.run(_run_job(settings, args.dataset, args.job))
     elif args.cmd == "demo":

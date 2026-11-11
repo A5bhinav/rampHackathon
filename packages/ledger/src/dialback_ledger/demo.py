@@ -25,6 +25,7 @@ import json
 import os
 import re
 import sys
+from collections.abc import Collection
 from importlib.resources import files
 from uuid import UUID, uuid5
 
@@ -212,10 +213,12 @@ def _url(database_url: str | None) -> str:
 
 async def load(database_url: str | None = None, *, phones: dict[str, str], dataset_id: UUID | None = None,
                with_requests: bool = False, now: dt.datetime | None = None, reader: Reader | None = None,
-               real: dict[str, tuple[str, str]] | None = None, like: str | None = None) -> dict:
-    """Write each seeded vendor's history and domain (and, with `with_requests`, its request).
-    `reader` defaults to the one DIALBACK_READER names. `real` maps a seed vendor to a real Ramp
-    vendor's (id, name), for a demo on Ramp's sandbox (spec 0103)."""
+               real: dict[str, tuple[str, str]] | None = None, like: str | None = None,
+               no_request: Collection[str] = ()) -> dict:
+    """Write each seeded vendor's history and domain (and, with `with_requests`, its request, unless
+    it is in `no_request`: an email-door vendor's live email is its request). `reader` defaults to the
+    one DIALBACK_READER names. `real` maps a seed vendor to a real Ramp vendor's (id, name), for a
+    demo on Ramp's sandbox (spec 0103)."""
     reader = _reader(reader)
     seed = _with_real_vendors(load_seed(), real, like) if real else load_seed()
     swaps = _phones(phones, seed)
@@ -232,7 +235,7 @@ async def load(database_url: str | None = None, *, phones: dict[str, str], datas
             docs = [_prepare(d, delta) for d in v["documents"]]
             n = await write_ingest(conn, dataset_id=ds, vendor_id=vendor_id, result=labeled(docs, reader, swap))
             await add_vendor_domain(conn, dataset_id=ds, vendor_id=vendor_id, domain=v["domain"])
-            requested = with_requests and await _request(conn, seed, ds, ref, vendor_id, now, reader)
+            requested = with_requests and ref not in no_request and await _request(conn, seed, ds, ref, vendor_id, now, reader)
             # A reload adds nothing, so a different --phone can't take effect: say so (reset to change it).
             phone = "already loaded: unchanged" if loaded else ("team" if swap else "fictional")
             summary[ref] = {"observations": n, "request": requested, "phone": phone}
@@ -279,6 +282,8 @@ def main(argv: list[str] | None = None) -> int:
     ld.add_argument("--real-vendor", type=_real_vendor, action="append", default=[], metavar="REF=RAMP_VENDOR_ID=NAME",
                     help="a demo on Ramp's sandbox: tell this seed vendor's history under a real vendor's name (spec 0103)")
     ld.add_argument("--like", metavar="REF", help="with --real-vendor: every real vendor retells this seed vendor's history")
+    ld.add_argument("--no-request", action="append", default=[], metavar="REF",
+                    help="with --with-requests: skip this vendor's request, since its live email is the request")
     rq = demo.add_parser("request", help="the change-request email for one vendor (beat 2)")
     rq.add_argument("--vendor", required=True)
     rq.add_argument("--dataset", type=UUID)
@@ -286,7 +291,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.action == "load":
             out = asyncio.run(load(phones=dict(args.phone), dataset_id=args.dataset, with_requests=args.with_requests,
-                                   real=dict(args.real_vendor) or None, like=args.like))
+                                   real=dict(args.real_vendor) or None, like=args.like, no_request=args.no_request))
             print(f"loaded the demo ledger into {out['dataset_id']}")
             for ref, s in out["vendors"].items():
                 print(f"  {ref:<11} {s['observations']:>3} new sightings, AR line: {s['phone']}"

@@ -25,6 +25,11 @@ None.
   own, since only Acme's history proves a number. REF is then just the real vendor's short name.
 - **D3. Known limit.** A demo dataset on the sandbox counts as the current demo if it is the newest,
   so `dialback-core demo` commands and the email door point at it, and `demo reset` retires it.
+- **D4. Email and Ramp changes in one demo.** `dialback-core email-door --dataset ID --ramp-vendor ID`
+  turns the door on for named vendors of a current demo dataset. An email never joins a case with a
+  Ramp change (R1), so one vendor takes emails and others take Ramp changes: the setup script gives
+  Salesforce the door, and `demo load --no-request salesforce` skips its preloaded request, since
+  the live email is the request.
 
 ## Acceptance
 
@@ -33,13 +38,17 @@ None.
       picks the team phone.
 - [x] A real vendor naming no seed vendor is refused.
 - [x] Three real vendors can retell one history, and the rule picks the team phone for each.
+- [x] The email door turns on only for named, imported vendors of a current demo dataset, and a
+      refusal turns nothing on.
+- [x] A vendor can skip its preloaded request.
 
 ## Tests
 
 | Acceptance item | Test |
 |---|---|
 | 1 | `supabase/tests/016_dataset_ramp.sql`, `apps/core/tests/test_ramp_sandbox.py` |
-| 2-3 | `packages/ledger/tests/test_demo.py::test_a_real_vendor_*` |
+| 2-4, 6 | `packages/ledger/tests/test_demo.py::test_a_real_vendor_*`, `::test_real_vendors_*`, `::test_a_vendor_can_skip_its_request` |
+| 5 | `apps/core/tests/test_ramp_sandbox.py::test_email_door_*` |
 
 ## Commands
 

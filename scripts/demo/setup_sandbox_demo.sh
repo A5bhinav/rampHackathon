@@ -6,7 +6,8 @@
 # A fresh demo dataset on the sandbox, its vendors imported, and Asana, Salesforce and DocuSign in
 # the Trust Ledger with the team phone as the number the rule picks. The phone is read from the voice
 # service's DIALBACK_DIAL_ALLOWLIST (never printed, never committed). Reject any bank change still
-# pending in Ramp first: the import counts whatever is there as already known.
+# pending in Ramp first: the import counts whatever is there as already known. The email door is on
+# for Salesforce only, since an email never joins a case with a Ramp change (R1).
 #
 # Needs the Railway CLI, logged in, with this folder linked (`railway link`).
 set -euo pipefail
@@ -33,7 +34,8 @@ if [[ -z "$dataset" ]]; then
 fi
 echo "dataset $dataset"
 railway ssh -s core -- dialback-core import-vendors --dataset "$dataset" 2>&1 | grep -v '^INFO:'
-railway ssh -s core -- dialback-ledger demo load --dataset "$dataset" --with-requests --like acme \
+railway ssh -s core -- dialback-ledger demo load --dataset "$dataset" --with-requests --like acme --no-request salesforce \
   --real-vendor "asana=$ASANA=Asana" --real-vendor "salesforce=$SALESFORCE=Salesforce" --real-vendor "docusign=$DOCUSIGN=DocuSign" \
   --phone "asana=$phone" --phone "salesforce=$phone" --phone "docusign=$phone" 2>&1 | grep -v '^INFO:'
-echo "ready: open the dashboard, pick Ramp-sandbox-demo, then enter a bank change in Ramp"
+railway ssh -s core -- dialback-core email-door --dataset "$dataset" --ramp-vendor "$SALESFORCE" 2>&1 | grep -v '^INFO:'
+echo "ready: open the dashboard and pick Ramp-sandbox-demo. Bank changes in Ramp: Asana or DocuSign. Emails: Salesforce."
