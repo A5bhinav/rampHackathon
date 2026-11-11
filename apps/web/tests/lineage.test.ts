@@ -86,3 +86,9 @@ test("seenBefore names what the cutoff is", () => {
   assert.equal(seenBefore(cutoff, cutoff, "the cutoff"), "with the cutoff");
   assert.equal(seenBefore("2026-11-04T00:00:00Z", cutoff, "the cutoff"), "after the cutoff");
 });
+
+test("lanePoints draws refused dots, then alternates, then the chosen one, on every chart (spec 0104, D7)", () => {
+  const order = { refused: 0, alternate: 1, pick: 2 } as const;
+  const kinds = lanePoints(example("picked"))!.points.map((p) => order[p.kind]);
+  assert.deepEqual(kinds, [...kinds].sort((a, b) => a - b));
+});

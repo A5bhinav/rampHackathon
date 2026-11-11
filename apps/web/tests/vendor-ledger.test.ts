@@ -70,7 +70,7 @@ const at = (chart: ReturnType<typeof lanePoints>, e164: string, lane: string) =>
   chart!.points.find((p) => p.e164 === e164 && p.lane === lane)!;
 
 test("each dot sits at the number's first sighting in that source: Acme's vendor master dot at its record's date", () => {
-  const chart = lanePoints(rule, laneDates(documents, rule.cutoff));
+  const chart = lanePoints(rule, laneDates(documents, rule.cutoff, documents.length));
   assert.equal(at(chart, MAIN, "on_file").at, "2022-08-23T16:00:00.000000Z");   // not the contract's date
   assert.equal(at(chart, MAIN, "contract").at, FIRST);
   assert.equal(at(chart, MAIN, "listing").at, "2023-07-20T16:00:00.000000Z");   // a later source is drawn later
@@ -81,11 +81,31 @@ test("each dot sits at the number's first sighting in that source: Acme's vendor
 
 test("a lane the documents don't date falls back to the number's first-seen date, as the case page draws it", () => {
   assert.ok(lanePoints(rule)!.points.every((p) => p.at === FIRST));
-  const partial = lanePoints(rule, laneDates(documents.filter((d) => d.custody_channel !== "listing"), rule.cutoff));
+  const noListing = documents.filter((d) => d.custody_channel !== "listing");
+  const partial = lanePoints(rule, laneDates(noListing, rule.cutoff, noListing.length));
   assert.equal(at(partial, MAIN, "listing").at, FIRST);
 });
 
 test("two numbers first seen in one document share a spot, and the chosen one is drawn last", () => {
-  const chart = lanePoints(rule, laneDates(documents, rule.cutoff))!;
-  assert.deepEqual(chart.points.filter((p) => p.lane === "contract").map((p) => [p.e164, p.kind]), [[MAIN, "alternate"], [AR, "pick"]]);
+  const chart = lanePoints(rule, laneDates(documents, rule.cutoff, documents.length))!;
+  const contract = chart.points.filter((p) => p.lane === "contract");
+  assert.deepEqual(contract.map((p) => [p.e164, p.kind]), [[MAIN, "alternate"], [AR, "pick"]]);
+  assert.equal(contract[0].pct, contract[1].pct);
+});
+
+test("a sighting received after the cutoff never dates a source's dot", () => {
+  const late = [...documents.filter((d) => d.custody_channel !== "listing"), doc("listing", "2026-11-20T00:00:00.000000Z", [MAIN])];
+  assert.equal(at(lanePoints(rule, laneDates(late, rule.cutoff, late.length)), MAIN, "listing").at, FIRST);
+});
+
+test("the vendor master lane dates any record the ledger counts as on file, even one after the cutoff", () => {
+  // select.py sets on_file from any visible vendor master sighting, with no cutoff: a number added to the
+  // vendor master after a lookalike email moved the cutoff must not look years old.
+  const added = [...documents.filter((d) => d.custody_channel !== "vendor_master"), doc("vendor_master", "2026-11-20T00:00:00.000000Z", [MAIN])];
+  assert.equal(at(lanePoints(rule, laneDates(added, rule.cutoff, added.length)), MAIN, "on_file").at, "2026-11-20T00:00:00.000000Z");
+});
+
+test("with the document list cut at its cap, no dot is dated from it: the oldest sightings may be missing", () => {
+  const chart = lanePoints(rule, laneDates(documents, rule.cutoff, documents.length + 1))!;
+  assert.ok(chart.points.every((p) => p.at === FIRST));
 });
