@@ -85,10 +85,15 @@ These are not reachable today, but each is frozen as a regression.
   - Production always runs the v1 settings.
 - **When they go live:** any replay or ablation tool, or a new ingestion path, that passes duplicate
   ids or non-default settings.
-- **With the label bar on (spec 0091):** a number a weak label used to refuse becomes eligible, so a
-  first-sorting duplicate id now also trips I1, I4 and I5: the lab assumes the worst of both copies,
-  and the rule reads one. Production can't file two documents under one id. The frozen world
-  (`fuzz-seed0-i1-first-seen-in-context-eligible-696be55b`) fires in all three flag states.
+- **I1, I4 and I5 on a duplicate id (spec 0091):** a first-sorting duplicate id can trip I1, I4 and
+  I5: the lab assumes the worst of both copies, and the rule reads one.
+  - The defect predates the label bar. The frozen world (`fuzz-seed0-i1-first-seen-in-context-eligible-696be55b`)
+    has no labels and fires in all three flag states.
+  - The bar only makes generated worlds reach it more often: a number a weak label used to refuse
+    is now eligible, so the lab checks it.
+  - Production can't file two documents under one id.
+  - The known-failures entry covers I1, I4 and I5 only for worlds with a duplicate id (`only_with`),
+    so the search still guards those bars everywhere else.
 
 ### A6. Fix trials for A1 (scratch only, never committed)
 
