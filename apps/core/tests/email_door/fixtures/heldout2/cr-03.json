@@ -1,0 +1,8 @@
+{
+  "subject": "FW: Updated remittance information - Cobalt Freight",
+  "sender": "Dana Whitfield <dwhitfield@larkspur-ind.com>",
+  "text": "Hi AP team,\n\nForwarding this from our Cobalt account rep. Can someone update their file before Friday's run? Thanks.\n\nDana\n\n---------- Forwarded message ---------\nFrom: Kevin Marsh <kmarsh@cobaltfreight.com>\nDate: Mon, Nov 9, 2026 at 3:12 PM\nSubject: Updated remittance information - Cobalt Freight\nTo: Dana Whitfield <dwhitfield@larkspur-ind.com>\n\nHi Dana,\n\nHope all is well. Quick heads up that our finance team has moved our receivables to a new bank. Could you pass the details below along to whoever handles payables on your side? All open invoices and anything going forward should go here:\n\nBeneficiary: Cobalt Freight LLC\nBank: Wells Fargo Bank, N.A.\nRouting (ACH): 121000248\nAccount: 6029384417\n\nAppreciate it, and thanks again for the volume this quarter.\n\nKevin Marsh\nAccount Executive | Cobalt Freight LLC",
+  "label": "change_request",
+  "vendor": "cobalt",
+  "note": "Internal colleague forwards a vendor rep's bank change; the outer sender is internal, the request is in the forwarded body."
+}

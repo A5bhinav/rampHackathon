@@ -1,0 +1,8 @@
+{
+  "subject": "Late fee notice",
+  "sender": "Morgan Pryce <ar@cobalt.example>",
+  "text": "A late fee of $45 applies to invoice 2188 because it is 30 days past due. Please pay ASAP.",
+  "label": "ordinary",
+  "vendor": "cobalt",
+  "note": "Late fee."
+}

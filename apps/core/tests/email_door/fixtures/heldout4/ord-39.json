@@ -1,0 +1,8 @@
+{
+  "subject": "Payment received, thank you",
+  "sender": "Accounts Receivable <ar@cobaltfreight.com>",
+  "text": "Confirming receipt of your ACH for $13,515.75 to our Chase account ending 7888. Applied to CF-20931, CF-21077, CF-21188. Your balance is now zero.\n\nThanks!",
+  "label": "ordinary",
+  "vendor": "cobalt",
+  "note": ""
+}

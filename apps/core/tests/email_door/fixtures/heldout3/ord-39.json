@@ -1,0 +1,8 @@
+{
+  "subject": "FY2026 audit - vendor bank detail confirmation sample",
+  "sender": "Priya Nair <priya.nair@hallowayllp.com>",
+  "text": "Hi Karen,\n\nFor our vendor master controls testing, please provide, for the attached sample of 25 vendors, the current bank routing and account numbers on file together with evidence of callback verification for any changes made during FY2026. Acme Fasteners, Brightline Office Supply and Cobalt Freight are in the sample.\n\nPlease upload to the Halloway client portal rather than emailing the file.\n\nThanks,\nPriya Nair\nHalloway LLP",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Auditor asking for data about vendors' on-file bank details. Not a request to change any of them (though it is a sensitive data request in its own right)."
+}

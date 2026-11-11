@@ -1,0 +1,8 @@
+{
+  "subject": "Payment applied",
+  "sender": "Sam Ortiz <ar@brightline.example>",
+  "text": "Your payment was applied to invoices 3391 and 3402. Remaining balance zero.",
+  "label": "ordinary",
+  "vendor": "brightline",
+  "note": "Payment applied."
+}

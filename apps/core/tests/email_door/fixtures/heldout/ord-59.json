@@ -1,0 +1,8 @@
+{
+  "subject": "Holiday hours",
+  "sender": "Sam Ortiz <ar@brightline.example>",
+  "text": "Our warehouse closes Dec 24 through Jan 2. Orders placed after Dec 15 ship in January.",
+  "label": "ordinary",
+  "vendor": "brightline",
+  "note": "Notice."
+}

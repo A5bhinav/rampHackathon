@@ -1,0 +1,92 @@
+{
+  "case": {
+    "answered_by": "human",
+    "answers": [
+      {
+        "capture_method": "speech",
+        "captured_at": "2026-11-01T17:01:00Z",
+        "slot": "recording_consent",
+        "tool_call_id": "t1_recording_consent",
+        "turn_id": 1,
+        "value": "yes"
+      },
+      {
+        "capture_method": "speech",
+        "captured_at": "2026-11-01T17:03:00Z",
+        "slot": "company_named",
+        "tool_call_id": "t3_company_named",
+        "turn_id": 3,
+        "value": "Acme Fasteners, sorry, I mean Hooli Supply"
+      },
+      {
+        "capture_method": "speech",
+        "captured_at": "2026-11-01T17:07:00Z",
+        "slot": "speaker_name",
+        "tool_call_id": "t7_speaker_name",
+        "turn_id": 7,
+        "value": "Jordan Lee"
+      },
+      {
+        "capture_method": "speech",
+        "captured_at": "2026-11-01T17:09:00Z",
+        "slot": "speaker_role",
+        "tool_call_id": "t9_speaker_role",
+        "turn_id": 9,
+        "value": "AP clerk"
+      },
+      {
+        "capture_method": "speech",
+        "captured_at": "2026-11-01T17:11:00Z",
+        "slot": "change_requested",
+        "tool_call_id": "t11_change_requested",
+        "turn_id": 11,
+        "value": "yes"
+      },
+      {
+        "capture_method": "keypad",
+        "captured_at": "2026-11-01T17:13:00Z",
+        "slot": "account_last4",
+        "tool_call_id": "t13_account_last4",
+        "turn_id": 13,
+        "value": "0358"
+      }
+    ],
+    "checks": {
+      "agent_spoke_account_digits": false,
+      "answers_grounded": true,
+      "disclosure_first": true,
+      "new_number_accepted": false,
+      "policy_violations": 0,
+      "speech_guard_trips": 0
+    },
+    "dialed_number_is_pick": null,
+    "direction": "outbound",
+    "domain": "reachable",
+    "earlier": [],
+    "legal_name": "Acme Fasteners LLC",
+    "new_last4": "0358",
+    "offered_number_from_request": false,
+    "old_last4": null,
+    "pick_current": true,
+    "result": "answers_recorded",
+    "speaker_in_change_thread": false,
+    "trade_names": [
+      "Acme Supply"
+    ],
+    "truth": {
+      "company": [
+        "correction"
+      ],
+      "earlier_concern": false,
+      "offered_from_request": false,
+      "speaker_from_thread": false
+    },
+    "verified_setup": true
+  },
+  "labels": [
+    "F1:company=correction",
+    "F3_company_accepted_correction"
+  ],
+  "name": "reports-f1-company-correction-8b4be5b5",
+  "why": "found by lab reports at seed 0 within 2000 reports (reachable domain), shrunk"
+}

@@ -1,0 +1,8 @@
+{
+  "subject": "Reminder: Finance phishing drill next week",
+  "sender": "IT Security <security@tallismfg.com>",
+  "text": "Finance team,\n\nNext week we'll run a simulated business email compromise exercise. Here is the kind of message to watch for:\n\n    \"Hi, our bank has changed. Please update your records and send all future payments to the account below. This is urgent and please keep it confidential.\"\n\nIf you see anything like this, don't reply and don't update the vendor record. Use the Report Phish button, and call the vendor on the number in the master file.\n\nThanks,\nIT Security",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Internal training quoting a sample redirect."
+}

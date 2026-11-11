@@ -121,9 +121,35 @@ dialback-core demo change --vendor acme
 
 ## 5. Answering the call (for the teammate on the phone)
 
-Answer with one short "Hello?", then stay quiet. Twilio's answering-machine detection decides from
-that greeting. A long greeting can sound like voicemail. On a trial account, press any key after
-Twilio's trial message.
+Before the agent speaks, Twilio's answering-machine detection listens to how you answer and labels
+the call. A call labeled `human` can reach Verified on its own (V03). So can one labeled `unknown`
+(silence at pickup), as long as the digits were typed on the keypad: a machine can't type them
+(spec 0080, Part B). With a `machine` label it goes to review, or is called again if Twilio's own
+report of the call reaches the core first.
+
+- **A greeting of up to about 4 seconds is fine**, from one short "Hello?" to "Acme accounts
+  payable, this is Jane, how can I help you?". Then stay quiet: after about 1.2 seconds of quiet,
+  detection decides and the disclosure starts a moment later. Talking for more than 4.5 seconds is
+  labeled a machine.
+- **Say something.** If you pick up and wait in silence, detection gives up after about 2.5
+  seconds with the label `unknown`, and only then does the disclosure start (spec 0080, Part C).
+  The call can still verify, since the digits go in on the keypad.
+- **On a trial account,** Twilio first plays its trial message and waits for a key. Press any key,
+  then answer.
+
+The label is in the voice service's deploy log on Railway, one line per call, written when Twilio
+fetches the call's instructions. Search the log for `twiml fetch`; Railway shows the line with a
+`INFO:dialback_voice.app:` prefix:
+
+```
+INFO:dialback_voice.app:twiml fetch for call <call id>: AnsweredBy=human MachineDetectionDuration=absent
+```
+
+`AnsweredBy` is Twilio's label (`human`, `machine_start`, `machine_end_beep`,
+`machine_end_silence`, `machine_end_other`, `fax` or `unknown`), `absent` if Twilio sent none, or
+`other` for anything else. `MachineDetectionDuration` is how long detection took, in
+milliseconds. Expect `absent`: Twilio documents it only for asynchronous detection (spec 0080,
+Q134). The call id is ours; the line never carries the phone number.
 
 The agent speaks first and cannot be interrupted. Three habits keep the answers in the right
 place:
@@ -132,29 +158,35 @@ place:
   change answers the agent can pause for up to 8 seconds while the model reads the answer.
   Anything said during that pause is taken as the answer to the next question.
 - **Say only the answer.** Nothing before or after it in the same breath.
-- **If the agent says "Sorry, are you still there?", give your last answer again in full.** It
-  does not repeat the question, so a bare "Yes, I'm here" is recorded as the answer to it.
+- **If the agent says "Sorry, are you still there?", say anything** ("Yes, I'm here" is fine). The
+  agent says "Thanks." and asks the question again; answer it as usual. Your reply to the check-in
+  is never taken as an answer. The check-in comes after about 10 seconds of quiet, and no reply
+  within another 10 seconds ends the call (`specs/0051-call-check-in.md`).
 
 | The agent asks | You say | If you say something else |
 |---|---|---|
 | Disclosure, then "Is it okay to continue on this recorded line?" | "Yes." | A clear no ends the call with "we won't continue" (NR02). An answer the agent can't make out, like "Hello?" or "Sorry?", is asked once more ("Sorry, let me ask that again."); a second one ends the call, and the core calls again later while the case has attempts left |
-| "Could you tell me the name of the company I've reached?" | "Acme Fasteners." | Every word of the vendor's name, without "LLC", is needed. "Acme" alone goes to review (NR03) |
+| "Could you tell me the name of the company I've reached?" | "Acme Fasteners." | The name is not required (spec 0082, D7b): "Acme", a misheard name or another company's name doesn't block, and the person releasing sees the answer. An answer with a refusal word goes to review (NR03): "Not Acme, this is Globex", "We're a reseller for Acme", even "Not sure, Acme", "Sorry, I didn't catch that, Acme" or "Wrong number?". Say only the name |
 | "Which department or team am I speaking with?" | "Accounts receivable." | Any answer works |
 | "May I have your name?" | "Jordan Lee." | A name made only of words from the change email's senders (Dana Whitfield, "Acme Fasteners LLC Accounts Receivable") goes to review (NR04) |
 | "And what's your role there?" | "AR clerk." | Any role works; a name and a role are both needed (V06) |
 | "Has your company recently asked [customer] to change how you get paid?" | "Yes." | "I think so" goes to review (NR09 or NR14). An answer the agent can't make out is asked once more, as at consent |
 | "For the account you'd like to be paid into, please use your phone's keypad to enter the last four digits, then press the pound key. To start over, press the star key." | Key `0` `0` `0` `1`, then `#` | See the keypad steps below |
-| "Thank you, that's everything I needed." | Hang up | The line may cut off mid-sentence; the answers are already in |
+| "Thank you, that's everything I needed. Have a good day." | Nothing, or hang up | The agent finishes the line and then ends the call itself (spec 0094). The answers are already in, so hanging up early loses nothing |
 
 The keypad steps (`specs/0043-keypad-only-digits.md`):
 
 - **Type the four digits, then press `#`.** Only the keypad counts. Nothing goes in at the fourth
-  key; if you forget `#`, the entry goes in 5 seconds after your last key.
-- **Press `#` before you hang up.** Four digits typed without `#` are lost if you hang up within 5
+  key; if you forget `#`, the entry goes in 10 seconds after your last key.
+- **Press `#` before you hang up.** Four digits typed without `#` are lost if you hang up within 10
   seconds: the call ends as dropped (failed), and the core calls again about 5 minutes later while
   the case has attempts left.
 - **A slip? Press `*` and type all four again.** The agent says "Okay, let's start over." This
   costs nothing.
+- **Need time to find the digits? Take it.** After 20 seconds with no key and no word, the agent
+  says "Take your time. When you have the last four digits, enter them on your keypad, then press
+  the pound key." Type them then. With nothing for another 20 seconds, the call finishes without
+  digits and the case goes to review (NR06).
 - **Do not say the digits.** Spoken digits are never recorded. The agent asks once for the keypad
   ("Please don't say the digits..."); a second time, the call finishes without digits and the case
   goes to review (NR06).
@@ -169,6 +201,54 @@ The keypad steps (`specs/0043-keypad-only-digits.md`):
 Pressure words are flagged by code and send the case to review (NR10): "urgent", "asap", "right
 away", "immediately", "pay it today", "late fee" and similar.
 
+### The detection check, on the first calls (spec 0080)
+
+The detection settings (4.5 seconds of talking before "machine", 1.2 seconds of quiet before "they
+finished") are educated guesses. The first calls test them. This check was written before any call.
+
+- **Question:** is a real person labeled `human`, without the disclosure starting while they are
+  still talking?
+- **One call per case.** Run sections 3 and 4 again before each one.
+  - (a) One short "Hello?", then silence until the agent speaks.
+  - (b) A business-style greeting of about 4 seconds: "Acme accounts payable, this is Jane, how
+    can I help you?"
+  - (c) The phone's voicemail greeting (let the call go to voicemail). For information only:
+    either label is fine. Run it last, then reset (section 3): a call that reaches voicemail is
+    redialed later while the case has attempts left, so the team phone may ring again.
+  - (d) Pick up and say nothing. Expect the label `unknown` and the disclosure after about 2.5
+    seconds. Then answer as usual and type the digits: the call should still verify (spec 0080,
+    Parts B and C). Once, also say "Hello?" at about 3 seconds. It will land on the disclosure;
+    note whether you still heard all of it ("AI" and "recorded line" included).
+- **Record for each call:**
+  - the `AnsweredBy` and `MachineDetectionDuration` values from the log line;
+  - whether the account is a trial account. On a trial account, say your greeting only after
+    pressing the key;
+  - whether the disclosure started while you were still talking (yes or no).
+- **Pass:** (a) and (b) are labeled `human`, and the disclosure did not start over them. (d) is
+  labeled `unknown`, the whole disclosure is heard, and the call verifies. Report it if the
+  "Hello?" at 3 seconds kept you from hearing the whole disclosure.
+- **If (a) or (b) comes back `machine_start` or `unknown`, or the disclosure talked over you,**
+  report it: the settings change, not the pass bar. One exception: on a trial account, retry an
+  `unknown` once first, since the trial message may confuse detection.
+- One call per case is a smoke check, not a measurement. Say so when you report the result.
+
+### The closing-line check, on the first calls (spec 0094)
+
+The agent now ends the call itself, after its closing line has played. Written before any call.
+
+- **Question:** do you hear the whole closing line before the line drops?
+- **Cases** (one call each; these can be the same calls as the detection check):
+  - (a) a full call, which ends with "Thank you, that's everything I needed. Have a good day.";
+  - (b) "No" at the consent question, which ends with "No problem, we won't continue. You can
+    reach us at ... Goodbye."
+- **Record for each call:** the voice service's `closing line: the wait ended (...)` log line.
+- **Pass:** each line is heard to the end, and the agent ends the call itself. Stay on the line
+  and let it hang up. Expect the drop about half a second after the line if the log says
+  `agent_stopped`, and up to about 4 seconds after if it says `estimate` (Twilio sent no speaker
+  events). Neither is a failure.
+- **If a line is cut off,** or the call hangs open, report it: the timing changes, not the bar
+  (spec 0094, Q160).
+
 ## 6. After the call
 
 ```bash
@@ -180,7 +260,8 @@ releases it from the dashboard, and the state moves to `released` once the hold 
 
 **To try again**, after a call that ended in review or Not verified: the case is not called again
 (only a dropped call, or one that ended after two unclear answers at consent or the change
-question, is called again), so run sections 3 and 4 again (a new reset, load, request and change).
+question, or with no reply to a check-in before the keypad question, is called again), so run
+sections 3 and 4 again (a new reset, load, request and change).
 
 ## When it goes wrong
 
@@ -199,8 +280,9 @@ on the dashboard says "The voice service checked the call and did not place it (
 | It rings, then "an application error has occurred" | The TwiML fetch failed: a 401 (`DIALBACK_PUBLIC_BASE_URL` must be exactly the public `https://` address Twilio calls), a 404 (the voice service could not look the call up, for example its database is unreachable), or the AI/ML addendum is not accepted (95250) | The Twilio call log's error code, then the voice log |
 | Silence after the disclosure | The socket failed (`DIALBACK_WS_BASE_URL` must be `wss://` on the same domain), or the voice service rejected the socket's setup (`setup_rejected`) | Voice log |
 | "We won't continue" right after consent | Consent was read as a clear no | Voice log |
+| "Sorry, are you still there?", then "Thanks for your time. Goodbye." | Nothing was said or pressed for about 10 seconds after the check-in. The call ends `failed`, and the core calls again after its wait (2 hours) while the case has attempts left | Voice log |
 | "Sorry, let me ask that again", then "Thanks for your time. Goodbye." | Two answers to the consent question, or to the change question, could not be made out, or the model call failed twice (an invalid key, an API error, or a reply slower than 8 seconds). A missing key does not cause this. The call ends `failed`, and the core calls again after its wait (2 hours) while the case has attempts left | Voice log |
-| The call finishes, but the case goes to review or is blocked | One rule decided it | The decision page names the rule. Common ones: NR01 or V03 (not detected as a person), NR03 (partial company name), NV02 or NV03 (wrong digits, blocked), NR10 (a pressure word), NR14 (an answer not found in the turn it cites) |
+| The call finishes, but the case goes to review or is blocked | One rule decided it | The decision page names the rule. Common ones: NR01 (labeled a machine), NR03 (the company answer had a refusal word such as "not", "never" or "reseller"), NV02 or NV03 (wrong digits, blocked), NR10 (a pressure word), NR14 (an answer not found in the turn it cites) |
 
 Not checked yet: a call on a real line. The steps above come from the code on main (Nov 8), not
 from a completed call. Fix this page after the first one.

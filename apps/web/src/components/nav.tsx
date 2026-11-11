@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Fragment } from "react";
-import { isCurrent } from "@/lib/apps";
+import { isCurrent, pageCrumb, type AppKey } from "@/lib/apps";
 import { Icon, type IconName } from "./icons";
 
 export type NavLink = { href: string; label: string; icon?: IconName; count?: number; group?: string; exact?: boolean; not?: string[] };
@@ -31,11 +31,28 @@ export function NavLinks({ links }: { links: NavLink[] }) {
 }
 
 // Where you are, from the path alone (the shell doesn't fetch the case): Inbox / Case / Number lineage.
-export function Crumbs({ datasetId }: { datasetId: string }) {
+export function Crumbs({ datasetId, app }: { datasetId: string; app: AppKey }) {
   const path = usePathname();
   const base = `/d/${datasetId}`;
+  const ramp = new RegExp(`^${base}/ramp/([^/]+)$`).exec(path);
+  if (ramp) {
+    return (
+      <nav className="crumbs" aria-label="Breadcrumb">
+        <Link href={`${base}/ramp`}>Ramp (mock)</Link><span aria-hidden="true">/</span><span aria-current="page">Vendor</span>
+      </nav>
+    );
+  }
   const m = new RegExp(`^${base}/cases/(?!all$)([^/]+)(/lineage)?$`).exec(path);  // /cases/all is the Cases list, not a case
-  if (!m) return <span />;
+  if (!m) {
+    // Every other page: the app, then the page, so the top bar is always there (Control / Evidence).
+    const c = pageCrumb(app, datasetId, path);
+    return (
+      <nav className="crumbs" aria-label="Breadcrumb">
+        {c.page ? <><Link href={c.app.href}>{c.app.label}</Link><span aria-hidden="true">/</span><span aria-current="page">{c.page}</span></>
+          : <span aria-current="page">{c.app.label}</span>}
+      </nav>
+    );
+  }
   const kase = `${base}/cases/${m[1]}`;
   return (
     <nav className="crumbs" aria-label="Breadcrumb">

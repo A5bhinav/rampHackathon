@@ -1,0 +1,8 @@
+{
+  "subject": "Cobalt accrual",
+  "sender": "Marc Lopez <marc@ourco.example>",
+  "text": "Please accrue $9,880 for Cobalt Freight for October, invoice arrives next week.",
+  "label": "ordinary",
+  "vendor": "cobalt",
+  "note": "Internal."
+}

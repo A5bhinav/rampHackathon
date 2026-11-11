@@ -1,0 +1,8 @@
+{
+  "subject": "FW: updated remittance info",
+  "sender": "Dana Whitfield <ar@acme.example>",
+  "text": "Sending this along as promised.\n\n-------- Original Message --------\nSubject: updated remittance info\nFrom: ar@acme.example\nDate: Oct 20, 2026\n\nBeginning with invoice 1760, send payment for Acme Fasteners to First Coastal Credit Union,\nABA 011000138, member account 0000 1111 0098.",
+  "label": "change_request",
+  "vendor": "acme",
+  "note": "Older-style original message block with the actual request below."
+}

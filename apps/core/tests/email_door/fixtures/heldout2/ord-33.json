@@ -1,0 +1,8 @@
+{
+  "subject": "ACH Return Notification - R03 No Account/Unable to Locate",
+  "sender": "Meridian Commercial Bank <ach-alerts@meridiancommercial.com>",
+  "text": "ACH Return Notification\n\nCompany: Larkspur Industries\nOriginal effective date: 11/06/2026\nReturn date: 11/09/2026\nReturn reason: R03 - No Account/Unable to Locate Account\nAmount: $2,115.00\nReceiver name: HARBOR SAFETY SUPPLY\nReceiver DFI: 121000248\nReceiver account: ******3390\nTrace: 021000020004471\n\nThe funds have been credited back to your account ending 4471. Please verify the receiver's account information before reinitiating this payment.",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Bank ACH return notice for a different vendor; says to verify the account, but proposes no new destination."
+}

@@ -1,0 +1,8 @@
+{
+  "subject": "Backorder notice",
+  "sender": "Brightline Billing <billing@brightline.example>",
+  "text": "Item BK-220 is back-ordered until Dec 3. We will ship the rest now.",
+  "label": "ordinary",
+  "vendor": "brightline",
+  "note": "Ops."
+}

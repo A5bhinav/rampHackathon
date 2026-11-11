@@ -1,0 +1,8 @@
+{
+  "subject": "Nouvelles coordonnees bancaires - Cobalt Freight",
+  "sender": "Comptabilite Cobalt <comptabilite@cobaltfreight.com>",
+  "text": "Bonjour,\n\nNous vous informons que Cobalt Freight LLC a change d'etablissement bancaire. Merci de bien vouloir mettre a jour vos informations fournisseur et d'effectuer tous les reglements a venir sur le compte suivant :\n\nBanque : Truist Bank\nNumero de routage (ABA) : 053101121\nNumero de compte : 3390018822\nTitulaire : Cobalt Freight LLC\n\nL'ancien compte sera cloture a la fin du mois.\n\nNous vous remercions de nous confirmer la prise en compte de ce changement.\n\nCordialement,\nService comptabilite\nCobalt Freight LLC",
+  "label": "change_request",
+  "vendor": "cobalt",
+  "note": "French-language bank change, accents stripped."
+}

@@ -42,7 +42,6 @@
    "V02_outbound_dial",
    "V03_live_person",
    "V04_recording_consent",
-   "V05_company_matches",
    "V06_speaker_identified",
    "V07_right_person_confirmed",
    "V08_digits_match",

@@ -12,6 +12,7 @@ const AP: Item[] = [
   { label: "Inbox", path: "cases", icon: "inbox", not: ["cases/all"] },
   { label: "Cases", path: "cases/all", icon: "folder" },
   { label: "Vendors", path: "vendors", icon: "building" },
+  { label: "Mail", path: "mail", icon: "mail" },
 ];
 
 const CONTROL: Item[] = [
@@ -45,7 +46,21 @@ export function appOf(path: string): AppKey {
   return /^\/d\/[^/]+\/control(\/|$)/.test(path) ? "control" : "ap";
 }
 
-/** Control is offered to everyone on demo data, and to approvers and auditors elsewhere (spec 0063, Q1). */
+/** Control is offered to everyone on demo data, and to approvers, auditors and admins elsewhere (spec 0063 Q1, spec 0095). */
 export function canSeeControl(roles: readonly string[], kind: string): boolean {
-  return kind === "demo" || roles.includes("approver") || roles.includes("auditor");
+  return kind === "demo" || roles.includes("approver") || roles.includes("auditor") || roles.includes("admin");
+}
+
+const APP_LABEL: Record<AppKey, string> = { ap: "AP workspace", control: "Control" };
+
+/** Every page's place for the top bar: the app, then the page (its sidebar label), so the bar is never
+ *  empty. Case and Ramp vendor pages build their own deeper trail; anything unknown shows the app only. */
+export function pageCrumb(app: AppKey, datasetId: string, path: string): { app: { label: string; href: string }; page: string | null } {
+  const base = `/d/${datasetId}`;
+  const extra: AppNavItem[] = [
+    { label: "Ramp (mock)", href: `${base}/ramp`, icon: "card" },
+    { label: "Demo controls", href: `${base}/control/demo`, icon: "lock" },
+  ];
+  const item = [...navFor(app, datasetId), ...extra].find((i) => isCurrent(i, path));
+  return { app: { label: APP_LABEL[app], href: switchTargets(datasetId)[app] }, page: item?.label ?? null };
 }

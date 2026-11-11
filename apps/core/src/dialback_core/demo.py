@@ -177,7 +177,9 @@ async def reset(env: DemoEnv, seed: dict[str, Any], links: dict[str, str], today
         await conn.execute("update app.datasets set retired_at = now() where kind = 'demo' and retired_at is null")
         await conn.execute("update app.datasets set demo_refs = %s, retired_at = null where id = %s", (Jsonb(demo_refs), dataset.id))
         for ref, user_id in accounts.items():
-            await conn.execute("update app.user_profiles set ramp_user_id = %s where user_id = %s", (refs[ref], user_id))
+            # A link the team sets from the shell is nobody's (spec 0095, D5): ramp_linked_by is cleared.
+            await conn.execute("update app.user_profiles set ramp_user_id = %s, ramp_linked_by = null where user_id = %s",
+                               (refs[ref], user_id))
     return ResetResult(dataset, refs, accounts, warnings)
 
 
@@ -186,14 +188,26 @@ class PrepareResult:
     reset: ResetResult
     ledger: dict[str, Any]          # dialback_ledger.demo.load's summary: per vendor, sightings and "team"/"fictional" AR line
     requests: dict[str, bool]       # per vendor, whether its change-request email went in
+    email_door: list[str] = field(default_factory=list)  # refs whose email door is on (the live email is their request)
+
+
+def describe_email_door(refs: list[str], inbox_address: str | None) -> str | None:
+    """The line `demo prepare` prints for the email door: where to send the change request."""
+    if not refs:
+        return None
+    where = f"send the change request to {inbox_address}" if inbox_address else "DIALBACK_INBOX_ADDRESS is unset"
+    return f"email door on for {', '.join(refs)}: {where}"
 
 
 async def prepare(env: DemoEnv, seed: dict[str, Any], links: dict[str, str], *, phones: dict[str, str],
-                  requests: list[str], today: dt.date | None = None) -> PrepareResult:
+                  requests: list[str], email_door: list[str] | None = None, today: dt.date | None = None) -> PrepareResult:
     """One command before the dashboard's clerk makes a change (spec 0077): a fresh demo with the clerk
     linked, then the Trust Ledger's history (with any team phones), then each vendor's change-request
     email. The order matters: the selection rule trusts only what was recorded before the case opened,
-    so the ledger and the email must be in before the bank change. Every check runs before the reset."""
+    so the ledger and the email must be in before the bank change. Every check runs before the reset.
+
+    `email_door` names vendors whose email door is turned on for this demo (app.datasets.email_door_vendors).
+    Their canned change-request email is not loaded: the live email is the request."""
     from dialback_ledger import demo as ledger_demo  # the ledger's own demo commands
 
     _guard(env.settings)
@@ -203,14 +217,51 @@ async def prepare(env: DemoEnv, seed: dict[str, Any], links: dict[str, str], *, 
         e164 = ledger_demo.check(phones, requests)
     except ledger_demo.DemoError as exc:
         raise DemoError(str(exc)) from None
+    email_door = list(email_door or [])
+    known = [v["ref"] for v in seed["vendors"]]
+    for ref in email_door:
+        if ref not in known:
+            raise DemoError(f"--email-door {ref}: the seed has no vendor with that ref (it has: {', '.join(known)})")
+        if ref in requests:
+            raise DemoError(f"--email-door {ref} and --request {ref}: the live email is the request, so a vendor can't have both")
     result = await reset(env, seed, links, today=today)
+    loaded, sent = await load_ledger(env, result.dataset.id, e164, requests)
+    if email_door:
+        async with system_tx(env.pool) as conn:
+            rows = await (await conn.execute("select ramp_vendor_id, id from app.vendors where dataset_id = %s",
+                                             (result.dataset.id,))).fetchall()
+            by_ramp = {r["ramp_vendor_id"]: r["id"] for r in rows}
+            ids = [by_ramp.get(result.refs[ref]) for ref in email_door]
+            if None in ids:
+                missing = [ref for ref, i in zip(email_door, ids) if i is None]
+                raise DemoError(f"the demo was reset ({result.dataset.id}) but the email door wasn't turned on: "
+                                f"{', '.join(missing)} is not in app.vendors")
+            await conn.execute("update app.datasets set email_door_vendors = %s where id = %s", (ids, result.dataset.id))
+    return PrepareResult(result, loaded, sent, list(email_door))
+
+
+def check_ledger(phones: dict[str, str], requests: list[str]) -> dict[str, str]:
+    """prepare's checks on the ledger side, before anything is reset. Returns the phones in E.164."""
+    from dialback_ledger import demo as ledger_demo
+
     try:
-        loaded = await ledger_demo.load(env.owner_url, phones=e164, dataset_id=result.dataset.id)
-        sent = {ref: await ledger_demo.request(env.owner_url, vendor=ref, dataset_id=result.dataset.id) for ref in requests}
+        return ledger_demo.check(phones, requests)
     except ledger_demo.DemoError as exc:
-        raise DemoError(f"the demo was reset ({result.dataset.id}) but the Trust Ledger refused: {exc}. "
+        raise DemoError(str(exc)) from None
+
+
+async def load_ledger(env: DemoEnv, dataset_id: UUID, e164: dict[str, str], requests: list[str]) -> tuple[dict, dict]:
+    """prepare's second half: the Trust Ledger's history, then each vendor's change-request email.
+    The dashboard's reset (spec 0095) runs it after linking the clerk through app.admin_set_ramp_link."""
+    from dialback_ledger import demo as ledger_demo
+
+    try:
+        loaded = await ledger_demo.load(env.owner_url, phones=e164, dataset_id=dataset_id)
+        sent = {ref: await ledger_demo.request(env.owner_url, vendor=ref, dataset_id=dataset_id) for ref in requests}
+    except ledger_demo.DemoError as exc:
+        raise DemoError(f"the demo was reset ({dataset_id}) but the Trust Ledger refused: {exc}. "
                         "Run `dialback-ledger demo load` and `dialback-ledger demo request` by hand, before any bank change.") from None
-    return PrepareResult(result, loaded, sent)
+    return loaded, sent
 
 
 async def change(env: DemoEnv, seed: dict[str, Any], vendor_ref: str, by: str = "clerk", unknown: bool = False) -> str:

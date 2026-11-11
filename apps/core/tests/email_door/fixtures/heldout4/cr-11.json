@@ -1,0 +1,8 @@
+{
+  "subject": "Remittance Address Notice",
+  "sender": "Brightline Credit Dept <credit@brightlineoffice.com>",
+  "text": "REMITTANCE ADDRESS NOTICE\n\nEffective December 1, all check payments to Brightline Office Supply must be mailed to our processing center:\n\n    Brightline Office Supply Inc\n    Dept 4471\n    PO Box 88213\n    Atlanta, GA 30384-8213\n\nPayments mailed to our Elm Street location after that date may be delayed. Please update your accounts payable records.",
+  "label": "change_request",
+  "vendor": "brightline",
+  "note": "Lockbox move. Often legitimate, still changes where the money lands."
+}

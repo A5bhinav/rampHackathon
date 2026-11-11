@@ -1,0 +1,8 @@
+{
+  "subject": "Fwd: Acme banking change",
+  "sender": "Dana Whitfield <ar@acme.example>",
+  "text": "Forwarding this from our controller, please action.\n\n---------- Forwarded message ---------\nFrom: Rick Alvarado <controller@acme.example>\nDate: Tue, Oct 13, 2026 at 9:14 AM\nSubject: Acme banking change\nTo: Dana Whitfield <ar@acme.example>\n\nDana, we have moved to a new bank. Customers should remit to routing 011000138,\naccount 000 9921 4470 starting with the next payment.",
+  "label": "change_request",
+  "vendor": "acme",
+  "note": "Forwarded message block with the original request below; forward wraps a real change request."
+}

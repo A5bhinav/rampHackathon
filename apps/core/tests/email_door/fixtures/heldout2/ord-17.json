@@ -1,0 +1,8 @@
+{
+  "subject": "Legal name change - Brightline Office Supply Inc",
+  "sender": "Brightline Office Supply Inc <accounting@brightlineoffice.com>",
+  "text": "Dear Customer,\n\nEffective January 1, 2027, Brightline Office Supply Inc will change its legal name to Brightline Workplace Inc. This is a name change only. Our EIN, ownership, bank account, and remittance instructions remain exactly the same, and you do not need to change how you pay us.\n\nAn updated Form W-9 reflecting the new name is attached. Please update the vendor name in your system when convenient. Invoices dated January 1 and later will show the new name.\n\nThank you,\nBrightline Accounting",
+  "label": "ordinary",
+  "vendor": "brightline",
+  "note": "Borderline: the payee name changes, but it is the same entity (same EIN) and the same bank account and remittance instructions, so the money lands where it does today. Labeled ordinary. Contrast with cr-31 (new entity, new EIN, new account)."
+}

@@ -1,0 +1,8 @@
+{
+  "subject": "ACH",
+  "sender": "Dana Whitfield <dwhitfield@acmefasteners.com>",
+  "text": "pls use the attached voided check for our payments going fwd. thx\n\nDana",
+  "label": "change_request",
+  "vendor": "acme",
+  "note": "Minimal wording; the voided check is the instrument of the redirect."
+}

@@ -1,0 +1,8 @@
+{
+  "subject": "Credit memo CM-1192",
+  "sender": "Billing <billing@acmefasteners.com>",
+  "text": "Attached is credit memo CM-1192 for $312.40 for the returned washers. Please apply it against your next payment.",
+  "label": "ordinary",
+  "vendor": "acme",
+  "note": ""
+}

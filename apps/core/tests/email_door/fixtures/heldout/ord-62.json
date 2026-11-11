@@ -1,0 +1,8 @@
+{
+  "subject": "Payment sent: Cobalt Freight LLC, inv 2310",
+  "sender": "Payments <payments-noreply@ourco.example>",
+  "text": "Your payment run completed.\n\nPayee: Cobalt Freight LLC\nAmount: $18,120.00\nDestination: routing 021000021, account 000077778888\nMethod: ACH, expected settle Nov 13\nRun ID 7731-A",
+  "label": "ordinary",
+  "vendor": "cobalt",
+  "note": "Remittance advice quoting the on-file account the payment went to; ordinary."
+}

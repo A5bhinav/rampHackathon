@@ -1,0 +1,8 @@
+{
+  "subject": "Confirmation: your updated banking details have been applied",
+  "sender": "Vendor Maintenance <vendormaster@sterlingcomponents.com>",
+  "text": "Dear Northgate Manufacturing,\n\nThis confirms that the banking update you submitted on 10/28/2026 for supplier record 20991 has been verified by callback and applied in our system. Future payments from Sterling Components Corp will be sent to your account ending 0917 at First Meridian Bank.\n\nNo further action is required.\n\nSterling Components Corp\nVendor Maintenance",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "A customer confirming a change to OUR bank details in THEIR system. Flows the opposite direction from a vendor change request."
+}

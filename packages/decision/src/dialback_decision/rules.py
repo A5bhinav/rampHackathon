@@ -92,7 +92,7 @@ def valid(f: object, mode: Mode) -> bool:
     return (_member(f.call_result, CALL_RESULTS) and isinstance(f.dialed_eligible_number, bool)
             and _strings(f.recording_consent, CONSENT) and _strings(f.company_named)
             and _strings(f.change_requested, CHANGE) and isinstance(f.speaker_named, bool) and _strings(f.speaker_role)
-            and _strings(f.flags, FLAGS) and isinstance(f.offered_number, bool)
+            and _strings(f.flags, FLAGS) and isinstance(f.offered_number, bool) and isinstance(f.digits_typed, bool)
             and _optional(f.last_four_result, LAST_FOUR_RESULTS) and _optional(f.answered_by, ANSWERED_BY)
             and all(getattr(f, n) is None or isinstance(getattr(f, n), bool) for n in TRI_STATE)
             and _checks_ok(f.checks) and isinstance(f.earlier_calls, tuple) and all(map(_earlier_ok, f.earlier_calls))
@@ -166,7 +166,10 @@ NOT_VERIFIED: tuple[Rule, ...] = (
 # Block 2: Needs review --------------------------------------------------------------------------
 
 NEEDS_REVIEW: tuple[Rule, ...] = (
-    Rule("NR03_wrong_company", "The company the person named does not match this vendor.",
+    # Spec 0082, D7b: company_matches is False only for an answer with a refusal word (D7a). The sentence is
+    # true under both meanings NR03 has had, so a decision-1.0.0 NR03 (no match) still reads correctly.
+    Rule("NR03_wrong_company",
+         "The company answer did not name this vendor, or said the person is not with it or only works with it.",
          lambda f, m: f.company_matches is False),
     Rule("NR04_speaker_from_change_thread", "The person first appeared in the change request thread.",
          lambda f, m: f.speaker_in_change_thread is True),
@@ -193,7 +196,7 @@ NEEDS_REVIEW: tuple[Rule, ...] = (
     Rule("NR17_split_speakers", "Two different names were given for the person speaking for the vendor.",
          lambda f, m: f.same_person_yes_and_digits is False or "speaker_changed" in f.flags),
     Rule("NR18_contradictory_answers", "The person gave conflicting answers about the change or their role.",
-         lambda f, m: _conflicting(f.change_requested) or _conflicting(f.speaker_role)),  # companies: NR03
+         lambda f, m: _conflicting(f.change_requested) or _conflicting(f.speaker_role)),  # not companies (spec 0082, D7b)
     Rule("NR19_earlier_call_concern", "An earlier call about this change raised a concern.",
          lambda f, m: _earlier(f, _earlier_concern)),
     Rule("NR20_manual_answers", "These answers were entered by hand, so a person must review them before release.",
@@ -210,14 +213,19 @@ VERIFIED: tuple[Rule, ...] = (
     Rule("V02_outbound_dial", "We placed the call, outbound, to the number we chose.",
          lambda f, m: f.dialed_out is True and f.dialed_number_is_pick is True,
          "We could not confirm the call was outbound to the number we chose."),
+    # Spec 0080, Part B: with no label (Twilio's "unknown", silence at pickup), digits typed on the keypad
+    # show a live person; a machine can't type them. A "machine" label still goes to review (NR01). Both
+    # sentences are unchanged, so they stay true for decisions earlier engine versions recorded.
     Rule("V03_live_person", "A person, not a machine, answered and gave the answers.",
-         lambda f, m: f.call_result == "answers_recorded" and f.answered_by == "human",
+         lambda f, m: f.call_result == "answers_recorded" and (
+             f.answered_by == "human"
+             or (f.answered_by is None and f.digits_typed is True
+                 and f.last_four_result not in (None, "not_provided"))),
          "We could not confirm a person, not a machine, answered."),
     Rule("V04_recording_consent", "The person agreed to the recorded call before anything else.",
          lambda f, m: _only(f.recording_consent, "yes") and f.consent_first is True,
          "Recording consent was not given first."),
-    Rule("V05_company_matches", "The person named this vendor.", lambda f, m: f.company_matches is True,
-         "The person did not clearly name this vendor."),
+    # V05_company_matches is retired (spec 0082, D7b): the company answer is no longer required.
     Rule("V06_speaker_identified", "The person gave their name and role.",
          lambda f, m: f.speaker_named is True and any(r.strip() for r in f.speaker_role),
          "The person did not give both their name and role."),
@@ -256,7 +264,7 @@ FIXED = {
 SLOT_RULES: dict[str, tuple[str, ...]] = {
     "recording_consent": ("V04_recording_consent", "V10_answers_grounded", "NR02_no_recording_consent",
                           "NR14_answer_not_in_transcript"),
-    "company_named": ("V05_company_matches", "NR03_wrong_company"),
+    "company_named": ("NR03_wrong_company",),
     "department": (),
     "speaker_name": ("V06_speaker_identified", "V07_right_person_confirmed", "V09_same_person", "V10_answers_grounded",
                      "NR04_speaker_from_change_thread", "NR14_answer_not_in_transcript", "NR17_split_speakers",
@@ -265,7 +273,9 @@ SLOT_RULES: dict[str, tuple[str, ...]] = {
     "change_requested": ("V07_right_person_confirmed", "V09_same_person", "V10_answers_grounded", "NV01_vendor_denied_change",
                          "NR09_change_unsure", "NR14_answer_not_in_transcript", "NR17_split_speakers",
                          "NR18_contradictory_answers"),
-    "account_last4": ("V08_digits_match", "V10_answers_grounded", "NV02_digits_mismatch", "NV03_digits_match_old_account",
+    # V03 reads the digits' capture method since spec 0080, Part B (an unlabeled call verifies with typed digits).
+    "account_last4": ("V03_live_person", "V08_digits_match", "V10_answers_grounded", "NV02_digits_mismatch",
+                      "NV03_digits_match_old_account",
                       "NR05_digits_near_miss", "NR06_digits_not_provided", "NR07_digits_ambiguous", "NR08_digits_inconsistent",
                       "NR14_answer_not_in_transcript"),
     "offered_number": ("V12_no_flags", "NV04_offered_number_from_request", "NR13_another_number"),

@@ -11,7 +11,10 @@ questions and the digits question are always code's fixed wording, so a "yes" ca
 question code asked. The last four come only from the keypad: exactly four keys, never speech
 (spec 0043). An answer the call could not make out is asked once more; a second one at consent or
 the change question ends the call `failed`, and at the digits question the call finishes without
-digits. Anything unexpected ends the call `failed`, and the hold stays (R7).
+digits. When the transport's quiet clock runs out (a `Silence`), the call checks in; the reply to a
+check-in only shows the caller is there, so it is never an answer and the question is asked again,
+and no reply ends the call closed (spec 0051). Anything unexpected ends the call `failed`, and the
+hold stays (R7).
 """
 from __future__ import annotations
 
@@ -31,13 +34,16 @@ from .script import (
     REASK,
     START_OVER,
     STILL_THERE,
+    TAKE_YOUR_TIME,
+    THANKS,
     Phase,
     Script,
 )
 from .tools import NO_DIGITS, ToolCall, ToolError, validate
 
 MAX_CALLEE_TURNS = 30
-MAX_SILENCES = 3
+MAX_SILENCES = 2      # quiet spells in a row: the check-in, then the end (spec 0051, D6)
+MAX_CHECK_INS = 3     # quiet spells in one call; the next one ends it, whatever came between (spec 0051, D6)
 MAX_VIOLATIONS = 2
 MAX_ANSWERS = 50  # call-answers.schema.json, answers.maxItems
 REDIAL_AFTER = dt.timedelta(minutes=5)
@@ -78,6 +84,7 @@ class Turn:
     speaker: Literal["agent", "callee"]
     text: str
     asked: Phase | None = None  # agent turns: the question this turn asked, in code's wording or the model's
+    presence: bool = False      # callee turns: the reply to a check-in, which is never an answer (spec 0051, D5)
 
 
 @dataclass(frozen=True)
@@ -96,7 +103,9 @@ class State:
     answered_by: str | None = None
     violations: int = 0
     guard_trips: int = 0
-    silences: int = 0
+    silences: int = 0                 # quiet spells in a row; any activity resets it
+    quiet_spells: int = 0             # quiet spells in the whole call (MAX_CHECK_INS)
+    check_in_pending: bool = False    # a check-in was said and nothing has come since (spec 0051, D5)
     callback_asked: bool = False
     pressure_flagged: bool = False
     reasked: frozenset[Phase] = frozenset()  # questions whose one more try is used (spec 0043, D5)
@@ -192,6 +201,7 @@ class AgentFailed:
 
 @dataclass(frozen=True)
 class Silence:
+    """The transport's quiet clock ran out: nothing came from the caller (spec 0051, D3)."""
     at: dt.datetime
 
 
@@ -274,7 +284,6 @@ def checks(state: State) -> dict[str, Any]:
 # --- the handlers ------------------------------------------------------------------------------
 
 def _dispatch(state: State, event: Event) -> Step:
-    script = state.ctx.script
     if state.answered_by is None and not isinstance(event, (Connected, Hangup, TimedOut, AgentFailed)):
         return Step(state)  # nothing is said or kept before the disclosure (R8)
     match event:
@@ -285,7 +294,7 @@ def _dispatch(state: State, event: Event) -> Step:
         case Keypad():
             return _keypad(state, event)
         case KeypadReset():
-            return _keypad_reset(state)
+            return _keypad_reset(state, event)
         case AgentReplied():
             return _agent_replied(state, event)
         case AgentUnclear():
@@ -293,10 +302,7 @@ def _dispatch(state: State, event: Event) -> Step:
         case AgentFailed():
             return _end(state, "failed", f"agent_error:{event.reason}", _goodbye(state))
         case Silence():
-            state = replace(state, silences=state.silences + 1)
-            if state.silences >= MAX_SILENCES:
-                return _end(state, "failed", "silence", script.goodbye())
-            return _speak(state, STILL_THERE, None)
+            return _silence(state)
         case Hangup():
             if state.answered_by is None:
                 return _end(state, "no_answer", "never_connected", None)
@@ -321,6 +327,8 @@ def _connected(state: State, event: Connected) -> Step:
 
 
 def _callee_said(state: State, event: CalleeSaid) -> Step:
+    if state.check_in_pending:
+        return _presence(state, event.text, event.at)
     state = replace(_add(state, "callee", event.text), silences=0)
     if _over_turn_cap(state):
         return _end(state, "failed", "turn_cap", state.ctx.script.goodbye())
@@ -333,8 +341,11 @@ def _callee_said(state: State, event: CalleeSaid) -> Step:
 
 def _keypad(state: State, event: Keypad) -> Step:
     if state.phase is not Phase.LAST4 or state.consent != "yes":
+        if state.check_in_pending:  # after a check-in, a key elsewhere shows the caller is there (spec 0051, D5)
+            return _presence(state, "[keys]", event.at)   # never "[keypad]", which marks a digits entry
         return Step(state)  # keys pressed outside the digits question mean nothing
-    state = _add(state, "callee", "[keypad]")  # the digits never enter the transcript
+    # The digits never enter the transcript. An entry is activity, and after a check-in it is the answer.
+    state = replace(_add(state, "callee", "[keypad]"), silences=0, check_in_pending=False)
     if _over_turn_cap(state):
         return _end(state, "failed", "turn_cap", state.ctx.script.goodbye())
     turn = state.turns[-1].id
@@ -344,15 +355,77 @@ def _keypad(state: State, event: Keypad) -> Step:
     return _advance(state, None)
 
 
-def _keypad_reset(state: State) -> Step:
+def _keypad_reset(state: State, event: KeypadReset) -> Step:
     """'*' at the digits question: start over. It does not use up the one more try, and each one is
-    a callee turn, so the turn cap bounds them (spec 0043, D3)."""
+    a callee turn, so the turn cap bounds them (spec 0043, D3). After a check-in it clears the
+    check-in; elsewhere it shows the caller is there (spec 0051, D5)."""
     if state.phase is not Phase.LAST4 or state.consent != "yes":
+        if state.check_in_pending:
+            return _presence(state, "[keys reset]", event.at)
         return Step(state)
-    state = _add(state, "callee", "[keypad reset]")
+    state = replace(_add(state, "callee", "[keypad reset]"), silences=0, check_in_pending=False)
     if _over_turn_cap(state):
         return _end(state, "failed", "turn_cap", state.ctx.script.goodbye())
     return _speak(state, START_OVER, Phase.LAST4)
+
+
+def asking_digits(state: State) -> bool:
+    """True while the open question is the digits question itself, not the callback-time question
+    asked during it. The check-in's line and ending follow this, and so do the relay's quiet timings
+    (spec 0051)."""
+    return state.phase is Phase.LAST4 and _open_question(state)[1] is Phase.LAST4
+
+
+def _silence(state: State) -> Step:
+    """The transport's quiet clock ran out (spec 0051, D4 and D6). The first time, the call checks in,
+    asking no question. With no reply to that, or on the fourth quiet spell in the call whatever came
+    between, the call ends closed: at the digits question it finishes with every other answer and no
+    digits (NR06), as a second unclear does there (spec 0043, Q79); anywhere else, the callback-time
+    question included, it ends `failed`."""
+    script = state.ctx.script
+    digits = asking_digits(state)
+    state = replace(state, silences=state.silences + 1, quiet_spells=state.quiet_spells + 1)
+    if state.silences >= MAX_SILENCES or state.quiet_spells > MAX_CHECK_INS:
+        if digits:
+            return _end(state, "answers_recorded", "silence:last4", script.goodbye())
+        return _end(state, "failed", "silence", script.goodbye())
+    line = TAKE_YOUR_TIME if digits else STILL_THERE
+    return _speak(replace(state, check_in_pending=True), line, None)
+
+
+def _presence(state: State, text: str, at: dt.datetime) -> Step:
+    """The first reply after a check-in, spoken or keyed, only shows the caller is there (spec 0051,
+    D5). It is kept in the call's transcript, marked, but it is never recorded, never sent to the
+    model and never citable by a tool call (R9); code's own pressure flag still reads it, which can
+    only add a review. The open question is asked again in code's wording, and that does not use up
+    the one more try (spec 0043, D5): presence is not an unclear answer. Digits said at the digits
+    question get spec 0043's keypad line instead of "Thanks." (D4)."""
+    state = replace(_add(state, "callee", text, presence=True), silences=0, check_in_pending=False)
+    if _over_turn_cap(state):
+        return _end(state, "failed", "turn_cap", state.ctx.script.goodbye())
+    if state.consent == "yes":
+        state = _flag_pressure(state, at)
+    if asking_digits(state) and any(len(run) >= SPOKEN_DIGITS for run in digit_runs(text)):
+        return _speak(state, f"{REASK} {KEYPAD_ONLY}", Phase.LAST4)
+    line, asked = _open_question(state)
+    return _speak(state, f"{THANKS} {line}", asked)
+
+
+def _open_question(state: State) -> tuple[str, Phase | None]:
+    """The question the caller was last asked, to ask again: the callback-time question while it is
+    the open one (asking no phase, so a "sure" to it is never consent), else the current question's
+    fixed wording. Check-ins and the turns after them ask nothing, so they are passed over."""
+    for turn in reversed(state.turns):
+        if turn.speaker != "agent":
+            continue
+        if turn.asked is not None:
+            break
+        if turn.text == CALLBACK_TIME_QUESTION:
+            return CALLBACK_TIME_QUESTION, None
+    phase = state.phase
+    if phase is None:
+        raise ValueError("no question is open")  # cannot happen while the call runs; step fails it closed
+    return QUESTIONS[phase].wording(state.ctx.script), phase
 
 
 def _unclear(state: State, line: str | None) -> Step:
@@ -378,7 +451,8 @@ def _agent_replied(state: State, event: AgentReplied) -> Step:
     violated = False
     closing: list[tuple[ToolCall, dict[str, Any]]] = []
     for call in event.tool_calls:
-        callee_turns = frozenset(t.id for t in state.turns if t.speaker == "callee")
+        # A presence turn is never citable: it answered a check-in, not a question (spec 0051, D5).
+        callee_turns = frozenset(t.id for t in state.turns if t.speaker == "callee" and not t.presence)
         try:
             args = validate(call, callee_turns=callee_turns)
             if call.name == "record_answer":
@@ -446,8 +520,9 @@ def _advance(state: State, text: str | None) -> Step:
 
 # --- helpers -----------------------------------------------------------------------------------
 
-def _add(state: State, speaker: Literal["agent", "callee"], text: str, asked: Phase | None = None) -> State:
-    return replace(state, turns=state.turns + (Turn(len(state.turns), speaker, text, asked),))
+def _add(state: State, speaker: Literal["agent", "callee"], text: str, asked: Phase | None = None,
+         presence: bool = False) -> State:
+    return replace(state, turns=state.turns + (Turn(len(state.turns), speaker, text, asked, presence),))
 
 
 def _speak(state: State, line: str, asked: Phase | None) -> Step:
@@ -506,7 +581,7 @@ def _request(state: State) -> AgentRequest:
         next_goal=QUESTIONS[later[0]].goal if later else None, customer_name=script.customer_name,
         vendor_name=state.ctx.vendor_names[0] if state.ctx.vendor_names else "",
         callback_number=script.callback_number,
-        transcript=tuple((t.id, t.speaker, t.text) for t in state.turns))
+        transcript=tuple((t.id, t.speaker, t.text) for t in state.turns if not t.presence))  # spec 0051, D5
 
 
 def _grounded(state: State, slot: str, value: str, turn_id: int) -> bool:

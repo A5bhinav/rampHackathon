@@ -1,0 +1,8 @@
+{
+  "subject": "New remittance address for check payments",
+  "sender": "Brightline Office Supply AR <ar@brightlineoffice.com>",
+  "text": "Dear Valued Customer,\n\nBrightline Office Supply Inc. has moved its payment processing to a new lockbox. Please update your records to send all check payments to:\n\nBrightline Office Supply Inc.\nDept. 3307\nPO Box 790126\nSt. Louis, MO 63179-0126\n\nOur previous remittance address, PO Box 22841, Columbus, OH, will be closed on December 15. Mail sent there after that date will not be forwarded.\n\nOur corporate office address is not changing. ACH customers do not need to take any action at this time.\n\nThank you,\nBrightline Accounts Receivable",
+  "label": "change_request",
+  "vendor": "brightline",
+  "note": "Borderline: a check lockbox (remit-to) move, not an office move. The lockbox is where check money lands, so this is new remittance instructions. ACH customers are told no action is needed, which a detector might over-weight."
+}

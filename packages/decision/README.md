@@ -36,11 +36,11 @@ First, **an earlier call that had consent and said "no" or gave wrong digits** d
 0. **Input problems (Needs review):** facts that fail validation (NR97), no live person (NR01), or consent refused, contradicted or not first (NR02). These come before Not verified, because answers after a refused consent aren't evidence.
 1. **Not verified (4 rules):** the vendor says they asked for no change; the digits don't match; the digits match the old account (all three on this call or an earlier one); the callee offers a number from the request. The hold stays and the controller is alerted.
 2. **Needs review (21 rules, NR01–NR21, counting the two in block 0):** the skeleton's 17 (the design's 16 plus split speakers) and four reasons the design names without counting: contradictory answers, an earlier call's concern, manual answers and line risk (NR18–NR21). Examples: the wrong company; a speaker from the change thread; near-miss or missing digits; pressure; an opt-out; an answer the transcript doesn't support.
-3. **Verified (12 conditions, all required):** V01–V12, from "we dialed the ledger's pick" and "outbound to that number", through "the right person confirmed and gave matching digits", to "no flags and a clean script".
+3. **Verified (11 conditions, all required):** V01 to V12 without V05, which spec 0082 D7b retired (the company answer is no longer required), from "we dialed the ledger's pick" and "outbound to that number", through "the right person confirmed and gave matching digits", to "no flags and a clean script".
 4. **Anything else is Needs review**, naming each unmet condition (`NR99_conditions_not_met` plus `<id>_unmet`); any error is `NR98_engine_error` (R7).
 
 The rules are a versioned table in code (`rules.py`; `engine_version` bumps with any
-change), and each one has a test, plus 23 worked examples (`tests/examples/`). **Strict mode**
+change), and each one has a test, plus 24 worked examples (`tests/examples/`). **Strict mode**
 adds `S01_known_contact` (a person known from before the request), so the scorecard can show
 what it costs in extra reviews.
 
@@ -61,9 +61,12 @@ inside this package; the caller passes everything in.
 - A Hypothesis property: for random facts, `decide()` never raises, and anything it cannot classify is `needs_review`.
 - `inputs_hash` is stable across dict ordering (canonicalize with `rfc8785` before hashing).
 
-## What exists (`decision-1.0.0`)
+## What exists (`decision-1.2.0`)
 
-- `rules.py`: the table above. Every rule carries the sentence the dashboard shows; sentences of retired ids (the skeleton's) are kept in `engine.RETIRED`, so old decisions still render.
+`decision-1.2.0` (spec 0080, Part B): V03 also holds for a call with no machine-detection label when every
+digits answer was typed on the keypad (`CaseFacts.digits_typed`, computed in `facts_from_answers`).
+
+- `rules.py`: the table above. Every rule carries the sentence the dashboard shows; sentences of retired ids (the skeleton's, and decision-1.0.0's V05) are kept in `engine.RETIRED`, so old decisions still render.
 - `decide(facts, *, strict=False, source="call")`: pure and total. It validates every fact first (NR97), then runs the blocks. `source="manual"` never verifies (NR20). `inputs_hash` is SHA-256 over the RFC 8785 form of the facts, the mode and the source.
 - `CaseFacts` per spec 0005 (`facts.py`):
   - a repeated answer keeps every value, in order;

@@ -1,0 +1,8 @@
+{
+  "subject": "Brightline Office Supply - Invoice 41022",
+  "sender": "Billing <billing@brightlineoffice.com>",
+  "text": "Brightline Office Supply Inc\n1200 Elm Street, Decatur GA 30030\n\nINVOICE 41022\nBill to: Tallis Manufacturing Co.\nPO: 77402\nDate: 11/06/2026\n\n  Copy paper, 20 cases        $  840.00\n  Toner, 12 units             $1,212.00\n  Freight                     $   96.50\n  TOTAL                       $2,148.50\n\nTerms: Net 30\n\nPayment information\n  Bank: Bank of America\n  ABA: 026009593\n  Account: 483022917755\n  Payee: Brightline Office Supply Inc\n\nThank you for your business.",
+  "label": "change_request",
+  "vendor": "brightline",
+  "note": "ON-FILE-ONLY: routing and account both differ from on-file; invoice has no wording about a change."
+}

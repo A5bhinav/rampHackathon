@@ -1,0 +1,8 @@
+{
+  "subject": "Fraud Watch: how vendor impersonation emails look in 2026",
+  "sender": "First Meridian Bank Business Insights <insights@firstmeridianbank.com>",
+  "text": "FRAUD WATCH | November 2026\n\nBusiness email compromise losses passed $3.1 billion last year, and vendor impersonation remains the most common play. A typical message reads:\n\n   \"Please be informed that we have changed our bank account. Kindly update\n    your records and remit all future payments to routing 026009593, account\n    4471002983. The old account is no longer in use.\"\n\nWhat to look for\n- A reply-to address that differs from the sender\n- Urgency (\"before today's run\")\n- A new account at a different bank than the vendor has used for years\n- Pressure to skip callback verification\n\nWhat to do\n- Call the vendor at a number from your own records, never from the email\n- Require a signed letter and a second approver for any bank change\n- Enrol in Positive Pay and ACH debit blocks through Treasury Online\n\nRead the full article: firstmeridianbank.com/insights/fraud-watch-nov-2026\n\nYou are receiving this because you are a First Meridian business customer. Unsubscribe.",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Bank newsletter that quotes sample scam wording and example bank numbers. Educational, not a request."
+}

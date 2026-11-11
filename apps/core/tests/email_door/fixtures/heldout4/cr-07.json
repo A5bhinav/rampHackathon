@@ -1,0 +1,8 @@
+{
+  "subject": "Fwd: Acme remittance - please handle today",
+  "sender": "Priya Raman <priya.raman@tallis-mfg.example>",
+  "text": "Renee - please take care of this before today's run. I spoke with their controller and it's fine, no need to go through the usual form on this one. I'm in board meetings all day so email only.\n\nPriya\n\nSent from my iPhone\n\n---------- Forwarded message ---------\nFrom: Greg Lindqvist <glindqvist@acmefasteners.com>\nDate: Mon, Nov 9, 2026 at 4:51 PM\nSubject: Acme remittance\nTo: Priya Raman\n\nPriya, good seeing you at the dinner. As we discussed, our remittances from Tallis need to be directed to our Regions account from here on: routing 062000019, account 0091447720. Could you ask your team to take care of it?\n\nGreg",
+  "label": "change_request",
+  "vendor": "acme",
+  "note": "Executive pressure plus forwarded request; sender domain is not the company's real one."
+}

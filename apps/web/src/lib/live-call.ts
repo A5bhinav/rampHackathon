@@ -16,7 +16,7 @@ export type Phase = "choosing" | "dialing" | "on_call" | "answers" | "not_connec
 export type LiveSlot = { slot: string; label: string; wording: string; answer: string | null; turn: number | null; method: string | null; order: number | null };
 export type LiveCallView = {
   caseId: string; version: number; vendor: string; state: CaseState; stateLabel: string; phase: Phase; status: string;
-  dialed: string | null; attempt: number | null; startedAt: string | null; endedAt: string | null;
+  dialed: string | null; dialedIsPick: boolean | null; attempt: number | null; startedAt: string | null; endedAt: string | null;
   result: string | null; reason: string | null; waiting: string | null; lastStep: string | null;
   disclosure: string | null; note: string | null; slots: LiveSlot[]; checks: CheckRow[];
   outcome: string | null; effect: string | null; steps: StationView[]; poll: boolean;
@@ -56,10 +56,8 @@ export function liveCallView(detail: CaseDetail, selection: SelectionView | null
 
   // The recorded answers, slot by slot in the script's order, numbered by the turn they came from.
   const answers = call?.result === "answers_recorded" || phase === "decided" ? call?.answers ?? [] : [];
-  // An older script asked name and role in one question (the helper folds the role into the name);
-  // when the script asks the role on its own, each slot keeps only its own answers.
-  const separate = new Set((script?.questions ?? []).map((q) => q.slot));
-  const asked = conversation(script, answers).asked.map((a) => ({ ...a, answers: separate.has("speaker_role") ? a.answers.filter((x) => x.slot === a.slot) : a.answers }));
+  // conversation() lists the role under the name only for an older script with no role question.
+  const asked = conversation(script, answers).asked;
   const firstTurn = (a: (typeof asked)[number]) => (a.answers.length ? Math.min(...a.answers.map((x) => x.turn_id)) : null);
   const answeredByTurn = asked.filter((a) => a.answers.length).sort((a, b) => firstTurn(a)! - firstTurn(b)!).map((a) => a.slot);
   const slots: LiveSlot[] = asked.map((a) => {
@@ -74,7 +72,7 @@ export function liveCallView(detail: CaseDetail, selection: SelectionView | null
 
   return {
     caseId: c.id, version: c.version, vendor: c.vendor.legal_name, state: c.state, stateLabel: stateLabel(c.state), phase, status,
-    dialed, attempt: call?.attempt ?? null, startedAt: call?.started_at ?? null, endedAt: call?.ended_at ?? null,
+    dialed, dialedIsPick: call?.dialed_number_is_pick ?? null, attempt: call?.attempt ?? null, startedAt: call?.started_at ?? null, endedAt: call?.ended_at ?? null,
     result: call?.result ?? null, reason: call?.reason ?? null,
     waiting: phase === "on_call" ? "Answers arrive when the call ends." : null,
     lastStep: phase === "no_call" ? detail.timeline.at(-1)?.summary ?? null : null,
@@ -130,9 +128,35 @@ export function flowColumns(timeline: readonly TimelineEntry[], state: CaseState
   });
 }
 
-/** "Watch the call" appears once the current version has a number to call (or a call). */
+/** "Watch the call" appears once the current version has a placed call (spec 0066). */
 export function canWatchCall(timeline: readonly { type: string }[]): boolean {
-  return currentVersion(timeline).some((e) => e.type === "number_resolved" || e.type === "call_started");
+  return currentVersion(timeline).some((e) => e.type === "call_started");
+}
+
+/** mm:ss for a span of milliseconds. */
+export function clock(ms: number): string {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+}
+
+/** An ended call's length; nothing when it took under a second (the text line), never 00:00. */
+export function callLength(startedAt: string | null, endedAt: string | null): string | null {
+  if (!startedAt || !endedAt) return null;
+  const ms = Date.parse(endedAt) - Date.parse(startedAt);
+  return Number.isFinite(ms) && ms >= 1000 ? clock(ms) : null;
+}
+
+/** The phone frame's lines: the call's status (with its length once it has ended), and whether the
+ *  number is the Trust Ledger's pick. Before the call reports, the number shown is the pick itself. */
+export function phoneLines(view: Pick<LiveCallView, "phase" | "status" | "dialed" | "dialedIsPick" | "startedAt" | "endedAt" | "result">):
+  { status: string; number: string | null; pick: { tone: "ok" | "bad"; text: string } | null } {
+  const length = callLength(view.startedAt, view.endedAt);
+  const status = view.endedAt && view.result ? ["Call ended", words(view.result), length].filter(Boolean).join(" · ") : view.status;
+  const pick = !view.dialed ? null
+    : view.dialedIsPick === false ? { tone: "bad" as const, text: "Not the Trust Ledger's pick" }
+    : { tone: "ok" as const, text: "The Trust Ledger's pick" };
+  // The number shown is the pick's; over a call that reports it dialed something else, show none.
+  return { status, number: view.dialedIsPick === false ? null : view.dialed, pick };
 }
 
 /** The AP top bar's Present menu: demo datasets only, for the newest case. */

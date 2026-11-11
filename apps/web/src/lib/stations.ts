@@ -158,7 +158,8 @@ const COUNT_LABEL: Record<string, string> = {
 export type StationCount = { key: StationKey; label: string; count: number; markers: { label: string; tone: Tone; count: number }[] };
 
 export function stationCounts(cases: readonly CaseLike[], rows: readonly Row[]): StationCount[] {
-  const out: StationCount[] = STATIONS.map((s) => ({ key: s.key, label: s.label, count: 0, markers: [] }));
+  // A count of cases now at Approved is cases waiting for an approval (spec 0066), so it says so.
+  const out: StationCount[] = STATIONS.map((s) => ({ key: s.key, label: s.key === "approved" ? "Waiting for approval" : s.label, count: 0, markers: [] }));
   for (const c of cases) {
     const views = stationsFromEvidence(rows, c);
     const i = stationIndex(views);

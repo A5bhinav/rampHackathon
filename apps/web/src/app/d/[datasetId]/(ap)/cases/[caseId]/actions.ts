@@ -8,7 +8,7 @@ export type ActionState = { error?: string };
 
 // On success the case usually moves on (awaiting release -> releasing), so the console that
 // sent the request is no longer shown. The outcome goes back to the page as a short code in
-// the URL, and the page shows a templated sentence for it (see NOTICES in page.tsx).
+// the URL, and the page shows a templated sentence for it (actionNotice in lib/states.ts).
 async function run(path: string, fn: () => Promise<{ status: string; to_state: string }>): Promise<ActionState> {
   let result: { status: string; to_state: string };
   try {

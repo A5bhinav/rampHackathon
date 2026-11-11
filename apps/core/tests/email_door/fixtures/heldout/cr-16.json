@@ -1,0 +1,8 @@
+{
+  "subject": "new bank - plz update",
+  "sender": "Priyanka Shah <priyanka@shahmedia.example>",
+  "text": "We switched. Please use account number 4410 2290 and routing 021000021 for my invoices.",
+  "label": "change_request",
+  "vendor": null,
+  "note": "Terse; short account."
+}

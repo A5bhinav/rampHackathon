@@ -14,8 +14,9 @@ import uuid
 import pytest
 from dialback_policy import step as policy
 from dialback_policy.script import QUESTIONS, REASK, Phase
+from dialback_policy.tools import ToolCall
 from dialback_voice import tokens
-from dialback_voice.agent import ScriptedAgent
+from dialback_voice.agent import AgentReply, ScriptedAgent, last_callee
 from dialback_voice.transport import ScriptedVendor, VendorScript, run_call
 from dialback_voice.twilio import relay as relay_module
 from dialback_voice.twilio.relay import run_relay, verify_setup
@@ -35,12 +36,18 @@ class FakeWS:
     """A scripted ConversationRelay socket. `inbound` is the messages Twilio would send, in order;
     once they run out, receive_json raises WSClosed, standing in for a dropped call. An item
     `{"pause": seconds}` stands for the caller doing nothing for that long. `delivered_at` is the
-    monotonic time each message was handed over."""
+    monotonic time each message was handed over, and `sent_at` the time each line was sent.
+    `sent` holds the spoken `text` tokens only; any other message the relay sends (the `end` of
+    spec 0094) goes to `control`, with its time in `control_at`. `log` is every send, in order."""
 
-    def __init__(self, inbound: list[dict]) -> None:
+    def __init__(self, inbound: list) -> None:
         self._inbound = list(inbound)
         self._i = 0
         self.sent: list[dict] = []
+        self.sent_at: list[float] = []
+        self.control: list[dict] = []
+        self.control_at: list[float] = []
+        self.log: list[tuple] = []
         self.closed = False
         self.delivered_at: list[float] = []
 
@@ -50,13 +57,20 @@ class FakeWS:
                 raise WSClosed("no more messages")
             msg = self._inbound[self._i]
             self._i += 1
-            if "pause" not in msg:
+            if not (isinstance(msg, dict) and "pause" in msg):
                 self.delivered_at.append(time.monotonic())
                 return msg
             await asyncio.sleep(msg["pause"])
 
     async def send_json(self, obj: dict) -> None:
-        self.sent.append(obj)
+        if obj.get("type") == "text":
+            self.sent.append(obj)
+            self.sent_at.append(time.monotonic())
+            self.log.append(("text", obj.get("token")))
+        else:
+            self.control.append(obj)
+            self.control_at.append(time.monotonic())
+            self.log.append(("control", obj.get("type")))
 
     async def close(self) -> None:
         self.closed = True
@@ -279,8 +293,9 @@ def test_keypad_sequences(row, make_ctx, clock, monkeypatch):
 
 
 def test_keypad_timeout_submits(make_ctx, clock, monkeypatch):
-    # A live call waits 5 seconds after the last key (Q78).
-    assert relay_module.KEYPAD_TIMEOUT == 5
+    # A live call waits 10 seconds after the last key (Q78, revised from 5 by Sami on Nov 9: a caller
+    # may pause mid-entry to find the rest of the digits).
+    assert relay_module.KEYPAD_TIMEOUT == 10
     assert inspect.signature(run_relay).parameters["keypad_timeout"].default == relay_module.KEYPAD_TIMEOUT
     seen = _spy_on_keypad(monkeypatch)
     # With no digits in hand a long pause submits nothing; a pause shorter than the wait keeps one
@@ -294,12 +309,17 @@ def test_keypad_timeout_submits(make_ctx, clock, monkeypatch):
     assert r.result == "answers_recorded" and _by_value(r)["account_last4"] == ("4821", "keypad")
 
 
-@pytest.mark.parametrize("between", [_say("Hmm."), [{"type": "prompt", "voicePrompt": "", "last": True}]],
-                         ids=["spoken turn", "silence"])
-def test_a_spoken_turn_or_a_silence_clears_a_partial_entry(between, make_ctx, clock, monkeypatch):
+@pytest.mark.parametrize(("between", "after"), [(_say("Hmm."), "4821#"),
+                                                ([{"type": "prompt", "voicePrompt": "", "last": True}], "21#")],
+                         ids=["spoken turn", "empty final prompt"])
+def test_a_spoken_turn_clears_a_partial_entry_and_line_noise_does_not(between, after, make_ctx, clock,
+                                                                      monkeypatch):
+    # A spoken turn drops the "48" typed before it, as before. An empty final transcription is line
+    # noise: activity for the quiet clock, never a Silence (spec 0051, D2; it was a Silence before, and
+    # cleared the entry), so the entry carries on across it.
     seen = _spy_on_keypad(monkeypatch)
-    r, _ = _relay(make_ctx(), clock, [_good_setup(), *_say(*SPOKEN), *_keys("48"), *between, *_keys("4821#")])
-    assert seen == ["4821"]                              # the "48" before the turn was dropped, as today
+    r, _ = _relay(make_ctx(), clock, [_good_setup(), *_say(*SPOKEN), *_keys("48"), *between, *_keys(after)])
+    assert seen == ["4821"]
     assert _by_value(r)["account_last4"] == ("4821", "keypad")
 
 
@@ -384,3 +404,515 @@ def test_two_short_entries_finish_without_digits_and_decide_gives_nr06(make_ctx,
                                answered_by="human", speaker_in_change_thread=False)
     decision = decide(facts)
     assert decision.outcome == "needs_review" and "NR06_digits_not_provided" in decision.rules_fired
+
+
+# --- spec 0051: the quiet clock ---------------------------------------------------------------
+
+Q = 0.3      # the quiet wait these tests run with; a live call waits QUIET_SECONDS
+Q4 = 0.6     # the same at the digits question (QUIET_SECONDS_LAST4)
+A = 0.3      # after a check-in (AFTER_CHECK_IN_SECONDS)
+A4 = 0.6     # after the digits check-in (AFTER_CHECK_IN_SECONDS_LAST4)
+SLACK = 0.8  # how late a timer may run on a loaded CI runner; nothing may come early
+STILL_THERE_LINE = "Sorry, are you still there?"
+DIGITS_CHECK_IN = ("Take your time. When you have the last four digits, enter them on your keypad, then press the "
+                   "pound key.")
+
+
+def _info(name, value) -> dict:
+    return {"type": "info", "name": name, "value": value}
+
+
+def _estimate(lead: float = 0.0, chars_per_second: float = 1e9, margin: float = 0.0):
+    """The speech estimate; by default about zero, so the clock starts as the last line is sent."""
+    return relay_module.SpeechEstimate(lead=lead, chars_per_second=chars_per_second, margin=margin)
+
+
+def _spy_on_events(monkeypatch) -> list[tuple[str, float]]:
+    """Each event the relay hands to step, by type, with the monotonic time it arrived."""
+    seen: list[tuple[str, float]] = []
+    real = policy.step
+
+    def spy(state, event):
+        seen.append((type(event).__name__, time.monotonic()))
+        return real(state, event)
+
+    monkeypatch.setattr(policy, "step", spy)
+    return seen
+
+
+def _silences(events: list[tuple[str, float]]) -> list[float]:
+    return [at for name, at in events if name == "Silence"]
+
+
+def _quiet_relay(ctx, clock, inbound: list, estimate=None, agent=None, **timings):
+    """Run a call with the short test timings (`timings` overrides any of them). The welcome greeting
+    speaks the disclosure, as on a live call, so the first line sent is the consent question."""
+    ws = FakeWS(inbound)
+    kw = {"keypad_timeout": FAST, "quiet_seconds": Q, "quiet_seconds_last4": Q4, "after_check_in_seconds": A,
+          "after_check_in_seconds_last4": A4} | timings
+    result = asyncio.run(run_relay(ctx, agent or ScriptedAgent(), ws, verify=_verify, clock=clock(),
+                                   greeting=ctx.script.disclosure(), estimate=estimate or _estimate(), **kw))
+    return result, ws
+
+
+def _about(waited: float, expected: float) -> bool:
+    """`waited` is `expected`, never early, and late only by scheduling."""
+    return 0.95 * expected <= waited < expected + SLACK
+
+
+def test_quiet_clock_timings_are_the_spec_values():  # D1, D3
+    assert (relay_module.QUIET_SECONDS, relay_module.QUIET_SECONDS_LAST4, relay_module.AFTER_CHECK_IN_SECONDS,
+            relay_module.AFTER_CHECK_IN_SECONDS_LAST4) == (10, 20, 10, 20)
+    params = inspect.signature(run_relay).parameters
+    assert params["quiet_seconds"].default == relay_module.QUIET_SECONDS
+    assert params["quiet_seconds_last4"].default == relay_module.QUIET_SECONDS_LAST4
+    assert params["after_check_in_seconds"].default == relay_module.AFTER_CHECK_IN_SECONDS
+    assert params["after_check_in_seconds_last4"].default == relay_module.AFTER_CHECK_IN_SECONDS_LAST4
+    # 1 second, plus 1 second per 12 characters of every line, plus 3 seconds of margin.
+    assert params["estimate"].default.seconds(("x" * 24, "y" * 12)) == 1 + 3 + 3
+
+
+def test_quiet_clock_fires_a_silence_after_an_agent_line(make_ctx, clock, monkeypatch):  # C1
+    events = _spy_on_events(monkeypatch)
+    ctx = make_ctx()
+    r, ws = _quiet_relay(ctx, clock, [_good_setup(), {"pause": 3 * LONG}])
+    silences = _silences(events)
+    sent = [m["token"] for m in ws.sent]
+    assert sent == [ctx.script.consent_question(), STILL_THERE_LINE, ctx.script.goodbye()]
+    assert len(silences) == 2
+    assert _about(silences[0] - ws.sent_at[0], Q)        # the quiet wait after the question
+    assert _about(silences[1] - ws.sent_at[1], A)        # the wait after the check-in
+    assert (r.result, r.end.reason) == ("failed", "silence") and r.answers["answers"] == []
+
+
+ACTIVITY = {
+    "partial prompt": [{"type": "prompt", "voicePrompt": "Um", "last": False}],
+    "empty final prompt": [{"type": "prompt", "voicePrompt": "", "last": True}],
+    "key": [{"type": "dtmf", "digit": "1"}],
+    "clientSpeaking": [_info("clientSpeaking", "on"), _info("clientSpeaking", "off")],   # a short utterance
+}
+
+
+@pytest.mark.parametrize("kind", list(ACTIVITY))
+def test_quiet_clock_activity_postpones_it(kind, make_ctx, clock, monkeypatch):  # C1, D2
+    # Two of the same activity, 0.4 of the wait apart: the Silence comes a full wait after the second,
+    # not after the line nor after the first. Without the postponement it would come 0.2 of the wait
+    # after the second at the latest, so the "never early" bound fails it.
+    events = _spy_on_events(monkeypatch)
+    gap = {"pause": 0.4 * Q}
+    r, ws = _quiet_relay(make_ctx(), clock, [_good_setup(), gap, *ACTIVITY[kind], gap, *ACTIVITY[kind],
+                                             {"pause": 3 * LONG}])
+    latest = ws.delivered_at[-1]
+    silences = _silences(events)
+    held = FAST if kind == "key" else 0.0   # keys are held for the keypad wait; then the clock starts at once
+    assert silences and _about(silences[0] - latest, Q + held)
+    assert ws.sent[1]["token"] == STILL_THERE_LINE
+    assert (r.result, r.end.reason) == ("failed", "silence")
+
+
+@pytest.mark.parametrize("kind", ["lone clientSpeaking", "key at another question"])
+def test_quiet_clock_still_fires_after_a_lone_client_speaking_or_a_key_elsewhere(kind, make_ctx, clock,
+                                                                                 monkeypatch):  # C1, D2, D3
+    events = _spy_on_events(monkeypatch)
+    if kind == "lone clientSpeaking":
+        inbound = [_good_setup(), _info("clientSpeaking", "on"), {"pause": 3 * LONG}]
+    else:   # at the company question; the key means nothing there and says nothing
+        inbound = [_good_setup(), *_say("Yes, that's fine."), *_keys("1"), {"pause": 3 * LONG}]
+    r, ws = _quiet_relay(make_ctx(), clock, inbound)
+    silences = _silences(events)
+    assert len(silences) == 2 and (r.result, r.end.reason) == ("failed", "silence")
+    if kind == "lone clientSpeaking":   # held as mid-sentence, until the per-wait cap (review fixes 2, 3)
+        assert _about(silences[0] - ws.sent_at[0], 3 * Q)
+    if kind == "key at another question":
+        keypad = [at for name, at in events if name == "Keypad"]
+        assert len(keypad) == 1
+        assert _about(silences[0] - keypad[0], Q)      # a step that said nothing: the clock starts at once
+        assert ws.sent[-2]["token"] == STILL_THERE_LINE
+
+
+def test_quiet_clock_starts_at_the_estimate_counting_the_disclosure(make_ctx, clock, monkeypatch):  # C1, D3
+    events = _spy_on_events(monkeypatch)
+    ctx = make_ctx()
+    lead, per_second, margin = 0.1, 500.0, 0.1
+    _, ws = _quiet_relay(ctx, clock, [_good_setup(), {"pause": 3 * LONG}],
+                         estimate=_estimate(lead, per_second, margin))
+    assert ws.sent[0]["token"] == ctx.script.consent_question()   # the disclosure was the welcome greeting
+    spoken = len(ctx.script.disclosure()) + len(ctx.script.consent_question())
+    silences = _silences(events)
+    # From the moment the consent question was sent, the estimate counts the disclosure too.
+    assert _about(silences[0] - ws.sent_at[0], lead + spoken / per_second + margin + Q)
+
+
+def test_quiet_clock_starts_when_the_agent_stops_speaking(make_ctx, clock, monkeypatch):  # C1, D3
+    on, off = _info("agentSpeaking", "on"), _info("agentSpeaking", "off")
+    slow = _estimate(lead=1.5)                            # the estimate alone would start the clock much later
+    # With an "on" then an "off" after the line was sent, the clock starts at the "off".
+    events = _spy_on_events(monkeypatch)
+    _, ws = _quiet_relay(make_ctx(), clock, [_good_setup(), {"pause": 0.1}, on, {"pause": 0.2}, off,
+                                             {"pause": 1.0}], estimate=slow)
+    stopped = ws.delivered_at[2]
+    silences = _silences(events)
+    assert silences and _about(silences[0] - stopped, Q)
+    # A lone "off", with no "on" since the line was sent, does not start it: the estimate does.
+    events.clear()
+    _, ws = _quiet_relay(make_ctx(), clock, [_good_setup(), {"pause": 0.05}, off, {"pause": 3 * LONG}],
+                         estimate=_estimate(lead=0.6))
+    silences = _silences(events)
+    assert silences and _about(silences[0] - ws.sent_at[0], 0.6 + Q)
+    # Nor does an "off" whose "on" came before the line was sent (one that piled up while the model
+    # answered): the clock for the company question starts at its estimate.
+    events.clear()
+    _, ws = _quiet_relay(make_ctx(), clock, [_good_setup(), on, *_say("Yes, that's fine."), off,
+                                             {"pause": 3 * LONG}], estimate=_estimate(lead=0.6))
+    company = [m["token"] for m in ws.sent].index(QUESTIONS[Phase.COMPANY].wording(make_ctx().script))
+    silences = _silences(events)
+    assert silences and _about(silences[0] - ws.sent_at[company], 0.6 + Q)
+
+
+def test_quiet_clock_uses_the_last4_timings(make_ctx, clock, monkeypatch):  # C1, C4, D1, D6
+    from dialback_decision import decide
+    from dialback_decision.facts import CallChecks, facts_from_answers
+    from dialback_decision.last_four import compare_last_four
+
+    events = _spy_on_events(monkeypatch)
+    ctx = make_ctx()
+    r, ws = _quiet_relay(ctx, clock, [_good_setup(), *_say(*SPOKEN), {"pause": 3 * LONG}])
+    sent = [m["token"] for m in ws.sent]
+    asked = sent.index(QUESTIONS[Phase.LAST4].wording(ctx.script))
+    assert sent[asked + 1:] == [DIGITS_CHECK_IN, ctx.script.goodbye()]
+    silences = _silences(events)
+    assert len(silences) == 2
+    assert _about(silences[0] - ws.sent_at[asked], Q4)
+    assert _about(silences[1] - ws.sent_at[asked + 1], A4)
+    # No reply at the digits question: the call finishes with every other answer and no digits, so
+    # decide() gives NR06 and a person sees the full call.
+    answers = r.answers["answers"]
+    assert r.result == "answers_recorded" and [a["slot"] for a in answers] == BEFORE_DIGITS
+    facts = facts_from_answers(answers, call_result=r.result, checks=CallChecks(**r.checks), dialed_out=True,
+                               dialed_eligible_number=True, dialed_number_is_pick=True,
+                               last_four_result=compare_last_four([], "4821", "4444"), company_matches=True,
+                               answered_by="human", speaker_in_change_thread=False)
+    decision = decide(facts)
+    assert decision.outcome == "needs_review" and "NR06_digits_not_provided" in decision.rules_fired
+
+
+def test_unknown_info_message_is_ignored(make_ctx, clock, monkeypatch):  # C6
+    junk = [{"type": "info"}, _info("tokensPlayed", "x"), _info("clientSpeaking", None), _info("clientSpeaking", 1),
+            _info(["clientSpeaking"], "on"), _info("agentSpeaking", "maybe"), _info("agentSpeaking", None),
+            {"type": "mystery"}, ["not", "an", "object"], "text"]
+    # None of it is activity, so it does not postpone the clock. A longer wait here, so a postponed
+    # Silence (about 1.8 s after the line) and a right one (1 s) are far apart even on a slow runner.
+    events = _spy_on_events(monkeypatch)
+    wait = 1.0
+    r, ws = _quiet_relay(make_ctx(), clock, [_good_setup(), {"pause": 0.8 * wait}, *junk, {"pause": 3 * LONG}],
+                         quiet_seconds=wait)
+    silences = _silences(events)
+    assert silences and _about(silences[0] - ws.sent_at[0], wait)
+    assert silences[0] < ws.delivered_at[-1] + 0.9 * wait
+    assert (r.result, r.end.reason) == ("failed", "silence")
+    # ... and no malformed agentSpeaking starts it before the estimate.
+    events.clear()
+    _, ws = _quiet_relay(make_ctx(), clock, [_good_setup(), _info("agentSpeaking", "on"), *junk,
+                                             {"pause": 3 * LONG}], estimate=_estimate(lead=0.6))
+    silences = _silences(events)
+    assert silences and _about(silences[0] - ws.sent_at[0], 0.6 + Q)
+
+
+def test_quiet_clock_a_socket_error_while_waiting_is_a_hangup(make_ctx, clock, monkeypatch):  # C6
+    events = _spy_on_events(monkeypatch)
+    r, _ = _quiet_relay(make_ctx(), clock, [_good_setup(), *_say("Yes, that's fine."), {"pause": 0.5 * Q}])
+    names = [name for name, _ in events]
+    assert "Silence" not in names and names[-1] == "Hangup"
+    assert (r.result, r.end.reason) == ("failed", "dropped")
+
+
+# --- spec 0051, the review's fixes --------------------------------------------------------------
+
+CALLBACK_TIME_QUESTION = "What time would work best for us to call you back?"
+
+
+class _CallbackAgent(ScriptedAgent):
+    """The double, except that a request to be called back schedules a callback with no time, so the
+    callback-time question is asked."""
+
+    def reply(self, request):
+        _, text = last_callee(request.transcript)
+        if "call me back" in text.lower():
+            return AgentReply(tool_calls=(ToolCall(id="tc_callback", name="schedule_callback",
+                                                   args={"window": None}),))
+        return super().reply(request)
+
+
+def test_quiet_clock_follows_the_open_question(make_ctx, clock, monkeypatch):  # fix 1
+    # The callback-time question asked at the digits question is the open one: the plain check-in,
+    # the plain timings, and no reply ends failed. The digits timings are long here, so using them
+    # would show.
+    events = _spy_on_events(monkeypatch)
+    ctx = make_ctx()
+    r, ws = _quiet_relay(ctx, clock, [_good_setup(), *_say(*SPOKEN, "Can you call me back later?"),
+                                      {"pause": 3 * LONG}], agent=_CallbackAgent(),
+                         quiet_seconds_last4=3.0, after_check_in_seconds_last4=3.0)
+    sent = [m["token"] for m in ws.sent]
+    asked = sent.index(CALLBACK_TIME_QUESTION)
+    assert sent[asked + 1:] == [STILL_THERE_LINE, ctx.script.goodbye()]
+    silences = _silences(events)
+    assert len(silences) == 2
+    assert _about(silences[0] - ws.sent_at[asked], Q) and _about(silences[1] - ws.sent_at[asked + 1], A)
+    assert (r.result, r.end.reason) == ("failed", "silence")
+
+
+def test_quiet_clock_has_a_hard_cap_per_wait(make_ctx, clock, monkeypatch):  # fix 2
+    # Activity that never stops (a partial transcription every 0.1 s) cannot postpone the clock
+    # forever: the Silence comes QUIET_CAP_FACTOR waits after the line, while it is still going on.
+    events = _spy_on_events(monkeypatch)
+    babble = [msg for _ in range(40) for msg in ({"pause": 0.1}, {"type": "prompt", "voicePrompt": "Um",
+                                                                  "last": False})]
+    _, ws = _quiet_relay(make_ctx(), clock, [_good_setup(), *babble, {"pause": 3 * LONG}])
+    silences = _silences(events)
+    assert silences and _about(silences[0] - ws.sent_at[0], 3 * Q)
+    assert silences[0] < ws.delivered_at[-1]
+    assert relay_module.QUIET_CAP_FACTOR == 3
+
+
+def test_quiet_clock_holds_while_the_caller_is_speaking(make_ctx, clock, monkeypatch):  # fix 3
+    # A clientSpeaking "on" with no "off" yet is a caller mid-sentence: no Silence until the "off"
+    # (it would come a wait after the "on" without the hold), then a full wait from it. The cap still
+    # applies: see the lone clientSpeaking case above.
+    events = _spy_on_events(monkeypatch)
+    wait = 0.5
+    _, ws = _quiet_relay(make_ctx(), clock, [_good_setup(), {"pause": 0.05}, _info("clientSpeaking", "on"),
+                                             {"pause": 1.2 * wait}, _info("clientSpeaking", "off"),
+                                             {"pause": 3 * LONG}], quiet_seconds=wait)
+    stopped = ws.delivered_at[-1]
+    silences = _silences(events)
+    assert silences and _about(silences[0] - stopped, wait)
+
+
+def test_a_json_null_is_ignored_not_a_timeout(make_ctx, clock, monkeypatch):  # fix 4
+    # A null frame is a malformed message, not the receive timing out: it neither submits held
+    # digits nor brings the Silence early.
+    entries = _spy_on_keypad(monkeypatch)
+    r, _ = _quiet_relay(make_ctx(), clock, [_good_setup(), *_say(*SPOKEN), *_keys("48"), None, *_keys("21#")])
+    assert entries == ["4821"] and _by_value(r)["account_last4"] == ("4821", "keypad")
+    events = _spy_on_events(monkeypatch)
+    _, ws = _quiet_relay(make_ctx(), clock, [_good_setup(), {"pause": 0.4 * Q}, None, {"pause": 3 * LONG}])
+    silences = _silences(events)
+    assert silences and _about(silences[0] - ws.sent_at[0], Q)
+
+
+def test_messages_before_setup_are_ignored(make_ctx, clock):  # fix 5
+    # Speaker events are subscribed now, so one can come before the setup. Only a setup that does not
+    # verify rejects the socket (test_bad_token_or_wrong_number_fails_closed).
+    early = [_info("agentSpeaking", "on"), _info("clientSpeaking", "on"), {"type": "mystery"}, None, ["x"]]
+    ws = FakeWS([*early, _good_setup(), *_say(*SPOKEN), *_keys("4821#")])
+    r = asyncio.run(run_relay(make_ctx(), ScriptedAgent(), ws, verify=_verify, clock=clock(), keypad_timeout=FAST))
+    assert ws.closed is False and r.result == "answers_recorded"
+    assert _by_value(r)["account_last4"] == ("4821", "keypad")
+
+
+@pytest.mark.parametrize("key", ["#", "*"])
+def test_quiet_clock_a_key_during_the_question_does_not_start_it_early(key, make_ctx, clock,
+                                                                       monkeypatch):  # fix 7
+    # A '#' or '*' at the company question means nothing there and says nothing. Pressed while the
+    # question still plays, it does not start the clock at once: the pending start (here the
+    # estimate) carries over.
+    events = _spy_on_events(monkeypatch)
+    ctx = make_ctx()
+    lead = 0.6
+    _, ws = _quiet_relay(ctx, clock, [_good_setup(), *_say("Yes, that's fine."), {"pause": 0.05}, *_keys(key),
+                                      {"pause": 3 * LONG}], estimate=_estimate(lead=lead))
+    company = [m["token"] for m in ws.sent].index(QUESTIONS[Phase.COMPANY].wording(ctx.script))
+    silences = _silences(events)
+    assert silences and _about(silences[0] - ws.sent_at[company], lead + Q)
+
+
+def test_held_digits_follow_the_keypad_wait_not_the_quiet_clock(make_ctx, clock, monkeypatch):  # D7
+    # The keypad wait is longer than the quiet wait here: with digits held, the entry still goes in
+    # at the keypad wait, and no Silence comes first.
+    events = _spy_on_events(monkeypatch)
+    keypad_wait = 2 * Q4
+    r, ws = _quiet_relay(make_ctx(), clock, [_good_setup(), *_say(*SPOKEN), *_keys("4821"), {"pause": 3 * LONG}],
+                         keypad_timeout=keypad_wait)
+    assert "Silence" not in [name for name, _ in events]
+    keypad = [at for name, at in events if name == "Keypad"]
+    assert len(keypad) == 1 and _about(keypad[0] - ws.delivered_at[-1], keypad_wait)
+    assert r.result == "answers_recorded" and _by_value(r)["account_last4"] == ("4821", "keypad")
+
+
+def test_keys_after_the_digits_check_in_are_recorded_over_the_relay(make_ctx, clock):  # C3
+    # The check-in comes about 0.3 s after the digits question, and the keys 1 s after it, well
+    # inside the long wait after the check-in.
+    ctx = make_ctx()
+    r, ws = _quiet_relay(ctx, clock, [_good_setup(), *_say(*SPOKEN), {"pause": 1.0}, *_keys("4821#")],
+                         quiet_seconds_last4=0.3, after_check_in_seconds_last4=3.0)
+    sent = [m["token"] for m in ws.sent]
+    assert DIGITS_CHECK_IN in sent and sent[-1] == ctx.script.close()
+    assert r.result == "answers_recorded" and _by_value(r)["account_last4"] == ("4821", "keypad")
+
+
+# --- spec 0094: the closing line plays before the call ends -----------------------------------
+
+REFUSE = {"type": "prompt", "voicePrompt": "No, I'd rather not.", "last": True}   # ends at consent
+
+
+def _closing_relay(ctx, clock, inbound: list, *, on_end=None, estimate=None):
+    """A call that ends at consent with the refusal line, then whatever `inbound` holds after it."""
+    ws = FakeWS([_good_setup(), REFUSE, *inbound])
+    result = asyncio.run(run_relay(ctx, ScriptedAgent(), ws, verify=_verify, clock=clock(),
+                                   greeting=ctx.script.disclosure(), on_end=on_end,
+                                   estimate=estimate or _estimate(lead=0.4)))
+    return result, ws
+
+
+def test_end_tail_is_the_spec_value():  # D2
+    assert relay_module.END_TAIL_SECONDS == 0.5
+
+
+def test_the_closing_line_is_reported_then_played_then_ended(make_ctx, clock):  # G1, G2
+    ctx = make_ctx()
+    reported: list[tuple[str, float]] = []
+    ws = FakeWS([_good_setup(), REFUSE, {"pause": LONG}])
+
+    async def on_end(result) -> None:
+        reported.append((result.result, time.monotonic()))
+        ws.log.append(("report", result.result))
+
+    r = asyncio.run(run_relay(ctx, ScriptedAgent(), ws, verify=_verify, clock=clock(),
+                              greeting=ctx.script.disclosure(), on_end=on_end, estimate=_estimate(lead=0.4)))
+    assert r.result == "answers_recorded" and r.end.reason == "consent_refused"
+    assert ws.log[-3:] == [("text", ctx.script.consent_refused()), ("report", "answers_recorded"),
+                           ("control", "end")]
+    assert ws.control == [{"type": "end"}]
+    # The report went out as the line was sent, not after the wait; the end came at the estimate.
+    assert reported[0][1] - ws.sent_at[-1] < 0.2
+    assert _about(ws.control_at[0] - ws.sent_at[-1], 0.4)
+
+
+def test_a_slow_report_does_not_move_the_end(make_ctx, clock):  # G2, D2 (review fix)
+    # The estimate counts from the send, not from when the report returns: a report that takes 1.0 s of a
+    # 1.2 s estimate still sees the end at about 1.2 s from the line (counting from the report would give
+    # 2.2 s, past the slack).
+    async def slow_report(result) -> None:
+        await asyncio.sleep(1.0)
+
+    _, ws = _closing_relay(make_ctx(), clock, [{"pause": 3.0}], on_end=slow_report, estimate=_estimate(lead=1.2))
+    assert ws.control == [{"type": "end"}] and _about(ws.control_at[0] - ws.sent_at[-1], 1.2)
+
+
+def test_a_hang_up_at_the_closing_line_still_reports(make_ctx, clock):  # G9 (review fix)
+    # The caller hangs up as the closing line goes out, so sending it fails. The call still reports
+    # (no wait for the core's call_timeout), and nothing more is sent.
+    class HungUp(FakeWS):
+        async def send_json(self, obj: dict) -> None:
+            if obj.get("token") == make_ctx().script.consent_refused():
+                raise WSClosed("the caller hung up")
+            await super().send_json(obj)
+
+    results: list = []
+
+    async def on_end(result) -> None:
+        results.append(result)
+
+    ctx = make_ctx()
+    ws = HungUp([_good_setup(), REFUSE, {"pause": LONG}])
+    r = asyncio.run(run_relay(ctx, ScriptedAgent(), ws, verify=_verify, clock=clock(), greeting=ctx.script.disclosure(),
+                              on_end=on_end, estimate=_estimate(lead=5.0)))
+    assert results == [r] and r.result == "answers_recorded" and r.end.reason == "consent_refused"
+    assert ws.control == []
+
+
+@pytest.mark.parametrize(("inbound", "lead", "why"), [
+    ([{"pause": 0.05}, _info("agentSpeaking", "on"), {"pause": 0.05}, _info("agentSpeaking", "off"), {"pause": 5.0}],
+     3.0, "agent_stopped"),                                  # the "off" plus the tail comes before the estimate
+    ([{"pause": LONG}], 0.4, "estimate"),
+    ([], 3.0, "dropped"),
+])
+def test_the_wait_logs_what_ended_it(inbound, lead, why, make_ctx, clock, caplog):  # G10 (review fix)
+    caplog.set_level("INFO", logger="dialback_voice.twilio.relay")
+    _closing_relay(make_ctx(), clock, inbound, estimate=_estimate(lead=lead))
+    lines = [rec.getMessage() for rec in caplog.records if rec.name == "dialback_voice.twilio.relay"]
+    assert f"closing line: the wait ended ({why})" in lines
+
+
+def test_end_follows_the_agent_stopping_or_the_estimate(make_ctx, clock):  # G3
+    on, off = _info("agentSpeaking", "on"), _info("agentSpeaking", "off")
+    # With an "on" then an "off" after the line, the end follows the "off" by the tail, long before
+    # the 3-second estimate.
+    _, ws = _closing_relay(make_ctx(), clock, [{"pause": 0.05}, on, {"pause": 0.2}, off, {"pause": 5.0}],
+                           estimate=_estimate(lead=3.0))
+    stopped = ws.delivered_at[-1]
+    assert ws.control == [{"type": "end"}]
+    assert _about(ws.control_at[0] - stopped, relay_module.END_TAIL_SECONDS)
+    # A lone "off", with no "on" since the line was sent, doesn't end it: the estimate does.
+    _, ws = _closing_relay(make_ctx(), clock, [{"pause": 0.05}, off, {"pause": 3.0}], estimate=_estimate(lead=0.6))
+    assert ws.control == [{"type": "end"}] and _about(ws.control_at[0] - ws.sent_at[-1], 0.6)
+    # With no speaker events at all, the end comes at the estimate.
+    _, ws = _closing_relay(make_ctx(), clock, [{"pause": 3.0}], estimate=_estimate(lead=0.6))
+    assert ws.control == [{"type": "end"}] and _about(ws.control_at[0] - ws.sent_at[-1], 0.6)
+
+
+def test_input_while_the_closing_line_plays_changes_nothing(make_ctx, clock):  # G4
+    quiet, _ = _closing_relay(make_ctx(), clock, [{"pause": 3.0}])
+    noisy, ws = _closing_relay(make_ctx(), clock, [{"pause": 0.05}, *_say("Wait, actually yes."), *_keys("4821#"),
+                                                   {"pause": 3.0}])
+    assert (noisy.result, noisy.end) == (quiet.result, quiet.end)
+    assert noisy.answers == quiet.answers and noisy.checks == quiet.checks
+    assert [(t.speaker, t.text) for t in noisy.transcript] == [(t.speaker, t.text) for t in quiet.transcript]
+    assert ws.sent[-1]["token"] == make_ctx().script.consent_refused()   # nothing more was said
+    assert ws.control == [{"type": "end"}]
+
+
+def test_a_drop_while_the_closing_line_plays_sends_no_end(make_ctx, clock):  # G5
+    started = time.monotonic()
+    r, ws = _closing_relay(make_ctx(), clock, [{"pause": 0.1}], estimate=_estimate(lead=5.0))
+    assert time.monotonic() - started < 2.0                  # the drop ended the wait, not the 5-second estimate
+    assert r.result == "answers_recorded" and ws.control == []
+
+
+def test_a_failed_report_still_plays_the_closing_line(make_ctx, clock):  # G6
+    import datetime as dt
+
+    from dialback_voice.app import CallDial, TwilioDeps, run_relay_call
+
+    dial = CallDial(case_id=CASE, attempt=ATTEMPT, number_e164=NUMBER, customer_name="Northwind Traders",
+                    callback_number="(415) 555-0100", vendor_names=("Acme Fasteners",))
+
+    class CoreDown(Exception):
+        pass
+
+    async def report(body: dict) -> None:
+        raise CoreDown("the core did not take the report")
+
+    deps = TwilioDeps(call_token_key=KEY, twilio_auth_token=b"auth", ws_base_url="wss://voice.example",
+                      public_base_url="https://voice.example", from_number="+14155550100", originator=None,
+                      lookup_call=lambda cid: dial if cid == CALL else None, report_ended=report,
+                      agent_for=ScriptedAgent, clock=lambda: dt.datetime(2026, 11, 1, 17, 0, tzinfo=dt.UTC))
+    on, off = _info("agentSpeaking", "on"), _info("agentSpeaking", "off")
+    ws = FakeWS([_good_setup(), REFUSE, {"pause": 0.05}, on, {"pause": 0.1}, off, {"pause": 5.0}])
+    with pytest.raises(CoreDown):
+        asyncio.run(run_relay_call(deps, CALL, ws))
+    assert ws.control == [{"type": "end"}]                   # the line still played, and the call still ended
+
+
+def test_no_closing_line_or_a_rejected_setup_sends_no_end(make_ctx, clock):  # G7
+    results: list = []
+
+    async def on_end(result) -> None:
+        results.append(result)
+
+    # A rejected setup: closed at once, reported, nothing spoken, no end.
+    ws = FakeWS([_setup("deadbeef"), {"pause": 5.0}])
+    started = time.monotonic()
+    r = asyncio.run(run_relay(make_ctx(), ScriptedAgent(), ws, verify=_verify, clock=clock(), on_end=on_end,
+                              estimate=_estimate(lead=5.0)))
+    assert time.monotonic() - started < 2.0
+    assert ws.closed is True and ws.sent == [] and ws.control == []
+    assert results == [r] and r.result == "failed"
+    # A call that ends with nothing to say (the caller hung up mid-call): no wait, no end.
+    results.clear()
+    ws = FakeWS([_good_setup(), *_say("Yes, that's fine.")])
+    started = time.monotonic()
+    r = asyncio.run(run_relay(make_ctx(), ScriptedAgent(), ws, verify=_verify, clock=clock(), on_end=on_end,
+                              estimate=_estimate(lead=5.0)))
+    assert time.monotonic() - started < 2.0
+    assert r.result == "failed" and r.end.reason == "dropped" and ws.control == [] and results == [r]

@@ -14,7 +14,7 @@ from hypothesis import strategies as st
 
 def test_a_clean_confirmation_is_verified_with_every_condition_named():
     d = decide(GOOD)
-    assert d.outcome == "verified" and d.engine_version == ENGINE_VERSION == "decision-1.0.0"
+    assert d.outcome == "verified" and d.engine_version == ENGINE_VERSION == "decision-1.2.0"   # spec 0080, B5
     assert d.rules_fired == tuple(r.id for r in rules.VERIFIED)
     assert all("safe" not in s.lower() for s in d.explanation)
 
@@ -29,8 +29,10 @@ def test_blocks_run_in_order_and_the_first_with_a_match_decides():
 
 
 def test_unknown_facts_fail_closed():
+    # company_matches is not here: an unknown company answer no longer blocks (spec 0082, D7b, and
+    # test_rules.py::test_the_company_answer_is_not_required_to_verify).
     for unknown in ("speaker_in_change_thread", "same_person_yes_and_digits", "dialed_out", "answered_by", "consent_first",
-                    "company_matches", "checks", "last_four_result"):
+                    "checks", "last_four_result"):
         assert decide(replace(GOOD, **{unknown: None})).outcome == "needs_review", unknown
 
 
@@ -152,6 +154,8 @@ def test_decide_is_total_and_never_verifies_on_what_it_didnt_check(facts, strict
         assert facts.last_four_result == "match" and set(facts.change_requested) == {"yes"} and source == "call"
         assert facts.same_person_yes_and_digits is True and facts.dialed_out is True and facts.dialed_number_is_pick is True
         assert not any("no" in c.change_requested for c in facts.earlier_calls if rules.consented(c))
+        assert facts.company_matches is not False, "a refusal in the company answer never verifies (NR03)"
+    assert not set(d.rules_fired) & set(RETIRED), "a retired id is never recorded again"
 
 
 def test_the_property_reaches_verified():

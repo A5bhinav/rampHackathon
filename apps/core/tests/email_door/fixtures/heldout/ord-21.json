@@ -1,0 +1,8 @@
+{
+  "subject": "Fraud watch: new BEC variant",
+  "sender": "Payments Weekly <editor@paymentsweekly.example>",
+  "text": "Researchers report a rise in emails that impersonate vendors and ask finance teams to\nchange bank details. Read how to protect your team.",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Newsletter about BEC, not an instance."
+}

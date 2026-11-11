@@ -1,0 +1,8 @@
+{
+  "subject": "October statement and where to wire",
+  "sender": "Cobalt AR <ar@cobalt.example>",
+  "text": "Cobalt Freight LLC statement attached. Total open: $6,210.00.\n\nWire or ACH to routing 021000021, account 000077778888, same as every statement we have sent. Please disregard any message that tells you otherwise unless it comes through your account manager.",
+  "label": "ordinary",
+  "vendor": "cobalt",
+  "note": "Statement with full on-file details and a fraud warning; no change requested."
+}

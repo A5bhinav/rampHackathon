@@ -1,0 +1,8 @@
+{
+  "subject": "Question about my invoice",
+  "sender": "Lena Fischer <lena@fischer-studio.example>",
+  "text": "Hello, my invoice from September still shows unpaid in my records. Could you look into it?",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Status."
+}

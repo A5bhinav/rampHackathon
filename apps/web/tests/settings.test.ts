@@ -40,7 +40,7 @@ test("people: the signed-in person, the demo accounts when demo sign-in is on, e
   assert.deepEqual(peopleRows(me, false).map((p) => p.name), ["Riley Approver"]);
   const demo = peopleRows(me, true);
   assert.deepEqual(demo.map((p) => p.name), ["Riley Approver", "Demo clerk", "Demo approver"]);
-  assert.equal(demo[1].roles, "clerk");
+  assert.equal(demo[1].roles, "Clerk");
 });
 
 test("rules & policy with no case: nothing invented", () => {

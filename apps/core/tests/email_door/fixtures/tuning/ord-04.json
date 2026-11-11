@@ -1,0 +1,8 @@
+{
+  "subject": "Invoice PP-2209",
+  "sender": "billing@pinecrest-printing.example",
+  "text": "Pinecrest Printing\nInvoice PP-2209\nAmount due: $1,206.15\nTerms: Net 15\nPay by ACH or check to the address and account on your vendor record.",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Invoice referring to vendor record."
+}

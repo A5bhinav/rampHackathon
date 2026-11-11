@@ -1,0 +1,89 @@
+{
+  "name": "g4-fax-label-number-6683e0ab",
+  "patterns": [
+    "G3/fax/label_number",
+    "G4/fax/label_number"
+  ],
+  "why": "G4/fax/label_number: shrunk from doc-s0-00166, found by lab docs at seed 0 in 1000 documents",
+  "violations": [
+    {
+      "pattern": "G3/fax/label_number",
+      "number": "+16455550101",
+      "detail": "claim fax, customer labeled fax, vendor"
+    },
+    {
+      "pattern": "G4/fax/label_number",
+      "number": "+16455550101",
+      "detail": "claim fax, customer labeled fax, vendor"
+    }
+  ],
+  "plan": {
+    "type": "doc",
+    "id": "doc-s0-00166",
+    "kind": "signature_block",
+    "author": "customer",
+    "channel": "email",
+    "sender": "ap@customer.example",
+    "thread": "t-doc-s0-00166",
+    "subject": "Quick question",
+    "received_at": "2025-11-28T16:00:00+00:00",
+    "filler": [],
+    "numbers": [
+      {
+        "e164": "+16455550101",
+        "owner": "customer",
+        "role": "fax",
+        "party": "customer",
+        "phrasing": "fax",
+        "placement": "label_number",
+        "format": "paren",
+        "visibility": "visible",
+        "shares_line": false
+      }
+    ],
+    "quote": null
+  },
+  "documents": [
+    {
+      "id": "doc-s0-00166",
+      "kind": "signature_block",
+      "custody": {
+        "channel": "email",
+        "received_at": "2025-11-28T16:00:00+00:00",
+        "sender": "ap@customer.example",
+        "thread_id": "t-doc-s0-00166",
+        "subject": "Quick question",
+        "parent_document_id": null
+      },
+      "pages": [
+        {
+          "width": 612,
+          "height": 792,
+          "spans": [
+            {
+              "text": "Message",
+              "x": 72,
+              "y": 72,
+              "size": 10,
+              "color": "#000000"
+            },
+            {
+              "text": "Example Customer Co",
+              "x": 72,
+              "y": 86,
+              "size": 10,
+              "color": "#000000"
+            },
+            {
+              "text": "Fax: (645) 555-0101",
+              "x": 72,
+              "y": 100,
+              "size": 10,
+              "color": "#000000"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

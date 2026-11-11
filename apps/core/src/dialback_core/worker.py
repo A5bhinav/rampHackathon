@@ -1,7 +1,8 @@
 """The core worker: runs every queued command exactly once and fires due timers (ADR-3).
 
-One tick: process stored webhooks, run due scheduled jobs (spec 0003), fire due timers, run
-due commands. Each command is
+One tick: process stored Ramp webhooks, run due scheduled jobs (spec 0003), fire due timers, run
+due commands, then process stored emails (spec 0085, last and time-bounded). An error in either
+inbound step ends that step only. Each command is
 claimed in its own short transaction (FOR UPDATE SKIP LOCKED, with a lease so a crashed
 worker's command is picked up again), run with Ramp and voice calls outside any
 transaction, then finished in a second transaction:
@@ -19,20 +20,24 @@ from __future__ import annotations
 import asyncio
 import datetime as dt
 import logging
+from collections.abc import Awaitable
 from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
 
-from dialback_decision import CallChecks, decide
-from dialback_decision.facts import earlier_call, facts_from_answers, values
+from dialback_decision import decide
+from dialback_decision.facts import values
 from psycopg import AsyncConnection
 from psycopg.types.json import Jsonb
 from psycopg_pool import AsyncConnectionPool
 
+from .call_facts import call_facts
 from .calling_window import CallingWindow
-from .company import every_name_matches
 from .db import dataset_now, system_tx
 from .detection import Keys, process_inbound_webhooks
+from .email_door.classifier import ChangeClassifier
+from .email_door.inbox import process_inbound_emails
+from .email_door.resend import ResendPort
 from .events import TransitionRefused, apply_event
 from .jobs import Jobs, unique_worker_name
 from .ports import CallerError, CallPlacer, ChangeContext, LedgerChangeContext, NumberResolver, PreDialRefused
@@ -121,8 +126,11 @@ select type, body_jcs::jsonb -> 'body' as body
 class Worker:
     def __init__(self, pool: AsyncConnectionPool, settings: Settings, connector: RampConnector, resolver: NumberResolver,
                  caller: CallPlacer, name: str | None = None, sleep=asyncio.sleep,
-                 change_context: ChangeContext | None = None) -> None:
+                 change_context: ChangeContext | None = None, resend: ResendPort | None = None,
+                 classifier: ChangeClassifier | None = None) -> None:
         self.pool, self.settings, self.connector = pool, settings, connector
+        self.resend = resend
+        self.classifier = classifier   # the email door's model, with DIALBACK_EMAIL_CLASSIFIER=model only
         self.resolver, self.caller, self.name, self._sleep = resolver, caller, name or unique_worker_name(), sleep
         self.change_context = change_context or LedgerChangeContext()
         self.keys = Keys(settings.fingerprint_key, settings.fingerprint_key_version)
@@ -137,12 +145,28 @@ class Worker:
     # The loop ---------------------------------------------------------------------------------
 
     async def tick(self, dataset_id: UUID | None = None) -> int:
-        done = await process_inbound_webhooks(self.pool, self.connector, self.keys, dataset_id=dataset_id)
+        done = await self._contained("Ramp webhook", process_inbound_webhooks(self.pool, self.connector, self.keys,
+                                                                              dataset_id=dataset_id))
         if self.settings.run_jobs:
             done += await self.jobs.run_due(dataset_id)  # the poller and reconciliation (spec 0003)
         done += await self.fire_timers(dataset_id)
         done += await self.run_commands(dataset_id)
+        # The email door last (spec 0085; final review finding I1): its fetches and model calls are slow and
+        # can fail, so it runs after the holds, calls and releases, within its own time budget.
+        if self.resend is not None:
+            done += await self._contained("email", process_inbound_emails(self.pool, self.settings, self.resend, self.keys,
+                                                                          dataset_id=dataset_id, classifier=self.classifier))
         return done
+
+    @staticmethod
+    async def _contained(step: str, work: Awaitable[int]) -> int:
+        """Run one inbound step; an error ends that step only, never the tick, so the commands still run (R1).
+        Only the error's type name is logged: its message can hold a webhook's or an email's values (ADR-8)."""
+        try:
+            return await work
+        except Exception as exc:  # noqa: BLE001  contained; the step runs again next tick
+            log.warning("worker: the %s step failed: %s", step, type(exc).__name__)
+            return 0
 
     async def drain(self, dataset_id: UUID | None = None, max_ticks: int = 50) -> int:
         """Tick until nothing is due. For tests, the smoke run and the lab."""
@@ -367,33 +391,11 @@ class Worker:
         answers = (body.get("answers") or {}).get("answers") or []
         async with system_tx(self.pool) as conn:
             generation = await (await conn.execute(GENERATION, (case["id"], case["version"]))).fetchall()
-        picks = [e["body"].get("contact_point_id") for e in generation if e["type"] == "number_resolved"]
-        # Only this version's pick counts, and a report that doesn't name it isn't eligible (D1).
-        dialed_eligible = bool(picks) and body.get("contact_point_id") == picks[-1]
-        # Earlier calls can count against the change, never for it (D2).
-        earlier = tuple(earlier_call(e["body"]) for e in generation
-                        if e["type"] == "call_ended" and e["body"].get("call_id") != body.get("call_id"))
         context = await self.change_context.check(
             case_id=case["id"], dataset_id=case["dataset_id"], vendor_id=case["vendor_id"],
             cutoff=case["ramp_changed_at"] or case["detected_at"],
             speaker_names=values(answers, "speaker_name"), offered_numbers=values(answers, "offered_number"))
-        checks = body.get("checks")
-        facts = facts_from_answers(
-            answers,
-            call_result=body["result"],
-            dialed_eligible_number=dialed_eligible,
-            last_four_result=body.get("last_four_result"),
-            company_matches=every_name_matches(values(answers, "company_named"), case["legal_name"], case["trade_names"] or ()),
-            checks=CallChecks(**checks) if checks else None,
-            earlier_calls=earlier,
-            dialed_out=None if body.get("direction") is None else body["direction"] == "outbound",
-            dialed_number_is_pick=body.get("dialed_number_is_pick"),
-            answered_by=body.get("answered_by"),
-            speaker_in_change_thread=context.speaker_in_change_thread,
-            offered_number_from_request=context.offered_number_from_request,
-            speaker_known_before_request=context.speaker_known_before_request,
-        )
-        decision = decide(facts)
+        decision = decide(call_facts(body, case, generation, context))   # the pick, earlier calls, company (D1, D2)
         await self._emit(case, "decision_made", f"{cmd.key}:made", decision.body())
 
     # release_hold ------------------------------------------------------------------------------

@@ -92,6 +92,13 @@ def anyio_backend():
     return "asyncio"
 
 
+@pytest.fixture(autouse=True)
+def _stub_ledger_reader(monkeypatch):
+    """The ledger's reader comes from DIALBACK_READER (spec 0049), and `demo prepare` loads the
+    ledger with it: core tests use the stub, so they never send a document to the model."""
+    monkeypatch.setenv("DIALBACK_READER", "stub")
+
+
 @pytest.fixture
 async def pool(database_url):
     p = await open_pool(database_url, max_size=6)

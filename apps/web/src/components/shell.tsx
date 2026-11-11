@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { AlertBanners } from "./alerts";
+import { AlertChip } from "./alerts";
 import { BrandMark, Crumbs, NavLinks } from "./nav";
 import { ViewingAs } from "./viewing-as";
 import type { Dataset, Me } from "@/lib/api-types";
 import { canSeeControl, navFor, switchTargets, type AppKey } from "@/lib/apps";
+import { isAdmin, roleLabels } from "@/lib/people";
 import { presentLinks } from "@/lib/live-call";
 import { demoAccounts } from "@/lib/auth-mode";
 import { CoreError, core } from "@/lib/core";
@@ -51,6 +52,12 @@ export async function Shell({ app, datasetId, children }: { app: AppKey; dataset
               <NavLinks links={[{ href: `/d/${datasetId}/ramp`, label: "Ramp (mock)", icon: "card" }]} />
             </>
           ) : null}
+          {app === "control" && isAdmin(me.roles) ? (
+            <>
+              <p className="side-group">Admin</p>
+              <NavLinks links={[{ href: `/d/${datasetId}/control/demo`, label: "Demo controls", icon: "lock" }]} />
+            </>
+          ) : null}
         </nav>
         <div className="side-foot side-desk">
           {current ? <p className="side-status"><span className="dot" aria-hidden="true" />Ramp Bill Pay · {current.kind} dataset</p> : null}
@@ -59,7 +66,8 @@ export async function Shell({ app, datasetId, children }: { app: AppKey; dataset
       </aside>
       <div className="main-col">
         <div className="utilbar">
-          <Crumbs datasetId={datasetId} />
+          <Crumbs datasetId={datasetId} app={app} />
+          <AlertChip alerts={alerts} datasetId={datasetId} />
           {present.length ? (
             <details className="present">
               <summary>Present</summary>
@@ -68,7 +76,6 @@ export async function Shell({ app, datasetId, children }: { app: AppKey; dataset
           ) : null}
           {demo ? <ViewingAs active={me.roles.includes("approver") ? "approver" : "clerk"} /> : null}
         </div>
-        <AlertBanners alerts={alerts} datasetId={datasetId} />
         {children}
       </div>
     </div>
@@ -98,7 +105,7 @@ function Person({ me }: { me: Me }) {
       <span className="avatar" aria-hidden="true">{initials(me.display_name)}</span>
       <span className="person-text">
         <strong>{me.display_name}</strong>
-        <span className="person-role">{me.roles.join(", ") || "no role"}</span>
+        <span className="person-role">{roleLabels(me.roles)}</span>
         {/* The team grants approver by this id (spec 0027), so the person can read it here. */}
         <span className="mono person-id" title="Your user ID: give it to the team to be made an approver">ID {me.user_id}</span>
       </span>

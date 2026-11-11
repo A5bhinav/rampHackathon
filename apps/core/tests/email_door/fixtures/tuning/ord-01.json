@@ -1,0 +1,8 @@
+{
+  "subject": "Invoice 1744 from Acme Fasteners LLC",
+  "sender": "Dana Whitfield <ar@acme.example>",
+  "text": "Hello,\n\nPlease find invoice 1744 attached for $4,820.00, net 30.\n\nRemit by ACH to the account we have on file with you (routing 021000021, account ending 2222).\n\nThank you for your business.",
+  "label": "ordinary",
+  "vendor": "acme",
+  "note": "Invoice listing the account already on file; no change."
+}

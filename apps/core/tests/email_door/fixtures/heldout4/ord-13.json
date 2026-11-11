@@ -1,0 +1,8 @@
+{
+  "subject": "Remittance advice email",
+  "sender": "Sheila Novak <snovak@brightlineoffice.com>",
+  "text": "Hi Renee, could you start sending your remittance advices to cashapps@brightlineoffice.com instead of to me? I'm getting buried. Payment itself stays exactly as is, this is just where the PDF goes.\n\nThanks!\nSheila",
+  "label": "ordinary",
+  "vendor": "brightline",
+  "note": "Only the notification email moves; the money does not."
+}

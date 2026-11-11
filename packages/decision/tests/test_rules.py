@@ -8,6 +8,7 @@ from dataclasses import replace
 import pytest
 from conftest import CLEAN, GOOD
 from dialback_decision import decide, rules
+from dialback_decision.engine import RETIRED, TEMPLATES
 from dialback_decision.facts import EarlierCall
 
 CONSENTED = ("yes",)
@@ -58,6 +59,7 @@ ALSO = [
     ("NR97_facts_invalid", {"earlier_calls": (EarlierCall(result="failed", last_four_result="close"),)}),
     ("NR97_facts_invalid", {"earlier_calls": (EarlierCall(result="failed", flags=("approve_now",)),)}),
     ("NR97_facts_invalid", {"extra": ["not", "a", "dict"]}),
+    ("NR97_facts_invalid", {"digits_typed": 1}), ("NR97_facts_invalid", {"digits_typed": None}),   # spec 0080, B4
     ("NV01_vendor_denied_change", {"earlier_calls": (EarlierCall(result="failed", recording_consent=CONSENTED,
                                                                  change_requested=("no",)),)}),
     ("NV02_digits_mismatch", {"earlier_calls": (EarlierCall(result="failed", recording_consent=CONSENTED,
@@ -84,7 +86,6 @@ UNMET = {
     "V02_outbound_dial": {"dialed_number_is_pick": None},
     "V03_live_person": {"answered_by": None},
     "V04_recording_consent": {"recording_consent": ()},
-    "V05_company_matches": {"company_matches": None},
     "V06_speaker_identified": {"speaker_role": ()},
     "V07_right_person_confirmed": {"speaker_in_change_thread": None},
     "V08_digits_match": {"last_four_result": None},
@@ -132,7 +133,7 @@ def test_every_rule_in_the_table_has_a_case():
     table = {r.id for r in (*rules.BLOCK0, *rules.NOT_VERIFIED, *rules.NEEDS_REVIEW)}
     assert table | {"NR97_facts_invalid", "NR99_conditions_not_met"} == set(FIRES)
     assert {r.id for r in (*rules.VERIFIED, *rules.STRICT)} == set(UNMET)
-    assert len(rules.NOT_VERIFIED) == 4 and len(rules.VERIFIED) == 12
+    assert len(rules.NOT_VERIFIED) == 4 and len(rules.VERIFIED) == 11, "V05 retired (spec 0082, D7b)"
     assert len(rules.NEEDS_REVIEW) + len(rules.BLOCK0) == 21, "NR01-NR21"
 
 
@@ -177,4 +178,66 @@ def test_every_rule_an_answer_feeds_exists():
                                "change_requested", "account_last4", "offered_number", "flag"}
     assert {i for feeds in (*SLOT_RULES.values(), *EARLIER_SLOT_RULES.values()) for i in feeds} <= ids
     assert "V09_same_person" not in SLOT_RULES["account_last4"], "same_person reads names and the change answer only"
+    assert "V03_live_person" in SLOT_RULES["account_last4"], "V03 reads the digits' capture method (spec 0080, B)"
     assert {"V09_same_person", "NR17_split_speakers"} <= set(SLOT_RULES["change_requested"])
+
+
+# Spec 0082, D7b (B10): the company answer is no longer required to verify. Only a refusal word
+# (company_matches False) blocks, through NR03; no answer, a short or garbled one, or another
+# company's name (None) blocks nothing.
+
+ELEVEN = ("V01_number_eligible", "V02_outbound_dial", "V03_live_person", "V04_recording_consent", "V06_speaker_identified",
+          "V07_right_person_confirmed", "V08_digits_match", "V09_same_person", "V10_answers_grounded", "V11_script_clean",
+          "V12_no_flags")
+
+
+@pytest.mark.parametrize("company_matches", [None, True], ids=["unknown", "named"])
+def test_the_company_answer_is_not_required_to_verify(company_matches):
+    for strict, extra in ((False, ()), (True, ("S01_known_contact",))):
+        d = decide(replace(GOOD, company_matches=company_matches), strict=strict)
+        assert (d.outcome, d.rules_fired) == ("verified", (*ELEVEN, *extra))
+    assert decide(replace(GOOD, company_matches=False)).rules_fired == ("NR03_wrong_company",), "a refusal still blocks"
+
+
+def test_v05_is_retired_and_its_ids_still_render():
+    table = (*rules.BLOCK0, *rules.NOT_VERIFIED, *rules.NEEDS_REVIEW, *rules.VERIFIED, *rules.STRICT)
+    current = {r.id for r in table} | {r.unmet_id for r in (*rules.VERIFIED, *rules.STRICT)} | set(rules.FIXED)
+    for retired, sentence in (("V05_company_matches", "The person named this vendor."),
+                              ("V05_company_matches_unmet", "The person did not clearly name this vendor.")):
+        assert retired not in current, f"{retired} never comes back as a current id"
+        assert RETIRED[retired] == TEMPLATES[retired] == sentence, "old decisions still render"
+
+
+def test_nr03_has_its_new_sentence_and_is_the_company_answers_only_rule():
+    # True under both meanings NR03 has had, so a decision-1.0.0 decision that recorded it (a company answer
+    # that didn't match) doesn't read as the vendor denying it (review fix, Nov 10).
+    assert TEMPLATES["NR03_wrong_company"] == \
+        "The company answer did not name this vendor, or said the person is not with it or only works with it."
+    assert rules.SLOT_RULES["company_named"] == ("NR03_wrong_company",)
+
+
+def test_an_unknown_label_verifies_only_with_typed_digits():  # spec 0080, Part B, B2 and B3
+    unknown = replace(GOOD, answered_by=None, digits_typed=True)
+    # Label absent, digits typed and matching, everything else clean: verified, with V03 met.
+    d = decide(unknown)
+    assert (d.outcome, d.rules_fired) == ("verified", ELEVEN)
+    # Typed digits that are wrong still decide as before.
+    assert (decide(replace(unknown, last_four_result="mismatch")).outcome,
+            decide(replace(unknown, last_four_result="mismatch")).rules_fired) == ("not_verified", ("NV02_digits_mismatch",))
+    old = decide(replace(unknown, last_four_result="matches_old_account"))
+    assert (old.outcome, old.rules_fired) == ("not_verified", ("NV03_digits_match_old_account",))
+    # Spoken digits, or none: still a person's review, with V03 unmet.
+    spoken = decide(replace(unknown, digits_typed=False))
+    assert (spoken.outcome, spoken.rules_fired) == ("needs_review", (rules.NOT_MET, "V03_live_person_unmet"))
+    # No digits, as production records it: not_provided, so NR06 decides (review fix: the spec's B2 said V03).
+    no_digits = decide(replace(unknown, digits_typed=False, last_four_result="not_provided"))
+    assert no_digits.rules_fired == ("NR06_digits_not_provided",)
+    # And defensively, typed digits with no comparison at all still don't satisfy V03.
+    none = decide(replace(unknown, last_four_result=None))
+    assert none.outcome == "needs_review" and "V03_live_person_unmet" in none.rules_fired
+    # The not-met sentence is unchanged, so it stays true for a decision-1.1.0 decision that recorded it:
+    # the API and the decision page render today's sentence for every engine version (review fix).
+    assert TEMPLATES["V03_live_person_unmet"] == "We could not confirm a person, not a machine, answered."
+    # A machine label still goes to review, typed digits or not; a human label doesn't need them.
+    assert decide(replace(unknown, answered_by="machine")).rules_fired == ("NR01_no_live_person",)
+    assert GOOD.digits_typed is False and decide(GOOD).outcome == "verified"

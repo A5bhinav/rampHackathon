@@ -1,0 +1,8 @@
+{
+  "subject": "Your October statement",
+  "sender": "Statements <statements@lumen-wholesale.example>",
+  "text": "Account statement for October.\n\nOpening balance: $2,401.00\nNew invoices: $3,115.20\nPayments received: $2,401.00\nClosing balance: $3,115.20\n\nRemit to our standard payment details, shown on every invoice.",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Statement, no bank change."
+}
