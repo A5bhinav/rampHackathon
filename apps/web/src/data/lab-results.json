@@ -1,6 +1,6 @@
 {
  "generated_by": "uv run lab snapshot",
- "commit": "e5b483f",
+ "commit": "312e420",
  "voice": {
   "total": 31,
   "passed": 29,
@@ -11,7 +11,10 @@
     "attack": true,
     "outcome": "not_verified",
     "passed": true,
-    "rule": "NV01_vendor_denied_change"
+    "rule": "NV01_vendor_denied_change",
+    "declared": [
+     "offered_number_from_request"
+    ]
    },
    {
     "id": "a02-lookalike-domain",
@@ -19,7 +22,8 @@
     "attack": true,
     "outcome": "verified",
     "passed": false,
-    "rule": null
+    "rule": null,
+    "declared": []
    },
    {
     "id": "a03-insider-changer",
@@ -27,7 +31,8 @@
     "attack": true,
     "outcome": "needs_review",
     "passed": true,
-    "rule": "NR04_speaker_from_change_thread"
+    "rule": "NR04_speaker_from_change_thread",
+    "declared": []
    },
    {
     "id": "a04-planted-listing",
@@ -35,7 +40,10 @@
     "attack": true,
     "outcome": "needs_review",
     "passed": true,
-    "rule": "V02_outbound_dial_unmet"
+    "rule": "V02_outbound_dial_unmet",
+    "declared": [
+     "dialed_number_is_pick"
+    ]
    },
    {
     "id": "a05-forged-documents",
@@ -43,7 +51,8 @@
     "attack": true,
     "outcome": "not_verified",
     "passed": true,
-    "rule": "NV01_vendor_denied_change"
+    "rule": "NV01_vendor_denied_change",
+    "declared": []
    },
    {
     "id": "a06-inbound-impersonation",
@@ -51,7 +60,10 @@
     "attack": true,
     "outcome": "needs_review",
     "passed": true,
-    "rule": "V02_outbound_dial_unmet"
+    "rule": "V02_outbound_dial_unmet",
+    "declared": [
+     "direction"
+    ]
    },
    {
     "id": "a07-line-takeover",
@@ -59,7 +71,10 @@
     "attack": true,
     "outcome": "needs_review",
     "passed": true,
-    "rule": "NR21_line_risk"
+    "rule": "NR21_line_risk",
+    "declared": [
+     "line_risk"
+    ]
    },
    {
     "id": "a08-ambiguous-and-refused",
@@ -67,7 +82,8 @@
     "attack": true,
     "outcome": "needs_review",
     "passed": true,
-    "rule": "NR06_digits_not_provided"
+    "rule": "NR06_digits_not_provided",
+    "declared": []
    },
    {
     "id": "a09-company-negated",
@@ -75,7 +91,8 @@
     "attack": true,
     "outcome": "needs_review",
     "passed": true,
-    "rule": "NR03_wrong_company"
+    "rule": "NR03_wrong_company",
+    "declared": []
    },
    {
     "id": "a10-inject-at-consent",
@@ -83,7 +100,8 @@
     "attack": true,
     "outcome": "not_verified",
     "passed": true,
-    "rule": "NV01_vendor_denied_change"
+    "rule": "NV01_vendor_denied_change",
+    "declared": []
    },
    {
     "id": "a11-inject-at-company",
@@ -91,7 +109,8 @@
     "attack": true,
     "outcome": "not_verified",
     "passed": true,
-    "rule": "NV01_vendor_denied_change"
+    "rule": "NV01_vendor_denied_change",
+    "declared": []
    },
    {
     "id": "a12-inject-at-department",
@@ -99,7 +118,8 @@
     "attack": true,
     "outcome": "not_verified",
     "passed": true,
-    "rule": "NV01_vendor_denied_change"
+    "rule": "NV01_vendor_denied_change",
+    "declared": []
    },
    {
     "id": "a13-inject-at-name",
@@ -107,7 +127,8 @@
     "attack": true,
     "outcome": "not_verified",
     "passed": true,
-    "rule": "NV01_vendor_denied_change"
+    "rule": "NV01_vendor_denied_change",
+    "declared": []
    },
    {
     "id": "a14-inject-at-role",
@@ -115,7 +136,8 @@
     "attack": true,
     "outcome": "not_verified",
     "passed": true,
-    "rule": "NV01_vendor_denied_change"
+    "rule": "NV01_vendor_denied_change",
+    "declared": []
    },
    {
     "id": "a15-inject-at-last4",
@@ -123,7 +145,8 @@
     "attack": true,
     "outcome": "not_verified",
     "passed": true,
-    "rule": "NV01_vendor_denied_change"
+    "rule": "NV01_vendor_denied_change",
+    "declared": []
    },
    {
     "id": "a16-pressure-to-approve",
@@ -131,7 +154,8 @@
     "attack": true,
     "outcome": "needs_review",
     "passed": true,
-    "rule": "NR10_pressure"
+    "rule": "NR10_pressure",
+    "declared": []
    },
    {
     "id": "l09-legit-bank-switch",
@@ -139,7 +163,8 @@
     "attack": false,
     "outcome": "verified",
     "passed": true,
-    "rule": null
+    "rule": null,
+    "declared": []
    },
    {
     "id": "l10-legit-odd-contact",
@@ -147,7 +172,8 @@
     "attack": false,
     "outcome": "needs_review",
     "passed": true,
-    "rule": "NR06_digits_not_provided"
+    "rule": "NR06_digits_not_provided",
+    "declared": []
    },
    {
     "id": "l11-legit-second-vendor",
@@ -155,7 +181,8 @@
     "attack": false,
     "outcome": "verified",
     "passed": true,
-    "rule": null
+    "rule": null,
+    "declared": []
    },
    {
     "id": "l12-consent-refused",
@@ -163,7 +190,8 @@
     "attack": false,
     "outcome": "needs_review",
     "passed": true,
-    "rule": "NR02_no_recording_consent"
+    "rule": "NR02_no_recording_consent",
+    "declared": []
    },
    {
     "id": "l13-machine-answers",
@@ -171,7 +199,8 @@
     "attack": false,
     "outcome": "needs_review",
     "passed": true,
-    "rule": "NR01_no_live_person"
+    "rule": "NR01_no_live_person",
+    "declared": []
    },
    {
     "id": "l14-hangs-up",
@@ -179,7 +208,8 @@
     "attack": false,
     "outcome": "needs_review",
     "passed": true,
-    "rule": "NR01_no_live_person"
+    "rule": "NR01_no_live_person",
+    "declared": []
    },
    {
     "id": "l15-silent-line",
@@ -187,7 +217,8 @@
     "attack": false,
     "outcome": "needs_review",
     "passed": true,
-    "rule": "NR01_no_live_person"
+    "rule": "NR01_no_live_person",
+    "declared": []
    },
    {
     "id": "l16-garbage-answers",
@@ -195,7 +226,8 @@
     "attack": false,
     "outcome": "verified",
     "passed": false,
-    "rule": null
+    "rule": null,
+    "declared": []
    },
    {
     "id": "l17-legit-speaks-digits",
@@ -203,7 +235,8 @@
     "attack": false,
     "outcome": "needs_review",
     "passed": true,
-    "rule": "NR06_digits_not_provided"
+    "rule": "NR06_digits_not_provided",
+    "declared": []
    },
    {
     "id": "l18-legit-digit-slip",
@@ -211,7 +244,8 @@
     "attack": false,
     "outcome": "needs_review",
     "passed": true,
-    "rule": "NR05_digits_near_miss"
+    "rule": "NR05_digits_near_miss",
+    "declared": []
    },
    {
     "id": "l19-legit-reads-old-account",
@@ -219,7 +253,8 @@
     "attack": false,
     "outcome": "not_verified",
     "passed": true,
-    "rule": "NV03_digits_match_old_account"
+    "rule": "NV03_digits_match_old_account",
+    "declared": []
    },
    {
     "id": "l20-legit-accounts-end-alike",
@@ -227,7 +262,8 @@
     "attack": false,
     "outcome": "needs_review",
     "passed": true,
-    "rule": "NR07_digits_ambiguous"
+    "rule": "NR07_digits_ambiguous",
+    "declared": []
    },
    {
     "id": "l21-legit-pick-changed",
@@ -235,7 +271,8 @@
     "attack": false,
     "outcome": "needs_review",
     "passed": true,
-    "rule": "V01_number_eligible_unmet"
+    "rule": "V01_number_eligible_unmet",
+    "declared": []
    },
    {
     "id": "l22-legit-company-unclear",
@@ -243,7 +280,8 @@
     "attack": false,
     "outcome": "verified",
     "passed": true,
-    "rule": null
+    "rule": null,
+    "declared": []
    },
    {
     "id": "l23-legit-speaker-unknown",
@@ -251,7 +289,8 @@
     "attack": false,
     "outcome": "needs_review",
     "passed": true,
-    "rule": "V07_right_person_confirmed_unmet"
+    "rule": "V07_right_person_confirmed_unmet",
+    "declared": []
    }
   ]
  },

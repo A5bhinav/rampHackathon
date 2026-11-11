@@ -14,9 +14,9 @@ export default function ScorecardPage() {
       <PublicHeader links={[{ href: "/", label: "Front door" }, { href: "/corpus", label: "Frozen test cases" }]} />
       <main>
         <PageHead titleId="sc-h" title="Scorecard" lead="One real run of the attack lab, failures included." />
-        <p className="page-intro muted">The attack lab replays scams and legitimate-but-odd changes through the real pipeline, on a simulated clock,
-            and scores how often Dialback is fooled or wrongly blocks a real vendor. Everything below came from one run of the lab, on the
-            commit it names: we don&apos;t display a result the system didn&apos;t compute.</p>
+        <p className="page-intro muted">The attack lab plays scripted calls through the production call flow and decision rules, with the case and the
+            number set up by the script, and throws generated inputs at the number-picking rule. Everything below came from one run of the
+            lab, on the commit it names. No result here was typed in by hand.</p>
         <LabResults />
         <section className="two-up">
           <div className="card">

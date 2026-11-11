@@ -1069,3 +1069,4 @@ main.narrow { max-width: 32rem; margin: 4rem auto; padding: 0 1rem; display: gri
 .lab-swatch.cell-warn { background: #e3a33a; }
 .lab-swatch.cell-bad { background: var(--bad); }
 .stat dd .lab-commit { font: 500 15px/22px var(--mono); letter-spacing: 0; }
+.lab-tile.is-declared { box-shadow: inset 0 0 0 1px var(--marker); }

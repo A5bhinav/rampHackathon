@@ -2,7 +2,7 @@
 // here runs the lab or judges a result; it only puts words and cells to what the run recorded.
 import data from "../data/lab-results.json" with { type: "json" };
 
-export type LabScenario = { id: string; class: string; attack: boolean; outcome: string; passed: boolean; rule: string | null };
+export type LabScenario = { id: string; class: string; attack: boolean; outcome: string; passed: boolean; rule: string | null; declared: string[] };
 export type LabFuzz = { seed: number; budget: number; worlds: number; hits: Record<string, number[]> };
 export type LabResults = { generated_by: string; commit: string; voice: { total: number; passed: number; scenarios: LabScenario[] }; fuzz: LabFuzz };
 
@@ -27,8 +27,14 @@ export function scenarioName(id: string): string {
 export function tile(s: LabScenario) {
   const e = ending(s.outcome);
   const by = s.rule ? `, by ${s.rule}` : "";
-  const label = `${scenarioName(s.id)}: ${e.word}${by}${s.passed ? "" : " (failed: not what the lab required)"}`;
-  return { ...e, failed: !s.passed, label };
+  const failed = s.passed ? "" : " (failed: not what the lab required)";
+  const declared = s.declared.length ? ` (rests on a fact the script supplies: ${s.declared.join(", ")})` : "";
+  return { ...e, failed: !s.passed, declared: s.declared.length > 0, label: `${scenarioName(s.id)}: ${e.word}${by}${failed}${declared}` };
+}
+
+/** Calls whose verdict rests on a fact production doesn't compute yet, so they measure a stand-in (spec 0048, A3). */
+export function declaredCount(scenarios: readonly LabScenario[]): number {
+  return scenarios.filter((s) => s.declared.length).length;
 }
 
 export function voiceGroups(scenarios: readonly LabScenario[]) {
@@ -42,8 +48,9 @@ export function voiceGroups(scenarios: readonly LabScenario[]) {
 export function failures(scenarios: readonly LabScenario[]) {
   return scenarios.filter((s) => !s.passed).map((s) => {
     const word = ending(s.outcome).word;
-    const sentence = s.attack ? `${scenarioName(s.id)}: this attack ended ${word}.`
-      : `${scenarioName(s.id)}: this legitimate-but-odd call ended ${word}, not what the lab required.`;
+    const name = scenarioName(s.id);
+    const sentence = s.attack && s.outcome === "verified" ? `${name}: this attack ended ${word}.`
+      : `${name}: this ${s.attack ? "attack" : "legitimate-but-odd call"} ended ${word}, not what the lab required.`;
     return { id: s.id, sentence };
   });
 }
@@ -52,7 +59,7 @@ export type Cell = "clean" | "warn" | "bad";
 
 // What each check found. A label not listed here is new to this page, so it reads as red, with its own name.
 const FUZZ_LABELS: Record<string, { words: string; tone: Cell }> = {
-  M_incontext_label_moved_pick: { words: "A label in the change email moved the number we'd call (finding A1)", tone: "bad" },
+  M_incontext_label_moved_pick: { words: "Text around the change request could move the number we'd call (finding A1)", tone: "bad" },
   M_shared_id_helped: { words: "A latent defect that production data can't reach today (finding A5)", tone: "warn" },
 };
 const labelInfo = (label: string) => FUZZ_LABELS[label] ?? { words: label, tone: "bad" as const };

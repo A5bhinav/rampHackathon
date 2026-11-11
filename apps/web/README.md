@@ -18,7 +18,7 @@ Show each case's evidence, take the release decision, and show the scorecard.
 | Number lineage | `/d/[datasetId]/cases/[caseId]/lineage` (suggested) | The chosen number with its sources, every rejected number with its reason | Inesh | to build |
 | Trust Ledger (vendor risk) | `/d/[datasetId]/control/trust-ledger` (old `/risk` redirects, spec 0063) | Vendors whose number on file is provable, unproven, a near miss, or missing | Inesh | built |
 | Call view | `/d/[datasetId]/calls/[callId]` (suggested) | The transcript with recorded answers, the recording, speech-guard trips | Sami | to build |
-| Scorecard | `/d/[datasetId]/scorecard` (suggested) | The latest run's gates, rates with intervals, results by attack class | Sami | to build |
+| Scorecard | `/scorecard`, and Control's Assurance page | One real lab run from `uv run lab snapshot`: every scripted call, and the fuzz map (spec 0101) | Sami | built |
 
 The routes for Inesh's and Sami's pages are suggestions; add a link in the shell's nav when a
 page lands.

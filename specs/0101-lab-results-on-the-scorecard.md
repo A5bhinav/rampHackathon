@@ -23,7 +23,8 @@ command runs the real lab and writes one JSON file, and the page only lays that 
    `lab fuzz --search archive` run; it does not copy it. It writes no findings and freezes nothing.
 2. **The file holds:**
    - `commit`: the short commit it ran on;
-   - `voice`: per scenario, its id, class, `attack`, `outcome`, `passed`, and the deciding rule;
+   - `voice`: per scenario, its id, class, `attack`, `outcome`, `passed`, the deciding rule, and
+     `declared`, the facts its verdict rests on that production doesn't compute yet;
    - `fuzz`: seed, budget, distinct worlds, and for each label the indexes of the worlds it flagged.
 
    Ids and rule names only: no phone numbers, transcripts or digits.
@@ -32,16 +33,22 @@ command runs the real lab and writes one JSON file, and the page only lays that 
    stale file says so. Regenerate after a change worth showing.
 4. **The tiles.** The tile's color and letter show the ending: V verified, R sent to a person
    (review), B blocked (not verified). A red ring and a "failed" word in its label mark a scenario
-   that didn't end as the lab required. Below the grid, each failure is listed in words.
+   that didn't end as the lab required. Below the grid, each failure is listed in words. A `*`
+   marks a call whose verdict rests on a fact the script supplies, because it measures a stand-in
+   (spec 0048, A3). The headline stat says how many. Added after the review.
 5. **The fuzz map.** Cells run in search order.
    - Clean: no check flagged the world.
-   - Red: finding A1, a label in the change email moved the number we'd call.
+   - Red: finding A1, text around the change request could move the number we'd call.
    - Amber: finding A5, a latent defect that can't happen on production data today.
    - An unknown label reads as red, with its raw name.
-6. **The page says what the map is not.** These worlds are built to attack the rule, so the
-   flagged share is not a real-world rate.
-7. **No client JavaScript.** Static server components, `title` for hover, and one `aria-label`
-   summary per picture. It must fit a phone.
+6. **The page says what the lab is, and what the map is not.**
+   - The worlds are randomly drawn and attacker-shaped, and some use non-default settings, so the
+     flagged share is not a real-world rate.
+   - The calls run the production call flow and decision rules, with the case and number set up
+     by the script. The fuzz map runs only the number-picking rule. So the page doesn't say "the
+     real pipeline" (corrected after the review).
+7. **No client JavaScript.** Static server components, `title` for hover, an `aria-label` per tile
+   and one summary for the map. It must fit a phone.
 
 ## Contract touched
 
@@ -60,7 +67,10 @@ None. The file is the dashboard's own data, like `corpus-results.json`.
   unknown label reads as red.
 - [ ] L7. `/scorecard` and the assurance page show the results and the commit they ran on. The
   "No lab run" empty state is gone, and the page says the flagged share is not a real-world rate.
-- [ ] L8. Checked in a browser at desktop and phone width. (The site has no dark theme.)
+- [ ] L8. `/scorecard` checked in a browser at desktop and phone width. (The site has no dark theme.
+  The assurance page needs a sign-in and was not viewed; it renders the same component.)
+- [ ] L9. A call resting on a declared fact is marked on its tile and in its label, and the headline
+  stat says how many there are.
 
 ## Tests (written first)
 
@@ -70,6 +80,7 @@ None. The file is the dashboard's own data, like `corpus-results.json`.
 | L4, L5, L6 | `apps/web/tests/lab.test.ts` |
 | L7 | the browser check, by hand |
 | L8 | the browser check, by hand |
+| L9 | `apps/web/tests/lab.test.ts`, `evals/tests/test_snapshot.py` |
 
 ## Out of scope
 
