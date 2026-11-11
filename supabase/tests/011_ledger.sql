@@ -13,6 +13,7 @@ declare
   v_obs  uuid;
   v_cp   uuid;
   v_sel  uuid := gen_random_uuid();
+  v_held uuid := gen_random_uuid();
   v_doc  jsonb;
   v_fp   text := repeat('ab', 32);
 begin
@@ -91,6 +92,19 @@ begin
     values (v_sel, f.dataset, v_case, f.vendor, v_cp, 'picked', 'ledger-select-v1', repeat('e', 64), v_doc);
   perform pg_temp.expect_error(format($q$ update ledger.number_selections set outcome = 'no_provable_number' where id = %L $q$, v_sel), '42501');
   perform pg_temp.expect_error(format($q$ delete from ledger.number_selections where id = %L $q$, v_sel), '42501');
+
+  -- A withheld selection (spec 0079): stored like no_provable_number, never with a contact point.
+  v_doc := jsonb_build_object('v', 1, 'number_selection_id', v_held, 'case_id', v_case, 'dataset_id', f.dataset, 'vendor_id', f.vendor,
+             'rule_version', 'ledger-select-v3', 'outcome', 'withheld', 'contact_point_id', v_cp, 'e164', '+14155550142',
+             'inputs_sha256', repeat('e', 64));
+  perform pg_temp.expect_error(format($q$ insert into ledger.number_selections (id, dataset_id, case_id, vendor_id, contact_point_id, outcome, rule_version, inputs_sha256, selection)
+    values (%L, %L, %L, %L, %L, 'withheld', 'ledger-select-v3', repeat('e', 64), %L) $q$, v_held, f.dataset, v_case, f.vendor, v_cp, v_doc), '23514');
+  v_doc := jsonb_build_object('v', 1, 'number_selection_id', v_held, 'case_id', v_case, 'dataset_id', f.dataset, 'vendor_id', f.vendor,
+             'rule_version', 'ledger-select-v3', 'outcome', 'withheld', 'inputs_sha256', repeat('e', 64),
+             'reason', 'The change request would change which number is called, so a person must verify.');
+  insert into ledger.number_selections (id, dataset_id, case_id, vendor_id, outcome, rule_version, inputs_sha256, selection)
+    values (v_held, f.dataset, v_case, f.vendor, 'withheld', 'ledger-select-v3', repeat('e', 64), v_doc);
+  assert (select outcome::text from ledger.number_selections where id = v_held) = 'withheld', 'a withheld selection is stored';
 
   -- A signed-in user reads and writes nothing; anon has no way in.
   set local role authenticated;

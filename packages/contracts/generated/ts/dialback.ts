@@ -101,9 +101,10 @@ export interface paths {
         };
         /**
          * The vendor risk list (spec 0026) - is each vendor's number on file one the Trust Ledger can prove?
-         * @description One row per vendor with ledger documents, worst first (near_miss, unproven, missing,
-         *     provable), then by name. The status is decided by code from `ledger-select-v1` as of now;
-         *     `status_text` is the ledger's sentence for it, so the dashboard writes none of its own.
+         * @description One row per vendor with ledger documents, worst first (needs_person, near_miss, unproven,
+         *     missing, provable), then by name. The status is decided by code from the selection rule
+         *     (`select()`, spec 0021 and spec 0079) run as of now; `status_text` is the ledger's sentence
+         *     for it, so the dashboard writes none of its own.
          */
         get: operations["getVendorRisk"];
         put?: never;
@@ -830,13 +831,13 @@ export interface components {
             vendor_id: components["schemas"]["Uuid"];
             legal_name: string;
             /**
-             * @description provable - the number on file meets the rule; near_miss - it is a near miss of a number the rule can prove; unproven - the rule can't prove it; missing - no number on file.
+             * @description needs_person - the rule withholds (spec 0079) because documents it treats as change context, such as a message from a lookalike domain, would change which number is called, so a person must verify; provable - the number on file meets the rule; near_miss - it is a near miss of a number the rule can prove; unproven - the rule can't prove it; missing - no number on file.
              * @enum {string}
              */
-            status: "near_miss" | "unproven" | "missing" | "provable";
+            status: "needs_person" | "near_miss" | "unproven" | "missing" | "provable";
             /** @description What the old vendor master says, in E.164, or null. */
             number_on_file: string | null;
-            /** @description The number ledger-select-v1 would pick today, in E.164, or null. */
+            /** @description The number the selection rule would call today, in E.164, or null when it would call no one (no provable number, or needs_person). */
             provable_number: string | null;
             /** @description The ledger's sentence for the status. */
             status_text: string;
@@ -1047,7 +1048,7 @@ export interface components {
             /** @description The older contact point this number is a near miss of, when reasons has near_miss_of_older_number. */
             near_miss_of?: components["schemas"]["Uuid"];
             eligible: boolean;
-            /** @description 1 is the pick. Present only on eligible candidates. */
+            /** @description 1 is the pick, unless the outcome is withheld: then no number is called, and eligible and rank still say what the rule found for each number (spec 0079). Present only on eligible candidates. */
             rank?: number;
             /** @description Empty when eligible. */
             reasons: components["schemas"]["Reason"][];
@@ -1055,7 +1056,7 @@ export interface components {
         Sha256: string;
         /**
          * Selection
-         * @description What dialback_ledger.select_number(case) returns, and what ledger.number_selections stores: the number a case will call, up to two alternates, or no_provable_number, plus every candidate the rule looked at and why it was or wasn't eligible. Owner: Inesh. The core reads number_selection_id, rule_version, contact_point_id, reason and source_types (spec 0002, D11). Rules: phone numbers only, in E.164; never a bank account number (ADR-8); numbers are integers; a selection reads only rows recorded before the cutoff and stores a hash of them, so it can be replayed.
+         * @description What dialback_ledger.select_number(case) returns, and what ledger.number_selections stores: the number a case will call, up to two alternates, no_provable_number or withheld, plus every candidate the rule looked at and why it was or wasn't eligible. Owner: Inesh. The core reads number_selection_id, rule_version, contact_point_id, reason and source_types (spec 0002, D11). Rules: phone numbers only, in E.164; never a bank account number (ADR-8); numbers are integers; a selection reads only rows recorded before the cutoff and stores a hash of them, so it can be replayed.
          */
         "selection.schema": {
             /**
@@ -1076,10 +1077,10 @@ export interface components {
             /** @description The cutoff the rule used: the earliest of the request's arrival, the first message from a lookalike domain and the change appearing in Ramp, never later than requested_cutoff. Our own receive times only, never a printed date or an email's Date: header. */
             cutoff: components["schemas"]["$defs-Timestamp"];
             /**
-             * @description picked: call contact_point_id. no_provable_number: no call; the case goes to needs_review (R7).
+             * @description picked: call contact_point_id. no_provable_number: no call; the case goes to needs_review (R7). withheld: today's rule would call a number, but the change context would change which one, so no call; the case goes to needs_review and a person verifies (spec 0079). The core treats withheld like no_provable_number: no contact_point_id means no pick.
              * @enum {unknown}
              */
-            outcome: "picked" | "no_provable_number";
+            outcome: "picked" | "no_provable_number" | "withheld";
             /** @description The chosen ledger.contact_points row. Present only when outcome is picked. */
             contact_point_id?: components["schemas"]["Uuid"];
             /** @description The chosen number. Present only when outcome is picked. */
@@ -1088,7 +1089,7 @@ export interface components {
             source_types?: components["schemas"]["SourceTypes"];
             /** @description Eligible runners-up in rank order, used only if the chosen number is dead. Present only when outcome is picked. */
             alternates?: components["schemas"]["Pick"][];
-            /** @description Why no number was picked, for a person. Required when outcome is no_provable_number. */
+            /** @description Why no number was picked, for a person. Required when outcome is no_provable_number or withheld. */
             reason?: string;
             /** @description Every phone number the rule considered for this vendor, eligible or not, in rank order (eligible first). */
             candidates: components["schemas"]["Candidate"][];
@@ -1140,7 +1141,7 @@ export interface components {
                     /** @description The older contact point this number is a near miss of, when reasons has near_miss_of_older_number. */
                     near_miss_of?: components["schemas"]["Uuid"];
                     eligible: boolean;
-                    /** @description 1 is the pick. Present only on eligible candidates. */
+                    /** @description 1 is the pick, unless the outcome is withheld: then no number is called, and eligible and rank still say what the rule found for each number (spec 0079). Present only on eligible candidates. */
                     rank?: number;
                     /** @description Empty when eligible. */
                     reasons: components["schemas"]["Reason"][];
@@ -1157,9 +1158,7 @@ export interface components {
                     same_subject_window_days: number;
                 };
             };
-        } & (unknown & unknown);
-        /** @enum {string} */
-        AdminEventType: "role_granted" | "role_revoked" | "ramp_link_set" | "access_disabled" | "access_enabled" | "demo_reset" | "demo_chaos" | "demo_tamper";
+        } & (unknown & unknown & unknown);
     };
     responses: {
         /** @description Missing, expired or invalid token */
