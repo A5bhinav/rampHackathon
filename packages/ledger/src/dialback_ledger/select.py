@@ -12,10 +12,11 @@ The flags pick the inner rule, and each state names its own rule (spec 0091, rul
 - DIALBACK_CONTEXT_GUARD=off: `_select_v1` alone, ledger-select-v1, whatever the label bar says (rollback).
 
 Spec 0091's label bar, `_select_rule(label_bar=True)`: a label against a number (a visible sighting
-whose party isn't `vendor`, or whose role is `fax` in any case) is not support, and vetoes the number only when established: the labeling documents span
-`min_source_types` source types and the earliest is `min_age_days` before the request. A labeling
-document counts only by its own facts (a counting channel, at or before the request, and not the
-request, its thread, its subject within `same_subject_window_days`, or a lookalike's), so a
+whose party isn't `vendor`, or whose role is `fax` in any case) is not support, and vetoes the number
+only when established: the labeling documents that count span `min_source_types` source types. A
+labeling document counts only by its own facts: a counting channel, received at least `min_age_days`
+before the request, and not a lookalike's (the fourth revision, Q162). So a fresh document never
+counts, whoever sent it; an old one counts whatever thread or subject a later request uses; and a
 lookalike's pull on the cutoff can't undo an honest label. Weaker labels are ignored. The near-miss
 check and `first_seen_at` keep today's first sighting, labeled or not.
 
@@ -185,17 +186,16 @@ def _select_rule(*, case_id: uuid.UUID, dataset_id: uuid.UUID, vendor_id: uuid.U
     # Spec 0091, rule 3: "the request" is the earlier of the requested cutoff and the request's receipt,
     # never the cutoff a lookalike pulls back.
     asked = requested_cutoff if request is None else min(requested_cutoff, request.received_at)
+    min_age = dt.timedelta(days=settings.min_age_days)
 
     def label_counts(d: DocumentRef) -> bool:
-        """May this document's label count toward an established veto? Read from the document alone."""
-        if request is None or d.received_at > asked or not counts(d):
+        """May this document's label count toward an established veto? Read from the document alone: a
+        counting channel, at least `min_age_days` before the request (so a fresh document never counts,
+        whoever sent it, and an old one counts whatever thread or subject a later request uses), and
+        not from a lookalike sender."""
+        if request is None or not counts(d) or asked - d.received_at < min_age:
             return False
-        if (sd := sender_domain(d.sender)) and is_lookalike(sd, domains):
-            return False
-        if d.id == request.document_id or (request.thread_id is not None and d.thread_id == request.thread_id):
-            return False
-        return not (_subject(d.subject) == _subject(request.subject) != ""
-                    and asked - d.received_at <= dt.timedelta(days=settings.same_subject_window_days))
+        return not ((sd := sender_domain(d.sender)) and is_lookalike(sd, domains))
 
     numbers: dict[str, list[tuple[Sighting, DocumentRef, bool]]] = {}
     for s in rows:
@@ -215,9 +215,8 @@ def _select_rule(*, case_id: uuid.UUID, dataset_id: uuid.UUID, vendor_id: uuid.U
         sources = sorted({d.channel for _, d in clean})
         vetoes = True                                                         # today: any label vetoes
         if label_bar:                                                         # spec 0091, rules 3 and 4
-            against = [d for s, d, _ in visible if not _vendors_own(s) and label_counts(d)]
-            vetoes = (bool(against) and len({d.channel for d in against}) >= settings.min_source_types
-                      and min(d.received_at for d in against) <= asked - dt.timedelta(days=settings.min_age_days))
+            against = {d.channel for s, d, _ in visible if not _vendors_own(s) and label_counts(d)}
+            vetoes = bool(against) and len(against) >= settings.min_source_types
         reasons = set()
         if not visible:
             reasons.add("hidden_text_only")

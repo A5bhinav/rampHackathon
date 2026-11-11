@@ -409,7 +409,7 @@ def test_context_blind_fix_opens_the_lookalike_hole():
 def test_context_blind_rule_passes_the_planted_bank_label_world(monkeypatch):
     # The attacker's in-thread email names the real number as a bank line, and a planted provable
     # number ranks below the real one. Ignoring change-context labels keeps the call on the real
-    # number, and the oracle must accept that output (a label in the request's thread is never
+    # number, and the oracle must accept that output (a fresh label from another domain is never
     # established), even though the shape is not a valid fix overall (the test above).
     world = overblock_world("bank_label_in_thread", 0, planted=True)
     assert _context_blind(world)["e164"] == REAL
@@ -542,8 +542,9 @@ def test_schema_is_found_from_the_package(tmp_path):
 
 
 # Spec 0091, rule 3: a label against a number refuses it only when established, so I3 fires only then.
-# The facts belong to the labeling document, and "the request" is the earlier of the requested cutoff
-# and the request's receipt.
+# The facts belong to the labeling document: a counting channel, not a lookalike's, and (the fourth
+# revision, Q162) itself at least `min_age_days` before "the request", the earlier of the requested
+# cutoff and the request's receipt. The request's thread and subject play no part.
 
 I3 = "I3_nonvendor_or_fax_eligible"
 BANK = {"party": "bank"}
@@ -586,22 +587,35 @@ def _bare(world):
     return dataclasses.replace(world, kwargs={**world.kwargs, "documents": docs})
 
 
+# The age edge, per label and measured from "the request": 89 days doesn't count, 90 does. Each pair
+# below differs only there. "From the requested cutoff" puts Ramp's change 30 days before the request
+# email, so the email's receipt would count a label a month too old; "from the receipt" puts the
+# change a day after the email, so the requested cutoff would count a label a day too old.
+YOUNG, OLD = 89, 90
+FROM_CUTOFF, FROM_RECEIPT = {"cutoff_lead_days": 30}, {"cutoff_lead_days": -1}
+
+
 @pytest.mark.parametrize("world", [
     pytest.param(_labels(OLD_LABEL, SightingSpec("contract", 100, **BANK)), id="one-channel"),
-    pytest.param(_labels(SightingSpec("contract", 89, **BANK), SightingSpec("listing", 89, **BANK)), id="a-day-too-young"),
+    pytest.param(_labels(SightingSpec("contract", YOUNG, **BANK), SightingSpec("listing", YOUNG, **BANK)),
+                 id="both-a-day-too-young"),
+    pytest.param(_labels(OLD_LABEL, SightingSpec("listing", YOUNG, **BANK)), id="the-second-a-day-too-young"),
+    pytest.param(_labels(OLD_LABEL, SightingSpec("listing", 1, **BANK)), id="only-the-earliest-is-old"),
+    pytest.param(_labels(OLD_LABEL, SightingSpec("listing", YOUNG, in_thread=True, **BANK)), id="in-its-thread-too-young"),
+    pytest.param(_labels(OLD_LABEL, SightingSpec("listing", YOUNG, subject="same", **BANK)), id="under-its-subject-too-young"),
+    pytest.param(_labels(OLD_LABEL, SightingSpec("listing", YOUNG, subject="re", **BANK)), id="a-reply-to-its-subject-too-young"),
+    pytest.param(_labels(SightingSpec("contract", 30 + YOUNG, **BANK), SightingSpec("listing", 30 + YOUNG, **BANK),
+                         **FROM_CUTOFF), id="too-young-from-the-requested-cutoff"),
+    pytest.param(_labels(SightingSpec("contract", YOUNG, **BANK), SightingSpec("listing", YOUNG, **BANK), **FROM_RECEIPT),
+                 id="too-young-from-the-receipt"),
     pytest.param(_labels(OLD_LABEL, SightingSpec("vendor_master", 200, **BANK)), id="non-counting-channel"),
     pytest.param(_labels(OLD_LABEL, SightingSpec("email", 200, sender="other", **BANK)), id="another-domains-email"),
     pytest.param(_labels(OLD_LABEL, SightingSpec("listing", 200, sender="lookalike", **BANK)), id="lookalike-sender"),
     pytest.param(_labels(OLD_LABEL, SightingSpec("email", 0, on_request=True, **BANK)), id="the-request"),
     pytest.param(_labels(OLD_LABEL, SightingSpec("email", 0, on_request=True, **BANK), request_thread=False,
                          request_subject=False), id="the-request-by-its-id-alone"),
-    pytest.param(_labels(OLD_LABEL, SightingSpec("listing", 200, in_thread=True, **BANK)), id="its-thread"),
-    pytest.param(_labels(OLD_LABEL, SightingSpec("listing", 30, subject="same", **BANK)), id="its-subject-at-the-window"),
-    pytest.param(_labels(OLD_LABEL, SightingSpec("listing", 30, subject="re", **BANK)), id="a-reply-to-its-subject"),
     pytest.param(_labels(OLD_LABEL, SightingSpec("listing", 0, after_request=True, **BANK)), id="after-the-request"),
-    pytest.param(_labels(OLD_LABEL, SightingSpec("listing", 10, **BANK), cutoff_lead_days=30), id="after-the-cutoff"),
-    pytest.param(_labels(SightingSpec("contract", 119, **BANK), SightingSpec("listing", 119, **BANK), cutoff_lead_days=30),
-                 id="too-young-from-the-cutoff"),
+    pytest.param(_labels(OLD_LABEL, SightingSpec("listing", 10, **BANK), **FROM_CUTOFF), id="after-the-cutoff"),
     pytest.param(_labels(OLD_LABEL, SightingSpec("listing", 200, visibility="white", **BANK)), id="hidden-text"),
     pytest.param(_labels(OLD_LABEL, SightingSpec("listing", 200, recorded_late=True, **BANK)), id="recorded-late"),
     pytest.param(_labels(OLD_LABEL, SightingSpec("listing", 200), SightingSpec("email", 200)), id="the-rest-are-the-vendors"),
@@ -612,18 +626,23 @@ def test_i3_stays_quiet_on_a_label_that_is_not_established(world):
 
 
 @pytest.mark.parametrize("world", [
-    pytest.param(_labels(SightingSpec("contract", 90, **BANK), SightingSpec("listing", 90, **BANK)), id="at-the-age-bar"),
-    pytest.param(_labels(OLD_LABEL, SightingSpec("listing", 1, **BANK)), id="only-the-earliest-is-old"),
-    pytest.param(_bare(_labels(OLD_LABEL, SightingSpec("listing", 20, **BANK), request_thread=False, request_subject=False)),
-                 id="a-bare-request-matches-no-bare-document"),
-    pytest.param(_labels(OLD_LABEL, SightingSpec("listing", 31, subject="same", **BANK)), id="its-subject-past-the-window"),
+    pytest.param(_labels(SightingSpec("contract", OLD, **BANK), SightingSpec("listing", OLD, **BANK)), id="both-at-the-age-bar"),
+    pytest.param(_labels(OLD_LABEL, SightingSpec("listing", OLD, **BANK)), id="the-second-at-the-age-bar"),
+    pytest.param(_labels(OLD_LABEL, SightingSpec("listing", OLD, in_thread=True, **BANK)), id="in-its-thread-at-the-bar"),
+    pytest.param(_labels(OLD_LABEL, SightingSpec("listing", 200, in_thread=True, **BANK)), id="an-old-label-in-its-thread"),
+    pytest.param(_labels(OLD_LABEL, SightingSpec("listing", OLD, subject="same", **BANK)), id="under-its-subject-at-the-bar"),
+    pytest.param(_labels(OLD_LABEL, SightingSpec("listing", OLD, subject="re", **BANK)), id="a-reply-to-its-subject-at-the-bar"),
+    pytest.param(_bare(_labels(OLD_LABEL, SightingSpec("listing", OLD, **BANK), request_thread=False, request_subject=False)),
+                 id="a-bare-request-and-bare-documents"),
+    pytest.param(_labels(SightingSpec("contract", 30 + OLD, **BANK), SightingSpec("listing", 30 + OLD, **BANK),
+                         **FROM_CUTOFF), id="at-the-age-bar-from-the-requested-cutoff"),
+    pytest.param(_labels(SightingSpec("contract", OLD, **BANK), SightingSpec("listing", OLD, **BANK), **FROM_RECEIPT),
+                 id="at-the-age-bar-from-the-receipt"),
     pytest.param(_labels(OLD_LABEL, SightingSpec("email", 200, **BANK)), id="the-vendors-own-email"),
     pytest.param(_labels(OLD_LABEL, SightingSpec("email", 200, sender="subdomain", **BANK)), id="a-vendor-subdomains-email"),
     pytest.param(_labels(OLD_LABEL, SightingSpec("listing", 200, role="fax")), id="a-fax-and-a-bank"),
     pytest.param(_labels(SightingSpec("contract", 200, role="FAX"), SightingSpec("listing", 200, role=" Fax ")),
                  id="fax-in-any-case"),
-    pytest.param(_labels(SightingSpec("contract", 120, **BANK), SightingSpec("listing", 120, **BANK), cutoff_lead_days=30),
-                 id="at-the-age-bar-from-the-cutoff"),
 ])
 def test_i3_flags_a_label_at_the_bar(world):
     assert _i3_if_eligible(world)

@@ -2,13 +2,19 @@
 
 `violations(world, out)` checks the rule's guarantees (I1-I7, I9) on one output. It recomputes
 visibility, counting channels, the change context, R2's first-seen order, age and near misses from the
-world's raw inputs. Where no document id is shared, that reference follows select()'s frame exactly, so
-there the structural checks catch regressions (a branch deleted, reasons mis-assembled), not design
-defects. Where two different documents share an id it is deliberately conservative, as R7 asks ("both
-count against"): the id is change context, a lookalike if any copy is one, and dated by its earliest
-copy. select() instead keeps the copy whose repr sorts first, so there the structural checks also catch
-a current defect (review finding I4). It reuses the ledger's lookalike-domain classifier and sender
-parsing (classification, not the decision), so a classifier bug is invisible to it.
+world's raw inputs. Where no document id is shared, that reference follows select()'s frame for the
+change context and its cutoff, R2, hidden text, near misses (today's first sighting, labeled or not,
+as spec 0091's Q153 keeps it) and spec 0091's rule 3 (`_established_against`), so there those checks
+catch regressions (a branch deleted, reasons mis-assembled), not design defects. It does not follow
+spec 0091's rule 2: its support for I4 and I5 (channels and age) is today's, every visible sighting in
+a counting channel outside the change context, labeled or not, where select() counts only the vendor's
+own. That is looser, so I4 and I5 never flag a number select() rightly made eligible, but they can't
+see a rule that counts a labeled sighting as support. Where two different documents share an id it is
+deliberately conservative, as R7 asks ("both count against"): the id is change context, a lookalike if
+any copy is one, and dated by its earliest copy. select() instead keeps the copy whose repr sorts
+first, so there the structural checks also catch a current defect (review finding I4). It reuses the
+ledger's lookalike-domain classifier and sender parsing (classification, not the decision), so a
+classifier bug is invisible to it.
 `metamorphic(world)` re-runs the rule on mutated copies of the world (I8, I10, I11, I12, and "attacker
 evidence never helps"). `liveness(world, out)` is the L1 over-blocking floor. Every function returns
 violation labels; an empty list means the rule held.
@@ -191,35 +197,31 @@ def _fax(r: Sighting) -> bool:
 
 
 def _established_against(f: _Frame, n: _Number, world: World) -> bool:
-    """Spec 0091, rule 3, re-derived from the lab's own frame so the oracle stays independent of the
-    ledger's: are the labels against this number established? A label against is a visible sighting
-    that isn't the vendor's, or is a fax. Its document counts only by its own facts: a counting channel,
-    at or before the request (the earlier of the requested cutoff and its receipt), and not the request,
-    its thread, its subject within the window, or a lookalike's. So the cutoff a lookalike pulls back,
-    and an id shared with another document, play no part. Established means those documents span
-    `min_source_types` channels and the earliest is `min_age_days` before the request. With no request
-    there is nothing to measure from, so no label is established."""
+    """Spec 0091, rule 3 (its fourth revision, Q162), re-derived from the lab's own frame so the oracle
+    stays independent of the ledger's: are the labels against this number established? A label against
+    is a visible sighting that isn't the vendor's, or is a fax. Its document counts only by its own
+    facts: a counting channel, received at least `min_age_days` before the request (the earlier of the
+    requested cutoff and its receipt), and not a lookalike's. So the cutoff a lookalike pulls back, the
+    request's thread and subject, and an id shared with another document play no part, and the request
+    itself, never that old, never counts. Established means the documents that count span
+    `min_source_types` channels. With no request there is nothing to measure from, so no label is
+    established."""
     kw, s = world.kwargs, world.settings
     request = kw["request"]
     if request is None:
         return False
     domains = tuple(v.strip().lower().rstrip(".") for v in kw["vendor_domains"])
     asked = min(kw["requested_cutoff"], request.received_at)
-    window = dt.timedelta(days=s.same_subject_window_days)
+    old_enough = dt.timedelta(days=s.min_age_days)
 
     def stands(d: DocumentRef) -> bool:
-        if d.received_at > asked or not _counts(d, domains):
+        if not _counts(d, domains) or asked - d.received_at < old_enough:
             return False
-        if (sd := sender_domain(d.sender)) and is_lookalike(sd, domains):
-            return False
-        if d.id == request.document_id or (request.thread_id is not None and d.thread_id == request.thread_id):
-            return False
-        return not (_norm(d.subject) == _norm(request.subject) != "" and asked - d.received_at <= window)
+        return not ((sd := sender_domain(d.sender)) and is_lookalike(sd, domains))
 
     labeling = [f.docs[r.document_id] for r in n.visible if r.party != "vendor" or _fax(r)]
-    against = [d for d in labeling if stands(d)]
-    return (bool(against) and len({d.channel for d in against}) >= s.min_source_types
-            and asked - min(d.received_at for d in against) >= dt.timedelta(days=s.min_age_days))
+    channels = {d.channel for d in labeling if stands(d)}
+    return bool(channels) and len(channels) >= s.min_source_types
 
 
 def violations(world: World, out: dict) -> list[str]:
@@ -243,9 +245,9 @@ def violations(world: World, out: dict) -> list[str]:
             found.append("I1_first_seen_in_context_eligible")
         if not n.visible:
             found.append("I2_hidden_only_eligible")
-        # Only an established label refuses a number (spec 0091, rule 3). A label in the request, its
-        # thread or under its subject can't establish anything, so I12 judges what those may do (I1
-        # still refuses a number first seen in the context).
+        # Only an established label refuses a number (spec 0091, rule 3). A label younger than
+        # `min_age_days`, such as the request's own or anything sent with it, can't establish anything,
+        # so I12 judges what those may do (I1 still refuses a number first seen in the context).
         if _established_against(f, n, world):
             found.append("I3_nonvendor_or_fax_eligible")
         if len(n.channels) < s.min_source_types:

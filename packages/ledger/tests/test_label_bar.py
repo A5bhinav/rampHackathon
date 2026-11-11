@@ -2,14 +2,15 @@
 
 A label against a number is a visible sighting whose party isn't `vendor`, or whose role is `fax`
 in any case. Support counts only the vendor's own sightings. The labels against a number veto it
-only when established: their documents span `min_source_types` source types and the earliest is
-`min_age_days` before the request, counting only documents that are honest by their own facts.
-Weaker labels are ignored: they neither veto nor support.
+only when established: the documents that count span `min_source_types` source types, and a document
+counts only by its own facts (a counting channel, itself `min_age_days` before the request, and not a
+lookalike's; the fourth revision, Q162). Weaker labels are ignored: they neither veto nor support.
 
 Most of these tests run the rule alone, `_select_rule(label_bar=True)`, without spec 0079's guard
 around it. The last sections run `select()`, the guard around it, under the two flags (rules 5 to 7).
 """
 import asyncio
+import dataclasses
 import datetime as dt
 import uuid
 
@@ -157,8 +158,8 @@ def test_attacker_cannot_unestablish():
     assert "not_vendor_party" in reasons(out, X)
     assert out["e164"] == REAL
     # Same subject: the listing, at 170 days under the request's subject, is older than the pulled
-    # cutoff but within the subject window of it, so it is in the change context. Rule 3 measures the
-    # window from the request (170 days, outside it), so the listing still counts and the labels establish.
+    # cutoff but within the subject window of it, so it is in the change context. Rule 3 reads only the
+    # listing's own channel, sender and age (170 days), so it still counts and the labels establish.
     w = world(x_labeled(listing_days=170, listing_subject="Updated banking details") + [look])
     listing = next(d for d in w["documents"] if d.id == "x-label-listing")
     out = inner(w)
@@ -169,28 +170,34 @@ def test_attacker_cannot_unestablish():
 
 
 def test_a_label_under_the_request_subject_does_not_establish():
-    # The listing is under the request's subject within the window: it doesn't count, and the contract
-    # alone is one source type. X keeps its own support and is the older number (the accepted cost).
+    # The listing is under the request's subject, 20 days before it: too young to count, so the
+    # contract alone is one source type. X keeps its own support and is the older number (the accepted cost).
     out = inner(world(x_labeled(listing_days=20, listing_subject="Updated banking details")))
     assert reasons(out, X) == []
-    # Controls: the same listing under another subject, or under the request's subject but outside
-    # the window, does count, and the labels establish.
+    # The fourth revision (Q162): only the listing's age matters, not its subject. Under another subject,
+    # or under the request's 40 days back, it is still too young (the third revision counted both).
     for days, subject in ((20, "Hello"), (40, "Updated banking details")):
-        assert "not_vendor_party" in reasons(inner(world(x_labeled(days, subject))), X), (days, subject)
+        assert not VETOES & set(reasons(inner(world(x_labeled(days, subject))), X)), (days, subject)
+    # Control: old enough, it counts under the request's subject, even inside a subject window that
+    # covers it (the third revision dropped it there).
+    wide = Settings(same_subject_window_days=200)
+    assert "not_vendor_party" in reasons(inner(world(x_labeled(120, "Updated banking details")), settings=wide), X)
 
 
-def test_an_old_label_in_the_request_thread_does_not_count():
-    # Rule 3: a labeling document in the request's thread never counts, however old (FINDINGS A3's
-    # hijacked thread). Without it, the contract's label is alone and weak.
+def test_an_old_label_in_the_request_thread_counts():
+    # The fourth revision (Q162): an old labeling document counts whatever thread a later request
+    # replies on, so a request can't erase an old warning by its thread (the final review's issue 2).
+    # The third revision dropped this email, and the contract's label was alone and weak.
     rows = provable(REAL, 400) + [in_thread(REAL, days=300, role="unknown", party="bank"), label(REAL, 300, "contract")]
     out = inner(world(rows))
-    assert reasons(out, REAL) == [] and out["e164"] == REAL
+    assert "not_vendor_party" in reasons(out, REAL) and calls(out) == []
     other = provable(REAL, 400) + [label(REAL, 300, "email", thread="t-other"), label(REAL, 300, "contract")]
-    assert "not_vendor_party" in reasons(inner(world(other)), REAL), "control: in another thread, it counts"
+    assert "not_vendor_party" in reasons(inner(world(other)), REAL), "the same email in another thread"
 
 
 def test_the_request_itself_does_not_count():
-    # Rule 3: the request is never a labeling document, even with no thread or subject to place it by.
+    # Rule 3: the request is never a labeling document, even with no thread or subject to place it by:
+    # it is never `min_age_days` before itself (Q162).
     w = world(provable(REAL, 400) + [label(REAL, 300, "contract")])
     bare = ChangeRequest(REQUEST.document_id, REQUEST.received_at, None, None, REQUEST.sender)
     w |= {"request": bare,
@@ -198,7 +205,9 @@ def test_the_request_itself_does_not_count():
     out = inner(w)
     assert reasons(out, REAL) == [] and out["e164"] == REAL
     other = provable(REAL, 400) + [label(REAL, 300, "contract"), label(REAL, 0, "email", thread="t-other")]
-    assert "not_vendor_party" in reasons(inner(world(other)), REAL), "control: another email that moment counts"
+    assert reasons(inner(world(other)), REAL) == [], "nor another email that moment: too young (the third revision counted it)"
+    old = provable(REAL, 400) + [label(REAL, 300, "contract"), label(REAL, 90, "email", thread="t-other")]
+    assert "not_vendor_party" in reasons(inner(world(old)), REAL), "control: 90 days before the request, it counts"
 
 
 def test_a_lookalike_label_does_not_count():
@@ -214,10 +223,14 @@ def test_a_lookalike_label_does_not_count():
 def test_the_label_bar_reads_its_settings():
     w = world(x_labeled())
     assert "not_vendor_party" in reasons(inner(w), X)
-    assert not VETOES & set(reasons(inner(w, settings=Settings(min_age_days=200)), X)), "earliest label is 150 days"
+    assert not VETOES & set(reasons(inner(w, settings=Settings(min_age_days=200)), X)), "both labels are younger"
     assert not VETOES & set(reasons(inner(w, settings=Settings(min_source_types=3)), X)), "labels span two types"
+    # The 20-day listing: the subject window no longer plays a part (Q162), and the age bar is per label.
     subject = world(x_labeled(listing_days=20, listing_subject="Updated banking details"))
-    assert "not_vendor_party" in reasons(inner(subject, settings=Settings(same_subject_window_days=10)), X)
+    for window in (10, 30):
+        assert not VETOES & set(reasons(inner(subject, settings=Settings(same_subject_window_days=window)), X)), window
+    assert "not_vendor_party" in reasons(inner(subject, settings=Settings(min_age_days=20)), X)
+    assert not VETOES & set(reasons(inner(subject, settings=Settings(min_age_days=21)), X)), "a day too young"
 
 
 # The near-miss anchor (Q153) --------------------------------------------------------------------------
@@ -298,7 +311,11 @@ def test_a_label_received_after_the_request_does_not_count():
     out = inner(w)
     assert reasons(out, REAL) == [] and out["e164"] == REAL
     early = provable(REAL, 200) + [label(REAL, 300, "contract"), label(REAL, 1, "listing")]
-    assert "not_vendor_party" in reasons(inner(world(early)), REAL), "control: a day before, it counts"
+    assert reasons(inner(world(early)), REAL) == [], "nor a day before: too young (the third revision counted it)"
+    old = provable(REAL, 200) + [label(REAL, 300, "contract"), label(REAL, 90, "listing")]
+    assert "not_vendor_party" in reasons(inner(world(old)), REAL), "control: 90 days before, it counts"
+    edge = provable(REAL, 200) + [label(REAL, 300, "contract"), label(REAL, 89.99, "listing")]
+    assert reasons(inner(world(edge)), REAL) == [], "about 15 minutes short of 90 days, it doesn't"
 
 
 # The label bar off is today's rule --------------------------------------------------------------------
@@ -378,6 +395,70 @@ def test_no_request_still_fails_closed():
     assert "not_vendor_party" in reasons(out, X) and out["e164"] == REAL
 
 
+# The fourth revision (Q162): each counted label is itself min_age_days old -----------------------------
+
+def one_fresh_email() -> dict:
+    """The final review's issue 1: an old contract's plain "Tel:" line (role and party `unknown`) labels
+    REAL, and one fresh email from the vendor's domain, in a thread of its own, calls REAL a fax.
+    PLANTED is provable but younger than REAL."""
+    return world(provable(REAL, 200) + provable(PLANTED, 150) + [
+        label(REAL, 300, "contract", party="unknown"),
+        label(REAL, 30, "email", role="fax", party="vendor", thread="t-fresh")])
+
+
+def test_one_fresh_email_cannot_complete_a_veto():
+    # The two labels span two channels and the earliest is 300 days old, so the third revision
+    # established them and the call moved to PLANTED. The email is 30 days old: it doesn't count, the
+    # contract's label is alone, and REAL is called.
+    w = one_fresh_email()
+    with flags():
+        assert first(run(w)) == REAL
+    with flags(bar="off"):
+        assert first(run(w)) == PLANTED, "spec 0079 alone: the label refuses REAL, as today"
+
+
+def on_its_thread(rows: list[dict], thread: str) -> dict:
+    """A world whose change request (and its email) replies on `thread`."""
+    w = world(rows)
+    return w | {"request": dataclasses.replace(REQUEST, thread_id=thread),
+                "documents": [dataclasses.replace(d, thread_id=thread) if d.id == REQUEST.document_id else d
+                              for d in w["documents"]]}
+
+
+def test_a_request_cannot_erase_old_warnings_by_its_thread():
+    # The final review's issue 2: X is older than REAL and provable, and two honest warnings say it
+    # isn't the vendor's line: a contract (a bank's, 200 days) and a vendor email (120 days) in thread
+    # `thr-old`. The change request replies on `thr-old`. The third revision dropped the email for its
+    # thread, the contract's label was alone, and X was called. Both are old, so they establish.
+    w = on_its_thread(provable(X, 500) + provable(REAL, 400) + [
+        label(X, 200, "contract", party="bank"),
+        label(X, 120, "email", party="unknown", thread="thr-old", doc_id="x-warning-email")], "thr-old")
+    assert "x-warning-email" in {d.id for d in change_context_documents(**w)}, "the email is in the change context"
+    out = inner(w)
+    assert "not_vendor_party" in reasons(out, X) and out["e164"] == REAL
+    # Spec 0079's run without the change context loses the email's label, so it picks X: the two runs
+    # disagree on the pick, and nobody is called.
+    with flags():
+        out = run(w)
+    assert X not in calls(out)
+    assert out["outcome"] == "withheld"
+
+
+def test_the_requested_cutoff_bounds_the_label_age():
+    # The final review's issue 4: label ages are measured from min(requested_cutoff, request
+    # receipt). Here Ramp's change came a day before the email, so a listing 90.5 days before the
+    # email is 89.5 days before the change: too young to count, and the contract's label is alone.
+    for days in (0.5, 90.5):
+        rows = provable(REAL, 400) + [label(REAL, 300, "contract"), label(REAL, days, "listing")]
+        w = world(rows) | {"requested_cutoff": T0 - dt.timedelta(days=1)}
+        out = inner(w)
+        assert reasons(out, REAL) == [] and out["e164"] == REAL, days
+    # Control: a day older, the listing is 90.5 days before the change and counts.
+    rows = provable(REAL, 400) + [label(REAL, 300, "contract"), label(REAL, 91.5, "listing")]
+    w = world(rows) | {"requested_cutoff": T0 - dt.timedelta(days=1)}
+    assert "not_vendor_party" in reasons(inner(w), REAL)
+
+
 # Spec 0091's table, through select() ------------------------------------------------------------------
 
 WEAK = [("unknown", "bank", "bank-line"), ("fax", "vendor", "fax-line"), ("unknown", "unknown", "bare-mention")]
@@ -394,6 +475,10 @@ TABLE = [  # the world; who is called first today, under spec 0079, and under th
                  id="an-honest-request-that-mentions-the-number"),
     pytest.param(world([vendors(REAL, 200, "email"), label(REAL, 200, "contract")]), None, None, None,
                  id="vendor-email-plus-a-contract-calling-it-a-banks"),
+    pytest.param(one_fresh_email(), PLANTED, PLANTED, REAL, id="an-old-tel-line-plus-one-fresh-fax-email"),
+    pytest.param(on_its_thread(provable(PLANTED, 500) + provable(REAL, 400) + [
+        label(PLANTED, 200, "contract", party="bank"), label(PLANTED, 120, "email", party="unknown", thread="thr-old")],
+        "thr-old"), REAL, REAL, None, id="two-honest-warnings-the-request-replies-on-ones-thread"),
     pytest.param(world(provable(REAL, 200) + provable(PLANTED, 400) + [HONEST]), REAL, REAL, PLANTED,
                  id="the-accepted-cost"),
 ]
