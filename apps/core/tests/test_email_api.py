@@ -63,17 +63,19 @@ async def test_mail_lists_outcomes_newest_first_and_matches_the_contract(world):
 
 async def test_mail_is_refused_signed_out_and_scoped_to_the_dataset(world, pool):
     other = await make_world(pool)
-    await import_all(other.pool, other.ramp, other.keys, other.dataset.id)
-    await put(world.pool, world.dataset.id, 1)
-    await put(pool, other.dataset.id, 2, subject="theirs")
-    url = MAIL.format(dataset_id=world.dataset.id)
-    assert (await world.core.get(url)).status_code == 401
-    mine = await get(world, url, "clerk", MAIL)
-    assert [i["subject"] for i in mine["items"]] == ["subject 1"]
-    r = await world.core.get(MAIL.format(dataset_id=uuid.uuid4()), headers=token(world.users["clerk"]))
-    assert r.status_code == 404 and r.json()["code"] == "not_found"
-    await other.core.aclose()
-    await other.mock.aclose()
+    try:
+        await import_all(other.pool, other.ramp, other.keys, other.dataset.id)
+        await put(world.pool, world.dataset.id, 1)
+        await put(pool, other.dataset.id, 2, subject="theirs")
+        url = MAIL.format(dataset_id=world.dataset.id)
+        assert (await world.core.get(url)).status_code == 401
+        mine = await get(world, url, "clerk", MAIL)
+        assert [i["subject"] for i in mine["items"]] == ["subject 1"]
+        r = await world.core.get(MAIL.format(dataset_id=uuid.uuid4()), headers=token(world.users["clerk"]))
+        assert r.status_code == 404 and r.json()["code"] == "not_found"
+    finally:
+        await other.core.aclose()
+        await other.mock.aclose()
 
 
 async def test_mail_returns_at_most_200_items(world):
@@ -99,15 +101,21 @@ async def test_case_detail_carries_the_email_info(world):
 
 
 async def test_no_mail_response_holds_a_body_or_full_number(world):
+    """The door never stores a body or a full number, so this plants both, by hand, in every text column of the
+    row that the contract does not return (message_id, thread_id, sender_domain, raw_sha256, error): the test
+    fails if the API ever hands back a column it should not (final review M8; it used to pass by construction)."""
     v = await acme(world)
-    # The table holds neither; put both through the door's columns anyway and read every response.
-    await put(world.pool, world.dataset.id, 1, outcome="case_opened", flagged=True, vendor_id=v["id"], last4=ACCOUNT[-4:],
-              routing_number="026009593", subject="new details")
     await change_and_detect(world)
     case = await case_of(world)
-    texts = [(await world.core.get(MAIL.format(dataset_id=world.dataset.id), headers=token(world.users["clerk"]))).text,
-             (await world.core.get(CASE.format(case_id=case["id"]), headers=token(world.users["clerk"]))).text]
-    for text in texts:
-        assert BODY_MARKER not in text and ACCOUNT not in text
-    items = (await world.core.get(MAIL.format(dataset_id=world.dataset.id), headers=token(world.users["clerk"]))).json()["items"]
-    assert all("body" not in i and "text" not in i for i in items)
+    planted = f"{BODY_MARKER} {ACCOUNT}"
+    await put(world.pool, world.dataset.id, 1, outcome="case_opened", flagged=True, vendor_id=v["id"], last4=ACCOUNT[-4:],
+              routing_number="026009593", subject="new details", case_id=case["id"], change_event_id=case["change_event_id"],
+              message_id=planted, thread_id=planted, sender_domain=planted, raw_sha256=planted, error=planted)
+    stored = await one(world.pool, "select count(*) as n from app.inbound_emails e where e::text like %s", f"%{planted}%")
+    assert stored["n"] == 1, "the planted values are there to leak"
+    mail = await world.core.get(MAIL.format(dataset_id=world.dataset.id), headers=token(world.users["clerk"]))
+    detail = await world.core.get(CASE.format(case_id=case["id"]), headers=token(world.users["clerk"]))
+    assert detail.json()["change"]["email"]["subject"] == "new details", "the case shows this row's email"
+    for r in (mail, detail):
+        assert r.status_code == 200 and BODY_MARKER not in r.text and ACCOUNT not in r.text
+    assert all("body" not in i and "text" not in i for i in mail.json()["items"])

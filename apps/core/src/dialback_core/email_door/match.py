@@ -17,13 +17,12 @@ from uuid import UUID
 from dialback_ledger.lookalike import is_lookalike, sender_domain
 
 from dialback_core.company import SUFFIXES
-
-_BOTH_SIDES = frozenset({"and", "the"})  # dropped from the text as well as the name
 from dialback_core.email_door.rules import MAX_CHARS
 
 LOOKALIKE_DOMAIN = "lookalike_domain"
 SENDER_OFF_DOMAIN = "sender_off_domain"
 
+_BOTH_SIDES = frozenset({"and", "the"})  # dropped from the text as well as the name
 _QUOTES = str.maketrans({"\u2018": "'", "\u2019": "'", "\u201a": "'", "\u201b": "'", "\u02bc": "'",
                          "\u201c": '"', "\u201d": '"', "\u201e": '"'})
 
@@ -71,7 +70,9 @@ def _contains(haystack: list[str], needle: list[str]) -> bool:
 
 def name_in_text(name: str, text: str) -> bool:
     """True when the name's words, legal suffixes dropped, appear together and in order in the first
-    MAX_CHARS characters of `text`. A name with no words left never matches."""
+    MAX_CHARS characters of `text`. "and" and "the" are dropped from both sides (SUFFIXES holds them for the
+    name, _BOTH_SIDES for the text), so "Acme & Sons" matches "the Acme Sons". A name with no words left
+    never matches."""
     wanted = [t for t in _tokens(name) if t not in SUFFIXES]  # "and"/"the" are in SUFFIXES
     return bool(wanted) and _contains([t for t in _tokens(text[:MAX_CHARS]) if t not in _BOTH_SIDES], wanted)
 

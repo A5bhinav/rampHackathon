@@ -65,4 +65,12 @@ begin
 end
 $$;
 
+-- The inbox's claim joins each notice to its email by delivery_id: it is indexed (0017).
+do $$
+begin
+  assert exists (select 1 from pg_indexes where schemaname = 'app' and tablename = 'inbound_emails'
+                   and indexdef like '%(delivery_id)%'), 'inbound_emails.delivery_id has an index';
+end
+$$;
+
 rollback;

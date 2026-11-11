@@ -44,6 +44,5 @@ None.
 ## Commands
 
 ```bash
-source .superpowers/sdd/2026-11-10-email-door/testenv.sh
 cd apps/core && uv run pytest -q tests/email_door/test_reply.py tests/test_email_door.py && uv run pytest -q
 ```

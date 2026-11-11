@@ -45,7 +45,6 @@ None.
 ## Commands
 
 ```bash
-source .superpowers/sdd/2026-11-10-email-door/testenv.sh
 cd apps/core && uv run pytest -q tests/test_email_api.py && uv run pytest -q
 cd ../web && pnpm check:api && pnpm typecheck && pnpm test && pnpm build
 ```

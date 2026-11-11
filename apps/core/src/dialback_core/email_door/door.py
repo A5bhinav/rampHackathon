@@ -108,7 +108,9 @@ def ledger_document(email: ReceivedEmail, ledger_lines: str, masked_subject: str
 # Bank details, per mail part ------------------------------------------------------------------------
 
 _LINE_BREAK = re.compile("[\n\r\x0b\x0c\x1c-\x1e\x85\u2028\u2029]")   # what str.splitlines splits on
-_CLAUSE_END = re.compile(r";|[.!?](?=\s|$)")
+# A clause ends at `;`, or at `.` `!` `?` right after a digit and before whitespace or the end. Not after a
+# word: "Routing R1 Acct. A, Wire Routing R2 Acct. B" would otherwise pair A with R2 (final review M1).
+_CLAUSE_END = re.compile(r";|(?<=\d)[.!?](?=\s|$)")
 
 
 @dataclass(frozen=True)
@@ -129,7 +131,8 @@ def _bank_details(parts: tuple[str, ...], on_file_routing: str | None) -> _Detai
     """The routing numbers and accounts of each part, read on its own (each up to rules.MAX_CHARS), and each
     account paired with a routing number: the nearest one on the same line, else the nearest within
     PAIR_REACH characters on either side, else the first that is not on file, else the first. "Nearest"
-    prefers a routing number in the same clause (no `;` or sentence end between them) and then the fewest
+    prefers a routing number in the same clause (no `;`, and no sentence end after a digit, between them; an
+    abbreviation such as "Acct." ends no clause) and then the fewest
     characters between, so "Account A, Routing 1; Account B, Routing 2" pairs B with 2 although `; Account `
     is shorter than `, Routing `. Only the nearest routing number on each side can win (a farther one on
     that side is farther and crosses every break the nearer one does), so pairing costs a binary search per

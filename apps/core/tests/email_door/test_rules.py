@@ -411,7 +411,7 @@ REPROS = [
     "Call 2125550199)\u4e03\u4e03\u516b\u4e09\u4e00\u4e00\u3007\u4e8c\u56db\u4e94x",  # round 4: CJK beside a phone
     "Ref 212-555-0199, 2125550199x\u4e03\u4e03\u516b\u4e09\u4e00\u4e00\u3007\u4e8c\u56db\u4e94 21569.",
     "Ph 212-555-0199, 77777/(617) 555-0143x51826279-",                                # round 5: a hidden phone
-    "Account (call 212-555-0199 to confirm): 7783110245x1",                           # round 5: the account stored
+    "Account (call 212-555-0199 to confirm): 7783110245x1",                           # round 5: still stored, see below
     "Call 212-555-0199, then wire it to 987654321098 today",                           # round 1
     "Call 212-555-0199 987654321098",
     "Account: 7783110245.\nTo confirm, wire to 7783110245 today.",
@@ -435,6 +435,17 @@ def test_every_stored_quote_is_words_and_one_phone(text):
         assert numeric_runs_outside_the_phones(quote) == []
     for account in find_accounts(text):
         assert surviving_account_digits(ledger_text(text), account) == set()
+
+
+def test_the_round_5_account_after_a_call_label_is_still_stored_as_a_phone():
+    """An accepted residual, asserted so the repro list above can't pass over it silently (final review M8;
+    spec 0086, "The remaining residual", first item). "call" sits between the label and the digits, so
+    find_accounts finds no account and the repro test's account check has nothing to check, and 7783110245
+    is a valid phone on a line with a phone word, so the ledger keeps it. If this starts failing, the
+    residual closed: update spec 0086 and drop this test."""
+    text = "Account (call 212-555-0199 to confirm): 7783110245x1"
+    assert find_accounts(text) == []
+    assert {phone for _, phone in stored(text)} == {"+12125550199", "+17783110245"}
 
 
 def test_the_round_4_repros_hold_no_phone_so_the_ledger_gets_nothing():
@@ -552,9 +563,7 @@ def test_ledger_text_is_fast_on_a_long_email():
     # Many found accounts, and many runs that repeat none of them: each run is checked against every account.
     text = "".join(f"Account: {7783110000 + i}. Wire {5000000000 + i} or {6000000000 + i}.\n" for i in range(8300))
     assert len(text) > 431_000
-    start = time.perf_counter()
-    ledger_text(text)
-    assert time.perf_counter() - start < 1.0
+    assert best_of_five(ledger_text, text) < 1.0   # the fastest of five, like the tests above: one run flaked under load
 
 
 def test_find_accounts_reads_past_the_cap_only_when_asked():

@@ -156,6 +156,8 @@ def permissions(case: dict[str, Any], user: UUID, roles: list[str], approved_thi
         reasons.append("This change has no known author, so it needs two approvers; you have already approved.")
     if case["state"] == "released":
         reasons.append("This case is released; the hold is off and nothing is left to decide.")
+    elif case["state"] == "blocked" and email_only and dismissed:   # spec 0090: the first of two dismissals
+        reasons.append("You have dismissed this case. A second, different approver must also dismiss it before the hold is lifted.")
     elif not awaiting and case["state"] != "needs_review":
         reasons.append(f"This case is {case['state'].replace('_', ' ')}; there is nothing to release or review yet.")
     return {
@@ -330,6 +332,8 @@ async def get_case(case_id: UUID, request: Request, user: UserDep):
                 "select app.case_email_only(c) as email_only, app.blocked_approvers(c) as approvers "
                 "from app.cases c where c.id = %s", (case_id,))).fetchone()
 
+    # The release's own check (awaiting_release, ADR-10's two approvers): any approval of this version. Not the
+    # dismiss check, which counts only approvals made while the case is blocked (dismiss["approvers"], spec 0090).
     approved = any(r["actor_id"] == user.user_id and r["action"] == "approve" and r["case_version"] == c["version"] for r in releases)
     timeline, call_events, strict = [], [], False
     for e in events:

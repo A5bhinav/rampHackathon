@@ -209,7 +209,7 @@ paths:
                     last4: null
                   - id: 1
                     received_at: '2026-11-10T14:58:41Z'
-                    sender: billing@acme-suppIy.example
+                    sender: billing@acme-suppIy.example   # deliberate lookalike (a capital I for the l): keep it, it shows lookalike_domain
                     subject: Our bank account has changed
                     flagged: true
                     outcome: case_opened

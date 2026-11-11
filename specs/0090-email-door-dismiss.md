@@ -54,7 +54,12 @@ existing `POST /api/cases/{case_id}/release` with `action=approve`.
 - [ ] (Task 14) `permissions.can_dismiss` is true only for an approver on a blocked email-only case
       who is not in `app.blocked_approvers(case)`; the timeline reads "Dismissed by {name}: Ramp never changed,
       so the hold can be lifted." and "Second person dismissed: the hold is being lifted."; the case
-      page has a "Dismiss (Ramp never changed)" button that needs a reason.
+      page has a "Dismiss (Ramp never changed)" button that needs a reason. After a first dismissal
+      (final review, ledger rows 254 and 283) the page says "The case is blocked, so your approval was
+      recorded as a dismissal. A second, different approver must also dismiss it before the hold is
+      lifted." (also when a stale Approve click on a case that is now blocked became one), and the
+      first dismisser's reason reads "You have dismissed this case. A second, different approver must
+      also dismiss it before the hold is lifted." `can_dismiss` excludes the changer and the reviewer.
 
 ### An approval made while blocked
 
@@ -82,7 +87,7 @@ existing `POST /api/cases/{case_id}/release` with `action=approve`.
 | 6 | `supabase/tests/002_case_machine.sql`, `008_release_replay.sql`, `014_review_needs_approver.sql` (unchanged, still pass) |
 | 7 | `supabase/tests/018_email_ramp_mix.sql` (blocks 1 to 5 refused, including 4b where only `four_eyes`'s new check refuses; blocks 6 to 9 are controls that still release or reject) |
 | 8 | `scripts/db/test.sh` redraws it; the diff is in the PR |
-| 9 | `apps/core/tests/test_email_door.py::test_a_not_verified_email_case_is_dismissed_by_two_people_and_the_hold_lifts`, `apps/web/tests/states.test.ts` |
+| 9 | `apps/core/tests/test_email_door.py::test_a_not_verified_email_case_is_dismissed_by_two_people_and_the_hold_lifts`, `::test_the_changer_and_the_reviewer_can_never_dismiss`, `::test_the_first_dismisser_is_told_a_second_person_must_dismiss`, `apps/web/tests/states.test.ts` |
 
 ## Stated limits (for Abhi)
 

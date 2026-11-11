@@ -17,18 +17,13 @@ import { brief, datasetNow, date, dueLabel, relative, when, words } from "@/lib/
 import { phone, seenBefore, sourceLabel, split } from "@/lib/lineage";
 import { REFRESH_STATES, stations } from "@/lib/stations";
 import { canWatchCall } from "@/lib/live-call";
-import { stateLabel } from "@/lib/states";
+import { actionNotice, stateLabel } from "@/lib/states";
 import { releaseAction, reviewAction } from "./actions";
 
 // Case detail and the action rail (specs 0009, 0036, 0041): the change, the hold, the number
 // chosen, the call, the decision, the evidence trail and (only for someone the rules allow)
-// release or review. The database refuses the changer whatever this page shows.
-const NOTICES: Record<string, string> = {
-  applied: "Done.",
-  already_applied: "That was already recorded.",
-  awaiting_second_approver: "Your approval is recorded. A second approver must release this change.",
-};
-
+// release or review. The database refuses the changer whatever this page shows. The sentence after an
+// action is states.ts's actionNotice.
 const account = (a: { routing_number: string; last4: string }) => `${a.routing_number} ····${a.last4}`;
 
 export default async function CaseDetailPage({ params, searchParams }: {
@@ -53,6 +48,7 @@ export default async function CaseDetailPage({ params, searchParams }: {
     ? detail.releases.find((r) => r.action === "approve" && r.case_version === c.version) : undefined;
   const lastStep = detail.timeline.at(-1);  // its summary is the core's template, so the reason is never guessed here
   const nextDue = dueLabel(c.next_payment_date, now);
+  const notice = actionNotice(done, to);   // the sentence for the action that redirected here
 
   const steps = stations(detail.timeline, c.state, decision?.outcome ?? null);
 
@@ -91,9 +87,9 @@ export default async function CaseDetailPage({ params, searchParams }: {
         </p>
       </PageHead>
 
-      {done && NOTICES[done] ? (
+      {notice ? (
         <Callout tone="ok" role="status" className="page-notice">
-          <p>{NOTICES[done]}{to ? ` The case moved to ${stateLabel(to).toLowerCase()}.` : ""}</p>
+          <p>{notice}</p>
         </Callout>
       ) : null}
 

@@ -24,6 +24,23 @@ export const STATE_TONE: Record<CaseState, Tone> = {
   awaiting_release: "ok", needs_review: "warn", blocked: "bad", releasing: "ok", released: "ok",
 };
 
+// The case page's sentence after an action: the redirect carries the result's status and to_state
+// (see actions.ts). A first dismissal (spec 0090), or a stale Approve click on a case that is now
+// blocked, answers awaiting_second_approver and leaves the case blocked, so it gets its own sentence.
+const NOTICES: Record<string, string> = {
+  applied: "Done.",
+  already_applied: "That was already recorded.",
+  awaiting_second_approver: "Your approval is recorded. A second approver must release this change.",
+};
+
+export function actionNotice(done: string | undefined, to: string | undefined): string | null {
+  if (done === "awaiting_second_approver" && to === "blocked") {
+    return "The case is blocked, so your approval was recorded as a dismissal. A second, different approver must also dismiss it before the hold is lifted.";
+  }
+  if (!done || !Object.hasOwn(NOTICES, done)) return null;
+  return to ? `${NOTICES[done]} The case moved to ${stateLabel(to).toLowerCase()}.` : NOTICES[done];
+}
+
 /** The label for a state; one the dashboard doesn't know reads as its own words. */
 export function stateLabel(state: string): string {
   return Object.hasOwn(STATE_LABEL, state) ? STATE_LABEL[state as CaseState] : words(state);

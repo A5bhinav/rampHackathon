@@ -18,6 +18,7 @@ from pathlib import Path
 import psycopg
 import pytest
 from conftest import core_settings, make_world
+from dialback_core import api
 from dialback_core import worker as worker_module
 from dialback_core.db import system_tx
 from dialback_core.demo import DemoEnv, change, load_seed, prepare
@@ -434,7 +435,11 @@ async def test_an_unflagged_invoice_listing_the_account_on_file_and_another_is_n
      [("121000248", "000099990000"), ("026009593", "000123454821")]),
     ("Routing 121000248\n" + "Thank you.\n" * 30 + "Account 000123454821",                # out of reach: first not on file
      [("121000248", "000123454821")]),
-], ids=["account-first", "routing-first", "account-first-short-labels", "lines", "out-of-reach"])
+    ("Routing 121000248 Acct. 000099990000, Wire Routing 026009593 Acct. 000123454821",   # final review M1: "Acct." ends no clause
+     [("121000248", "000099990000"), ("026009593", "000123454821")]),
+    ("Account 000099990000, Routing 121000248. Account 000123454821, Routing 026009593",   # a period after digits still does:
+     [("121000248", "000099990000"), ("026009593", "000123454821")]),                       # B is 10 characters from both
+], ids=["account-first", "routing-first", "account-first-short-labels", "lines", "out-of-reach", "abbreviation", "after-digits"])
 def test_each_account_pairs_with_its_own_routing_number(text, pairs):
     assert [(routing, a.digits) for routing, a in door._bank_details((text, ""), None).pairs] == pairs
 
@@ -1135,6 +1140,29 @@ async def test_a_blocked_case_a_ramp_change_opened_offers_no_dismiss(door_world)
     (case,) = await cases(w)
     assert case["state"] == "blocked"
     assert (await get(w, url, "approver1", CASE))["permissions"]["can_dismiss"] is False, "Ramp changed: not email only"
+
+
+def test_the_changer_and_the_reviewer_can_never_dismiss():
+    """Spec 0090, Task 14 (final review, ledger row 283): can_dismiss excludes the changer and the reviewer,
+    as eval_guard's dismiss guards do; a third approver may."""
+    changer, reviewer, other = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+    case = {"state": "blocked", "changer_ids": [changer], "reviewed_by": reviewer}
+
+    def can(user):
+        return api.permissions(case, user, ["approver"], False, email_only=True)["can_dismiss"]
+    assert (can(changer), can(reviewer), can(other)) == (False, False, True)
+    assert api.permissions(case, other, ["approver"], False, email_only=False)["can_dismiss"] is False, "not email only"
+
+
+def test_the_first_dismisser_is_told_a_second_person_must_dismiss():
+    """Ledger row 283: after dismissing, the first approver saw the generic "nothing to release or review yet"."""
+    case = {"state": "blocked", "changer_ids": [], "reviewed_by": None}
+    me = uuid.uuid4()
+    after = api.permissions(case, me, ["approver"], False, email_only=True, dismissed=True)
+    assert after["can_dismiss"] is False
+    assert after["reasons"] == ["You have dismissed this case. A second, different approver must also dismiss it before the hold is lifted."]
+    before = api.permissions(case, me, ["approver"], False, email_only=False)
+    assert before["reasons"] == ["This case is blocked; there is nothing to release or review yet."], "a case that isn't email only"
 
 
 async def test_an_approval_given_before_the_case_was_blocked_is_not_a_dismissal(door_world):
