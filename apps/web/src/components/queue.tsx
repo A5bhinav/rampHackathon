@@ -2,13 +2,25 @@ import Link from "next/link";
 import { OutcomeBadge, StateBadge } from "./badges";
 import { MiniRail } from "./flow";
 import { stationsFromEvidence, type StationView } from "@/lib/stations";
-import type { CaseState, CaseSummary } from "@/lib/api-types";
+import type { CaseSummary } from "@/lib/api-types";
+import { core } from "@/lib/core";
 import { brief, date, dueLabel, relative, when } from "@/lib/format";
+import { NEEDS_A_PERSON, readPermissions, rowAction } from "@/lib/queue";
+import type { CaseDetail } from "@/lib/api-types";
+type Permissions = CaseDetail["permissions"];
 
 // The case table shared by the Inbox and the Cases list (specs 0041, 0063): each row's vendor, state
 // with its mini rail, decision, held bills, next payment, deadline and the one action it waits for.
 
-export const NEEDS_A_PERSON: CaseState[] = ["needs_review", "awaiting_release", "blocked"];
+export { NEEDS_A_PERSON };
+
+export type CasePermissions = ReadonlyMap<string, Permissions | null>;
+
+/** The core's own permissions for each waiting case: what the case page's lock card reads (spec 0066).
+ *  Capped and batched; a case whose permissions can't be read counts as nothing to act on. */
+export function actionable(cases: readonly CaseSummary[]): Promise<CasePermissions> {
+  return readPermissions(cases, (id) => core.case(id).then((d) => d.permissions));
+}
 
 export function bySoonestPayment(a: CaseSummary, b: CaseSummary): number {
   const ka = a.next_payment_date ?? "9999-12-31";
@@ -25,9 +37,10 @@ function stripe(c: CaseSummary, soon: boolean): string {
 }
 
 // These only label links; the case page and the database decide who may act.
-function action(c: CaseSummary, href: string) {
-  if (c.state === "awaiting_release") return <Link className="button-link primary" href={href}>Review and release</Link>;
-  if (c.state === "needs_review") return <Link className="button-link" href={href}>Review</Link>;
+function action(c: CaseSummary, href: string, perms: CasePermissions) {
+  const label = rowAction(c.state, perms.get(c.id));
+  if (label === "Review and release") return <Link className="button-link primary" href={href}>{label}</Link>;
+  if (label === "Review") return <Link className="button-link" href={href}>{label}</Link>;
   return <Link className="open-link" href={href}>Open</Link>;
 }
 
@@ -36,8 +49,9 @@ function Held({ c }: { c: CaseSummary }) {
   return <><span className="held-n">{c.bills_held}</span> <span className="muted sub">{c.bills_held === 1 ? "bill" : "bills"}</span></>;
 }
 
-export function QueueTable({ id, title, cases, datasetId, now, rails }: {
+export function QueueTable({ id, title, cases, datasetId, now, rails, perms }: {
   id: string; title: string; cases: CaseSummary[]; datasetId: string; now: Date; rails?: Map<string, StationView[]>;
+  perms: CasePermissions;  // the core's permissions for the waiting cases (actionable)
 }) {
   return (
     <section id={id} className="card queue-group" aria-label={title}>
@@ -73,7 +87,7 @@ export function QueueTable({ id, title, cases, datasetId, now, rails }: {
                       <div className="muted sub">{Date.parse(c.deadline_at) < now.getTime() ? "passed" : relative(c.deadline_at, now)}</div>
                     ) : null}
                   </td>
-                  <td className="num">{action(c, href)}</td>
+                  <td className="num">{action(c, href, perms)}</td>
                 </tr>
               );
             })}
@@ -91,7 +105,7 @@ export function QueueTable({ id, title, cases, datasetId, now, rails }: {
                 <StateBadge state={c.state} />
                 <span className={due?.soon ? "tone-text-bad sub" : "muted sub"}>{due ? due.text : c.state === "blocked" ? "Hold stays on" : ""}</span>
               </div>
-              <div className="qc-action">{action(c, href)}</div>
+              <div className="qc-action">{action(c, href, perms)}</div>
             </li>
           );
         })}

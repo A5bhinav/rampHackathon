@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { OutcomeBadge } from "@/components/badges";
 import { PaymentLanes, QueueRail } from "@/components/flow";
-import { NEEDS_A_PERSON, QueueTable, bySoonestPayment } from "@/components/queue";
+import { NEEDS_A_PERSON, QueueTable, actionable, bySoonestPayment } from "@/components/queue";
 import { Callout, PageHead, Stats } from "@/components/page";
 import { RingMotif } from "@/components/ring-band";
 import type { EvidenceLog } from "@/lib/api-types";
 import { core } from "@/lib/core";
+import { needsYou as waitingOnYou } from "@/lib/queue";
 import { stationCounts, stationsFromEvidence } from "@/lib/stations";
 import { heldTotals } from "@/lib/overview";
 import { demoStory } from "@/lib/story";
@@ -30,6 +31,8 @@ export default async function CaseQueue({ params, searchParams }: {
   const now = datasetNow(dataset?.sim_now);
   const waiting = cases.filter((c) => NEEDS_A_PERSON.includes(c.state)).sort(bySoonestPayment);
   const working = cases.filter((c) => !NEEDS_A_PERSON.includes(c.state)).sort(bySoonestPayment);
+  const perms = await actionable(waiting);  // "Needs you": only what the signed-in person can act on (spec 0066)
+  const needsYou = waitingOnYou(waiting, perms).length;
   const soon = cases.filter((c) => dueLabel(c.next_payment_date, now)?.soon).sort(bySoonestPayment);
   const unconfirmed = cases.filter((c) => c.hold_status === "failed").length;
   const held = heldTotals(cases);
@@ -43,7 +46,7 @@ export default async function CaseQueue({ params, searchParams }: {
       <PageHead
         eyebrow={`${dataset?.label ?? "Dataset"} · Accounts payable`}
         title="Inbox"
-        lead={`${waiting.length} need${waiting.length === 1 ? "s" : ""} you. ${held.bills} bill${held.bills === 1 ? " is" : "s are"} held across ${held.vendors} vendor${held.vendors === 1 ? "" : "s"}.`}
+        lead={`${needsYou} need${needsYou === 1 ? "s" : ""} you. ${held.bills} bill${held.bills === 1 ? " is" : "s are"} held across ${held.vendors} vendor${held.vendors === 1 ? "" : "s"}.`}
       />
       {missing ? (
         <Callout role="status">
@@ -55,7 +58,7 @@ export default async function CaseQueue({ params, searchParams }: {
       ) : null}
       <Stats label="Held payments" items={[
         { label: "On hold", value: held.bills, sub: `${held.bills === 1 ? "bill" : "bills"} · ${held.vendors} vendor${held.vendors === 1 ? "" : "s"}` },
-        { label: "Needs you", value: waiting.length, tone: "warn", sub: "cases waiting on a person" },
+        { label: "Needs you", value: needsYou, tone: "warn", sub: needsYou === waiting.length ? "cases waiting on you" : `cases you can act on · ${waiting.length} waiting on a person` },
         { label: "Due ≤ 3 days", value: soon.length, tone: "bad",
           sub: soon.length ? soon.slice(0, 3).map((c) => c.vendor.legal_name).join(" · ") : "payments overdue or due soon" },
         { label: "Hold not confirmed", value: unconfirmed, tone: "bad" },
@@ -64,7 +67,7 @@ export default async function CaseQueue({ params, searchParams }: {
 
       <div className="tabs-row">
         <nav className="tabs" aria-label="Queue sections">
-          <a href="#waiting" className="tab tab-waiting">Needs you <span className="tab-n">{waiting.length}</span></a>
+          <a href="#waiting" className="tab tab-waiting">Waiting on a person <span className="tab-n">{waiting.length}</span></a>
           <a href="#working" className="tab tab-working">In progress <span className="tab-n">{working.length}</span></a>
           <a href="#released" className="tab tab-released">Released <span className="tab-n">{released.length}</span></a>
         </nav>
@@ -77,8 +80,8 @@ export default async function CaseQueue({ params, searchParams }: {
           <p>No open cases. A case opens here when a vendor&apos;s bank details change in Ramp.{released.length ? " Released changes are listed below." : ""}</p>
         </div>
       ) : null}
-      {waiting.length > 0 ? <QueueTable id="waiting" title="Waiting on a person" cases={waiting} datasetId={datasetId} now={now} rails={rails} /> : null}
-      {working.length > 0 ? <QueueTable id="working" title="In progress" cases={working} datasetId={datasetId} now={now} rails={rails} /> : null}
+      {waiting.length > 0 ? <QueueTable id="waiting" title="Waiting on a person" cases={waiting} datasetId={datasetId} now={now} rails={rails} perms={perms} /> : null}
+      {working.length > 0 ? <QueueTable id="working" title="In progress" cases={working} datasetId={datasetId} now={now} rails={rails} perms={perms} /> : null}
 
       <div className="inbox-lower">
         <div className="inbox-lanes"><PaymentLanes cases={cases} now={now} datasetId={datasetId} /></div>
