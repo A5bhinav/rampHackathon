@@ -140,6 +140,16 @@ None.
   audit log; the vendor's own (undocumented) `status` field, or the bills' `ON_HOLD`, may show it
   sooner. Measuring each read-back's parts would tell. The worker is the money path's; this needs
   its own spec.
+  **Measured, 2026-11-10 (third hold-check run, spec 0099 D10): the audit log is what lags.** On the
+  first read after the hold (+0.0 s), the vendor's own `status` was already `ON_HOLD`, its
+  `updated_at` had moved, and the bill showed `ON_HOLD` with no date; the audit log first showed the
+  hold on the third read (+6.6 s). After the release, the vendor's `status` was back and the bill
+  back to `APPROVAL_PENDING` on the first read; the audit log still showed the hold until the third
+  (+7.0 s). (One run each way: the pattern is plain, the seconds are coarse.) So the layer could read
+  the hold from the vendor's `status` (undocumented, so falling back to the audit log if it's
+  missing), and treat `BILL_PAY_7284` as the hold being on; then the worker's quick read-backs
+  would pass at once, with no change to the worker. Not built: that is spec 0097's layer, a
+  change of its own.
 - **Q207:** Ramp issued a token for a scope the app isn't allowed (`bills:write`) and refused only
   the call (HTTP 403). The core's login doesn't compare what Ramp granted with what it needs, so a
   sandbox dataset missing `bills:write` would hold and call normally, then fail every release when

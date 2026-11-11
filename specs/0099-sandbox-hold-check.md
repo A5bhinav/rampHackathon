@@ -85,6 +85,15 @@ None.
   read. The date set again: PATCH 200, and the bill ended with its starting date and status
   (`2026-11-13`, `APPROVAL_PENDING`). So spec 0097's payment-date call works on Ramp.
 
+## Found on the sandbox, 2026-11-10 (third run, same vendor and bill, with D10)
+
+- After the hold, the first read (+0.0 s) already showed the vendor's `status` as `ON_HOLD` (and a
+  new `updated_at`) and the bill `ON_HOLD` with no date; the audit log showed the hold from the
+  third read (+6.6 s). After the release, the vendor and the bill were back on the first read; the
+  audit log still showed the hold until the third (+7.0 s). Second hold refused again (400,
+  `BILL_PAY_7284`); the date came back again. So the audit log is the part that lags (spec 0097,
+  Q209).
+
 ## Acceptance
 
 - [x] Without `--yes`, or without a needed scope, nothing reaches Ramp.
