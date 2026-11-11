@@ -11,11 +11,11 @@ from pathlib import Path
 
 import eval_flagger
 import pytest
+from dialback_core.email_door import classifier as classifier_module
 from dialback_core.email_door.classifier import ClassifierFailed, Verdict
 
 ASKS = "Hi team, we have changed our bank account. Please update your records."   # the rule flags this
 PLAIN = "Hi team, attached is invoice for October. Thanks!"                        # and not this
-ASKS2 = "We have changed our bank, please note."   # the fake model says yes to this
 SOFT = "Kindly route the remaining balance to Evergreen Mutual from now on. TEXTMARK"   # the model flags this
 BOOM = "Hi team, a note that makes the fake model fail. TEXTMARK"
 QUOTE = "QUOTEMARK from the model"
@@ -94,6 +94,13 @@ def heldout3(root: Path, *, on_file_only_flagged: bool = False, cr04_flagged: bo
     seal3(root)
 
 
+@pytest.fixture(autouse=True)
+def synthetic_pin(monkeypatch):
+    """The synthetic heldout3 tree's ON-FILE-ONLY request is cr-20; the real pin (the three real names) is tested
+    on its own below."""
+    monkeypatch.setattr(eval_flagger, "ON_FILE_ONLY_HELDOUT3", frozenset({"cr-20.json"}))
+
+
 def evaluate(fixtures_dir, name="tuning", model_factory=FakeModel):
     return eval_flagger.evaluate_set(name, eval_flagger.load_set(fixtures_dir / eval_flagger.SETS[name]),
                                      model_factory(), model="claude-haiku-5-5", workers=4)
@@ -119,7 +126,7 @@ def test_a_failure_counts_as_not_flagged_and_is_tallied_by_reason(fixtures):
     assert r["failed"] == {"cr-01.json": "timeout"}   # told apart from an ordinary email that failed
 
 
-def test_only_subject_text_and_label_are_loaded(fixtures):
+def test_only_subject_text_label_and_the_on_file_only_flag_are_loaded(fixtures):
     loaded = eval_flagger.load_set(fixtures / "tuning")
     assert set(loaded["cr-01.json"]) == {"subject", "text", "label", "on_file_only"}
     assert loaded["cr-01.json"]["on_file_only"] is False
@@ -165,11 +172,24 @@ def run_main(fixtures, tmp_path, *args, now=T0, model_factory=FakeModel):
                              make_classifier=lambda m: model_factory(), now=now, expected=EXPECTED)
 
 
-def test_heldout2_needs_the_confirm_flag_and_is_never_read_without_it(tmp_path, capsys):
+def spy_on_read_set(monkeypatch) -> list:
+    """Records each directory eval_flagger.read_set is asked to read (and still reads it)."""
+    seen, real = [], eval_flagger.read_set
+
+    def spy(directory):
+        seen.append(directory.name)
+        return real(directory)
+    monkeypatch.setattr(eval_flagger, "read_set", spy)
+    return seen
+
+
+def test_heldout2_needs_the_confirm_flag_and_is_never_read_without_it(tmp_path, capsys, monkeypatch):
     heldout2(tmp_path, cr36_flagged=True, ordinary_flagged=0)
+    read = spy_on_read_set(monkeypatch)
     assert run_main(tmp_path, tmp_path, "--sets", "heldout2") == 2
     assert "--confirm-heldout2" in capsys.readouterr().err
     assert not (tmp_path / "out").exists()
+    assert read == [], "heldout2 was never read"
 
 
 def test_a_hash_mismatch_refuses_heldout2(tmp_path, capsys):
@@ -285,12 +305,14 @@ def test_every_result_file_records_the_flagger_mode(fixtures, tmp_path):
         assert json.loads(path.read_text())["flagger"] == "model"
 
 
-def test_heldout3_needs_its_own_confirm_flag_and_is_never_read_without_it(tmp_path, capsys):
+def test_heldout3_needs_its_own_confirm_flag_and_is_never_read_without_it(tmp_path, capsys, monkeypatch):
     heldout3(tmp_path)
+    read = spy_on_read_set(monkeypatch)
     assert run_main(tmp_path, tmp_path, "--sets", "heldout3") == 2
     assert "--confirm-heldout3" in capsys.readouterr().err and not (tmp_path / "out").exists()
     heldout2(tmp_path, cr36_flagged=True, ordinary_flagged=0)
     assert run_main(tmp_path, tmp_path, "--sets", "heldout3", "--confirm-heldout2") == 2   # the other flag does not do
+    assert read == [], "heldout3 was never read"
 
 
 def test_a_hash_mismatch_refuses_heldout3(tmp_path, capsys):
@@ -409,3 +431,71 @@ def test_the_table_shows_failures_by_file_and_model_call_latency(fixtures, tmp_p
     run_main(fixtures, tmp_path, "--sets", "tuning")
     out = capsys.readouterr().out
     assert "ord-03.json" in out and "timeout" in out and "model-call latency" in out
+
+
+# Task 6g -------------------------------------------------------------------------------------------------
+
+def test_every_result_records_its_prompt_and_the_header_shows_the_version(fixtures, tmp_path, capsys):
+    assert run_main(fixtures, tmp_path, "--sets", "tuning", "dev") == 0
+    out = capsys.readouterr().out
+    expected = hashlib.sha256(classifier_module.SYSTEM_PROMPT.encode("utf-8")).hexdigest()
+    for path in (tmp_path / "out").glob("*.json"):
+        data = json.loads(path.read_text())
+        assert data["prompt_version"] == classifier_module.PROMPT_VERSION == "v2"
+        assert data["prompt_sha256"] == expected
+    assert out.count("prompt v2") == 2
+    assert "== tuning (claude-haiku-5-5, flagger: model, prompt v2) ==" in out
+
+
+def test_the_recorded_prompt_is_read_from_the_classifier_module_at_run_time(fixtures, tmp_path, monkeypatch):
+    monkeypatch.setattr(classifier_module, "SYSTEM_PROMPT", "another prompt")
+    monkeypatch.setattr(classifier_module, "PROMPT_VERSION", "v9")
+    assert run_main(fixtures, tmp_path, "--sets", "dev") == 0
+    (path,) = (tmp_path / "out").glob("*.json")
+    data = json.loads(path.read_text())
+    assert data["prompt_version"] == "v9"
+    assert data["prompt_sha256"] == hashlib.sha256(b"another prompt").hexdigest()
+
+
+def test_the_pinned_on_file_only_set_is_the_three_named_requests(monkeypatch):
+    monkeypatch.undo()   # the autouse fixture's stand-in for the synthetic tree
+    assert eval_flagger.ON_FILE_ONLY_HELDOUT3 == frozenset({"cr-26.json", "cr-27.json", "cr-31.json"})
+
+
+def heldout3_with_on_file_only(root: Path, names: set[str]) -> None:
+    """A heldout3 tree whose ON-FILE-ONLY change requests are exactly `names`."""
+    ofo = "ON-FILE-ONLY: SECRETNOTE"
+    emails = {name: email("change_request", ASKS, ofo) for name in names}
+    emails["cr-01.json"] = email("change_request", ASKS)
+    for i in range(5):
+        emails[f"ord-{i:02d}.json"] = email("ordinary", PLAIN)
+    write(root / "heldout3", emails)
+    seal3(root)
+
+
+@pytest.mark.parametrize("names", [{"cr-20.json", "cr-21.json"}, set()], ids=["one extra", "one missing"])
+def test_a_heldout3_whose_on_file_only_set_differs_from_the_pin_is_refused(tmp_path, capsys, names):
+    heldout3_with_on_file_only(tmp_path, names)
+    calls = []
+
+    class Spy(FakeModel):
+        def classify(self, subject, text):
+            calls.append(1)
+            return super().classify(subject, text)
+
+    expected = {**EXPECTED, "heldout3": (len(names) + 1, 5)}
+    made = []
+    code = eval_flagger.main(["--sets", "heldout3", "--confirm-heldout3"], fixtures=tmp_path, out_dir=tmp_path / "out",
+                             make_classifier=lambda m: made.append(m) or Spy(), now=T0, expected=expected)
+    err = capsys.readouterr().err
+    assert code == 2 and "heldout3" in err and "ON-FILE-ONLY" in err
+    assert calls == [] and made == [] and not (tmp_path / "out").exists()
+    assert "SECRETNOTE" not in err
+
+
+def test_a_heldout3_whose_on_file_only_set_matches_the_pin_runs(tmp_path):
+    heldout3_with_on_file_only(tmp_path, {"cr-20.json"})
+    expected = {**EXPECTED, "heldout3": (2, 5)}
+    code = eval_flagger.main(["--sets", "heldout3", "--confirm-heldout3"], fixtures=tmp_path, out_dir=tmp_path / "out",
+                             make_classifier=lambda m: FakeModel(), now=T0, expected=expected)
+    assert code == 0 and len(list((tmp_path / "out").glob("*-heldout3.json"))) == 1

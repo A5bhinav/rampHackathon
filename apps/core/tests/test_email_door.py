@@ -265,12 +265,28 @@ async def test_a_model_that_says_no_does_not_stop_the_on_file_mismatch_check(doo
     differ from the account on file still opens a case."""
     w = door_world
     w.worker.classifier = FakeClassifier(False)
+    subject = "Cobalt Freight remittance"
     text = f"Hello from Cobalt Freight LLC. Our details:\nRouting {ROUTING}\nAccount {ACCOUNT}\n"
-    row = await arrive(w, sender=FROM_COBALT, subject="Cobalt Freight remittance", text=text)
+    assert not flag_email(subject, text, "", None).flagged, "the rule alone does not flag it"
+    row = await arrive(w, sender=FROM_COBALT, subject=subject, text=text)
     assert len(w.worker.classifier.asked) == 1, "the model was asked, and said no"
     assert (row["outcome"], row["flagged"], row["routing_number"], row["last4"]) == ("case_opened", True, ROUTING, "4821")
     (case,) = await cases(w)
     assert case["detected_via"] == "email"
+
+
+async def test_the_model_saying_no_overrides_a_rule_yes(door_world):
+    """Decision 12 the other way: the word rule would flag this text, but with a classifier the model alone
+    decides, and it says no. No bank details are named, so the on-file check has nothing to compare."""
+    w = door_world
+    subject = "Cobalt Freight: new bank details"
+    text = "Hi, this is Cobalt Freight. We have changed our bank account. Please update your records.\n"
+    assert flag_email(subject, text, "", None).flagged, "the rule alone flags it"
+    w.worker.classifier = FakeClassifier(False)
+    row = await arrive(w, sender=FROM_COBALT, subject=subject, text=text)
+    assert len(w.worker.classifier.asked) == 1, "the model was asked, and said no"
+    assert (row["outcome"], row["flagged"], row["case_id"]) == ("not_flagged", False, None)
+    await assert_no_case(w)
 
 
 async def test_an_unflagged_invoice_naming_the_account_on_file_opens_nothing(door_world):

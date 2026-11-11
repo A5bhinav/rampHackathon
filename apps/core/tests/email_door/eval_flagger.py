@@ -27,6 +27,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from pathlib import Path
 
+from dialback_core.email_door import classifier as classifier_module
 from dialback_core.email_door.classifier import (
     AnthropicClassifier,
     ChangeClassifier,
@@ -46,6 +47,8 @@ TELEMETRY_VAR = "ANTHROPIC_OPEN_TELEMETRY_TRACES_CONTENT_MODE"
 WORKERS = 4
 MAX_ORDINARY_FLAGGED = 3
 CR_36 = "cr-36.json"   # reported separately on heldout2
+ON_FILE_ONLY_HELDOUT3 = frozenset({"cr-26.json", "cr-27.json", "cr-31.json"})   # pinned: the sealed set's ON-FILE-ONLY requests
+CONFIRMED_SETS = ("heldout2", "heldout3")   # held back: each needs its own --confirm-<name> and a matching hash
 REVISED_EXCLUDED = ("cr-04.json", "cr-10.json")   # leave heldout3's bar when heldout2 informed a prompt revision
 ON_FILE_ONLY = "ON-FILE-ONLY:"   # a change request's note starts with this when only the on-file check can catch it
 FLAGGER = "model"   # the flagger evaluated: the model alone decides (decision 12)
@@ -155,7 +158,11 @@ def evaluate_set(name: str, emails: dict[str, dict], classifier: ChangeClassifie
     by = lambda f, who: outcomes[f] == (True, who) 
     in_tokens, out_tokens = getattr(classifier, "input_tokens", 0), getattr(classifier, "output_tokens", 0)
     result = {
-        "set": name, "model": model, "flagger": FLAGGER, "emails": len(emails),
+        "set": name, "model": model, "flagger": FLAGGER,
+        # read from the classifier module now, not copied, so a result names the prompt that produced it
+        "prompt_version": classifier_module.PROMPT_VERSION,
+        "prompt_sha256": hashlib.sha256(classifier_module.SYSTEM_PROMPT.encode("utf-8")).hexdigest(),
+        "emails": len(emails),
         "change_requests_total": len(crs), "change_requests_flagged": sum(map(flagged, crs)),
         "change_requests_by_model": sum(by(f, "model") for f in crs),
         "ordinary_total": len(ords), "ordinary_flagged": sum(map(flagged, ords)),
@@ -188,7 +195,7 @@ def table(r: dict) -> str:
     cost = "unknown" if r["cost_usd"] is None else f"${r['cost_usd']:.4f}"
     lat = lambda v: "n/a" if v is None else f"{v:.2f}s" 
     lines = [
-        f"== {r['set']} ({r['model']}, flagger: {r['flagger']}) ==",
+        f"== {r['set']} ({r['model']}, flagger: {r['flagger']}, prompt {r['prompt_version']}) ==",
         f"change requests flagged {r['change_requests_flagged']}/{r['change_requests_total']}",
         f"ordinary flagged        {r['ordinary_flagged']}/{r['ordinary_total']}",
         f"failures (counted as not flagged): {r['failures'] or 'none'}",
@@ -237,14 +244,19 @@ def main(argv: list[str] | None = None, *, fixtures: Path = FIXTURES, out_dir: P
             raise EvalError(f"{TELEMETRY_VAR} would put email text in trace spans; unset it (or use metadata)")
         loaded = {}
         for name in sets:
-            if name in ("heldout2", "heldout3") and not getattr(args, f"confirm_{name}"):
+            if name in CONFIRMED_SETS and not getattr(args, f"confirm_{name}"):
                 raise EvalError(f"{name} is held back: pass --confirm-{name} to run it")
             if name in SEALED and list(out_dir.glob(f"*-{safe_model}-{name}.json")):
                 raise EvalError(f"a {name} result for {args.model} already exists in {out_dir.name}; it runs once")
             emails, digest = read_set(fixtures / SETS[name])
-            if name in ("heldout2", "heldout3") and digest != (fixtures / f"{name}.sha256").read_text().split()[0]:
+            if name in CONFIRMED_SETS and digest != (fixtures / f"{name}.sha256").read_text().split()[0]:
                 raise EvalError(f"the {name} hash does not match {name}.sha256; refusing to run")
             check_composition(name, emails, expected[name])
+            if name == "heldout3":
+                derived = frozenset(f for f, e in emails.items() if e["label"] == "change_request" and e["on_file_only"])
+                if derived != ON_FILE_ONLY_HELDOUT3:
+                    raise EvalError("the heldout3 ON-FILE-ONLY change requests are not the pinned three "
+                                    f"({', '.join(sorted(ON_FILE_ONLY_HELDOUT3))}); refusing to run")
             loaded[name] = emails
         classifier = make_classifier(args.model)
     except EvalError as exc:
