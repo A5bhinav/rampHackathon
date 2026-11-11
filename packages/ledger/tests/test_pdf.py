@@ -132,3 +132,69 @@ def test_unmapped_glyphs_hold_no_digits():
     got = read_spans(data)
     assert got and len("".join(s["text"] for s in got)) == 7, "each glyph is kept, as one character"
     assert not any(ch.isdigit() for s in got for ch in s["text"])
+
+
+# --- Ink (D3): with and without the text that draws it -------------------------------------------------
+
+AR = "AR direct: (415) 555-0142"
+
+
+def no_visible_candidate(data: bytes, e164: str = "+14155550142") -> bool:
+    return not [c for c in find_phones(lines(document_of(data))) if c.e164 == e164 and c.visibility == "visible"]
+
+
+@pytest.mark.parametrize("plant", [{"trick": "cover_rect"}, {"trick": "cover_image"}, {"trick": "invisible"},
+                                   {"trick": "invisible", "under": "#000000"}, {"trick": "clipped"}],
+                         ids=["covered_by_a_rectangle", "covered_by_an_image", "invisible_render_mode",
+                              "invisible_over_a_black_bar", "clipped"])
+def test_the_ink_tricks_are_no_ink(plant):
+    data = pdf_of([span("Main: 206.555.0117", y=86), span(AR, **plant)])
+    assert classes(data) == [("Main: 206.555.0117", "visible"), (AR, "no_ink")]
+    assert no_visible_candidate(data)
+
+
+def test_covered_by_a_rectangle_is_no_ink():
+    assert only(pdf_of([span(AR, trick="cover_rect")])) == (AR, "no_ink")
+
+
+def test_covered_by_an_image_is_no_ink():
+    assert only(pdf_of([span(AR, trick="cover_image")])) == (AR, "no_ink")
+
+
+def test_invisible_render_mode_is_no_ink():
+    assert only(pdf_of([span(AR, trick="invisible")])) == (AR, "no_ink")
+
+
+def test_invisible_over_a_black_bar_is_no_ink():
+    assert only(pdf_of([span(AR, trick="invisible", under="#000000")])) == (AR, "no_ink")
+
+
+def test_clipped_is_no_ink():
+    assert only(pdf_of([span(AR, trick="clipped")])) == (AR, "no_ink")
+
+
+def test_an_invisible_number_overlapping_a_visible_line_is_no_ink():
+    visible = span("Main: 206.555.0117", 72, 100)
+    hidden = span("415-555-0109", 72 + text_width("Main: ", 10), 100, trick="invisible")
+    data = pdf_of([visible, hidden])
+    assert no_visible_candidate(data, "+14155550109")
+    seen = "".join(t for t, c in classes(data) if c == "visible")
+    assert sorted(seen.replace(" ", "")) == sorted("Main:206.555.0117"), "only the visible line's characters are visible"
+
+
+def test_white_over_a_white_shape_is_white():
+    assert only(pdf_of([span(AR, color="#ffffff", under="#ffffff")])) == (AR, "white")
+
+
+def test_a_colour_over_a_shape_of_that_colour_is_no_ink():
+    assert only(pdf_of([span(AR, color="#808080", under="#808080")])) == (AR, "no_ink")
+
+
+def test_spaces_keep_a_no_ink_span_whole():
+    data = pdf_of([span(AR, trick="invisible")])
+    assert only(data) == (AR, "no_ink")
+    assert [(c.e164, c.visibility) for c in find_phones(lines(document_of(data)))] == [("+14155550142", "no_ink")]
+
+
+def test_light_but_visible_text_has_ink():
+    assert only(pdf_of([span(AR, color="#e6e6e6")])) == (AR, "visible")

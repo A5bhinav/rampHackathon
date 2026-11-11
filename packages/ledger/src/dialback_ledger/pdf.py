@@ -18,10 +18,17 @@ express carries `ink: false`, so `visibility.classify` never reads a hidden span
 """
 from __future__ import annotations
 
+import ctypes
+import io
 import math
 import re
 import time
 from collections.abc import Sequence
+
+import numpy as np
+import pdfplumber
+import pypdfium2 as pdfium
+import pypdfium2.raw as pdfium_c
 
 from .visibility import NEAR_WHITE, TINY_POINTS, classify
 
@@ -29,6 +36,10 @@ READER_VERSION = "1"            # extractor_version is "pdf-<this>/<labeler>" (D
 BASELINE_TOLERANCE = 0.5        # points: characters this close in baseline share a line
 WORD_GAP = 1.0                  # a gap wider than this many of the left character's size splits a span (D2)
 NARROW_POINTS = 0.8             # a non-whitespace character narrower than this can't be read: no_ink
+TIME_LIMIT_SECONDS = 20.0       # D4: reading that takes longer is refused
+INK_SCALE = 3                   # the ink check renders at 216 dpi, so small glyphs still cover whole pixels
+INK_DIFF = 16                   # a pixel has ink when a channel moves by this much: the white rule's own margin
+INK_MARGIN = 2.0                # points rendered around an object's characters
 _CID = re.compile(r"\(cid:\d+\)")
 
 
@@ -70,7 +81,7 @@ def _white(color: str | None) -> bool:
 
 def _text(char: dict) -> str:
     """An unmapped glyph (pdfminer's "(cid:N)") is kept, but holds no digits (D4)."""
-    return _CID.sub("�", str(char.get("text", "")))
+    return _CID.sub("\ufffd", str(char.get("text", "")))
 
 
 def _early_class(char: dict, crop: tuple[float, float, float, float]) -> str | None:
@@ -96,9 +107,80 @@ def _early_class(char: dict, crop: tuple[float, float, float, float]) -> str | N
     return None
 
 
+def _pdfium_chars(pdfium_page) -> list[tuple[str, int | None]]:
+    """The page's characters as PDFium reads them, without the spaces and line breaks it adds and without
+    whitespace, each with the index of the top-level text object that draws it (None: no object, or one nested
+    in a form, which the ink check can't hide on its own)."""
+    objects = {ctypes.addressof(o.raw.contents): k for k, o in enumerate(pdfium_page.get_objects(max_depth=0))}
+    textpage = pdfium_page.get_textpage()
+    try:
+        out = []
+        for i in range(textpage.count_chars()):
+            if pdfium_c.FPDFText_IsGenerated(textpage.raw, i) != 0:
+                continue
+            ch = chr(pdfium_c.FPDFText_GetUnicode(textpage.raw, i))
+            if ch.isspace():
+                continue
+            obj = pdfium_c.FPDFText_GetTextObject(textpage.raw, i)
+            out.append((ch, objects.get(ctypes.addressof(obj.contents)) if obj else None))
+        return out
+    finally:
+        textpage.close()
+
+
+def _render(pdfium_page, box, crop) -> np.ndarray:
+    x0, top, x1, bottom = box
+    cx0, ctop, cx1, cbottom = crop
+    bitmap = pdfium_page.render(scale=INK_SCALE, crop=(x0 - cx0, cbottom - bottom, cx1 - x1, top - ctop),
+                                may_draw_forms=False)
+    return np.asarray(bitmap.to_numpy(), dtype=np.int16)
+
+
 def _ink(chars: Sequence[dict], need: set[int], pdfium_page, crop, deadline: float) -> dict[int, bool]:
-    """Whether each character in `need` leaves a mark on the page (Task 4 replaces this placeholder)."""
-    return {i: True for i in need}
+    """Whether each character in `need` leaves a mark on the page (D3). The page is rendered as it is and with
+    the text object that draws the character hidden; the character has ink when the two renders differ inside
+    its own box. Comparing with and without the text, not the box against its surroundings, catches text drawn
+    under a shape or an image, in invisible mode, clipped away, or in the colour of what's under it. A character
+    the reader can't tie to its own text object has no ink (R7)."""
+    solid = [i for i, ch in enumerate(chars) if not _text(ch).isspace()]
+    theirs = _pdfium_chars(pdfium_page)
+    if len(theirs) != len(solid) or any(_text(chars[i]) not in (u, "\ufffd") for i, (u, _) in zip(solid, theirs)):
+        return {i: False for i in need}              # the two readings of the page disagree: can't isolate
+    owner = {i: k for i, (_, k) in zip(solid, theirs)}
+    by_object: dict[int, list[int]] = {}
+    for i in need:
+        if owner.get(i) is not None:
+            by_object.setdefault(owner[i], []).append(i)
+    ink = {i: False for i in need}
+    objects = list(pdfium_page.get_objects(max_depth=0))
+    cx0, ctop, cx1, cbottom = crop
+    for k, members in sorted(by_object.items()):
+        box = (max(cx0, min(float(chars[i]["x0"]) for i in members) - INK_MARGIN),
+               max(ctop, min(float(chars[i]["top"]) for i in members) - INK_MARGIN),
+               min(cx1, max(float(chars[i]["x1"]) for i in members) + INK_MARGIN),
+               min(cbottom, max(float(chars[i]["bottom"]) for i in members) + INK_MARGIN))
+        obj = objects[k].raw
+        mode = pdfium_c.FPDFTextObj_GetTextRenderMode(obj)
+        before = _render(pdfium_page, box, crop)
+        pdfium_c.FPDFTextObj_SetTextRenderMode(obj, pdfium_c.FPDF_TEXTRENDERMODE_INVISIBLE)
+        try:
+            after = _render(pdfium_page, box, crop)
+        finally:
+            pdfium_c.FPDFTextObj_SetTextRenderMode(obj, mode)
+        if before.shape != after.shape:
+            continue                                  # can't compare: no ink (R7)
+        diff = np.abs(before - after).max(axis=2)
+        for i in members:
+            ch = chars[i]
+            px0 = math.floor((float(ch["x0"]) - box[0]) * INK_SCALE) + 1
+            px1 = math.ceil((float(ch["x1"]) - box[0]) * INK_SCALE) - 1
+            py0 = math.floor((float(ch["top"]) - box[1]) * INK_SCALE)
+            py1 = math.ceil((float(ch["bottom"]) - box[1]) * INK_SCALE)
+            cell = diff[max(py0, 0):max(py1, 0), max(px0, 0):max(px1, 0)]
+            ink[i] = bool(cell.size) and int(cell.max()) >= INK_DIFF
+        if time.monotonic() > deadline:
+            raise PdfRefused("too_slow")
+    return ink
 
 
 def _lines(chars: Sequence[dict]) -> list[list[int]]:
@@ -171,9 +253,10 @@ def _page(plumber_page, pdfium_page, deadline: float) -> dict:
 
 def read_pdf(data: bytes) -> list[dict]:
     """The PDF's pages in the page model (D1)."""
-    import io
-
-    import pdfplumber
-    deadline = time.monotonic() + 20.0
-    with pdfplumber.open(io.BytesIO(data)) as pdf:
-        return [_page(p, None, deadline) for p in pdf.pages]
+    deadline = time.monotonic() + TIME_LIMIT_SECONDS
+    document = pdfium.PdfDocument(data)
+    try:
+        with pdfplumber.open(io.BytesIO(data)) as pdf:
+            return [_page(p, document[n], deadline) for n, p in enumerate(pdf.pages)]
+    finally:
+        document.close()
