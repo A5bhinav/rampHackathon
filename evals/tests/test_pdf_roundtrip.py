@@ -103,3 +103,36 @@ def test_every_visible_span_has_ink_and_every_planted_one_has_none():
         _, pages = _read(source_id)
         (trick,) = [r for r in pages[0]["spans"] if r["text"] == AR["text"]]
         assert trick.get("ink") is False
+
+
+def test_lab_docs_patterns_match(monkeypatch):
+    # Spec 0092, D8: `lab docs` at its gate's own arguments finds the same failing patterns whether every
+    # document reaches ingestion as a page model or as a real PDF read back. Both places the lab ingests (G1 to
+    # G6 in docgen.check_doc, G7 through the bridge) are swapped for the PDF path. The whole report must match
+    # too: with an exact round trip, ingestion's output is the same.
+    from _sources import ROOT
+    from dialback_evals import bridge, docgen
+    from dialback_ledger import ingest as ledger_ingest
+    from dialback_ledger.reader import StubReader
+
+    frozen = ROOT / "evals" / "docs-generated"
+    page_model = docgen.run(examples=1000, seed=0, reader=StubReader())
+    page_model_frozen = docgen.rerun_frozen(frozen, reader=StubReader())
+    real = ledger_ingest.ingest_all
+    calls = {"check_doc": 0, "bridge": 0}
+
+    def through_pdfs(site):
+        def ingest_all(documents, *, extractor_version, reader):
+            calls[site] += 1
+            return real(documents, extractor_version=extractor_version, reader=reader,
+                        pdfs={d["id"]: render_pdf(d) for d in documents})
+        return ingest_all
+
+    monkeypatch.setattr(ledger_ingest, "ingest_all", through_pdfs("check_doc"))
+    monkeypatch.setattr(bridge, "ingest_all", through_pdfs("bridge"))
+    pdf_run = docgen.run(examples=1000, seed=0, reader=StubReader())
+    pdf_frozen = docgen.rerun_frozen(frozen, reader=StubReader())
+    assert calls["check_doc"] >= 1000 and calls["bridge"] >= len(docgen.draw_worlds(seed=0)), calls
+    assert {v.pattern for v in pdf_run.violations} == {v.pattern for v in page_model.violations}
+    assert pdf_frozen == page_model_frozen
+    assert docgen.report(pdf_run) == docgen.report(page_model)

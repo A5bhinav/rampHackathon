@@ -52,7 +52,19 @@ def test_provenance_comes_from_custody():
 @pytest.mark.parametrize("path", TRUTHS, ids=lambda p: p.stem)
 def test_gate_b_ingest_then_select_reproduces_the_truth(path):
     truth, inputs = corpus_world(path)
-    result = ingested(truth)
+    gate_b(truth, inputs, ingested(truth))
+
+
+@pytest.mark.parametrize("path", TRUTHS, ids=lambda p: p.stem)
+def test_gate_b_through_pdfs(path):
+    # Spec 0092, D8: every document rendered to a real PDF, then ingest_pdf (C04 rendered digital).
+    from _pdfs import corpus_pdfs
+    truth, inputs = corpus_world(path)
+    docs = json.loads((ROOT / "corpus" / truth["documents"]).read_text())
+    gate_b(truth, inputs, ingest_all(docs, extractor_version="test", reader=StubReader(), pdfs=corpus_pdfs(docs)))
+
+
+def gate_b(truth, inputs, result):
     assert result.dropped == []
     # Everything select() reads comes from ingest(): its documents' custody and its observations.
     inputs["documents"] = [DocumentRef(d["id"], d["custody_channel"], d["received_at"], d["sender"], d["thread_id"],
@@ -110,7 +122,7 @@ def test_every_test_passes_a_reader_to_ingest():
         if {".venv", "node_modules"} & set(path.parts):
             continue
         for node in ast.walk(ast.parse(path.read_text(), str(path))):
-            if isinstance(node, ast.Call) and getattr(node.func, "id", getattr(node.func, "attr", None)) in {"ingest", "ingest_all"}:
+            if isinstance(node, ast.Call) and getattr(node.func, "id", getattr(node.func, "attr", None)) in {"ingest", "ingest_all", "ingest_pdf"}:
                 reader = next((k.value for k in node.keywords if k.arg == "reader"), None)
                 if reader is None or (isinstance(reader, ast.Constant) and reader.value is None):
                     missing.append(f"{path.relative_to(ROOT)}:{node.lineno}")

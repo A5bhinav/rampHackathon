@@ -21,10 +21,11 @@ including the decision of which number to call.
 | The demo's ledger and `dialback-ledger demo` | `demo.py`, `demo_seed.json` | 0025 |
 | Vendor risk list | `risk.py`, `apps/web/…/risk` | 0026 |
 | The LLM reader (`DIALBACK_READER=llm`, default `stub`) and its evaluation script | `llm_reader.py`, `scripts/reader_eval.py` | 0049 |
+| Real digital PDFs: read into the page model with visibility per character (`no_ink` included), `ingest_pdf`, `dialback-ledger read-pdf FILE` | `pdf.py`, `ingest.py` | 0092 (Part A) |
 
 Not built yet: the LLM reader's prompt work against real documents and its scored run (the
-100-document labeled set, spec 0049; the reader is built and tested on a faked API only), reading
-real PDFs and scans, entity resolution, `lineage()` as its own call (the panel reads the stored
+100-document labeled set, spec 0049; the reader is built and tested on a faked API only), scans
+and the pixel check on digital PDFs (spec 0092, Part B), entity resolution, `lineage()` as its own call (the panel reads the stored
 selection), the ledger's nightly evals and ablations. Open questions for the team are in specs
 0024 to 0026 (Q45, Q46, Q51 to Q53) and 0049 (Q107, Q108, Q110, Q123).
 
@@ -52,8 +53,8 @@ for the Nov 1 walking skeleton).
 | Stage | What happens |
 |---|---|
 | Custody | Record how the document reached us (email, contract upload, vendor portal, listing snapshot, paper mail), our own receive time, the sender, the thread headers and a SHA-256. Attachments inherit their email's custody. |
-| Text | pdfplumber extracts the text with each character's color, size and position. Pages without a text layer go to Claude's vision input (scans stay about 5% of the corpus). |
-| Visibility | Flag white, tiny and off-page text. Hidden values are kept, marked not visible to a person, and never eligible. OCR of the rendered page double-checks flagged documents, everything in a change context, and a random 10%. |
+| Text | pdfplumber extracts the text with each character's color, size and position (`pdf.py`, spec 0092), into the same page model the corpus uses. A page with no characters is a scan: refused while scans are off (spec 0092, Part B, reads it with local OCR and Claude's vision input). |
+| Visibility | Flag white, tiny, off-page and no-ink text, per character. No ink: rendering the page with PDFium with and without the text changes nothing in its box (covered, invisible, clipped, or the colour of what's under it). Hidden values are kept, marked not visible to a person, and never eligible. |
 | Candidates | libphonenumber finds phone numbers; code finds checksum-valid routing numbers and labeled account numbers. |
 | Labeling (AI) | A quarantined model with no tools sees one document's visible text and returns JSON that must match a schema: each value's role (main, AR, billing, fax), its party (vendor, customer, bank) and the exact quote. Starts on Haiku 5.5; a 100-document labeled set decides on day 2 whether it needs Sonnet 5.5. Flag: `DIALBACK_READER=stub|llm`. |
 | Grounding | Each quote must appear in the visible text and match a candidate. Code parses the value from the quote, not from the model's output; anything else is dropped (OWASP LLM09: zero ungrounded values accepted, by construction). |

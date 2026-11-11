@@ -3,9 +3,13 @@
 Code runs every stage but labeling: custody, text, visibility, candidates, then the reader on
 visible text only, then grounding. Every candidate code found becomes an observation; a label can
 only describe it. Writing the rows is the database wiring (Q45).
+
+A real PDF goes through `ingest_pdf` (spec 0092): read into the page model, then the same `ingest()`.
 """
 from __future__ import annotations
 
+import hashlib
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 
 from .candidates import find_phones
@@ -24,7 +28,9 @@ class IngestResult:
 
 
 def ingest(document: dict, custody: Custody, *, extractor_version: str, reader: Reader | None = None,
-           result: IngestResult | None = None) -> IngestResult:
+           result: IngestResult | None = None, sha256: str | None = None) -> IngestResult:
+    """One document's rows. `sha256` is the custody hash when the caller holds the file itself (a PDF's
+    bytes, spec 0092 D5); by default it is the hash of the page model's pages."""
     if custody.document_id != document["id"]:
         raise ValueError(f"custody for {custody.document_id} given for document {document['id']}")
     result = result if result is not None else IngestResult()
@@ -39,7 +45,7 @@ def ingest(document: dict, custody: Custody, *, extractor_version: str, reader: 
     labels = {g.candidate: g for g in accepted}
     result.dropped += [(document["id"], raw, why) for raw, why in dropped]
     result.documents.append({
-        "id": document["id"], "kind": document["kind"], "sha256": document_sha256(document),
+        "id": document["id"], "kind": document["kind"], "sha256": sha256 or document_sha256(document),
         "custody_channel": custody.channel, "received_at": custody.received_at,
         "claimed_date": document.get("claimed_date"), "sender": custody.sender, "thread_id": custody.thread_id,
         "subject": custody.subject, "parent_document_id": custody.parent_document_id})
@@ -54,8 +60,25 @@ def ingest(document: dict, custody: Custody, *, extractor_version: str, reader: 
     return result
 
 
-def ingest_all(documents: list[dict], *, extractor_version: str, reader: Reader | None = None) -> IngestResult:
-    """Ingest a batch; an attachment's parent must be in the batch (its custody comes from there)."""
+def ingest_pdf(data: bytes, document: dict, custody: Custody, *, extractor_version: str, reader: Reader | None = None,
+               result: IngestResult | None = None) -> IngestResult:
+    """A real PDF's rows (spec 0092, D1 and D5). `document` is everything but its pages (any `pages` it has are
+    replaced by what the file holds). The file is read first: a refused file (`PdfRefused`) leaves `result`
+    untouched. The stored hash is the file's, and `extractor_version` names both the text reader and the
+    labeler: `pdf-<reader version>/<labeler version>`."""
+    from .pdf import READER_VERSION, PdfRefused, read_pdf  # here, so page-model ingestion never loads PDFium
+    try:
+        pages = read_pdf(data)
+    except PdfRefused as exc:   # fail closed: nothing of this document reaches `result` (D4)
+        raise exc.for_document(document["id"]) from None
+    return ingest({**document, "pages": pages}, custody, extractor_version=f"pdf-{READER_VERSION}/{extractor_version}",
+                  reader=reader, result=result, sha256=hashlib.sha256(data).hexdigest())
+
+
+def ingest_all(documents: list[dict], *, extractor_version: str, reader: Reader | None = None,
+               pdfs: Mapping[str, bytes] | None = None) -> IngestResult:
+    """Ingest a batch; an attachment's parent must be in the batch (its custody comes from there). A document
+    whose id is in `pdfs` is read from that PDF instead of its pages (spec 0092)."""
     by_id = {d["id"]: d for d in documents}
     custody: dict[str, Custody] = {}
 
@@ -71,5 +94,9 @@ def ingest_all(documents: list[dict], *, extractor_version: str, reader: Reader 
     result = IngestResult()
     reader = reader or reader_for(reader_mode())
     for d in documents:
-        ingest(d, resolve(d["id"]), extractor_version=extractor_version, reader=reader, result=result)
+        if pdfs is not None and d["id"] in pdfs:
+            ingest_pdf(pdfs[d["id"]], d, resolve(d["id"]), extractor_version=extractor_version, reader=reader,
+                       result=result)
+        else:
+            ingest(d, resolve(d["id"]), extractor_version=extractor_version, reader=reader, result=result)
     return result

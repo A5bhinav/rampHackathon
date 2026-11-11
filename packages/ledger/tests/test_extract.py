@@ -66,6 +66,21 @@ def test_gate_a_every_planted_number_and_nothing_else(path):
     assert got == want
 
 
+@pytest.mark.parametrize("path", TRUTHS, ids=lambda p: p.stem)
+def test_gate_a_through_pdfs(path):
+    # Spec 0092, D8: the same gate with every document rendered to a real PDF and read back (C04's scanned
+    # contract is rendered as a digital PDF in Part A).
+    from _pdfs import corpus_pdfs
+    from dialback_ledger.pdf import read_pdf
+    truth = json.loads(path.read_text())
+    docs = json.loads((ROOT / "corpus" / truth["documents"]).read_text())
+    pdfs = corpus_pdfs(docs)
+    want = Counter((s["document_id"], p["e164"], s["visibility"]) for p in truth["planted"] for s in p["sightings"])
+    got = Counter((d["id"], c.e164, c.visibility) for d in docs
+                  for c in find_phones(lines({**d, "pages": read_pdf(pdfs[d["id"]])})))
+    assert got == want
+
+
 def test_anything_unreadable_counts_as_hidden():
     doc = page(span("no colour", color=None), span("odd colour", color="blue"), span("no x", x=None),
                span("text x", x="left"), span("nan size", size=float("nan")), span("inf y", y=float("inf")))

@@ -93,3 +93,19 @@ def refused_pdfs() -> list[tuple[str, str, bytes]]:
         ("rotated", "rotated", pdf_of(ar, rotate=90)),
         ("scan", "scan", pdf_of([])),
     ]
+
+
+_RENDERED: dict[str, bytes] = {}
+
+
+def corpus_pdfs(documents: list[dict]) -> dict[str, bytes]:
+    """Each document rendered to a PDF, by id: what `ingest_all(..., pdfs=...)` reads instead of its pages.
+    Cached across tests by the document's whole content."""
+    import json
+    out = {}
+    for d in documents:
+        key = json.dumps(d, sort_keys=True)
+        if key not in _RENDERED:
+            _RENDERED[key] = render_pdf(d)
+        out[d["id"]] = _RENDERED[key]
+    return out
