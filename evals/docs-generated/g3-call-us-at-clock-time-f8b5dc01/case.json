@@ -1,0 +1,77 @@
+{
+  "name": "g3-call-us-at-clock-time-f8b5dc01",
+  "patterns": [
+    "G3/call_us_at/clock_time",
+    "G4/call_us_at/clock_time"
+  ],
+  "why": "G3/call_us_at/clock_time: shrunk from doc-s0-00019, found by lab docs at seed 0 in 1000 documents",
+  "plan": {
+    "type": "doc",
+    "id": "doc-s0-00019",
+    "kind": "remittance_notice",
+    "author": "bank",
+    "channel": "paper_mail",
+    "sender": null,
+    "thread": null,
+    "subject": null,
+    "received_at": "2025-10-23T16:00:00+00:00",
+    "filler": [],
+    "numbers": [
+      {
+        "e164": "+14235550185",
+        "owner": "bank",
+        "role": "main",
+        "party": "bank",
+        "phrasing": "call_us_at",
+        "placement": "clock_time",
+        "format": "paren",
+        "visibility": "visible",
+        "shares_line": false
+      }
+    ],
+    "quote": null
+  },
+  "documents": [
+    {
+      "id": "doc-s0-00019",
+      "kind": "remittance_notice",
+      "custody": {
+        "channel": "paper_mail",
+        "received_at": "2025-10-23T16:00:00+00:00",
+        "sender": null,
+        "thread_id": null,
+        "subject": null,
+        "parent_document_id": null
+      },
+      "pages": [
+        {
+          "width": 612,
+          "height": 792,
+          "spans": [
+            {
+              "text": "Remittance notice",
+              "x": 72,
+              "y": 72,
+              "size": 10,
+              "color": "#000000"
+            },
+            {
+              "text": "First Example Bank",
+              "x": 72,
+              "y": 86,
+              "size": 10,
+              "color": "#000000"
+            },
+            {
+              "text": "Office hours 9:00-5:00, call us at (423) 555-0185",
+              "x": 72,
+              "y": 100,
+              "size": 10,
+              "color": "#000000"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

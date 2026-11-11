@@ -1,0 +1,76 @@
+{
+  "name": "g3-accounts-receivable-label-number-9145365d",
+  "patterns": [
+    "G3/accounts_receivable/label_number"
+  ],
+  "why": "G3/accounts_receivable/label_number: shrunk from doc-s0-00017, found by lab docs at seed 0 in 1000 documents",
+  "plan": {
+    "type": "doc",
+    "id": "doc-s0-00017",
+    "kind": "signature_block",
+    "author": "unrelated",
+    "channel": "email",
+    "sender": "info@other.example",
+    "thread": "t-doc-s0-00017",
+    "subject": "Quick question",
+    "received_at": "2026-08-31T16:00:00+00:00",
+    "filler": [],
+    "numbers": [
+      {
+        "e164": "+14695550179",
+        "owner": "unrelated",
+        "role": "ar",
+        "party": null,
+        "phrasing": "accounts_receivable",
+        "placement": "label_number",
+        "format": "paren",
+        "visibility": "visible",
+        "shares_line": false
+      }
+    ],
+    "quote": null
+  },
+  "documents": [
+    {
+      "id": "doc-s0-00017",
+      "kind": "signature_block",
+      "custody": {
+        "channel": "email",
+        "received_at": "2026-08-31T16:00:00+00:00",
+        "sender": "info@other.example",
+        "thread_id": "t-doc-s0-00017",
+        "subject": "Quick question",
+        "parent_document_id": null
+      },
+      "pages": [
+        {
+          "width": 612,
+          "height": 792,
+          "spans": [
+            {
+              "text": "Message",
+              "x": 72,
+              "y": 72,
+              "size": 10,
+              "color": "#000000"
+            },
+            {
+              "text": "Other Example Logistics",
+              "x": 72,
+              "y": 86,
+              "size": 10,
+              "color": "#000000"
+            },
+            {
+              "text": "Accounts receivable: (469) 555-0179",
+              "x": 72,
+              "y": 100,
+              "size": 10,
+              "color": "#000000"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

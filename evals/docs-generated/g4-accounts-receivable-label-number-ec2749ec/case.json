@@ -1,0 +1,77 @@
+{
+  "name": "g4-accounts-receivable-label-number-ec2749ec",
+  "patterns": [
+    "G3/accounts_receivable/label_number",
+    "G4/accounts_receivable/label_number"
+  ],
+  "why": "G4/accounts_receivable/label_number: shrunk from doc-s0-00044, found by lab docs at seed 0 in 1000 documents",
+  "plan": {
+    "type": "doc",
+    "id": "doc-s0-00044",
+    "kind": "email_body",
+    "author": "customer",
+    "channel": "email",
+    "sender": "ap@customer.example",
+    "thread": "t-doc-s0-00044",
+    "subject": "Following up",
+    "received_at": "2026-07-11T16:00:00+00:00",
+    "filler": [],
+    "numbers": [
+      {
+        "e164": "+16455550183",
+        "owner": "customer",
+        "role": "ar",
+        "party": "customer",
+        "phrasing": "accounts_receivable",
+        "placement": "label_number",
+        "format": "paren",
+        "visibility": "visible",
+        "shares_line": false
+      }
+    ],
+    "quote": null
+  },
+  "documents": [
+    {
+      "id": "doc-s0-00044",
+      "kind": "email_body",
+      "custody": {
+        "channel": "email",
+        "received_at": "2026-07-11T16:00:00+00:00",
+        "sender": "ap@customer.example",
+        "thread_id": "t-doc-s0-00044",
+        "subject": "Following up",
+        "parent_document_id": null
+      },
+      "pages": [
+        {
+          "width": 612,
+          "height": 792,
+          "spans": [
+            {
+              "text": "Message",
+              "x": 72,
+              "y": 72,
+              "size": 10,
+              "color": "#000000"
+            },
+            {
+              "text": "Example Customer Co",
+              "x": 72,
+              "y": 86,
+              "size": 10,
+              "color": "#000000"
+            },
+            {
+              "text": "Accounts receivable: (645) 555-0183",
+              "x": 72,
+              "y": 100,
+              "size": 10,
+              "color": "#000000"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

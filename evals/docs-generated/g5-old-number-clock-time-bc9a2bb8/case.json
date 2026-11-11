@@ -1,0 +1,76 @@
+{
+  "name": "g5-old-number-clock-time-bc9a2bb8",
+  "patterns": [
+    "G5/old_number/clock_time"
+  ],
+  "why": "G5/old_number/clock_time: shrunk from doc-s0-00378, found by lab docs at seed 0 in 1000 documents",
+  "plan": {
+    "type": "doc",
+    "id": "doc-s0-00378",
+    "kind": "signature_block",
+    "author": "bank",
+    "channel": "email",
+    "sender": "notices@firstexamplebank.example",
+    "thread": "t-doc-s0-00378",
+    "subject": "Quick question",
+    "received_at": "2025-09-23T16:00:00+00:00",
+    "filler": [],
+    "numbers": [
+      {
+        "e164": "+14235550127",
+        "owner": "bank",
+        "role": null,
+        "party": "bank",
+        "phrasing": "verify_with_bank",
+        "placement": "clock_time",
+        "format": "paren",
+        "visibility": "visible",
+        "shares_line": false
+      }
+    ],
+    "quote": null
+  },
+  "documents": [
+    {
+      "id": "doc-s0-00378",
+      "kind": "signature_block",
+      "custody": {
+        "channel": "email",
+        "received_at": "2025-09-23T16:00:00+00:00",
+        "sender": "notices@firstexamplebank.example",
+        "thread_id": "t-doc-s0-00378",
+        "subject": "Quick question",
+        "parent_document_id": null
+      },
+      "pages": [
+        {
+          "width": 612,
+          "height": 792,
+          "spans": [
+            {
+              "text": "Message",
+              "x": 72,
+              "y": 72,
+              "size": 10,
+              "color": "#000000"
+            },
+            {
+              "text": "First Example Bank",
+              "x": 72,
+              "y": 86,
+              "size": 10,
+              "color": "#000000"
+            },
+            {
+              "text": "Office hours 9:00-5:00, verify with First Example Bank at (423) 555-0127",
+              "x": 72,
+              "y": 100,
+              "size": 10,
+              "color": "#000000"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

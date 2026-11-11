@@ -1,0 +1,77 @@
+{
+  "name": "g4-fax-clock-time-1847721a",
+  "patterns": [
+    "G3/fax/clock_time",
+    "G4/fax/clock_time"
+  ],
+  "why": "G4/fax/clock_time: shrunk from doc-s0-00047, found by lab docs at seed 0 in 1000 documents",
+  "plan": {
+    "type": "doc",
+    "id": "doc-s0-00047",
+    "kind": "remittance_notice",
+    "author": "bank",
+    "channel": "paper_mail",
+    "sender": null,
+    "thread": null,
+    "subject": null,
+    "received_at": "2026-09-20T16:00:00+00:00",
+    "filler": [],
+    "numbers": [
+      {
+        "e164": "+14695550141",
+        "owner": "bank",
+        "role": "fax",
+        "party": "bank",
+        "phrasing": "fax",
+        "placement": "clock_time",
+        "format": "paren",
+        "visibility": "visible",
+        "shares_line": false
+      }
+    ],
+    "quote": null
+  },
+  "documents": [
+    {
+      "id": "doc-s0-00047",
+      "kind": "remittance_notice",
+      "custody": {
+        "channel": "paper_mail",
+        "received_at": "2026-09-20T16:00:00+00:00",
+        "sender": null,
+        "thread_id": null,
+        "subject": null,
+        "parent_document_id": null
+      },
+      "pages": [
+        {
+          "width": 612,
+          "height": 792,
+          "spans": [
+            {
+              "text": "Remittance notice",
+              "x": 72,
+              "y": 72,
+              "size": 10,
+              "color": "#000000"
+            },
+            {
+              "text": "First Example Bank",
+              "x": 72,
+              "y": 86,
+              "size": 10,
+              "color": "#000000"
+            },
+            {
+              "text": "Office hours 9:00-5:00, Fax: (469) 555-0141",
+              "x": 72,
+              "y": 100,
+              "size": 10,
+              "color": "#000000"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

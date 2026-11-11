@@ -1,0 +1,76 @@
+{
+  "name": "g3-billing-label-number-c1c67b0e",
+  "patterns": [
+    "G3/billing/label_number"
+  ],
+  "why": "G3/billing/label_number: shrunk from doc-s0-00143, found by lab docs at seed 0 in 1000 documents",
+  "plan": {
+    "type": "doc",
+    "id": "doc-s0-00143",
+    "kind": "email_body",
+    "author": "unrelated",
+    "channel": "email",
+    "sender": "info@other.example",
+    "thread": "t-doc-s0-00143",
+    "subject": "Following up",
+    "received_at": "2026-05-15T16:00:00+00:00",
+    "filler": [],
+    "numbers": [
+      {
+        "e164": "+18675550141",
+        "owner": "unrelated",
+        "role": "billing",
+        "party": null,
+        "phrasing": "billing",
+        "placement": "label_number",
+        "format": "paren",
+        "visibility": "visible",
+        "shares_line": false
+      }
+    ],
+    "quote": null
+  },
+  "documents": [
+    {
+      "id": "doc-s0-00143",
+      "kind": "email_body",
+      "custody": {
+        "channel": "email",
+        "received_at": "2026-05-15T16:00:00+00:00",
+        "sender": "info@other.example",
+        "thread_id": "t-doc-s0-00143",
+        "subject": "Following up",
+        "parent_document_id": null
+      },
+      "pages": [
+        {
+          "width": 612,
+          "height": 792,
+          "spans": [
+            {
+              "text": "Message",
+              "x": 72,
+              "y": 72,
+              "size": 10,
+              "color": "#000000"
+            },
+            {
+              "text": "Other Example Logistics",
+              "x": 72,
+              "y": 86,
+              "size": 10,
+              "color": "#000000"
+            },
+            {
+              "text": "Billing: (867) 555-0141",
+              "x": 72,
+              "y": 100,
+              "size": 10,
+              "color": "#000000"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

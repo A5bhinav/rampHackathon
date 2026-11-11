@@ -318,6 +318,24 @@ def test_g7_blames_only_the_labels_that_move_the_call(_today_rule):
     found = sorted(v.pattern for v in docgen.check_world(world, reader=StubReader()))
     assert found == ["G7/bank_verification_line/label_number", "G7/main/number_label"]
 
+@pytest.mark.docs_gate
+def test_checks_on_the_stub():
+    # G1 to G7 on the stub at seed 0 with 1000 documents (and every frozen case): every failing pattern is on
+    # lab-docs' known-failures list, every listed pattern still fails, and every entry names a written finding.
+    from dialback_evals import known
+    found = docgen.run(examples=EXAMPLES, seed=SEED, reader=StubReader())
+    frozen = docgen.rerun_frozen(FROZEN, reader=StubReader())
+    assert [name for name, _, drift in frozen if drift] == []      # each frozen case still means what it meant
+    failing = {p: [p.split("/", 1)[0]] for p in {*(v.pattern for v in found.violations),
+                                                 *(p for _, patterns, _ in frozen for p in patterns)}}
+    entries = known.load(ROOT / "evals" / "known-failures.json")["lab-docs"]
+    verdict = known.judge(entries, failing)
+    assert verdict.problems == [], "\n".join(verdict.problems)
+    assert known.missing_findings(entries, (ROOT / "evals" / "FINDINGS.md").read_text(encoding="utf-8")) == []
+    tally = found.result.tally                                     # every check ran on the whole sample
+    assert tally.documents == EXAMPLES and tally.worlds == docgen.world_count(EXAMPLES)
+    assert tally.visible_numbers > 1000 and tally.g5_compared > 1000 and tally.g6_compared > 100
+
 # --- Known failures by pattern (decision 6) ----------------------------------------------------------
 
 SMALL = 40   # a small run for the known-failures tests; the gate runs 1000
