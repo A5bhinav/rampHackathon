@@ -78,12 +78,17 @@ These are not reachable today, but each is frozen as a regression.
 | `lookalike-erased-by-first-sorting-twin` | v1 | The rule keeps the copy of a shared id whose repr sorts first, which isn't chronological. A first-sorting twin of a lookalike email erases its cutoff pull-back. |
 | `fuzz-seed0-m-shared-id-helped-06bbe3c8` | v1 | The same erasure, unblocking the genuine number. |
 | `near-miss-unanchored-by-old-lookalike` | non-default | Possible only when `same_subject_window_days` exceeds `min_age_days`. |
+| `fuzz-seed0-i1-first-seen-in-context-eligible-696be55b` | v1 | The same erasure, seen by the direct checks: I1, I4 and I5. |
 
 - **Why latent:**
   - `ledger.documents.id` is a primary key, and `write_ingest` skips ids it already holds.
   - Production always runs the v1 settings.
 - **When they go live:** any replay or ablation tool, or a new ingestion path, that passes duplicate
   ids or non-default settings.
+- **With the label bar on (spec 0091):** a number a weak label used to refuse becomes eligible, so a
+  first-sorting duplicate id now also trips I1, I4 and I5: the lab assumes the worst of both copies,
+  and the rule reads one. Production can't file two documents under one id. The frozen world
+  (`fuzz-seed0-i1-first-seen-in-context-eligible-696be55b`) fires in all three flag states.
 
 ### A6. Fix trials for A1 (scratch only, never committed)
 

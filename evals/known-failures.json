@@ -8,7 +8,8 @@
     {"case": "fuzz-seed0-m-shared-id-helped-06bbe3c8", "labels": ["M_shared_id_helped"], "finding": "A5", "owner": "Inesh"},
     {"case": "lookalike-erased-by-first-sorting-twin", "labels": ["M_shared_id_helped"], "finding": "A5", "owner": "Inesh"},
     {"case": "near-miss-unanchored-by-shared-id", "labels": ["M_shared_id_helped"], "finding": "A5", "owner": "Inesh"},
-    {"case": "near-miss-unanchored-by-old-lookalike", "labels": ["M_lookalike_helped", "M_shared_id_helped"], "finding": "A5", "owner": "Inesh"}
+    {"case": "near-miss-unanchored-by-old-lookalike", "labels": ["M_lookalike_helped", "M_shared_id_helped"], "finding": "A5", "owner": "Inesh"},
+    {"case": "fuzz-seed0-i1-first-seen-in-context-eligible-696be55b", "labels": ["I1_first_seen_in_context_eligible", "I4_too_few_channels_eligible", "I5_too_young_eligible"], "finding": "A5", "owner": "Inesh"}
   ],
   "lab-reports": []
 }
