@@ -96,18 +96,26 @@ them follows.
 
 ## Acceptance
 
-- [ ] The table's six cases give the results shown, as fixed worlds.
-- [ ] On every label-free world (generated, corpus, demo), the result is `_select_v1`'s, field for
+- [x] The table's six cases give the results shown, as fixed worlds.
+  (`test_label_bar.py::test_the_table`)
+- [x] On every label-free world (generated, corpus, demo), the result is `_select_v1`'s, field for
   field except `rule_version`, `number_selection_id` and `inputs_sha256`, against 0079's frozen copy.
-- [ ] Every number today's rule finds eligible, the new rule finds eligible, in the same order.
-- [ ] A real line one digit from a planted number still anchors it when the real line's oldest
+  (`test_label_bar.py::test_no_labels_means_todays_rule`, `::test_corpus_and_demo_worlds_are_todays`)
+- [x] Every number today's rule finds eligible, the new rule finds eligible, in the same order.
+  (`test_label_bar.py::test_todays_eligible_stay_eligible_in_order`)
+- [x] A real line one digit from a planted number still anchors it when the real line's oldest
   sightings carry a label: the builder check's worlds 1, 1b and 1c call nobody, as today.
-- [ ] Spec 0079's guard: the call list is a prefix of the new rule's on the case.
-- [ ] A weak label leaves the contact point `eligible` in `_store` (FINDINGS A26 for weak labels).
-- [ ] The three flag states of rule 6 give their rules and `rule_version` names; default and unknown
-  values give this rule.
-- [ ] Failure path: a case with no request still gives `no_provable_number` (R7); a world where
+  (`test_label_bar.py::test_labeled_real_line_still_anchors_its_near_miss`)
+- [x] Spec 0079's guard: the call list is a prefix of the new rule's on the case.
+  (`test_select_properties.py::test_new_rule_is_a_prefix_of_the_inner_rule`)
+- [x] A weak label leaves the contact point `eligible` in `_store` (FINDINGS A26 for weak labels).
+  (`test_label_bar.py::test_weak_label_keeps_contact_point_eligible`, Postgres)
+- [x] The three flag states of rule 6 give their rules and `rule_version` names; default and unknown
+  values give this rule. (`test_label_bar.py::test_three_flag_states_name_their_rule`,
+  `::test_unknown_flag_values_run_this_rule`, `test_flags.py::test_label_bar_defaults_on`)
+- [x] Failure path: a case with no request still gives `no_provable_number` (R7); a world where
   labels are established still refuses the number with today's reason.
+  (`test_label_bar.py::test_no_request_still_fails_closed`, `::test_two_old_sources_veto`)
 
 ## Tests (written first)
 
@@ -115,6 +123,7 @@ them follows.
 |---|---|
 | The six cases | `packages/ledger/tests/test_label_bar.py::test_the_table` |
 | Label-free equals today | `test_label_bar.py::test_no_labels_means_todays_rule` (with 0079's `select_v1_frozen.py`) |
+| The corpus and demo worlds equal today | `test_label_bar.py::test_corpus_and_demo_worlds_are_todays` |
 | Eligibility only grows | `test_label_bar.py::test_todays_eligible_stay_eligible_in_order` |
 | Near-miss anchor kept | `test_label_bar.py::test_labeled_real_line_still_anchors_its_near_miss` (worlds 1, 1b, 1c) |
 | Established labels still veto | `test_label_bar.py::test_two_old_sources_veto`, `::test_attacker_cannot_unestablish` (lookalike pull, same subject) |
@@ -167,7 +176,7 @@ them follows.
   Nov 10. While building, the same gap also showed up as `I1`, `I4` and `I5` hits in the archive
   search (a number a weak label used to refuse becomes eligible, so the lab's worst-of-both-copies
   view of a duplicate id now applies to it). They are listed under A5 too.
-- **Q155, resolved: the middle option is rejected.** It used this rule only where today's rule
+- **Q161, resolved: the middle option is rejected.** It used this rule only where today's rule
   calls nobody, and otherwise called what both rules agree on, else nobody. In generated worlds it
   sent the honest-warning case (the table's last row) to a person instead of the planted number.
   But an attacker who adds one weak label to the real number ("Fax: 0142" in the change request)
