@@ -39,20 +39,21 @@ from dialback_core.email_door.rules import flag_email
 
 FIXTURES = Path(__file__).parent / "fixtures"
 OUT_DIR = Path(__file__).parent / "eval_results"
-SETS = {"tuning": "tuning", "dev": "heldout", "heldout2": "heldout2", "heldout3": "heldout3"}   # set name -> fixture directory
+SETS = {"tuning": "tuning", "dev": "heldout", "heldout2": "heldout2", "heldout3": "heldout3", "heldout4": "heldout4"}   # set name -> fixture directory
 DEFAULT_MODEL = "claude-haiku-5-5"
 MODELS = ("claude-haiku-5-5", "claude-opus-5-5")
-EXPECTED = {"tuning": (30, 62), "dev": (35, 65), "heldout2": (40, 70), "heldout3": (40, 70)}   # (change requests incl. cr-36, ordinary)
+EXPECTED = {"tuning": (30, 62), "dev": (35, 65), "heldout2": (40, 70), "heldout3": (40, 70), "heldout4": (40, 70)}   # (change requests incl. cr-36, ordinary)
 TELEMETRY_VAR = "ANTHROPIC_OPEN_TELEMETRY_TRACES_CONTENT_MODE"
 WORKERS = 4
 MAX_ORDINARY_FLAGGED = 3
 CR_36 = "cr-36.json"   # reported separately on heldout2
-ON_FILE_ONLY_HELDOUT3 = frozenset({"cr-26.json", "cr-27.json", "cr-31.json"})   # pinned: the sealed set's ON-FILE-ONLY requests
-CONFIRMED_SETS = ("heldout2", "heldout3")   # held back: each needs its own --confirm-<name> and a matching hash
+ON_FILE_ONLY_HELDOUT3 = frozenset({"cr-26.json", "cr-27.json", "cr-31.json"})   # pinned: the set's ON-FILE-ONLY requests
+ON_FILE_ONLY_HELDOUT4 = frozenset({"cr-38.json", "cr-39.json", "cr-40.json"})   # fixed in the pre-registration, before the set existed
+CONFIRMED_SETS = ("heldout2", "heldout3", "heldout4")   # held back: each needs its own --confirm-<name> and a matching hash
 REVISED_EXCLUDED = ("cr-04.json", "cr-10.json")   # leave heldout3's bar when heldout2 informed a prompt revision
 ON_FILE_ONLY = "ON-FILE-ONLY:"   # a change request's note starts with this when only the on-file check can catch it
 FLAGGER = "model"   # the flagger evaluated: the model alone decides (decision 12)
-SEALED = ("heldout3",)   # once per model, behind --confirm-<name>
+SEALED = ("heldout3", "heldout4")   # once per model, behind --confirm-<name>
 PRICES_PER_MILLION = {"claude-haiku-5-5": (0.10, 0.50), "claude-opus-5-5": (4.0, 20.0)}   # (input, output) USD
 
 
@@ -148,7 +149,7 @@ def evaluate_set(name: str, emails: dict[str, dict], classifier: ChangeClassifie
     # On heldout2, cr-36 is reported on its own and left out of the change-request counts. On heldout3, the
     # ON-FILE-ONLY change requests are, and so are cr-04 and cr-10 when heldout2 informed a prompt revision.
     separate = {CR_36} if name == "heldout2" and CR_36 in emails else set()
-    on_file_only = {f for f in emails if name == "heldout3" and is_cr(f) and emails[f]["on_file_only"]}
+    on_file_only = {f for f in emails if name in SEALED and is_cr(f) and emails[f]["on_file_only"]}
     revised = {f for f in REVISED_EXCLUDED if name == "heldout3" and heldout2_revised and f in emails and is_cr(f)}
     separate |= on_file_only | revised
     crs = [f for f in sorted(emails) if is_cr(f) and f not in separate]
@@ -180,7 +181,7 @@ def evaluate_set(name: str, emails: dict[str, dict], classifier: ChangeClassifie
         result["cr_36"] = {"flagged": cr36_flagged}
         result["bar_without_cr_36"] = "PASS" if without else "FAIL"          # the pre-registered bar
         result["bar_with_cr_36"] = "PASS" if without and cr36_flagged else "FAIL"
-    if name == "heldout3":
+    if name in SEALED:
         ok_ordinary = result["ordinary_flagged"] <= MAX_ORDINARY_FLAGGED
         without = not result["missed"] and ok_ordinary
         result["on_file_only"] = {f: flagged(f) for f in sorted(on_file_only)}
@@ -210,8 +211,11 @@ def table(r: dict) -> str:
                   f"bar without {CR_36} (the pre-registered bar): {r['bar_without_cr_36']}",
                   f"bar with {CR_36}: {r['bar_with_cr_36']}"]
     if "on_file_only" in r:
-        lines += [f"ON-FILE-ONLY (separate): flagged {sum(r['on_file_only'].values())}/{len(r['on_file_only'])}: {r['on_file_only'] or 'none'}",
-                  f"cr-04 and cr-10 excluded after a heldout2 revision: {r['excluded_after_heldout2_revision'] or 'none'}",
+        separate = {**r["on_file_only"], **r["excluded_after_heldout2_revision"]}
+        lines += [f"ON-FILE-ONLY (separate): flagged {sum(r['on_file_only'].values())}/{len(r['on_file_only'])}: {r['on_file_only'] or 'none'}"]
+        if r["set"] == "heldout3":
+            lines += [f"cr-04 and cr-10 excluded after a heldout2 revision: {r['excluded_after_heldout2_revision'] or 'none'}"]
+        lines += [f"all change requests: {r['change_requests_flagged'] + sum(separate.values())}/{r['change_requests_total'] + len(separate)}",
                   f"bar without the ON-FILE-ONLY ones (the pre-registered bar): {r['bar_without_on_file_only']}",
                   f"bar with them: {r['bar_with_on_file_only']}"]
     return "\n".join(lines)
@@ -232,6 +236,7 @@ def main(argv: list[str] | None = None, *, fixtures: Path = FIXTURES, out_dir: P
     parser.add_argument("--sets", nargs="+", choices=sorted(SETS), default=["tuning", "dev"])
     parser.add_argument("--confirm-heldout2", action="store_true")
     parser.add_argument("--confirm-heldout3", action="store_true")
+    parser.add_argument("--confirm-heldout4", action="store_true")
     parser.add_argument("--heldout2-revised", action="store_true",
                         help="a prompt revision was judged on heldout2: cr-04 and cr-10 leave heldout3's bar")
     args = parser.parse_args(argv)
@@ -252,11 +257,12 @@ def main(argv: list[str] | None = None, *, fixtures: Path = FIXTURES, out_dir: P
             if name in CONFIRMED_SETS and digest != (fixtures / f"{name}.sha256").read_text().split()[0]:
                 raise EvalError(f"the {name} hash does not match {name}.sha256; refusing to run")
             check_composition(name, emails, expected[name])
-            if name == "heldout3":
+            if name in SEALED:
+                pinned = {"heldout3": ON_FILE_ONLY_HELDOUT3, "heldout4": ON_FILE_ONLY_HELDOUT4}[name]
                 derived = frozenset(f for f, e in emails.items() if e["label"] == "change_request" and e["on_file_only"])
-                if derived != ON_FILE_ONLY_HELDOUT3:
-                    raise EvalError("the heldout3 ON-FILE-ONLY change requests are not the pinned three "
-                                    f"({', '.join(sorted(ON_FILE_ONLY_HELDOUT3))}); refusing to run")
+                if derived != pinned:
+                    raise EvalError(f"the {name} ON-FILE-ONLY change requests are not the pinned three "
+                                    f"({', '.join(sorted(pinned))}); refusing to run")
             loaded[name] = emails
         classifier = make_classifier(args.model)
     except EvalError as exc:

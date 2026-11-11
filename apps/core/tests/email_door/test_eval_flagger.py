@@ -99,6 +99,7 @@ def synthetic_pin(monkeypatch):
     """The synthetic heldout3 tree's ON-FILE-ONLY request is cr-20; the real pin (the three real names) is tested
     on its own below."""
     monkeypatch.setattr(eval_flagger, "ON_FILE_ONLY_HELDOUT3", frozenset({"cr-20.json"}))
+    monkeypatch.setattr(eval_flagger, "ON_FILE_ONLY_HELDOUT4", frozenset({"cr-20.json"}))
 
 
 def evaluate(fixtures_dir, name="tuning", model_factory=FakeModel):
@@ -163,7 +164,7 @@ def test_the_heldout2_bar_with_and_without_cr_36(tmp_path, cr36_flagged, ordinar
     assert r["bar_with_cr_36"] == ("PASS" if with_ else "FAIL")
 
 
-EXPECTED = {"tuning": (3, 3), "dev": (1, 1), "heldout2": (3, 5), "heldout3": (5, 5)}
+EXPECTED = {"tuning": (3, 3), "dev": (1, 1), "heldout2": (3, 5), "heldout3": (5, 5), "heldout4": (3, 5)}
 T0 = datetime(2026, 11, 10, 12, 30, 5, tzinfo=UTC)
 
 
@@ -399,7 +400,7 @@ def test_an_unknown_label_is_an_error(tmp_path):
 
 
 def test_heldout2_composition_is_forty_change_requests_with_cr_36_and_seventy_ordinary():
-    assert eval_flagger.EXPECTED == {"tuning": (30, 62), "dev": (35, 65), "heldout2": (40, 70), "heldout3": (40, 70)}
+    assert eval_flagger.EXPECTED == {"tuning": (30, 62), "dev": (35, 65), "heldout2": (40, 70), "heldout3": (40, 70), "heldout4": (40, 70)}
 
 
 def test_nul_bytes_are_stripped_as_production_does(tmp_path):
@@ -499,3 +500,82 @@ def test_a_heldout3_whose_on_file_only_set_matches_the_pin_runs(tmp_path):
     code = eval_flagger.main(["--sets", "heldout3", "--confirm-heldout3"], fixtures=tmp_path, out_dir=tmp_path / "out",
                              make_classifier=lambda m: FakeModel(), now=T0, expected=expected)
     assert code == 0 and len(list((tmp_path / "out").glob("*-heldout3.json"))) == 1
+
+
+# heldout4: the re-test, pre-registered in spec 0086 before the set existed.
+
+def heldout4(root: Path, *, on_file_only_flagged: bool = False, ordinary_flagged: int = 0, missed_other: bool = False,
+             on_file_only: tuple[str, ...] = ("cr-20.json",)) -> None:
+    ofo = "ON-FILE-ONLY: SECRETNOTE the bank details come with no ask"
+    emails = {"cr-01.json": email("change_request", PLAIN if missed_other else ASKS), "cr-02.json": email("change_request", ASKS)}
+    for name in on_file_only:
+        emails[name] = email("change_request", ASKS if on_file_only_flagged else PLAIN, ofo)
+    if "cr-20.json" not in on_file_only:
+        emails["cr-20.json"] = email("change_request", ASKS)
+    for i in range(5):
+        emails[f"ord-{i:02d}.json"] = email("ordinary", SOFT if i < ordinary_flagged else PLAIN)
+    write(root / "heldout4", emails)
+    files = sorted((root / "heldout4").glob("*.json"))
+    (root / "heldout4.sha256").write_text(hashlib.sha256(b"".join(p.read_bytes() for p in files)).hexdigest() + "  -\n")
+
+
+def test_heldout4_needs_its_own_confirm_flag_and_is_never_read_without_it(tmp_path, capsys, monkeypatch):
+    heldout4(tmp_path)
+    read = spy_on_read_set(monkeypatch)
+    assert run_main(tmp_path, tmp_path, "--sets", "heldout4") == 2
+    assert "--confirm-heldout4" in capsys.readouterr().err and not (tmp_path / "out").exists()
+    assert run_main(tmp_path, tmp_path, "--sets", "heldout4", "--confirm-heldout3") == 2   # another set's flag does not do
+    assert read == [], "heldout4 was never read"
+
+
+def test_a_hash_mismatch_refuses_heldout4(tmp_path, capsys):
+    heldout4(tmp_path)
+    (tmp_path / "heldout4.sha256").write_text("0" * 64 + "  -\n")
+    assert run_main(tmp_path, tmp_path, "--sets", "heldout4", "--confirm-heldout4") == 2
+    assert "hash" in capsys.readouterr().err and not (tmp_path / "out").exists()
+
+
+def test_heldout4_runs_once_per_model(tmp_path, capsys):
+    heldout4(tmp_path)
+    assert run_main(tmp_path, tmp_path, "--sets", "heldout4", "--confirm-heldout4") == 0
+    later = datetime(2026, 11, 11, tzinfo=UTC)
+    assert run_main(tmp_path, tmp_path, "--sets", "heldout4", "--confirm-heldout4", now=later) == 2
+    assert "already" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("ofo_flagged, ordinary_flagged, missed_other, without, with_", [
+    (False, 3, False, "PASS", "FAIL"),   # the ON-FILE-ONLY one missed: passes without it, fails with it
+    (True, 3, False, "PASS", "PASS"),
+    (True, 4, False, "FAIL", "FAIL"),    # 4 ordinary flagged kills it
+    (True, 0, True, "FAIL", "FAIL"),     # one in-bar change request missed kills it
+])
+def test_the_heldout4_bar(tmp_path, ofo_flagged, ordinary_flagged, missed_other, without, with_):
+    heldout4(tmp_path, on_file_only_flagged=ofo_flagged, ordinary_flagged=ordinary_flagged, missed_other=missed_other)
+    r = evaluate(tmp_path, "heldout4")
+    assert (r["bar_without_on_file_only"], r["bar_with_on_file_only"]) == (without, with_)
+    assert r["change_requests_total"] == 2 and list(r["on_file_only"]) == ["cr-20.json"]
+
+
+def test_heldout4_excludes_nothing_else_even_after_a_heldout2_revision(tmp_path):
+    heldout4(tmp_path)
+    emails = eval_flagger.load_set(tmp_path / "heldout4")
+    emails["cr-04.json"] = {**emails["cr-01.json"]}
+    r = eval_flagger.evaluate_set("heldout4", emails, FakeModel(), model="claude-haiku-5-5", workers=2, heldout2_revised=True)
+    assert r["change_requests_total"] == 3 and r["excluded_after_heldout2_revision"] == {}
+
+
+@pytest.mark.parametrize("names", [("cr-20.json", "cr-21.json"), ()], ids=["one extra", "one missing"])
+def test_a_heldout4_whose_on_file_only_set_differs_from_the_pin_is_refused(tmp_path, capsys, names):
+    heldout4(tmp_path, on_file_only=names)
+    made = []
+    expected = {**EXPECTED, "heldout4": (3 + max(0, len(names) - 1), 5)}
+    code = eval_flagger.main(["--sets", "heldout4", "--confirm-heldout4"], fixtures=tmp_path, out_dir=tmp_path / "out",
+                             make_classifier=lambda m: made.append(m), expected=expected)
+    err = capsys.readouterr().err
+    assert code == 2 and "heldout4" in err and "ON-FILE-ONLY" in err and "SECRETNOTE" not in err
+    assert made == [] and not (tmp_path / "out").exists()
+
+
+def test_the_heldout4_pin_is_the_three_names_fixed_before_the_set_existed(monkeypatch):
+    monkeypatch.undo()
+    assert eval_flagger.ON_FILE_ONLY_HELDOUT4 == frozenset({"cr-38.json", "cr-39.json", "cr-40.json"})
