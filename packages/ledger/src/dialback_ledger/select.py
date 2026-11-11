@@ -163,7 +163,9 @@ def select(*, case_id: uuid.UUID, dataset_id: uuid.UUID, vendor_id: uuid.UUID, v
         sources = sorted({d.channel for _, d in clean})
         reasons = set()
         if not visible:
-            reasons.add("hidden_text_only")
+            # Seen where a person could see it, but its digits couldn't be confirmed (spec 0092, D10a)?
+            reasons.add("unconfirmed_digits_only" if any(s.visibility == "unverified" for s, _, _ in seen)
+                        else "hidden_text_only")
         elif first_ctx is not None and (not outside or first_ctx <= min(outside)):
             reasons.add("first_seen_in_change_context")
         if visible and any(s.party != "vendor" for s, _, _ in visible):

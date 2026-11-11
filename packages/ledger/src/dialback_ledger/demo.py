@@ -108,7 +108,7 @@ def labeled(documents: list[dict], reader: Reader, swap: tuple[str, str] | None 
 
     A document the reader can't label, or a PDF it refuses, stops everything (spec 0049, decision 4):
     the DemoError rolls back the caller's transaction, so nothing is written."""
-    failures: tuple[type[Exception], ...] = (ReaderFailed,)
+    failures: tuple[type[Exception], ...] = (ReaderFailed, ReaderUnavailable)
     if pdfs is not None:
         from .pdf import PdfRefused
         failures += (PdfRefused,)
@@ -161,6 +161,11 @@ def _is_committed(pdf: Path) -> bool:
 
 def _check_pdf(pdf: Path, phones: dict[str, str], seed: dict) -> None:
     """Every check `--pdf` makes (spec 0092, D9), before anything is written."""
+    from . import legibility
+    try:
+        legibility.require_ocr()
+    except ReaderUnavailable as exc:
+        raise DemoError(f"--pdf: {exc}") from None
     if phones:
         raise DemoError("--pdf with --phone: the phone is already in the PDFs "
                         "(render them with `lab pdf render --demo --phone REF=+1... --out DIR`)")
@@ -292,6 +297,9 @@ def read_pdf_command(path: Path) -> int:
         pages = read_pdf(path.read_bytes())
     except PdfRefused as exc:
         print(f"refused: {exc.reason}", file=sys.stderr)
+        return 2
+    except ReaderUnavailable as exc:
+        print(f"refused: {exc}", file=sys.stderr)
         return 2
     except OSError as exc:
         print(f"refused: can't read {path} ({exc.strerror})", file=sys.stderr)

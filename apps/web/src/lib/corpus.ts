@@ -46,7 +46,8 @@ export function plantedStat(cases: readonly CorpusCase[]): { value: number | str
 export const REASON_SHORT: Record<string, string> = {
   first_seen_in_change_context: "first seen in or after the request", too_few_source_types: "too few sources before the request",
   younger_than_minimum_age: "too new", near_miss_of_older_number: "one digit off, or two swapped",
-  hidden_text_only: "only in hidden text", not_vendor_party: "someone else's number", fax_line: "a fax line",
+  hidden_text_only: "only in hidden text", unconfirmed_digits_only: "digits not confirmed", not_vendor_party: "someone else's number",
+  fax_line: "a fax line",
 };
 
 export const CHANNEL: Record<string, string> = {

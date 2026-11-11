@@ -31,6 +31,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
+      - name: Install Tesseract (spec 0092, D10a)
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq tesseract-ocr
       - name: Install the Python workspace
         run: uv sync --all-packages --locked
       - name: Lab checks that must stay green

@@ -13,7 +13,7 @@ from .visibility import classify
 @dataclass(frozen=True)
 class Line:
     text: str
-    visibility: str   # visible, white, tiny, off_page, no_ink
+    visibility: str   # visible, white, tiny, off_page, no_ink, unverified
     page: int
     index: int        # position in the document, across pages
 

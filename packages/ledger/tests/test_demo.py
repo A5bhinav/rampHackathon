@@ -302,6 +302,16 @@ def test_llm_with_the_committed_pdfs_is_allowed(monkeypatch):
     assert demo.check({}, [], pdf=demo.committed_pdfs()) == {}
 
 
+def test_pdf_without_tesseract_is_refused(monkeypatch):
+    from dialback_ledger import legibility
+
+    def missing():
+        raise demo.ReaderUnavailable("no Tesseract")
+    monkeypatch.setattr(legibility, "require_ocr", missing)
+    with pytest.raises(DemoError, match="Tesseract"):
+        demo.check({}, [], pdf=demo.committed_pdfs())
+
+
 def test_a_missing_pdf_is_refused(tmp_path):
     with pytest.raises(DemoError, match=load_seed()["vendors"]["acme"]["documents"][0]["id"]):
         demo.check({}, [], pdf=tmp_path)

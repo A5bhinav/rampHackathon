@@ -35,4 +35,6 @@ def classify(span: dict, width: float, height: float) -> str:
         return "white"
     if "ink" in span and span["ink"] is not True:
         return "no_ink"   # drawing it leaves no mark (spec 0092): anything but a plain true counts (R7)
+    if "legible" in span and span["legible"] is not True:
+        return "unverified"   # a phone number in it couldn't be confirmed on the page (spec 0092, D10a)
     return "visible"

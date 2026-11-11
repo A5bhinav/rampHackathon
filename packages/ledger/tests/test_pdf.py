@@ -216,7 +216,8 @@ def test_spaces_keep_a_no_ink_span_whole():
 
 
 def test_light_but_visible_text_has_ink():
-    assert only(pdf_of([span(AR, color="#e6e6e6")])) == (AR, "visible")
+    # Words, not a number: this pins D3's ink rule, and D10a would judge a number's contrast separately.
+    assert only(pdf_of([span("Accounts receivable", color="#e6e6e6")])) == ("Accounts receivable", "visible")
 
 
 # --- What the reader refuses (D4) ----------------------------------------------------------------------

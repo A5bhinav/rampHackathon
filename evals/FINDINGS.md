@@ -1218,32 +1218,36 @@ are reproduced here.
 
 ### H1. The glyphs say one thing, the text layer another
 
-**Confirmed (ran).** `evals/tests/test_pdf_tricks.py::test_glyph_swap`, on the strict known-failures list as
-`lab-pdf` / `glyph-swap` (spec 0048, D3).
+**Closed by the legibility check (spec 0092, D10a).** `evals/tests/test_pdf_tricks.py::test_glyph_swap`. It was on the
+strict known-failures list as `lab-pdf` / `glyph-swap` until that check landed.
 
-A font whose outlines disagree with its character map shows one digit and extracts another. The plant is
-Bitstream Vera with the outlines of 3 and 8 swapped (renamed, as Vera's license requires). A line whose text layer
-says `(415) 555-0138` shows `(415) 555-0183` on the page. There is ink, so the ink rule passes it, and Part A reads
-the text layer, so it records `+14155550138` as visible: a number no person saw.
+A font whose outlines disagree with its character map shows one digit and extracts another. The plant is Bitstream
+Vera with the outlines of 3 and 8 swapped (renamed, as Vera's license requires). A line whose text layer says
+`(415) 555-0138` shows `(415) 555-0183` on the page. There is ink, so the ink rule passes it. Tesseract reads the
+page, sees different digits, and the number is `unverified`.
 
-An image drawn over text is not this case: the ink rule catches it, because removing the covered text changes
-nothing on the page.
+### H2. A small patch inside a digit changes it
 
-**What closes it:** spec 0092, Part B's pixel check (D14), which reads each visible phone candidate from the rendered
-page with local OCR and marks it `unverified` when the digits differ. The test then turns red, and this comes off the
-list. Until then, a digital PDF's digits are only as honest as its font.
+**Closed by the legibility check (spec 0092, D10a).** `evals/tests/test_pdf_tricks.py::test_digit_patch`. It was on the
+strict list as `lab-pdf` / `digit-patch` until that check landed.
 
-### H2. A small patch inside a digit changes it, and the ink rule can't tell
+White rectangles over the left side of an 8, between its bars, leave a 3 on the page while the text layer still
+says 8. The digit keeps ink across its rows and columns, so the ink rule passes it. Tesseract reads the page, and
+the number doesn't confirm.
 
-**Confirmed (ran).** `evals/tests/test_pdf_tricks.py::test_digit_patch`, on the strict list as `lab-pdf` /
-`digit-patch`.
+### H3. PDFium is the only renderer judged
 
-White rectangles over the left side of an 8, between its bars, leave a 3 on the page, while the text layer still
-says 8. The ink rule needs a digit's visible ink to reach most of its glyph's rows and columns, which stops a cover
-or clip that leaves only a sliver (Nov 11 review, C2), but a patch this small leaves ink in every row and column. So
-the ledger records the 8 as visible. Only reading the pixels can tell, which is Part B's pixel check (D14).
+**Confirmed (ran), and a stated limit of spec 0092, D10a.** Four cases in `packages/ledger/tests/test_pdf_review.py`
+(`UNREADABLE_IN_ANOTHER_VIEWER`), on the strict list as `lab-pdf`, label `covered_only_in_another_viewer`.
 
-Found by reasoning from the review's C2, then planted. Other small-patch shapes are the same limit.
+PDFium shows the number, so it reads as legible, but another viewer paints over it: a Link's border in Quartz (two
+cases), a cover nested past PDFium's depth limit in MuPDF, and an image with no data, which MuPDF draws black. Judging
+every viewer is out of reach, so these stay, and the list goes red if one starts passing.
+
+### H4. Only digits are checked for legibility
+
+**A stated limit of spec 0092, D10a (not run).** The legibility check reads a number's digits. An illegible label
+beside a legible number can still steer the labeler, since the label's text reaches it from the text layer.
 
 ## E. Process and housekeeping
 

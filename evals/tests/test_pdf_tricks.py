@@ -1,7 +1,5 @@
-"""Spec 0092, D10: the known limit until Part B. A font whose outlines disagree with its character map shows one
-digit and extracts another: there is ink, but not the digits the text layer holds. Part A reads the text layer, so
-it reads what the map says. The plant is on the strict known-failures list (spec 0048, D3): it turns red, and comes
-off the list, once Part B's pixel check lands."""
+"""Spec 0092, D10: a font whose outlines disagree with its character map shows one digit and extracts another: there
+is ink, but not the digits the text layer holds. The legibility check (D10a) reads the page, so it catches it."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -53,10 +51,11 @@ def _failing(data: bytes, seen: str) -> dict[str, set[str]]:
 
 
 def test_glyph_swap(swapped_font):
-    failing = _failing(render_pdf(_doc(TEXT_LAYER), font_path=swapped_font), WHAT_A_PERSON_SEES)
-    entries = [e for e in known.for_job(KNOWN, "lab-pdf") if e.case == "glyph-swap"]
-    assert known.judge(entries, failing).problems == []
-    assert known.missing_findings(entries, FINDINGS.read_text(encoding="utf-8")) == []
+    # D10a's check reads the page: Tesseract sees 0183 where the text layer says 0138, so the number is unverified.
+    assert _failing(render_pdf(_doc(TEXT_LAYER), font_path=swapped_font), WHAT_A_PERSON_SEES) == {}
+    found = find_phones(lines({"pages": read_pdf(render_pdf(_doc(TEXT_LAYER), font_path=swapped_font))}))
+    assert [c.visibility for c in found] == ["unverified"]
+    assert not [e for e in known.for_job(KNOWN, "lab-pdf") if e.case == "glyph-swap"], "it comes off the list"
 
 
 def test_an_honest_font_is_not_a_failure():
@@ -76,15 +75,8 @@ def test_glyph_swap_plant_really_swaps(swapped_font):
     assert not np.array_equal(_bitmap("3", swapped_font), _bitmap("3", FONT_PATH))
 
 
-def test_the_list_goes_red_once_the_swap_is_caught():
-    # Part B's pixel check will stop this failing; the strict list then says to take it off.
-    entries = [e for e in known.for_job(KNOWN, "lab-pdf") if e.case == "glyph-swap"]
-    verdict = known.judge(entries, {})
-    assert verdict.red and "take it off the list" in verdict.problems[0]
-
-
 # A patch inside a digit: the same family. White rectangles over the left side of an 8, between its bars, leave a
-# 3. The digit still has ink across its rows and columns, so the ink rule passes it; only reading the pixels can tell.
+# 3. The digit still has ink across its rows and columns, so the ink rule passes it; reading the pixels catches it.
 HEAD = "AR direct: (415) 555-018"
 PATCHED = "+14155550183"
 
@@ -99,13 +91,15 @@ def _patched(with_patches: bool) -> dict:
 
 
 def test_digit_patch():
-    failing = {}
+    # The legibility check reads the page, so the patched digit doesn't confirm.
     found = find_phones(lines({"pages": read_pdf(render_pdf(_patched(True)))}))
-    if [c for c in found if c.visibility == "visible" and c.e164 != PATCHED]:
-        failing = {"digit-patch": {"a_patch_changes_a_digit"}}
-    entries = [e for e in known.for_job(KNOWN, "lab-pdf") if e.case == "digit-patch"]
-    assert len(entries) == 1 and known.judge(entries, failing).problems == []
-    assert known.missing_findings(entries, FINDINGS.read_text(encoding="utf-8")) == []
+    assert [c.visibility for c in found] == ["unverified"]
+    assert not [e for e in known.for_job(KNOWN, "lab-pdf") if e.case == "digit-patch"], "it comes off the list"
+
+
+def test_the_same_digit_unpatched_is_visible():
+    found = find_phones(lines({"pages": read_pdf(render_pdf(_patched(False)))}))
+    assert [c.visibility for c in found] == ["visible"]
 
 
 def test_digit_patch_really_changes_the_digit():

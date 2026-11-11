@@ -5,6 +5,7 @@ from __future__ import annotations
 import dataclasses
 import functools
 import json
+import os
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -48,6 +49,14 @@ def docgen_documents() -> Iterator[tuple[str, dict]]:
 
 def all_documents() -> list[tuple[str, dict]]:
     return [*corpus_documents(), *demo_documents(), *docgen_documents()]
+
+
+def round_trip_documents() -> list[tuple[str, dict]]:
+    """What the round trip reads. Spec 0092, D10a puts Tesseract on every visible number, so CI runs the corpus, the
+    demo seed and the frozen cases; PDF_ROUND_TRIP_FULL=1 runs everything (the full set runs once, per the spec)."""
+    if os.environ.get("PDF_ROUND_TRIP_FULL"):
+        return all_documents()
+    return [*corpus_documents(), *demo_documents(), *(s for s in docgen_documents() if s[0].startswith("docs-frozen-"))]
 
 
 def bank_strings() -> list[str]:
