@@ -35,9 +35,6 @@ from .settings import Settings
 async def _new_dataset(settings: Settings, kind: str, label: str, sim_now: str | None, ramp: str | None = None) -> None:
     """`ramp` defaults to what this server has: the mock, or with DIALBACK_RAMP=sandbox, the sandbox (spec 0096)."""
     ramp = ramp or ("sandbox" if settings.ramp_mode is RampMode.SANDBOX else "mock")
-    if kind == "demo" and ramp == "sandbox":
-        # Spec 0034: shared demo accounts may act on any demo dataset, so none may sit on Ramp's sandbox.
-        raise SystemExit("refused: a demo dataset can't be on Ramp's sandbox; demo datasets use the Ramp mock")
     if ramp == "sandbox" and settings.ramp_sandbox is None:
         raise SystemExit("refused: this server has no Ramp sandbox credentials (RAMP_SANDBOX_CLIENT_ID, RAMP_SANDBOX_CLIENT_SECRET)")
     if ramp == "mock" and settings.ramp_mode is not RampMode.MOCK:
@@ -46,6 +43,26 @@ async def _new_dataset(settings: Settings, kind: str, label: str, sim_now: str |
     try:
         d = await create_dataset(pool, kind, label, dt.datetime.fromisoformat(sim_now) if sim_now else None, ramp)
         print(f"dataset {d.id}\nchain   {d.chain_id}\nramp    {d.ramp}")
+    finally:
+        await pool.close()
+
+
+async def _email_door(settings: Settings, dataset_id: UUID, ramp_vendors: list[str]) -> None:
+    """Spec 0103, D4: turn the email door on for these vendors of a current demo dataset, by Ramp id."""
+    pool = await open_pool(settings.database_url, max_size=2)
+    try:
+        async with system_tx(pool) as conn:
+            dataset = await (await conn.execute("select 1 from app.datasets where id = %s and kind = 'demo' and retired_at is null",
+                                                (dataset_id,))).fetchone()
+            if dataset is None:
+                raise SystemExit(f"refused: {dataset_id} is not a current demo dataset")
+            rows = await (await conn.execute("select id, ramp_vendor_id from app.vendors where dataset_id = %s and ramp_vendor_id = any(%s)",
+                                             (dataset_id, ramp_vendors))).fetchall()
+            missing = sorted(set(ramp_vendors) - {r["ramp_vendor_id"] for r in rows})
+            if missing:
+                raise SystemExit(f"refused: not imported into this dataset: {', '.join(missing)}")
+            await conn.execute("update app.datasets set email_door_vendors = %s where id = %s", ([r["id"] for r in rows], dataset_id))
+        print(f"email door on for {len(rows)} vendor(s)")
     finally:
         await pool.close()
 
@@ -163,6 +180,9 @@ def run() -> None:
                     help="the Ramp this dataset uses, for good (default: the mock, or the sandbox with DIALBACK_RAMP=sandbox)")
     for name in ("import-vendors", "retire-dataset"):
         sub.add_parser(name).add_argument("--dataset", type=UUID, required=True)
+    ed = sub.add_parser("email-door", help="turn the email door on for these vendors of a current demo dataset")
+    ed.add_argument("--dataset", type=UUID, required=True)
+    ed.add_argument("--ramp-vendor", action="append", required=True, metavar="RAMP_VENDOR_ID")
     rj = sub.add_parser("run-job")
     rj.add_argument("--dataset", type=UUID, required=True)
     rj.add_argument("--job", choices=JOBS, required=True)
@@ -205,6 +225,8 @@ def run() -> None:
         asyncio.run(_import(settings, args.dataset))
     elif args.cmd == "retire-dataset":
         asyncio.run(_retire(settings, args.dataset))
+    elif args.cmd == "email-door":
+        asyncio.run(_email_door(settings, args.dataset, args.ramp_vendor))
     elif args.cmd == "run-job":
         asyncio.run(_run_job(settings, args.dataset, args.job))
     elif args.cmd == "demo":

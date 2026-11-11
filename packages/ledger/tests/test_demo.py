@@ -89,6 +89,58 @@ def test_a_team_phone_replaces_the_ar_line(database_url):
     assert n == 0, "the fictional AR line is gone everywhere the rule reads"
 
 
+def test_a_real_vendor_takes_a_seed_vendors_history(database_url):
+    """Spec 0103: a demo on Ramp's sandbox has no demo_refs and only real vendors."""
+    d = demo_dataset(database_url, refs=("acme",))
+    team = "+12025550100"
+    with psycopg.connect(database_url, autocommit=True, row_factory=dict_row) as c:
+        c.execute("update app.datasets set demo_refs = null where id = %s", (d["dataset_id"],))
+        ramp_id = c.execute("select ramp_vendor_id from app.vendors where id = %s", (d["vendors"]["acme"],)).fetchone()["ramp_vendor_id"]
+    out = run(load(database_url, phones={"acme": team}, with_requests=True, dataset_id=d["dataset_id"],
+                   real={"acme": (ramp_id, "Asana")}))
+    assert list(out["vendors"]) == ["acme"]
+    assert selection(database_url, d, "acme")["e164"] == team
+    with psycopg.connect(database_url) as c:
+        quotes = [r[0] for r in c.execute("select quote from ledger.observations where vendor_id = %s and quote is not null",
+                                          (d["vendors"]["acme"],)).fetchall()]
+        domains = [r[0] for r in c.execute("select domain from ledger.vendor_domains where vendor_id = %s",
+                                           (d["vendors"]["acme"],)).fetchall()]
+    assert not any("Acme" in q for q in quotes) and domains == ["asana.example"]
+
+
+def test_real_vendors_can_all_retell_one_clean_history(database_url):
+    """Spec 0103: Acme's history is the one that proves a number, so all three real vendors use it."""
+    d = demo_dataset(database_url)
+    team = "+12025550100"
+    with psycopg.connect(database_url, autocommit=True, row_factory=dict_row) as c:
+        c.execute("update app.datasets set demo_refs = null where id = %s", (d["dataset_id"],))
+        ramp = {ref: c.execute("select ramp_vendor_id from app.vendors where id = %s", (d["vendors"][ref],)).fetchone()["ramp_vendor_id"]
+                for ref in REFS}
+    real = {ref: (ramp[ref], name) for ref, name in zip(REFS, ("Asana", "Salesforce", "DocuSign"), strict=True)}
+    out = run(load(database_url, phones=dict.fromkeys(REFS, team), with_requests=True, dataset_id=d["dataset_id"],
+                   real=real, like="acme"))
+    assert sorted(out["vendors"]) == sorted(REFS)
+    for ref in REFS:
+        assert selection(database_url, d, ref)["e164"] == team, ref
+
+
+def test_a_vendor_can_skip_its_request(database_url):
+    """Spec 0103: an email-door vendor's live email is its request, so none is preloaded."""
+    d = demo_dataset(database_url, refs=("acme", "cobalt"))
+    out = run(load(database_url, phones={}, with_requests=True, dataset_id=d["dataset_id"], no_request=["cobalt"]))
+    assert out["vendors"]["acme"]["request"] and not out["vendors"]["cobalt"]["request"]
+    with psycopg.connect(database_url) as c:
+        vendors = [r[0] for r in c.execute("select vendor_id from ledger.change_requests where dataset_id = %s",
+                                           (d["dataset_id"],)).fetchall()]
+    assert vendors == [d["vendors"]["acme"]]
+
+
+def test_a_real_vendor_must_name_a_seed_vendor(database_url):
+    d = demo_dataset(database_url, refs=("acme",))
+    with pytest.raises(DemoError, match="zenith"):
+        run(load(database_url, phones={}, dataset_id=d["dataset_id"], real={"zenith": ("ven_x", "Asana")}))
+
+
 def test_loading_and_requesting_twice_adds_nothing(database_url):
     d = demo_dataset(database_url, refs=("acme",))
     for _ in range(2):

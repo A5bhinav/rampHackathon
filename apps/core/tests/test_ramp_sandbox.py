@@ -19,7 +19,7 @@ from conftest import MOCK_SECRET, core_settings
 from dialback_core.datasets import create_dataset
 from dialback_core.db import open_pool, system_tx
 from dialback_core.flags import RampMode
-from dialback_core.main import _new_dataset
+from dialback_core.main import _email_door, _new_dataset
 from dialback_core.ramp.connector import MockRefused, RampConnector
 from dialback_core.ramp.http import RampHttpAdapter, TokenBucket
 from dialback_core.ramp.login import RampLogin
@@ -219,9 +219,46 @@ async def test_create_dataset_stores_its_ramp(pool):
     assert (d.ramp, m.ramp) == ("sandbox", "mock")
 
 
-def test_new_dataset_refuses_a_demo_on_the_sandbox():
-    with pytest.raises(SystemExit, match="demo"):
-        asyncio.run(_new_dataset(core_settings(ramp_sandbox=SANDBOX), "demo", "Demo", None, "sandbox"))
+@pytest.mark.anyio
+async def test_new_dataset_makes_a_demo_on_the_sandbox(pool, database_url, capsys):
+    """Spec 0103 reversed spec 0034's rule. Retired after, so later tests' current demo isn't this one."""
+    retire = "update app.datasets set retired_at = now() where ramp = 'sandbox' and retired_at is null"
+    async with system_tx(pool) as conn:
+        await conn.execute(retire)
+    await _new_dataset(core_settings(ramp_sandbox=SANDBOX, database_url=database_url), "demo", "Demo", None, "sandbox")
+    assert "ramp    sandbox" in capsys.readouterr().out
+    async with system_tx(pool) as conn:
+        await conn.execute(retire)
+
+
+@pytest.mark.anyio
+async def test_email_door_turns_on_only_named_vendors_of_a_current_demo(pool, database_url, capsys):
+    """Spec 0103, D4. The dataset is retired after, so later tests' current demo isn't this one."""
+    settings = core_settings(database_url=database_url)
+    demo_set = await create_dataset(pool, "demo", f"test-{uuid.uuid4().hex[:8]}")
+    dev_set = await create_dataset(pool, "dev", f"test-{uuid.uuid4().hex[:8]}")
+    async with system_tx(pool) as conn:
+        ids = {}
+        for ramp_id in ("ven-email", "ven-other"):
+            row = await (await conn.execute("insert into app.vendors (dataset_id, ramp_vendor_id, legal_name) values (%s, %s, %s) returning id",
+                                            (demo_set.id, ramp_id, ramp_id))).fetchone()
+            ids[ramp_id] = row["id"]
+    try:
+        with pytest.raises(SystemExit, match="not a current demo"):
+            await _email_door(settings, dev_set.id, ["ven-email"])
+        with pytest.raises(SystemExit, match="ven-typo"):
+            await _email_door(settings, demo_set.id, ["ven-email", "ven-typo"])
+        async with system_tx(pool) as conn:
+            row = await (await conn.execute("select email_door_vendors from app.datasets where id = %s", (demo_set.id,))).fetchone()
+        assert row["email_door_vendors"] == [], "a refusal turns nothing on"
+        await _email_door(settings, demo_set.id, ["ven-email"])
+        assert "email door on for 1" in capsys.readouterr().out
+        async with system_tx(pool) as conn:
+            row = await (await conn.execute("select email_door_vendors from app.datasets where id = %s", (demo_set.id,))).fetchone()
+        assert row["email_door_vendors"] == [ids["ven-email"]]
+    finally:
+        async with system_tx(pool) as conn:
+            await conn.execute("update app.datasets set retired_at = now() where id = any(%s)", ([demo_set.id, dev_set.id],))
 
 
 def test_new_dataset_refuses_the_sandbox_without_credentials():
