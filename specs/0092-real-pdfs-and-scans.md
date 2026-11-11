@@ -173,18 +173,51 @@ Observations and documents keep their columns.
        it's an email, not a PDF.
    - **`dialback-ledger read-pdf FILE`:** prints each line with its visibility, plus the phone
      candidates code found. It labels and stores nothing.
-10. **Known limit until Part B: the glyphs say one thing, the text layer another.**
+10. **The glyphs can say one thing, the text layer another.**
     - **The case:** a font whose character map is altered shows one digit and extracts another.
       There is ink, but not the digits the text layer holds.
-    - **Why Part A misses it:** Part A reads the text layer, so it reads what the map says.
     - **The plant:** the lab plants one, with two digit glyphs swapped using fontTools on a font
       whose license allows changes.
-    - **Its listing:** it goes on the list as a strict known failure, in spec 0048 D3's manner,
-      with its finding. It turns red once Part B's pixel check lands.
-    - **Not in this limit:** an image drawn over text is caught by the ink rule (D3), because
+    - **Its listing:** it was listed as a strict known failure, in spec 0048 D3's manner, with
+      its finding. The legibility check (D10a) closes it, so it comes off the list.
+    - **Not in this case:** an image drawn over text is caught by the ink rule (D3), because
       removing the covered text changes nothing on the page.
 
-### Part B: scans and the pixel check
+10a. **The legibility check, moved up from Part B (Sami, Nov 11).**
+    - **Why.** D3's ink rule asks "did anything change on the page?", which isn't "can a person
+      read this?". The first review found 5 ways past it, and those were patched. A red team
+      then found 15 more (#156). Sami chose to stop patching rule by rule and read the pixels.
+      D3 and its patches stay: they classify all text, cheaply. This check is added on top.
+    - **The rule.** Every `visible` phone candidate in a digital PDF must pass all four tests
+      below, measured on the page PDFium renders, never on the text layer. If any fails, or OCR
+      errors or times out, its span is `unverified`: kept, never eligible, no quote, and a
+      number seen only this way gets `unconfirmed_digits_only`.
+      1. **Contrast.** The digits' ink against its local background has a contrast ratio of at
+         least 3:1 (the WCAG ratio for large text).
+      2. **Size.** The digits measure, in pixels, at least what a 4 point font's digits measure
+         (`TINY_POINTS`). Size comes from the pixels because the text layer's size can lie.
+      3. **Together.** No gap between the number's inked digits is wider than 2 digit heights,
+         so a number split across a line can't read as one.
+      4. **Read.** Tesseract 5 (local, through `pytesseract`) reads the same digits, in the same
+         order, with a confidence of at least `C_MIN`.
+    - **OCR must not out-read a person.** OCR binarizes adaptively, so left alone it would read
+      `#FFFFEE` on white perfectly. So test 1 comes first, and OCR gets only an image in which
+      pixels below the contrast floor are set to the background. Upscaling for OCR is allowed;
+      it adds no information.
+    - **Settings.** The render resolution, the crop margin and `C_MIN` are the builder's, and
+      are development settings: they're chosen with #156's and the first review's attacks in
+      view. The 3:1 ratio, the 4 point floor and the 2-digit-height gap are set here, now.
+    - **Time.** OCR counts inside D4's 20 seconds per document.
+    - **Installs.** `pytesseract` in `packages/ledger`; `tesseract-ocr` in the core image and in
+      CI. Without Tesseract, reading a PDF stops with `ReaderUnavailable` (R7). So
+      `demo load --pdf` needs Tesseract on the machine that runs it.
+    - **Stated limits, each with a finding:**
+      - PDFium is the only renderer judged, so #156's 4 cases that only another viewer covers
+        stay. They're listed as strict known failures.
+      - Only digits are checked. An illegible label beside a legible number can still steer the
+        labeler.
+
+### Part B: scans
 
 11. **What a scan is:**
     - a page with no characters and one image covering at least 90% of it;
@@ -231,18 +264,13 @@ Observations and documents keep their columns.
     - **Vision only:** a number that only the vision call reads is not a candidate. It's counted
       as dropped, with the reason "vision only".
     - **`C_MIN`:** set on development data, then frozen before the held-out run.
-14. **The pixel check on digital PDFs.**
-    - **The check:** every visible phone candidate in a digital PDF is also read by local OCR,
-      from the rendered page region around it.
-    - **The result:** if OCR's digits differ from the text layer's, or its confidence is below
-      `C_MIN`, the span is `unverified`.
-    - **What it closes:** decision 10's glyph swap. It makes no API call.
+14. **The pixel check on digital PDFs** moved to Part A as D10a (Sami, Nov 11). Part B reuses
+    its OCR and its `C_MIN`.
 15. **Flags and installs.**
     - **`DIALBACK_SCANS=off|on`:** the default is `off`. With it off, a scan page fails its
       document closed with `PdfRefused("scan")`. With it on, both Tesseract and
       `ANTHROPIC_API_KEY` are needed, or the run stops at startup with `ReaderUnavailable`.
-    - **The pixel check:** always on once Part B lands. It needs Tesseract, so the core image
-      and CI install `tesseract-ocr`.
+    - **The legibility check (D10a):** always on, from Part A.
 16. **The lab's scans.** `pdfrender` rasterizes each rendered page with PDFium, then applies one
     of four damage profiles. Each is deterministic by seed:
     - `clean`: 300 dpi;
@@ -320,8 +348,25 @@ Part A:
   - `lab pdf render --check` fails when a committed demo PDF is stale.
 - [ ] Failure path: a corrupt, truncated or zero-page file, or one that is too big or too slow,
       gives `PdfRefused`. No partial document is stored.
-- [ ] D10's glyph swap is listed as a strict known failure, with its finding in
-      `evals/FINDINGS.md`.
+- [ ] The legibility check (D10a). These bars are set before it runs:
+  - **Attacks caught:** #156's 11 cases unreadable in PDFium's render are never eligible. Their
+    tests pass unchanged: `UNREADABLE_IN_EVERY_RENDERER` and `UNREADABLE_IN_PDFIUM`.
+  - **Stated limit:** #156's 4 `UNREADABLE_IN_ANOTHER_VIEWER` cases are listed as strict known
+    failures, with a finding. Their test bodies don't change.
+  - **Glyph swap:** D10's plant is `unverified`, and it comes off the known-failures list.
+  - **No over-blocks:** no visible number in any round-trip document ends up `unverified`, and
+    `STILL_CALLABLE` still passes. CI runs the corpus, the demo seed and the frozen cases. The
+    full 7,748-document set runs once, and its result goes in the PR. If this bar fails, stop
+    and report the misreads; don't loosen a setting to pass it.
+  - **Each test can fail:** one planted case per test (contrast, size, together, read) fails
+    only that test. A stand-in that skips the contrast floor must read `#FFFFEE` and be caught.
+  - **Fail closed:** an OCR error or timeout gives `unverified`, and a missing Tesseract gives
+    `ReaderUnavailable`.
+  - **Refusal reason:** a number seen only as `unverified` is refused with
+    `unconfirmed_digits_only`.
+  - **Exploratory until confirmed:** the settings were chosen with these attacks in view. A
+    fresh red-team session, on constructions it hasn't seen and with the settings frozen, is
+    what confirms them. Until then the PR says exploratory.
 
 Part B:
 - [ ] Scans are detected per D11. With `DIALBACK_SCANS=off`, a scan fails closed.
@@ -337,8 +382,6 @@ Part B:
 - [ ] Redaction: every non-phone run of 7 or more digits that OCR reads is blacked out before
       the image is sent. The scored run reports how many runs OCR missed. No transcription is
       stored or logged.
-- [ ] The pixel check (D14) marks D10's glyph swap `unverified`, and it comes off the
-      known-failures list.
 - [ ] The scored run (D17) meets every bar on held-out seeds, or scans stay off. Either result
       is written into this spec.
 - [ ] Failure path: Tesseract or the key missing with scans on stops the run at startup.
@@ -357,7 +400,7 @@ Part B:
 | No overlap, and the `docgen` fix | `evals/tests/test_pdf_roundtrip.py::test_no_source_has_overlapping_spans` |
 | Refusal reasons | `packages/ledger/tests/test_select.py::test_no_ink_only_is_hidden_text_only`, `::test_unverified_only_is_unconfirmed_digits_only` |
 | Agreement and redaction | `packages/ledger/tests/test_scan.py` (faked API, real Tesseract) |
-| Pixel check | `packages/ledger/tests/test_scan.py::test_pixel_check_*` |
+| Legibility check (D10a) | `packages/ledger/tests/test_pdf_review.py` (#156, unchanged), `packages/ledger/tests/test_pdf_legibility.py` |
 | Scored run | `packages/ledger/scripts/scan_eval.py`, with its tests in `packages/ledger/tests/test_scan_eval.py` |
 
 ## Out of scope
