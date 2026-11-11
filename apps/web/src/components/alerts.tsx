@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Alert } from "@/lib/api-types";
+import { alertChip } from "@/lib/alerts";
 import { when } from "@/lib/format";
 import { Icon } from "./icons";
 
@@ -32,5 +33,28 @@ export function AlertBanners({ alerts, datasetId }: { alerts: Alert[]; datasetId
         </div>
       ))}
     </section>
+  );
+}
+
+/** The top bar's alert chip (spec 0066): "2 critical", which opens the list. A case page shows its own
+ *  alerts as banners instead (AlertBanners with alertsForCase). */
+export function AlertChip({ alerts, datasetId }: { alerts: Alert[]; datasetId: string }) {
+  const chip = alertChip(alerts);
+  if (!chip) return null;
+  const shown = alerts.filter((a) => a.severity !== "info")
+    .sort((x, y) => (x.severity === y.severity ? y.raised_at.localeCompare(x.raised_at) : x.severity === "critical" ? -1 : 1));
+  return (
+    <details className="alert-chip">
+      <summary className={`badge tone-${chip.tone}`} aria-label={`Alerts: ${chip.label}`}>{chip.label}</summary>
+      <ul className="alert-pop">
+        {shown.map((a) => (
+          <li key={a.id} role={a.severity === "critical" ? "alert" : undefined}>
+            <span className={`badge tone-${a.severity === "critical" ? "bad" : "warn"}`}>{TITLES[a.kind] ?? a.kind}</span>
+            <p>{a.message}</p>
+            <p className="muted sub">{when(a.raised_at)}{a.case_id ? <> · <Link href={`/d/${datasetId}/cases/${a.case_id}`}>Open the case</Link></> : null}</p>
+          </li>
+        ))}
+      </ul>
+    </details>
   );
 }

@@ -976,3 +976,38 @@ ol.slots li.is-filled { animation: slot-in 360ms var(--ease) both; }
 .ramp-form input { font-family: var(--mono); letter-spacing: 0.04em; }
 .ramp-form .actions { margin-top: 8px; }
 .ramp-watch .stepper-card { border: 0; padding: 0; margin-bottom: 12px; }
+
+/* Spec 0066, PR 1: compact chrome. Inner pages get one title line and one subtitle line, no ring
+   art; alerts become one chip in the top bar (a case keeps its own as banners). ------------------ */
+.main-col > main { padding-top: 20px; }
+.page-title { display: grid; gap: 6px; padding-bottom: 4px; }
+.page-title-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-width: 0; }
+.page-title h1 { font-size: 28px; line-height: 34px; font-weight: 700; letter-spacing: -0.03em; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.page-title-aside { flex: none; display: flex; gap: 8px; align-items: center; }
+.page-title-aside .present-links { margin: 0; }
+.page-sub { font-size: 14px; line-height: 22px; color: var(--muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.page-sub .tags { display: inline-flex; flex-wrap: nowrap; gap: 8px; align-items: center; margin: 0; }
+.page-sub .held-n { font-size: 14px; color: var(--ink); }
+.page-intro { max-width: 80ch; margin: -8px 0 0; font-size: 14px; line-height: 21px; }
+.main-col > .banners { display: none; }  /* no stacked banners above inner pages */
+.case-page > .banners { margin-bottom: -8px; }
+.alert-chip { position: relative; }
+.alert-chip > summary { cursor: pointer; list-style: none; height: 26px; padding: 0 10px; }
+.alert-chip > summary::-webkit-details-marker { display: none; }
+.alert-pop { position: absolute; left: 0; top: calc(100% + 6px); z-index: 30; width: min(460px, 90vw); list-style: none; margin: 0; padding: 6px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); box-shadow: var(--shadow-lift); }
+.alert-pop li { display: grid; gap: 4px; padding: 10px; border-bottom: 1px solid var(--line-soft); font-size: 13px; line-height: 18px; }
+.alert-pop li:last-child { border-bottom: 0; }
+.alert-pop p { margin: 0; }
+.alert-pop .badge { justify-self: start; }
+.utilbar { justify-content: flex-start; gap: 16px; }
+.utilbar .viewing-as, .utilbar .present { margin-left: auto; }
+.utilbar .present + .viewing-as { margin-left: 12px; }
+.utilbar:not(:has(.crumbs, .viewing-as, .present, .alert-chip)) { display: none; }
+@media (max-width: 720px) {
+  .page-title h1 { white-space: normal; }
+  .page-sub { white-space: normal; }
+  .page-sub .tags { flex-wrap: wrap; }
+  .page-title-row { flex-wrap: wrap; }
+}

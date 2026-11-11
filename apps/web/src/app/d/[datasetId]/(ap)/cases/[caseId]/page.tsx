@@ -9,7 +9,9 @@ import { CaseRail } from "@/components/flow";
 import { Icon } from "@/components/icons";
 import { PaymentPath } from "@/components/path";
 import { CardHead, Callout, PageHead } from "@/components/page";
-import type { CaseDetail, Candidate, SelectionView } from "@/lib/api-types";
+import type { Alert, CaseDetail, Candidate, SelectionView } from "@/lib/api-types";
+import { AlertBanners } from "@/components/alerts";
+import { alertsForCase } from "@/lib/alerts";
 import { CoreError, core } from "@/lib/core";
 import { brief, datasetNow, date, dueLabel, relative, when, words } from "@/lib/format";
 import { phone, seenBefore, sourceLabel, split } from "@/lib/lineage";
@@ -34,13 +36,14 @@ export default async function CaseDetailPage({ params, searchParams }: {
   searchParams: Promise<{ done?: string; to?: string }>;
 }) {
   const [{ datasetId, caseId }, { done, to }] = await Promise.all([params, searchParams]);
-  const [detail, datasets, view] = await Promise.all([
+  const [detail, datasets, view, alerts] = await Promise.all([
     core.case(caseId).catch((e) => {
       if (e instanceof CoreError && e.status === 404) notFound();
       throw e;
     }),
     core.datasets(),
     core.selection(caseId).catch((): SelectionView | null => null),  // the number card says nothing rather than failing the page
+    core.alerts(datasetId).catch((): Alert[] => []),  // this case's alerts stay full banners here (spec 0066)
   ]);
   const { case: c, change, hold, decision, permissions: can } = detail;
   const path = `/d/${datasetId}/cases/${caseId}`;
@@ -56,21 +59,17 @@ export default async function CaseDetailPage({ params, searchParams }: {
 
   return (
     <main className="case-page">
+      <AlertBanners alerts={alertsForCase(alerts, caseId)} datasetId={datasetId} />
       <PageHead
-        back={{ href: `/d/${datasetId}/cases`, label: "Inbox" }}
-        eyebrow={`Bank change · ${change.detected_via}`}
         title={c.vendor.legal_name}
         aside={
-          <div className="held-aside">
-            <span className="section-marker">Held</span>
-            <span className="held-figure">{c.bills_held} {c.bills_held === 1 ? "bill" : "bills"}</span>
-            <span className="muted sub">
-              {c.next_payment_date ? <>next payment {date(c.next_payment_date)}{nextDue ? ` · ${nextDue.text}` : ""}</> : "no saved payment date"}
-            </span>
-          </div>
+          <span className="present-links">
+            {canWatchCall(detail.timeline) ? <Link className="button-link primary" href={`${path}/call`}>Watch the call</Link> : null}
+            <Link className="button-link" href={`${path}/flow`}>Flow mode</Link>
+          </span>
         }
       >
-        <div className="tags">
+        <span className="tags">
           <StateBadge state={c.state} />
           <Link className="badge-link" href={`/d/${datasetId}/control/evidence${detail.chain.ok ? "" : `#row-${detail.chain.first_bad_seq}`}`}>
             <ChainBadge chain={detail.chain} />
@@ -81,12 +80,12 @@ export default async function CaseDetailPage({ params, searchParams }: {
               Deadline {deadlinePassed ? "passed" : relative(c.deadline_at, now)}
             </span>
           ) : null}
-          <span className="muted sub">Version {c.version}</span>
-        </div>
-        <p className="present-links">
-          {canWatchCall(detail.timeline) ? <Link className="button-link primary" href={`${path}/call`}>Watch the call</Link> : null}
-          <Link className="button-link" href={`${path}/flow`}>Flow mode</Link>
-        </p>
+          <span className="muted sub">
+            <strong className="held-n">{c.bills_held}</strong> {c.bills_held === 1 ? "bill" : "bills"} held
+            {c.next_payment_date ? <> · next payment {date(c.next_payment_date)}{nextDue ? ` · ${nextDue.text}` : ""}</> : null}
+            {" "}· version {c.version} · via {change.detected_via}
+          </span>
+        </span>
       </PageHead>
 
       {done && NOTICES[done] ? (

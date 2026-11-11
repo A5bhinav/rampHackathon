@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { StateBadge } from "@/components/badges";
+import { PageHead } from "@/components/page";
 import { BankChangeForm } from "@/components/bank-change-form";
 import { CaseRail } from "@/components/flow";
 import { CoreError, core } from "@/lib/core";
@@ -34,12 +35,9 @@ export default async function RampVendor({ params, searchParams }: {
   const working = watch === "detecting" || (watch === "opened" && detail !== null && REFRESH_STATES.has(detail.case.state));
   return (
     <main className="ramp">
-      <header className="ramp-head">
-        <p className="back"><Link href={`/d/${datasetId}/ramp`}><span className="arrow" aria-hidden="true">←</span> Ramp (mock) vendors</Link></p>
-        <p className="section-marker">Ramp (mock) · vendor payment details</p>
-        <h1>{vendor.legal_name}</h1>
-        <p className="muted">Current account: <span className="mono">{formatAccount(vendor.account)}</span></p>
-      </header>
+      <PageHead title={vendor.legal_name}>
+        <span className="muted">Ramp (mock) · current account <span className="mono">{formatAccount(vendor.account)}</span></span>
+      </PageHead>
 
       {watch !== "idle" ? (
         <section className="card ramp-watch" aria-live="polite" aria-labelledby="watch-h">
