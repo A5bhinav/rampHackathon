@@ -124,6 +124,17 @@ def test_real_vendors_can_all_retell_one_clean_history(database_url):
         assert selection(database_url, d, ref)["e164"] == team, ref
 
 
+def test_a_vendor_can_skip_its_request(database_url):
+    """Spec 0103: an email-door vendor's live email is its request, so none is preloaded."""
+    d = demo_dataset(database_url, refs=("acme", "cobalt"))
+    out = run(load(database_url, phones={}, with_requests=True, dataset_id=d["dataset_id"], no_request=["cobalt"]))
+    assert out["vendors"]["acme"]["request"] and not out["vendors"]["cobalt"]["request"]
+    with psycopg.connect(database_url) as c:
+        vendors = [r[0] for r in c.execute("select vendor_id from ledger.change_requests where dataset_id = %s",
+                                           (d["dataset_id"],)).fetchall()]
+    assert vendors == [d["vendors"]["acme"]]
+
+
 def test_a_real_vendor_must_name_a_seed_vendor(database_url):
     d = demo_dataset(database_url, refs=("acme",))
     with pytest.raises(DemoError, match="zenith"):
