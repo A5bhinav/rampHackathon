@@ -14,13 +14,13 @@ from test_store import load as load_truth
 from test_store import new_vendor, truth_of
 
 
-def as_person(url: str, dataset_id, read=risk_list, **kw):
+def as_person(url: str, dataset_id, read=risk_list, user=None, **kw):
     """Read the way the core's person_tx does: role authenticated, with a user's claims."""
     async def go():
         async with await psycopg.AsyncConnection.connect(url, row_factory=dict_row) as conn, conn.transaction():
             await conn.execute("set local role authenticated")
             await conn.execute("select set_config('request.jwt.claims', %s, true)",
-                               (json.dumps({"sub": str(uuid.uuid4()), "role": "authenticated"}),))
+                               (json.dumps({"sub": str(user or uuid.uuid4()), "role": "authenticated"}),))
             return await read(conn, dataset_id, **kw)
     return asyncio.run(go())
 
@@ -83,8 +83,8 @@ DOC_KEYS = {"document_id", "kind", "custody_channel", "received_at", "claimed_da
             "parent_document_id", "observations"}
 
 
-def ledger_of(url, dataset_id, vendor_id, now):
-    return as_person(url, dataset_id, vendor_ledger, vendor_id=uuid.UUID(str(vendor_id)), now=now)
+def ledger_of(url, dataset_id, vendor_id, now, user=None):
+    return as_person(url, dataset_id, vendor_ledger, user, vendor_id=uuid.UUID(str(vendor_id)), now=now)
 
 
 def test_vendor_ledger_agrees_with_the_risk_list_and_stores_nothing(database_url):
@@ -100,13 +100,15 @@ def test_vendor_ledger_agrees_with_the_risk_list_and_stores_nothing(database_url
         v = ledger_of(database_url, d["dataset_id"], row["vendor_id"], now)
         assert v["risk"] == row                                   # the same run, the same now
         rule = v["rule"]
-        assert set(rule) <= {"rule_version", "rule_settings", "as_of", "cutoff", "outcome", "contact_point_id",
-                             "alternates", "candidates"}           # no case, selection id or inputs hash
+        base = {"rule_version", "rule_settings", "as_of", "cutoff", "outcome", "candidates"}
+        assert set(rule) == base | ({"contact_point_id", "alternates"} if row["provable_number"] else set())  # no case or selection id
         assert rule["rule_version"] == "ledger-select-v1" and rule["as_of"].startswith(now.strftime("%Y-%m-%dT%H:%M"))
         pick = [c for c in rule["candidates"] if c.get("rank") == 1]
         if row["provable_number"]:
             assert rule["outcome"] == "picked" and pick[0]["e164"] == row["provable_number"]
             assert rule["contact_point_id"] == pick[0]["contact_point_id"]
+            ranked = sorted((c for c in rule["candidates"] if c["eligible"]), key=lambda c: c["rank"])[1:3]
+            assert rule["alternates"] == [{k: c[k] for k in ("contact_point_id", "e164", "source_types")} for c in ranked]
         else:
             assert rule["outcome"] == "no_provable_number" and not pick and "contact_point_id" not in rule
         assert {c["e164"] for c in rule["candidates"] if c["on_file"]} >= ({row["number_on_file"]} - {None})
@@ -142,8 +144,8 @@ def test_vendor_ledger_shows_no_bank_account_and_redacts_long_digit_runs(databas
     v = new_vendor(database_url, "Quoted account")
     fingerprint = "ab" * 32
     with psycopg.connect(database_url, autocommit=True, row_factory=dict_row) as c:
-        doc = c.execute("insert into ledger.documents (dataset_id, vendor_id, kind, sha256, custody_channel, received_at) "
-                        "values (%s, %s, 'invoice', %s, 'email', now() - interval '200 days') returning id",
+        doc = c.execute("insert into ledger.documents (dataset_id, vendor_id, kind, sha256, custody_channel, received_at, subject) "
+                        "values (%s, %s, 'invoice', %s, 'email', now() - interval '200 days', 'Pay to 000123456789') returning id",
                         (v["dataset_id"], v["vendor_id"], "0" * 64)).fetchone()["id"]
         for kind, value, quote in (("phone", "+14155550142", "AR line +14155550142, remit to account 000123456789"),
                                    ("bank_account", f"026009593:6789:{fingerprint}", None)):
@@ -151,6 +153,7 @@ def test_vendor_ledger_shows_no_bank_account_and_redacts_long_digit_runs(databas
                       "quote, visibility, extractor_version) values (%s, %s, %s, %s, %s, 'ar', 'vendor', %s, 'visible', 't')",
                       (v["dataset_id"], doc, v["vendor_id"], kind, value, quote))
     out = ledger_of(database_url, v["dataset_id"], v["vendor_id"], None)
+    assert out["documents"][0]["subject"] == "Pay to [digits removed]"
     (only,) = out["documents"][0]["observations"]
     assert only == {"e164": "+14155550142", "role": "ar", "party": "vendor", "visibility": "visible",
                     "quote": "AR line +14155550142, remit to account [digits removed]"}
@@ -165,3 +168,22 @@ def test_vendor_ledger_of_a_vendor_on_another_dataset_is_none(database_url):
     empty = ledger_of(database_url, a["dataset_id"], a["vendor_id"], None)   # a vendor with no documents yet
     assert empty["documents"] == [] and empty["document_count"] == 0 and empty["rule"]["candidates"] == []
     assert empty["risk"]["status"] == "missing" and empty["rule"]["outcome"] == "no_provable_number"
+
+
+def test_vendor_ledger_shows_only_rows_recorded_before_now_and_caps_the_list(database_url, monkeypatch):
+    d = demo_dataset(database_url)
+    asyncio.run(load(database_url, phones={}))
+    acme = next(r for r in as_person(database_url, d["dataset_id"]) if r["legal_name"] == load_seed()["vendors"]["acme"]["name"])
+    before = ledger_of(database_url, d["dataset_id"], acme["vendor_id"], dt.datetime.now(dt.UTC) - dt.timedelta(days=1))
+    assert before["documents"] == [] and before["document_count"] == 0 and before["rule"]["candidates"] == []
+    monkeypatch.setattr("dialback_ledger.risk.DOCUMENT_LIMIT", 5)
+    capped = ledger_of(database_url, d["dataset_id"], acme["vendor_id"], None)
+    assert len(capped["documents"]) == 5 and capped["document_count"] == len(load_seed()["vendors"]["acme"]["documents"])
+
+
+def test_vendor_ledger_is_none_for_a_dataset_the_person_cant_see(database_url):
+    v, demo_account = new_vendor(database_url, "Dev only"), uuid.uuid4()
+    with psycopg.connect(database_url, autocommit=True) as c:
+        c.execute("insert into app.demo_accounts (user_id) values (%s)", (demo_account,))
+    assert ledger_of(database_url, v["dataset_id"], v["vendor_id"], None) is not None
+    assert ledger_of(database_url, v["dataset_id"], v["vendor_id"], None, user=demo_account) is None   # a dev dataset

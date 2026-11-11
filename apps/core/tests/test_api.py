@@ -367,6 +367,17 @@ async def test_the_vendor_ledger_of_an_unknown_or_foreign_vendor_is_not_found(wo
     assert body["documents"] == [] and body["risk"]["status"] == "missing" and body["rule"]["candidates"] == []
 
 
+async def test_the_vendor_ledger_reads_as_the_person(world, database_url):
+    """A demo account can't see a dev dataset, so its vendor's history is not found for it (spec 0034): the
+    endpoint reads under the person's token, whatever the ledger's own read policies allow."""
+    vendor, _, _ = await ingest_c01(world)
+    async with await psycopg.AsyncConnection.connect(database_url, autocommit=True) as owner:
+        await owner.execute("insert into app.demo_accounts (user_id) values (%s)", (world.users["approver1"],))
+    url = f"/api/datasets/{world.dataset.id}/vendors/{vendor}/ledger"
+    await get(world, url, "approver1", LEDGER, status=404)
+    assert (await get(world, url, "clerk", LEDGER))["documents"]
+
+
 async def test_the_case_shows_its_calls_answers_and_checks(world):
     """Spec 0035: the call comes from the evidence chain; account_last4 is a digit count, never the digits."""
     case = await verified_case(world)
