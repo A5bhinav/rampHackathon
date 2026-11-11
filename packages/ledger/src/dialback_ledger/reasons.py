@@ -16,11 +16,9 @@ REASON_TEXT: dict[str, str] = {
     "near_miss_of_older_number": "Not provable: it is one digit off, or two swapped digits away from, an older number "
                                  "of this vendor.",
     "hidden_text_only": "Not provable: it appeared only in text a person couldn't see (white, tiny or off the page).",
-    "not_vendor_party": "Not provable: records from at least two independent channels, months before the request, "
-                        "say it isn't the vendor's line, and one labels it as someone else's number, such as a bank's "
-                        "or a customer's.",
-    "fax_line": "Not provable: records from at least two independent channels, months before the request, say it "
-                "isn't the vendor's line, and one labels it as a fax line.",
+    "not_vendor_party": "Not provable: the documents label it as someone else's number, such as a bank's or a "
+                        "customer's, or their labels disagree.",
+    "fax_line": "Not provable: the documents label it as a fax line.",
 }
 
 # The lineage panel's other states (spec 0023): the dashboard shows these and writes none itself.
