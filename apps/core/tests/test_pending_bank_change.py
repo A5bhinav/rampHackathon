@@ -7,6 +7,8 @@ lists it as `active` under a new id with no proposal id (seen on the sandbox, sp
 """
 from __future__ import annotations
 
+import dataclasses
+import datetime as dt
 from types import SimpleNamespace
 
 import httpx
@@ -14,6 +16,7 @@ import pytest
 from conftest import FINGERPRINT_KEY, core_settings
 from dialback_core.db import system_tx
 from dialback_core.detection import Keys, import_all, sync_vendor
+from dialback_core.jobs import Jobs
 from dialback_core.ramp.connector import RampConnector
 from dialback_core.ramp.http import TokenBucket
 from test_ramp_sandbox_shapes import SANDBOX, SandboxRamp, V, _no_sleep, account, sandbox_dataset
@@ -69,6 +72,22 @@ async def test_a_change_entered_in_ramp_opens_a_case_while_it_waits_for_review(w
     assert found.ramp_account_id == "acct-p" and found.case_id is not None and found.status == "applied"
     assert await changes(world) == ["acct-p"]
     assert (await mirror(world))["acct-p"] == (False, True), "pending: not the account Ramp pays"
+
+
+@pytest.mark.parametrize("watch", [(V,), ()])
+async def test_the_poll_opens_a_case_for_a_pending_change_only_on_a_watched_vendor(pool, watch):
+    # Spec 0102: a pending change writes no event and moves no timestamp, so the poll can't see it
+    # unless the vendor is on the demo watch list.
+    fake = SandboxRamp()
+    async with httpx.AsyncClient(transport=httpx.MockTransport(fake.handle)) as http:
+        d = await sandbox_dataset(pool)
+        settings = core_settings(ramp_sandbox=dataclasses.replace(SANDBOX, watch_vendors=watch))
+        connector = RampConnector(settings, http, limiter=TokenBucket(100_000), sleep=_no_sleep, pool=pool)
+        keys = Keys(FINGERPRINT_KEY)
+        await import_all(pool, connector.for_dataset(d.id), keys, d.id)
+        fake.accounts[V].append(pending("acct-p", "4321"))
+        found = await Jobs(pool, settings, connector, keys).poll(d.id, {"watermark": dt.datetime(2026, 11, 10, 11, tzinfo=dt.UTC)})
+    assert found.effects == (1 if watch else 0)
 
 
 async def test_a_pending_account_already_known_is_not_a_change_again(world):

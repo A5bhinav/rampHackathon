@@ -58,6 +58,7 @@ class RampSandbox:
     client_secret: bytes = field(repr=False)
     base_url: str = ""
     scopes: tuple[str, ...] = ()
+    watch_vendors: tuple[str, ...] = ()  # a demo's vendors, read on every poll (spec 0102)
 
 
 RAMP_SANDBOX_URL = "https://demo-api.ramp.com"
@@ -79,7 +80,8 @@ def _ramp_sandbox(environ: dict[str, str]) -> RampSandbox | None:
     scopes = tuple(environ.get("RAMP_SANDBOX_SCOPES", " ".join(RAMP_SANDBOX_SCOPES)).split())
     if not scopes:
         raise ConfigurationError("RAMP_SANDBOX_SCOPES is empty: a token with no scopes can call nothing")
-    return RampSandbox(client_id, secret.encode(), RAMP_SANDBOX_URL, scopes)
+    watch = tuple(environ.get("RAMP_SANDBOX_WATCH_VENDORS", "").replace(",", " ").split())
+    return RampSandbox(client_id, secret.encode(), RAMP_SANDBOX_URL, scopes, watch)
 
 
 @dataclass(frozen=True)

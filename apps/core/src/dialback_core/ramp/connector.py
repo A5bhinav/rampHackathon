@@ -83,7 +83,7 @@ class RampConnector:
                 if self._login is None or self._settings.ramp_sandbox is None:
                     raise RampError(f"dataset {dataset_id} is on Ramp's sandbox, and this server has no sandbox credentials")
                 adapter = RampSandboxAdapter(self._settings.ramp_sandbox.base_url, self._login, self._http, self._limiter,
-                                             sleep=self._sleep)
+                                             sleep=self._sleep, watch_vendors=self._settings.ramp_sandbox.watch_vendors)
             self._adapters[dataset_id] = adapter
         return adapter
 
