@@ -115,7 +115,19 @@ None.
          on the stub;
        - in half the worlds, a planted provable number: 2 counting channels, at least 90 days old,
          labeled the vendor's;
-       - the attacker's change-request email and follow-ups, with varied text.
+       - the attacker's change-request email, naming a fresh attacker number, and the vendor's real
+         number mentioned once, visibly, in the change context: in the request itself, a reply in its
+         thread, an email after it, or one from a lookalike sender.
+     - **A sweep, not a sample (amended Nov 10):** every phrasing and placement the generator can
+       render is the real number's mention in two worlds, one planted and one not (102 layouts, 204
+       worlds). The path, the records, the formats and the filler are drawn at the seed.
+       - **Why:** 100 sampled worlds showed only 8 of the 81 layouts the stub fails, so the list held
+         at seed 0 alone, and any change to the draws added unlisted patterns that weren't new
+         findings. The sweep shows all 81 at every seed.
+       - **What it leaves out:** each world holds one mention of the real number. That finds every
+         failing layout on today's rule, which refuses a number when any visible sighting does. Two
+         mentions, a mention of the planted number, or a hidden one matter for a reader that reads
+         across lines, so they go with the LLM-reader run (out of scope).
      - **The check:**
        - relabel every change-context sighting ingestion produced as the vendor's, and the call
          list must not change (spec 0083's I12, removal half only, so only labels ingestion
@@ -135,9 +147,13 @@ None.
 7. **A fixed sample, not a search.**
    - Plans come from a seeded `random.Random`, not Hypothesis. So a seed gives the same documents
      everywhere (FINDINGS B10), and every plan is checked: nothing stops at the first failure (B3).
+   - `--examples` is the number of document plans. G7's worlds are the sweep (decision 5), whatever
+     `--examples` is.
    - A violation is shrunk at the plan level until removing any single number, filler line or
      document, or simplifying any phrasing or format, makes it go away. It is frozen under
      `evals/docs-generated/` as the plan and its rendered documents, and re-run on every run.
+   - Only a run at the gate's seed freezes cases there. A run at another seed freezes into the
+     gitignored `evals/out/docs-generated-seed<N>`, and is held to the same list.
    - `lab docs --examples 1000 --seed 0` runs in CI against the stub, which makes no network call.
 8. **CI.** The must-stay-green steps in `lab-fuzz.yml` and `lab-smoke.yml` deselect the new
    `docs_gate` tests, as they do `selection_gate`. A `lab-docs` job runs them with the
@@ -165,18 +181,23 @@ None.
 
 | Item | Test |
 |---|---|
-| Shape, round trip, coverage | `evals/tests/test_docgen.py::test_documents_ingest`, `::test_plan_round_trips`, `::test_coverage_floor` |
+| Shape, round trip, coverage | `evals/tests/test_docgen.py::test_documents_ingest`, `::test_plan_round_trips`, `::test_coverage_floor`, `::test_area_codes_parse_in_every_format`, `::test_draws_are_pinned_by_the_seed` |
 | G1 to G7 | `evals/tests/test_docgen.py::test_each_check_catches_its_stand_in`, `::test_g7_fails_today_and_passes_context_blind`, `::test_checks_on_the_stub` (`docs_gate`) |
-| Known failures by pattern | `evals/tests/test_docgen.py::test_unlisted_pattern_turns_red`, `::test_listed_pattern_that_passes_turns_red` |
+| G7's sweep and blame (amended) | `evals/tests/test_docgen.py::test_g7_sweeps_every_layout_of_the_real_number`, `::test_g7_blames_only_the_labels_that_move_the_call`, `::test_the_list_is_not_fitted_to_seed_0` (`docs_gate`) |
+| Known failures by pattern | `evals/tests/test_docgen.py::test_unlisted_pattern_turns_red`, `::test_listed_pattern_that_passes_turns_red`, `::test_a_pattern_entry_needs_every_field` |
+| Frozen cases and other seeds | `evals/tests/test_docgen.py::test_a_frozen_case_says_what_each_violation_was`, `::test_another_seed_never_writes_to_the_committed_cases`, `::test_another_seed_is_held_to_the_list_by_default` |
 | Stub report | `evals/tests/test_docgen.py::test_stub_report_has_every_count` |
 | Bridge | `evals/tests/test_generated_corpus.py::test_ingested_case_is_still_what_real_ingestion_produces` (unchanged) |
 | Fictional numbers | `evals/tests/test_docgen.py::test_rendered_text_holds_only_fictional_numbers` |
-| CI | `evals/tests/test_ci_wiring.py` |
+| CI | `evals/tests/test_ci_wiring.py` (`::test_the_green_steps_deselect_the_docs_gate`, `::test_lab_docs_runs_the_docs_gate_with_its_list`) |
+| Numbering | `evals/tests/test_numbering.py` (this spec's questions) |
 
 ## Out of scope
 
 - **Running against the LLM reader.** It needs spec 0049's reader and its model client, so that a
-  run can count its own cost and stop at a cap. That's a follow-up once 0049 lands.
+  run can count its own cost and stop at a cap. 0049 has landed (PRs #113 and #114), so this is the
+  next follow-up. G7 worlds with several mentions of the real number, a mention of the planted
+  number, or a hidden one go with it (decision 5).
 - **Prose written by a model** around a plan from code.
 - **A red-team agent** that writes attack documents. It needs the LLM reader first, and an attacker
   that isn't Claude (the lab's rule that no model attacks or grades itself).
@@ -194,7 +215,13 @@ None open. Sami approved the spec and every call in it as written on Nov 10:
 - **Q121, resolved:** the generator lives in `evals`, not in `corpus/generator`. The corpus is
   Inesh's frozen truth, and this is the lab's search.
 - **Q122, resolved:** this builds on spec 0048's known-failures list (D3). So it starts from
-  `sami/lab-honest-impl` once D3 is pushed. It doesn't need spec 0046.
+  `sami/lab-honest-impl` once D3 is pushed. It doesn't need spec 0046. (D3 reached main first, so the
+  build started from main.)
+
+**Amended by Sami on Nov 10, after the build's fresh review:** G7's worlds are a sweep of every
+layout, not a sample (decision 5); `--examples` counts documents, and other seeds freeze outside the
+committed cases (decision 7); the Tests table lists the tests the build and its two reviews added.
+No check, bar or known-failures rule changed.
 
 ## Commands
 
