@@ -96,6 +96,21 @@ Version 5 fails the held-out bar on recall. Per the stop rule, at most two revis
 
 No failures in any run; heldout2's cr-36 (reported separately) was not flagged in any run. v1's six false flags: two customers giving their own account for a refund (heldout2 ord-06, ord-39), a brand-new vendor setup (ord-38), a vendor's new outbound account with "keep paying us as today" (ord-25), a hypothetical process question (dev ord-36) and a declined-card notice (dev ord-47). Root cause in v1: its first line said every sender "was written by, or claims to be from, one of the company's vendors". v2 (revision 1 of at most 2, pre-registered before it ran) says the sender may be anyone, defines the request as paying a vendor somewhere new in place of where the company pays it today, and lists five example exclusions. The exclusions were drawn from these six false flags, so v2's zero false flags here are exploratory, not evidence; the check that could have failed here was recall, which held. Because v2 was judged on heldout2, heldout3 runs with `--heldout2-revised` (cr-04 and cr-10 reported separately), as pre-registered.
 
+### Decision 12: the confirmatory run (Task 6f, heldout3, once)
+
+Stated in the ledger before it started: Haiku (`claude-haiku-5-5`), prompt v2 (`prompt_sha256` starts `168990eec3fdf1a2`), `--confirm-heldout3 --heldout2-revised`, the pre-registered bar. Run stamp `2026-11-11T005711Z`, result file in `eval_results/`.
+
+| Measure | Result | Bar |
+|---|---|---|
+| Change requests in the bar | 35/35 flagged | all |
+| Ordinary emails | 0/70 flagged | at most 3 |
+| Failures (counted as not flagged) | none | |
+| ON-FILE-ONLY cr-26, cr-27, cr-31 (separate) | 0/3 flagged | not in the bar |
+| cr-04, cr-10 (separate, after the heldout2 revision) | 2/2 flagged | not in the bar |
+| Cost, latency | $0.0129 for 110 calls; p50 0.82 s, p95 1.58 s | |
+
+**Result: PASS (confirmed).** This is the only confirmed flagger result; every number above this section is exploratory. Caveats: one run of one model on one sealed set of 110 synthetic emails written by a coding agent (not real fraud mail); with 0 of 70 false flags the one-sided 95% upper bound on the false-flag rate is still about 4.2%, and with 35 of 35 the one-sided 95% lower bound on recall is about 92%. The three ON-FILE-ONLY requests carry no wording that gives them away, and the model did not flag them, as expected: an email door case for them depends on the door's on-file mismatch check, which unit and door tests cover but which was not run on these three emails.
+
 ### What the ledger gets, and what can still reach it (review fix round 5)
 
 The model's copy (`redact_for_model`) has no numeric characters at all (`str.isnumeric`, since Task 6b's fix round 1; before it, no `str.isdigit` characters). The ledger stores only rebuilt phone lines: `ledger_text` emits one line per kept phone, made of the words before it (letters, colons and apostrophes; nothing numeric) and the phone in phonenumbers' canonical form, and nothing else from the email. Rounds 2 to 4 masked the email's text in place for the ledger and each round's masking changed what the ledger's matcher read (masking created a phone where there was none; masking beside a kept phone hid it so a second phone, or a phone-shaped account, passed the stub reader's one-phone rule: `Ph 212-555-0199, 77777/(617) 555-0143x51826279-` stored 6175550143 and `Account (call 212-555-0199 to confirm): 7783110245x1` stored the account). The property test over 200 fixed seeds (phones in every format the rounds found, `(digits)` glue, extensions, `~` `|` and middle-dot joins, phone-shaped labeled and unlabeled accounts, CJK and fullwidth numerals, several phones per line) now checks that every line the stub reader would store is words plus exactly the digits of one phone the keep-decision kept, and its guard shows the same generator leaks through the stub reader on the original text.
