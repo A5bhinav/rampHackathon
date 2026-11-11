@@ -83,8 +83,9 @@ language sql as $$
             jsonb_build_object('change_event_id', p_change)) ->> 'case_id')::uuid
 $$;
 
--- Drive a case from open or held to blocked: hold, number, call, Not verified. Returns the version.
-create function pg_temp.to_blocked(p_case uuid) returns integer
+-- Drive a case from open or held through a call to a decision: hold, number, call, p_outcome.
+-- Returns the version.
+create function pg_temp.call_and_decide(p_case uuid, p_outcome text) returns integer
 language plpgsql as $$
 declare
   c      app.cases%rowtype;
@@ -102,10 +103,41 @@ begin
   perform app.apply_case_event(p_case, 'call_ended', pg_temp.sys(), k || ':ended',
             jsonb_build_object('call_id', v_call, 'result', 'answers_recorded'));
   perform app.apply_case_event(p_case, 'decision_made', pg_temp.sys(), k || ':decided',
-            jsonb_build_object('outcome', 'not_verified', 'inputs_hash', repeat('c', 64), 'engine_version', 'test'));
-  select * into c from app.cases where id = p_case;
-  assert c.state = 'blocked', format('case %s is %s, not blocked', p_case, c.state);
-  return c.version;
+            jsonb_build_object('outcome', p_outcome, 'inputs_hash', repeat('c', 64), 'engine_version', 'test'));
+  return (select version from app.cases where id = p_case);
+end
+$$;
+
+-- Drive a case to blocked (Not verified). Returns the version.
+create function pg_temp.to_blocked(p_case uuid) returns integer
+language plpgsql as $$
+declare
+  v integer := pg_temp.call_and_decide(p_case, 'not_verified');
+begin
+  assert pg_temp.state_of(p_case) = 'blocked', format('case %s is %s, not blocked', p_case, pg_temp.state_of(p_case));
+  return v;
+end
+$$;
+
+-- Drive a case to awaiting_release (Verified). Returns the version.
+create function pg_temp.to_awaiting_release(p_case uuid) returns integer
+language plpgsql as $$
+declare
+  v integer := pg_temp.call_and_decide(p_case, 'verified');
+begin
+  assert pg_temp.state_of(p_case) = 'awaiting_release', format('case %s is %s, not awaiting_release', p_case, pg_temp.state_of(p_case));
+  return v;
+end
+$$;
+
+-- The release worker gave up: the release_hold command failed and the case goes to review.
+create function pg_temp.release_failed(p_case uuid, p_key text) returns void
+language plpgsql as $$
+begin
+  update app.outbox set status = 'failed', last_error = 'test: Ramp refused', done_at = now()
+   where case_id = p_case and command = 'release_hold' and status = 'pending';
+  perform app.apply_case_event(p_case, 'command_failed', pg_temp.sys(), p_key, '{"command": "release_hold", "attempts": 5}');
+  assert pg_temp.state_of(p_case) = 'needs_review', 'a failed release goes to review';
 end
 $$;
 
@@ -454,6 +486,214 @@ begin
   assert app.case_email_only(null) = false, 'a null case is not email only';
   assert app.eval_guard('email_dismiss_first', null::app.cases, f.approver1, '{"reason": "x"}') = false, 'first guard on a null case';
   assert app.eval_guard('email_dismiss_four_eyes', null::app.cases, f.approver1, '{"reason": "x"}') = false, 'second guard on a null case';
+end
+$$;
+
+-- 11. Rule C1 alone: the account the email was compared against is no longer current, and no
+--     other account is (C2 has nothing to object to). Refused.
+do $$
+declare
+  f      pg_temp.fx%rowtype;
+  vn     uuid;
+  a_file uuid;
+  c      uuid;
+  v      integer;
+begin
+  select * into f from pg_temp.fx limit 1;
+  vn := pg_temp.vendor('ven_no_current');
+  a_file := pg_temp.on_file(vn);
+  c := pg_temp.detect(pg_temp.email_change(vn, '000008701'));
+  v := pg_temp.to_blocked(c);
+  assert pg_temp.email_only(c), 'email only to start with';
+  update app.bank_accounts set is_current = false where id = a_file;
+  assert not exists (select 1 from app.bank_accounts where vendor_id = vn and is_current), 'no current account at all';
+  assert not pg_temp.email_only(c), 'the account on file is gone: refused';
+  perform pg_temp.sign_in(f.approver1);
+  perform pg_temp.expect_error(format($q$ select app.release_case(%L, %s, 'approve', 'Ramp never changed.') $q$, c, v), '23514', '%is blocked, not awaiting_release%');
+  perform pg_temp.sign_out();
+  assert pg_temp.state_of(c) = 'blocked' and not exists (select 1 from app.releases where case_id = c), 'nothing moved';
+end
+$$;
+
+-- 12. No account on file when the email came (old_account_id null): never email only, stays blocked.
+do $$
+declare
+  f  pg_temp.fx%rowtype;
+  vn uuid;
+  c  uuid;
+  v  integer;
+begin
+  select * into f from pg_temp.fx limit 1;
+  vn := pg_temp.vendor('ven_no_account');
+  update app.bank_accounts set is_current = false where vendor_id = vn;
+  c := pg_temp.detect(pg_temp.email_change(vn, '000008801'));
+  assert (select ce.old_account_id is null from app.cases x join app.bank_change_events ce on ce.id = x.change_event_id where x.id = c),
+    'the email change has no old account';
+  v := pg_temp.to_blocked(c);
+  assert not pg_temp.email_only(c), 'no account on file: not email only';
+  perform pg_temp.sign_in(f.approver1);
+  perform pg_temp.expect_error(format($q$ select app.release_case(%L, %s, 'approve', 'Ramp never changed.') $q$, c, v), '23514', '%is blocked, not awaiting_release%');
+  perform pg_temp.sign_out();
+  assert pg_temp.state_of(c) = 'blocked' and not exists (select 1 from app.releases where case_id = c), 'nothing moved';
+end
+$$;
+
+-- 13. Path A: approver1 co-approves the release in awaiting_release, approver2 rejects it, and the
+--     case is blocked at the same version. Only approvals made while blocked count, so the
+--     earlier co-approval is not a first dismissal, and approver1's own earlier receipt does not
+--     answer approver1's dismissal.
+do $$
+declare
+  f    pg_temp.fx%rowtype;
+  c    uuid;
+  v    integer;
+  r    jsonb;
+begin
+  select * into f from pg_temp.fx limit 1;
+  c := pg_temp.detect(pg_temp.email_change(pg_temp.vendor('ven_path_a'), '000009101'));
+  v := pg_temp.to_awaiting_release(c);
+  perform pg_temp.sign_in(f.approver1);
+  r := app.release_case(c, v, 'approve', 'The vendor confirmed.');
+  assert r ->> 'status' = 'awaiting_second_approver', r::text;
+  perform pg_temp.sign_in(f.approver2);
+  r := app.release_case(c, v, 'reject', 'Not convinced.');
+  assert r ->> 'to_state' = 'blocked' and (select version from app.cases where id = c) = v, r::text;
+
+  -- One person can't lift the hold on the strength of the earlier co-approval, even directly.
+  perform pg_temp.sign_in(f.approver3);
+  perform pg_temp.expect_error(format($q$ select app.apply_case_event(%L, 'release_approved', pg_temp.person(%L), 'a1', %L) $q$,
+            c, f.approver3, format('{"reason": "Ramp never changed.", "expected_version": %s}', v)), '23514', '%guard failed%');
+
+  perform pg_temp.sign_in(f.approver1);
+  r := app.release_case(c, v, 'approve', 'Ramp never changed.');
+  assert r ->> 'status' = 'awaiting_second_approver' and r ->> 'from_state' = 'blocked' and pg_temp.state_of(c) = 'blocked', r::text;
+  r := app.release_case(c, v, 'approve', 'Clicked twice.');
+  assert r ->> 'status' = 'already_applied' and pg_temp.state_of(c) = 'blocked', r::text;
+  perform pg_temp.sign_in(f.approver2);
+  r := app.release_case(c, v, 'approve', 'Ramp never changed; agreed.');
+  assert r ->> 'status' = 'applied' and r ->> 'to_state' = 'releasing', r::text;
+  assert (select count(*) from app.outbox where case_id = c and command = 'release_hold') = 1, 'exactly one release_hold';
+  perform pg_temp.sign_out();
+end
+$$;
+
+-- 14. Path B: after the reject, a third approver's stale Approve (the version didn't change) is
+--     a first dismissal only; a second, different person is still needed.
+do $$
+declare
+  f pg_temp.fx%rowtype;
+  c uuid;
+  v integer;
+  r jsonb;
+begin
+  select * into f from pg_temp.fx limit 1;
+  c := pg_temp.detect(pg_temp.email_change(pg_temp.vendor('ven_path_b'), '000009201'));
+  v := pg_temp.to_awaiting_release(c);
+  perform pg_temp.sign_in(f.approver1);
+  r := app.release_case(c, v, 'approve', 'The vendor confirmed.');
+  assert r ->> 'status' = 'awaiting_second_approver', r::text;
+  perform pg_temp.sign_in(f.approver2);
+  perform app.release_case(c, v, 'reject', 'Not convinced.');
+  assert pg_temp.state_of(c) = 'blocked', 'rejected to blocked';
+
+  perform pg_temp.sign_in(f.approver3);
+  r := app.release_case(c, v, 'approve', 'Looks fine to me.');           -- loaded before the reject
+  assert r ->> 'status' = 'awaiting_second_approver' and pg_temp.state_of(c) = 'blocked', r::text;
+  r := app.release_case(c, v, 'approve', 'Looks fine to me.');
+  assert r ->> 'status' = 'already_applied' and pg_temp.state_of(c) = 'blocked', r::text;
+  perform pg_temp.sign_in(f.approver1);
+  r := app.release_case(c, v, 'approve', 'Ramp never changed.');
+  assert r ->> 'to_state' = 'releasing', r::text;
+  perform pg_temp.sign_out();
+end
+$$;
+
+-- 15. Path C: a release that two people approved fails, a reviewer blocks the case, and it is
+--     blocked at the same version with both approvals still on file. Neither counts: the first
+--     approval after the block is a first dismissal. Then the same again after a completed
+--     dismissal: each blocked spell starts from nothing.
+do $$
+declare
+  f pg_temp.fx%rowtype;
+  c uuid;
+  v integer;
+  r jsonb;
+begin
+  select * into f from pg_temp.fx limit 1;
+  c := pg_temp.detect(pg_temp.email_change(pg_temp.vendor('ven_path_c'), '000009301'));
+  v := pg_temp.to_awaiting_release(c);
+  perform pg_temp.sign_in(f.approver1);
+  perform app.release_case(c, v, 'approve', 'The vendor confirmed.');
+  perform pg_temp.sign_in(f.approver2);
+  r := app.release_case(c, v, 'approve', 'Agreed.');
+  assert r ->> 'to_state' = 'releasing', r::text;
+  perform pg_temp.sign_out();
+  perform pg_temp.release_failed(c, c || ':failed:1');
+  perform pg_temp.sign_in(f.approver3);
+  perform app.apply_case_event(c, 'review_blocked', pg_temp.person(f.approver3), c || ':blocked:1',
+            format('{"reason": "Hold it until we know why Ramp refused.", "expected_version": %s}', v)::jsonb);
+  assert pg_temp.state_of(c) = 'blocked' and (select version from app.cases where id = c) = v, 'blocked at the same version';
+  assert pg_temp.email_only(c), 'still email only';
+
+  perform pg_temp.sign_in(f.approver1);
+  r := app.release_case(c, v, 'approve', 'Ramp never changed.');
+  assert r ->> 'status' = 'awaiting_second_approver' and pg_temp.state_of(c) = 'blocked', r::text;
+  perform pg_temp.sign_in(f.approver2);
+  r := app.release_case(c, v, 'approve', 'Ramp never changed; agreed.');
+  assert r ->> 'status' = 'applied' and r ->> 'to_state' = 'releasing', r::text;
+  -- Pre-existing (spec 0090, for Abhi): release_hold is keyed {case}:release:v{n}, and that key was
+  -- used by the failed release, so this second release queues no command. The case waits in
+  -- releasing with the hold on (fails closed). Change this assertion when that is fixed.
+  assert (select count(*) from app.outbox where case_id = c and command = 'release_hold') = 1
+     and not exists (select 1 from app.outbox where case_id = c and command = 'release_hold' and status = 'pending'),
+    'known issue: no new release_hold for a second release at the same version';
+
+  -- The dismissal's release fails too, and the case is blocked again: a new spell.
+  perform pg_temp.sign_out();
+  perform pg_temp.release_failed(c, c || ':failed:2');
+  perform pg_temp.sign_in(f.approver3);
+  perform app.apply_case_event(c, 'review_blocked', pg_temp.person(f.approver3), c || ':blocked:2',
+            format('{"reason": "Blocked again.", "expected_version": %s}', v)::jsonb);
+  perform pg_temp.sign_in(f.approver1);
+  r := app.release_case(c, v, 'approve', 'Ramp never changed.');
+  assert r ->> 'status' = 'awaiting_second_approver' and pg_temp.state_of(c) = 'blocked', r::text;
+  perform pg_temp.sign_in(f.approver3);
+  r := app.release_case(c, v, 'approve', 'Ramp never changed; agreed.');
+  assert r ->> 'to_state' = 'releasing', r::text;
+  perform pg_temp.sign_out();
+end
+$$;
+
+-- 16. The approvals are read from the receipts, which only apply_case_event writes. A forged
+--     evidence row (the service role may insert evidence) saying approver2 dismissed does not let
+--     approver1 dismiss alone, and the service role cannot write a receipt.
+do $$
+declare
+  f pg_temp.fx%rowtype;
+  c uuid;
+  v integer;
+  r jsonb;
+begin
+  select * into f from pg_temp.fx limit 1;
+  c := pg_temp.detect(pg_temp.email_change(pg_temp.vendor('ven_forged'), '000009401'));
+  v := pg_temp.to_blocked(c);
+  set local role service_role;
+  insert into audit.evidence_events (chain_id, seq, event_id, dataset_id, case_id, type, actor_kind, actor_id, occurred_at,
+                                     body_jcs, content_hash, prev_hash, hash)
+    select f.chain_id, max(e.seq) + 1, gen_random_uuid(), f.dataset, c, 'release_co_approved', 'person', f.approver2, now(),
+           format('{"body":{"reason":"forged"},"from_state":"blocked","to_state":"blocked","version":%s}', v),
+           repeat('d', 64), repeat('e', 64), repeat('f', 64)
+      from audit.evidence_events e where e.chain_id = f.chain_id;
+  perform pg_temp.expect_error(format($q$ insert into app.case_event_receipts (idempotency_key, case_id, event_type, result)
+            values ('forged', %L, 'release_co_approved', '{"to_state": "blocked"}') $q$, c), '42501');
+  reset role;
+
+  perform pg_temp.sign_in(f.approver1);
+  perform pg_temp.expect_error(format($q$ select app.apply_case_event(%L, 'release_approved', pg_temp.person(%L), 'g1', %L) $q$,
+            c, f.approver1, format('{"reason": "Ramp never changed.", "expected_version": %s}', v)), '23514', '%guard failed%');
+  r := app.release_case(c, v, 'approve', 'Ramp never changed.');
+  assert r ->> 'status' = 'awaiting_second_approver' and pg_temp.state_of(c) = 'blocked', r::text;
+  perform pg_temp.sign_out();
 end
 $$;
 

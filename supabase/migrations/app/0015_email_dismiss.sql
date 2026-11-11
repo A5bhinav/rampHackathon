@@ -9,11 +9,19 @@
 -- blocked; the second moves it to releasing, which queues release_hold, so bills pay the account
 -- already on file.
 --
+-- Only approvals made while the case is blocked count toward a dismissal (app.blocked_approvers).
+-- release_rejected and command_failed keep the version, so approvals given in awaiting_release,
+-- or by an earlier dismissal whose release failed, are still at the same version; they don't count.
+--
 -- The dismiss reuses release_co_approved and release_approved, so apply_case_event and its side
 -- effects (the app.releases row; the release_hold command keyed {case}:release:v{n}) and the
 -- evidence schema do not change. eval_guard and release_case are redefined in full, as 0008,
 -- 0011 and 0005 did, so one file shows each whole function. create or replace keeps the grants
 -- (see 0004).
+
+-- Rules B and C read a vendor's changes; the blocked-spell functions read a case's receipts.
+create index bank_change_events_vendor_detected_idx on app.bank_change_events (vendor_id, detected_at);
+create index case_event_receipts_case_idx on app.case_event_receipts (case_id);
 
 -- Email only ---------------------------------------------------------------------------------
 
@@ -77,6 +85,49 @@ comment on function app.case_email_only(app.cases) is
 
 revoke execute on function app.case_email_only(app.cases) from public;
 grant  execute on function app.case_email_only(app.cases) to authenticated, service_role;
+
+-- Approvals made while blocked -----------------------------------------------------------------
+--
+-- Both read app.case_event_receipts, which only apply_case_event writes, and order by the
+-- receipt's evidence_seq: assigned under the chain's lock in commit order, so strictly
+-- increasing. (A receipt's applied_at is the transaction's start on the real clock, while
+-- app.releases.created_at is the dataset clock, so times can't order them.)
+
+-- Where the case's current blocked spell starts: the evidence seq of its latest move into
+-- blocked from another state. Null if it was never blocked.
+create function app.blocked_entry_seq(p_case_id uuid) returns bigint
+language sql stable
+set search_path = pg_catalog, pg_temp
+as $$
+  select max((r.result ->> 'evidence_seq')::bigint)
+    from app.case_event_receipts r
+   where r.case_id = p_case_id
+     and r.result ->> 'to_state' = 'blocked'
+     and (r.result ->> 'from_state') is distinct from 'blocked'
+$$;
+
+-- Who has approved the case at its current version since that move: the approvals that count
+-- toward a dismissal. The set comes from the receipts; each actor from the evidence row the
+-- receipt names. event_id is unique there and written with the receipt, so a forged evidence
+-- row can't stand in for it, and one with no receipt is never read.
+create function app.blocked_approvers(p_case app.cases) returns uuid[]
+language sql stable
+set search_path = pg_catalog, pg_temp
+as $$
+  select coalesce(array_agg(e.actor_id order by e.seq), '{}')
+    from app.case_event_receipts r
+    join audit.evidence_events e on e.event_id = (r.result ->> 'event_id')::uuid
+   where r.case_id = p_case.id
+     and r.event_type in ('release_co_approved', 'release_approved')
+     and (r.result ->> 'version')::integer = p_case.version
+     and (r.result ->> 'evidence_seq')::bigint > app.blocked_entry_seq(p_case.id)
+$$;
+
+comment on function app.blocked_approvers(app.cases) is
+  'Spec 0090: who approved this case at its current version since it last moved into blocked. Only these approvals count toward dismissing a blocked email-only case.';
+
+revoke execute on function app.blocked_entry_seq(uuid), app.blocked_approvers(app.cases) from public;
+grant  execute on function app.blocked_entry_seq(uuid), app.blocked_approvers(app.cases) to authenticated, service_role;
 
 -- Guards: 0011's eval_guard, plus the two dismiss guards -------------------------------------
 
@@ -155,18 +206,16 @@ begin
       return v_is_approver and not v_is_changer and v_reason_given;
     -- Spec 0090: two different approvers, each with a written reason, dismiss a blocked
     -- email-only case, whatever has_unknown_changer says. Not the changer nor the reviewer, as
-    -- for any release (the releases_four_eyes trigger refuses both too).
+    -- for any release (the releases_four_eyes trigger refuses both too). Only approvals made
+    -- while the case is blocked count (app.blocked_approvers).
     when 'email_dismiss_first' then
       return v_is_approver and v_reason_given and not v_is_changer and not v_is_reviewer
          and app.case_email_only(p_case)
-         and not exists (select 1 from app.releases r
-                          where r.case_id = p_case.id and r.case_version = p_case.version and r.action = 'approve');
+         and cardinality(app.blocked_approvers(p_case)) = 0;
     when 'email_dismiss_four_eyes' then
       return v_is_approver and v_reason_given and not v_is_changer and not v_is_reviewer
          and app.case_email_only(p_case)
-         and exists (select 1 from app.releases r
-                      where r.case_id = p_case.id and r.case_version = p_case.version
-                        and r.action = 'approve' and r.actor_id <> p_actor_id);
+         and exists (select 1 from unnest(app.blocked_approvers(p_case)) a (actor_id) where a.actor_id <> p_actor_id);
     else
       raise exception 'app.eval_guard: unknown guard %', p_guard;
   end case;
@@ -205,7 +254,8 @@ declare
   v_body    jsonb;
   v_actor   jsonb;
   v_res     jsonb;
-  v_dismiss boolean := false;   -- spec 0090: approving a blocked email-only case
+  v_dismiss boolean := false;   -- spec 0090: approving a blocked email-only case dismisses it
+  v_entry   bigint;             -- spec 0090: where the case's current blocked spell starts
 begin
   if v_uid is null then
     raise exception 'release_case: sign in first; releases are never made with a server key (ADR-9)'
@@ -220,12 +270,32 @@ begin
     raise exception 'release_case: unknown case %', p_case_id;
   end if;
 
+  -- Spec 0090: approving a blocked case dismisses it when it is email only. Lock the vendor
+  -- first, as change detection and the email door do before they write a change, so no change
+  -- for this vendor commits between the check and the move; then read the case again. No key
+  -- update is enough to wait for them, and lets foreign-key checks (KEY SHARE) through.
+  if v_case.state = 'blocked' and p_action = 'approve' then
+    perform 1 from app.vendors v where v.id = v_case.vendor_id for no key update;
+    select * into v_case from app.cases c where c.id = p_case_id;
+    v_dismiss := coalesce(v_case.state = 'blocked' and app.case_email_only(v_case), false);
+  end if;
+  if p_action = 'approve' then
+    v_entry := app.blocked_entry_seq(p_case_id);
+  end if;
+
   -- A repeated request (a double click, a retried page) returns the first result, whatever
   -- state the case has moved to since. Only this person's own earlier request can match.
+  -- Spec 0090: a dismissal is a request of its own. In the dismiss context only the dismiss keys
+  -- of the current blocked spell match, so an earlier approval of the release never answers it;
+  -- awaiting_release matches exactly the keys it did before; other states match both.
   select r.result into v_res from app.case_event_receipts r
    where r.idempotency_key in (
-           format('%s:%s:v%s:%s', p_case_id, p_action, p_expected_version, v_uid),
-           case when p_action = 'approve' then format('%s:co_approve:v%s:%s', p_case_id, p_expected_version, v_uid) end)
+           case when not v_dismiss then format('%s:%s:v%s:%s', p_case_id, p_action, p_expected_version, v_uid) end,
+           case when p_action = 'approve' and not v_dismiss then format('%s:co_approve:v%s:%s', p_case_id, p_expected_version, v_uid) end,
+           case when v_entry is not null and v_case.state <> 'awaiting_release'
+                then format('%s:dismiss_first:v%s:b%s:%s', p_case_id, p_expected_version, v_entry, v_uid) end,
+           case when v_entry is not null and v_case.state <> 'awaiting_release'
+                then format('%s:dismiss:v%s:b%s:%s', p_case_id, p_expected_version, v_entry, v_uid) end)
    order by r.applied_at desc
    limit 1;
   if found then
@@ -233,15 +303,6 @@ begin
   end if;
   if not app.has_role(v_uid, 'approver') then
     raise exception 'release_case: approver role required' using errcode = 'insufficient_privilege';
-  end if;
-
-  -- Spec 0090: approving a blocked case dismisses it when it is email only. Lock the vendor
-  -- first, as change detection and the email door do before they write a change, so no change
-  -- for this vendor commits between the check and the move; then read the case again.
-  if v_case.state = 'blocked' and p_action = 'approve' then
-    perform 1 from app.vendors v where v.id = v_case.vendor_id for update;
-    select * into v_case from app.cases c where c.id = p_case_id;
-    v_dismiss := v_case.state = 'blocked' and app.case_email_only(v_case);
   end if;
 
   if v_case.version <> p_expected_version then
@@ -270,9 +331,24 @@ begin
       using errcode = 'check_violation';
   end if;
 
-  -- Unknown changer (ADR-10), and every dismiss (spec 0090): the first approver co-approves;
-  -- the second releases.
-  if (v_case.has_unknown_changer or v_dismiss) and not exists (
+  -- Spec 0090: a dismissal, always by two people. Only approvals made while the case is blocked
+  -- count: with none from someone else this is the first; otherwise the second lifts the hold.
+  -- The keys carry the blocked spell, so a later spell at the same version starts afresh.
+  if v_dismiss then
+    if not exists (select 1 from unnest(app.blocked_approvers(v_case)) a (actor_id) where a.actor_id <> v_uid) then
+      v_res := app.apply_case_event(p_case_id, 'release_co_approved', v_actor,
+                 format('%s:dismiss_first:v%s:b%s:%s', p_case_id, p_expected_version, v_entry, v_uid), v_body);
+      if v_res ->> 'status' = 'already_applied' then
+        return v_res;                                    -- the same approver clicking twice
+      end if;
+      return v_res || jsonb_build_object('status', 'awaiting_second_approver');
+    end if;
+    return app.apply_case_event(p_case_id, 'release_approved', v_actor,
+             format('%s:dismiss:v%s:b%s:%s', p_case_id, p_expected_version, v_entry, v_uid), v_body);
+  end if;
+
+  -- Unknown changer (ADR-10): the first approver co-approves; the second releases.
+  if v_case.has_unknown_changer and not exists (
        select 1 from app.releases r
         where r.case_id = p_case_id and r.case_version = v_case.version and r.action = 'approve' and r.actor_id <> v_uid) then
     v_res := app.apply_case_event(p_case_id, 'release_co_approved', v_actor,
@@ -289,7 +365,7 @@ end
 $$;
 
 comment on function app.release_case(uuid, integer, app.release_action, text) is
-  'Four-eyes release with the signed-in user (ADR-9): approver role, not the changer, not the reviewer, version matches; two approvers when the changer is unknown (ADR-10). A blocked email-only case can be approved (dismissed) by two approvers (spec 0090); reject from blocked stays refused.';
+  'Four-eyes release with the signed-in user (ADR-9): approver role, not the changer, not the reviewer, version matches; two approvers when the changer is unknown (ADR-10). A blocked email-only case can be approved (dismissed) by two approvers, counting only approvals made while it is blocked (spec 0090); reject from blocked stays refused.';
 
 -- create or replace keeps the earlier grants on eval_guard (owner only) and release_case
 -- (authenticated only).

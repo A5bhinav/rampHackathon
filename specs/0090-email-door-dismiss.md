@@ -30,7 +30,13 @@ existing `POST /api/cases/{case_id}/release` with `action=approve`.
       `awaiting_second_approver` and the case stays `blocked`; a second, different approver moves it
       to `releasing`, with one `app.releases` row per approver and exactly one `release_hold`
       command. This holds whether or not the changer is known.
-- [ ] The same approver twice answers `already_applied`, with no second approval row.
+- [ ] Only approvals made while the case is blocked count (definition below). An approval given
+      in `awaiting_release`, or by an earlier dismissal whose release failed, does not, even at the
+      same version: after a reject (path A), a stale Approve click (path B) or a failed release
+      that a reviewer blocked (path C), the first approval made while blocked always answers
+      `awaiting_second_approver`, and a second, different approver is still needed.
+- [ ] The same approver twice answers `already_applied`, with no second approval row. A dismissal
+      is its own request: an earlier approval of the release never answers it.
 - [ ] Refused (the case stays `blocked`, the hold stays): a non-approver; no reason; `reject`; a
       case a Ramp change opened or joined; a Ramp change since the case opened; a changed or
       ambiguous account on file; the changer; the reviewer who cleared the case; the first
@@ -38,18 +44,51 @@ existing `POST /api/cases/{case_id}/release` with `action=approve`.
 - [ ] `release_case` on every other state behaves exactly as before.
 - [ ] `docs/state-machine.md` shows the two new `blocked` moves.
 - [ ] (Task 14) `permissions.can_dismiss` is true only for an approver on a blocked email-only case
-      who hasn't approved this version; the timeline reads "Dismissed by {name}: Ramp never changed,
+      who is not in `app.blocked_approvers(case)`; the timeline reads "Dismissed by {name}: Ramp never changed,
       so the hold can be lifted." and "Second person dismissed: the hold is being lifted."; the case
       page has a "Dismiss (Ramp never changed)" button that needs a reason.
+
+### An approval made while blocked
+
+- The **entry** is the case's latest receipt in `app.case_event_receipts` whose result moved it
+  into `blocked` from another state (`to_state = 'blocked'`, `from_state` not `'blocked'`);
+  `app.blocked_entry_seq(case_id)` returns its `evidence_seq`.
+- An **approval made while blocked** is a `release_co_approved` or `release_approved` receipt for
+  the case at its current version whose `evidence_seq` is greater than the entry's.
+  `app.blocked_approvers(case)` returns their actors, each read from the evidence row whose
+  `event_id` the receipt names.
+- Why receipts and `evidence_seq`, not `app.releases.created_at`: only `apply_case_event` writes
+  receipts, and `evidence_seq` is assigned under the chain's lock in commit order. A receipt's
+  `applied_at` is the start of its transaction on the real clock while `created_at` is the dataset
+  clock, so times cannot order them (and in one transaction all `applied_at` are equal). An
+  evidence row is read only through a receipt's `event_id`, which is unique, so a forged evidence
+  row is never counted.
+- Dismiss requests have their own replay keys, `{case}:dismiss_first:v{n}:b{entry}:{user}` and
+  `{case}:dismiss:v{n}:b{entry}:{user}`. `b{entry}` starts each blocked spell afresh.
 
 ## Tests (written first)
 
 | Acceptance item | Test |
 |---|---|
-| 1 to 4 | `supabase/tests/017_email_dismiss.sql` |
-| 5 | `supabase/tests/002_case_machine.sql`, `008_release_replay.sql`, `014_review_needs_approver.sql` (unchanged, still pass) |
-| 6 | `scripts/db/test.sh` redraws it; the diff is in the PR |
-| 7 | `apps/core/tests/test_email_door.py::test_a_not_verified_email_case_is_dismissed_by_two_people_and_the_hold_lifts`, `apps/web/tests/states.test.ts` |
+| 1 to 5 | `supabase/tests/017_email_dismiss.sql` (blocks 13 to 15: paths A, B, C; block 16: a forged evidence row) |
+| 6 | `supabase/tests/002_case_machine.sql`, `008_release_replay.sql`, `014_review_needs_approver.sql` (unchanged, still pass) |
+| 7 | `scripts/db/test.sh` redraws it; the diff is in the PR |
+| 8 | `apps/core/tests/test_email_door.py::test_a_not_verified_email_case_is_dismissed_by_two_people_and_the_hold_lifts`, `apps/web/tests/states.test.ts` |
+
+## Stated limits (for Abhi)
+
+- **A second release at the same version queues no command (pre-existing, new way in).**
+  `release_hold` is keyed `{case}:release:v{n}` with `on conflict do nothing`. After a release fails
+  (`command_failed`, then review, then `blocked` at the same version), a completed dismissal moves
+  the case to `releasing` but queues no new `release_hold`, so it waits there with the hold on
+  (fails closed). The same was already true for a re-release from `awaiting_release`.
+  `017_email_dismiss.sql` block 15 asserts today's behaviour and says to change it when fixed.
+- **The hold is lifted without a fresh look at Ramp.** `release_hold` lifts the hold using what
+  Dialback's mirror says. A Ramp change not yet detected (no webhook or poll yet) is invisible to
+  `case_email_only`. Running `sync_vendor` before lifting a dismissed case's hold would close that
+  window.
+- `evidence_seq` is per chain. If the service role moved a dataset to another chain mid-case,
+  the order across the two chains would be meaningless.
 
 ## Out of scope
 
@@ -61,11 +100,8 @@ existing `POST /api/cases/{case_id}/release` with `action=approve`.
 1. **A vendor with no account on file.** An email case for a vendor with no current account
    (`old_account_id` null) is never email only, so it stays blocked. Lifting the hold there pays
    nothing anyway; refusing is the fail-closed choice. Confirm.
-2. **An approval made before the case was blocked counts.** If an unknown-changer case had one
-   co-approval in `awaiting_release` and was then rejected to `blocked` at the same version, that
-   approval counts as the first dismissal: one more approver then dismisses. Both approvals lift
-   the same hold on the same account on file, so this is still two people; say if a fresh first
-   dismissal should be required.
+2. (Settled) Approvals made before the case was blocked do not count; see "An approval made while
+   blocked".
 
 ## Commands
 
