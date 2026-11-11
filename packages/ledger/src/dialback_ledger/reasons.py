@@ -14,7 +14,10 @@ REASON_TEXT: dict[str, str] = {
                                 "number the vendor has used for months.",
     "near_miss_of_older_number": "Not provable: it is one digit off, or two swapped digits away from, an older number "
                                  "of this vendor.",
-    "hidden_text_only": "Not provable: it appeared only in text a person couldn't see (white, tiny or off the page).",
+    "hidden_text_only": "Not provable: it appeared only in text a person couldn't see (white, tiny, off the page, or "
+                        "leaving no ink on the page).",
+    "unconfirmed_digits_only": "Not provable: it appeared where a person could see it, but only in text whose digits "
+                               "couldn't be confirmed against the page.",
     "not_vendor_party": "Not provable: the documents label it as someone else's number, such as a bank's or a "
                         "customer's, or their labels disagree.",
     "fax_line": "Not provable: the documents label it as a fax line.",
