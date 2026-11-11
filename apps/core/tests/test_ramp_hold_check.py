@@ -150,11 +150,40 @@ async def test_each_bills_ramp_status_is_reported_before_while_held_and_after():
     assert report.status_held == {"bill-1": "ON_HOLD", "bill-2": "ON_HOLD"}
     assert report.status_after == {"bill-1": "PAYMENT_SCHEDULED", "bill-2": "APPROVAL_PENDING"}
     gets = [r for r in fake.requests if r.method == "GET" and r.url.path.endswith("/bills")]
-    assert len(gets) == 3, "before, one read-back, after: the statuses cost no request of their own"
+    assert len(gets) == 4, "before, the hold's read-back, the release's (D10), after: the statuses cost no request"
     text = render(report)
     assert "bill-1  2026-11-12  PAYMENT_SCHEDULED" in text
     assert "bill-1  date (none)  held  ON_HOLD" in text
     assert "bill-2  (none)  APPROVAL_PENDING  (before: (none)  PAYMENT_NOT_INSTRUCTED)" in text
+
+
+async def test_each_read_back_shows_what_the_audit_log_the_vendor_and_the_bills_said():
+    # D10, for spec 0097 Q209: which part of Ramp's answer lags. Here the vendor's own `status`
+    # changes at once and the audit log three reads later (made up: the sandbox run will say).
+    fake = SandboxRamp()
+    fake.lag = 3
+    fake.vendors[V]["status"] = "ACTIVE"
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        response = fake.handle(request)
+        if request.url.path.endswith("/hold"):
+            fake.vendors[V]["status"] = "ON_HOLD"
+        elif request.url.path.endswith("/release"):
+            fake.vendors[V]["status"] = "ACTIVE"
+        return response
+
+    report = await checked(fake, handle=handle)
+    held = (("status", "ON_HOLD"),)
+    assert [(look.read, look.at, look.audit_hold, look.vendor_changes) for look in report.hold_looks] == [
+        (1, 0.0, False, held), (2, 1.0, False, held), (3, 2.0, True, held)]
+    assert [(look.read, look.at, look.audit_hold, look.vendor_changes) for look in report.release_looks] == [
+        (1, 0.0, True, ()), (2, 1.0, True, ()), (3, 2.0, False, ())]
+    unscheduled = (("bill-1", "PAYMENT_SCHEDULED", None), ("bill-2", "PAYMENT_NOT_INSTRUCTED", None))
+    assert report.hold_looks[0].bills == unscheduled and report.release_looks[-1].bills == unscheduled
+    text = render(report)
+    assert ("  read 1  +0.0 s  audit log: no hold  vendor: status=ON_HOLD  "
+            "bills: bill-1 PAYMENT_SCHEDULED (none), bill-2 PAYMENT_NOT_INSTRUCTED (none)") in text
+    assert "  read 3  +2.0 s  audit log: no hold  vendor: as before the hold" in text.split("after the release")[1]
 
 
 async def test_an_error_answer_to_a_bill_read_stays_ramps_error():

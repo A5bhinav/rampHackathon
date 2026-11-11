@@ -50,6 +50,14 @@ None.
 - **D9. Each bill's Ramp status** (`status_summary`) before the hold, at the last read-back, and
   after, taken from the bill reads the check makes anyway (no extra request, so the timings stay
   honest). Added after the first run, whose bill turned out to be waiting for a transfer match.
+- **D10. What each part showed, read by read** (for spec 0097, Q209: which part of Ramp's answer
+  lags). For every read-back after the hold and after the release: seconds since Ramp answered the
+  write, when the read started; whether the audit log shows the hold (the layer's reading, which the
+  worker uses); every vendor field that differs from before the hold (Ramp's undocumented `status`
+  among them, and any other); and each unpaid bill's status and payment date. The release's
+  read-backs now read the bills too. Parts within one read are read one after another, a second or
+  two apart on the sandbox, so the timeline is coarse; a part that changes reads earlier than one
+  that doesn't is still plain.
 
 ## Found on the sandbox, 2026-11-10 (first run, one vendor: DocuSign, one unpaid bill)
 
@@ -98,6 +106,9 @@ None.
 - [x] The first read-back is "yes" on read 1, "maybe" on reads 2 and 3, "no" after (D4).
 - [x] Each unpaid bill's Ramp status is reported before, while held and after, with no extra bill
       read; an error answer to a bill read stays Ramp's error (D9).
+- [x] Each read-back after the hold and after the release is reported with its time, the audit
+      log's reading, the vendor fields changed since before the hold, and each bill's status and
+      date (D10).
 
 ## Tests (written first)
 

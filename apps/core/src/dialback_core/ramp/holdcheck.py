@@ -21,6 +21,7 @@ import os
 import sys
 import time
 from collections.abc import Awaitable, Callable
+from typing import Any
 
 import httpx
 
@@ -57,6 +58,7 @@ class WriteGuard:
         self.dates: dict[str, str] = {}
         self.writes: list[tuple[str, str, int]] = []
         self.statuses: dict[str, str | None] = {}
+        self.vendor_raw: dict[str, Any] = {}  # Ramp's last answer for this vendor, as sent (D10)
 
     @staticmethod
     def _path(request: httpx.Request) -> str:
@@ -84,20 +86,46 @@ class WriteGuard:
         request = response.request
         if request.method != "GET" and self._path(request) != "/token":
             self.writes.append((request.method, self._path(request), response.status_code))
-        if request.method == "GET" and self._path(request) == "/bills":
-            await response.aread()
-            try:
-                body = response.json()
-            except ValueError:
-                return
-            data = body.get("data") if isinstance(body, dict) else None
-            for b in data if isinstance(data, list) else []:
-                if isinstance(b, dict) and "id" in b:
-                    self.statuses[str(b["id"])] = b.get("status_summary")
+        path = self._path(request)
+        if request.method != "GET" or path not in ("/bills", f"/vendors/{self.vendor_id}"):
+            return
+        await response.aread()
+        try:
+            body = response.json()
+        except ValueError:
+            return
+        if not isinstance(body, dict):
+            return
+        if path != "/bills":  # an error answer is followed by a retry or a RampError, so the last is kept
+            self.vendor_raw = body
+            return
+        data = body.get("data")
+        for b in data if isinstance(data, list) else []:
+            if isinstance(b, dict) and "id" in b:
+                self.statuses[str(b["id"])] = b.get("status_summary")
 
     def client(self, transport: httpx.AsyncBaseTransport | None = None) -> httpx.AsyncClient:
         return httpx.AsyncClient(transport=transport, timeout=15.0,
                                  event_hooks={"request": [self._on_request], "response": [self._on_response]})
+
+
+@dataclasses.dataclass(frozen=True)
+class Look:
+    """D10: one read-back, as each part of Ramp's answer showed it."""
+    read: int
+    at: float  # seconds after Ramp answered the hold or release, when this read started
+    audit_hold: bool  # the audit log's newest hold event is a placement (the layer's reading)
+    vendor_changes: tuple[tuple[str, str], ...]  # vendor fields that differ from before the hold
+    bills: tuple[tuple[str, str | None, str | None], ...]  # (bill, status_summary, payment date)
+
+
+def _short(value: Any) -> str:
+    text = value if isinstance(value, str) else json.dumps(value)
+    return text if len(text) <= 60 else text[:57] + "..."
+
+
+def _day(bill: Any) -> str | None:
+    return bill.payment_date.isoformat() if bill.payment_date else None
 
 
 @dataclasses.dataclass
@@ -124,6 +152,8 @@ class Report:
     after: dict[str, str | None] = dataclasses.field(default_factory=dict)
     writes: list[tuple[str, str, int]] = dataclasses.field(default_factory=list)
     wait: float = 60.0
+    hold_looks: list[Look] = dataclasses.field(default_factory=list)  # D10
+    release_looks: list[Look] = dataclasses.field(default_factory=list)
 
     @property
     def dates_back(self) -> bool:
@@ -171,20 +201,34 @@ async def hold_check(sandbox: RampSandbox, guard: WriteGuard, http: httpx.AsyncC
     r.saved = {b.id: b.payment_date.isoformat() if b.payment_date else None for b in unpaid}
     r.status_before = {b: guard.statuses.get(b) for b in r.saved}
     guard.dates = {b: d for b, d in r.saved.items() if d}
+    base = dict(guard.vendor_raw)  # the vendor before the hold, for D10's changed fields
+    written = [0.0]  # when Ramp answered the last hold or release
 
-    async def held() -> bool:
+    async def look(looks: list[Look]) -> tuple[Any, list[Any]]:
+        """D10: one read of the vendor (and so the audit log) and its bills, as each part showed it."""
+        at = clock() - written[0]
         v = await layer.get_vendor(vendor_id)
         bills = [b for b in await layer.list_bills_for_vendor(vendor_id) if b.id in r.saved]
-        r.held_bills = [(b.id, b.payment_date.isoformat() if b.payment_date else None, b.is_on_hold) for b in bills]
+        raw = guard.vendor_raw
+        changes = tuple((k, _short(raw.get(k))) for k in sorted(set(raw) | set(base)) if raw.get(k) != base.get(k))
+        looks.append(Look(len(looks) + 1, at, bool(v.hold_id), changes,
+                          tuple((b.id, guard.statuses.get(b.id), _day(b)) for b in bills)))
+        return v, bills
+
+    async def held() -> bool:
+        v, bills = await look(r.hold_looks)
+        r.held_bills = [(b.id, _day(b), b.is_on_hold) for b in bills]
         r.vendor_showed_hold = bool(v.hold_id)
         return r.vendor_showed_hold and all(b.is_on_hold for b in bills)  # the worker's read-back rule
 
     async def cleared() -> bool:
-        return (await layer.get_vendor(vendor_id)).hold_id is None
+        v, _ = await look(r.release_looks)
+        return v.hold_id is None
 
     try:
         try:
             await layer.place_vendor_hold(vendor_id, REASON)
+            written[0] = clock()
             r.held_after, r.held_reads = await _until(held, clock, sleep, wait)
             r.status_held = {b: guard.statuses.get(b) for b in r.saved}
         except RampError as exc:
@@ -198,6 +242,7 @@ async def hold_check(sandbox: RampSandbox, guard: WriteGuard, http: httpx.AsyncC
     finally:  # D5: release whatever happened above, even a bug
         try:
             await layer.release_vendor_hold(vendor_id)
+            written[0] = clock()
         except RampError as exc:
             r.release_error = str(exc)
         if not r.release_error:
@@ -213,6 +258,19 @@ async def hold_check(sandbox: RampSandbox, guard: WriteGuard, http: httpx.AsyncC
                 r.status_after = {b: guard.statuses.get(b) for b in r.saved}
         r.writes = list(guard.writes)
     return r
+
+
+def _timeline(title: str, looks: list[Look]) -> list[str]:
+    """D10: one line per read-back."""
+    if not looks:
+        return []
+    lines = ["", f"Read by read {title} (seconds after Ramp's answer, when each read started)"]
+    for look in looks:
+        vendor = ", ".join(f"{k}={v}" for k, v in look.vendor_changes) or "as before the hold"
+        bills = ", ".join(f"{b} {s or '(status unknown)'} ({d or 'none'})" for b, s, d in look.bills) or "none"
+        lines.append(f"  read {look.read}  +{look.at:.1f} s  audit log: {'hold' if look.audit_hold else 'no hold'}  "
+                     f"vendor: {vendor}  bills: {bills}")
+    return lines
 
 
 def render(r: Report) -> str:
@@ -255,6 +313,8 @@ def render(r: Report) -> str:
     elif r.second_hold:
         lines.append(f"A second hold on the held vendor (the worker's retry sends one): Ramp REFUSED it "
                      f"({r.second_hold.removeprefix('refused: ')}); a worker retry after a slow read-back would fail")
+    lines += _timeline("after the hold", r.hold_looks)
+    lines += _timeline("after the release", r.release_looks)
     if r.release_error:
         lines += ["", f"Release FAILED: {r.release_error}",
                   f"The vendor is still on hold. Remove it by hand ({BY_HAND}), then set these payment dates:"]
