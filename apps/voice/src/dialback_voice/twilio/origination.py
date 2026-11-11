@@ -136,8 +136,12 @@ def build_connect_twiml(*, ws_url: str, call_token: str, disclosure: str, answer
     # relay (spec 0043). Twilio's default has been "none" since May 2025, which drops them, and
     # callers often start typing the last four before the question ends. Keys still don't cut the
     # agent off, and speech during the agent's turn is still not reported.
+    # events="speaker-events": Twilio sends agentSpeaking and clientSpeaking, so the relay's quiet
+    # clock starts when the agent stops and is postponed while the caller speaks (spec 0051, D3; the
+    # exact message is Q117, and the relay falls back to an estimate without it).
     attrs = (f"url={quoteattr(ws_url)} welcomeGreeting={quoteattr(disclosure)} "
-             f'dtmfDetection="true" interruptible="false" reportInputDuringAgentSpeech="dtmf"')
+             f'dtmfDetection="true" interruptible="false" reportInputDuringAgentSpeech="dtmf" '
+             'events="speaker-events"')
     # hints: one list for the whole call (Twilio documents it per session, not per question), and
     # left out when empty so a call with no vendor name gets exactly the TwiML it got before.
     hints = speech_hints(vendor_names)

@@ -156,8 +156,10 @@ place:
   change answers the agent can pause for up to 8 seconds while the model reads the answer.
   Anything said during that pause is taken as the answer to the next question.
 - **Say only the answer.** Nothing before or after it in the same breath.
-- **If the agent says "Sorry, are you still there?", give your last answer again in full.** It
-  does not repeat the question, so a bare "Yes, I'm here" is recorded as the answer to it.
+- **If the agent says "Sorry, are you still there?", say anything** ("Yes, I'm here" is fine). The
+  agent says "Thanks." and asks the question again; answer it as usual. Your reply to the check-in
+  is never taken as an answer. The check-in comes after about 10 seconds of quiet, and no reply
+  within another 10 seconds ends the call (`specs/0051-call-check-in.md`).
 
 | The agent asks | You say | If you say something else |
 |---|---|---|
@@ -173,12 +175,16 @@ place:
 The keypad steps (`specs/0043-keypad-only-digits.md`):
 
 - **Type the four digits, then press `#`.** Only the keypad counts. Nothing goes in at the fourth
-  key; if you forget `#`, the entry goes in 5 seconds after your last key.
-- **Press `#` before you hang up.** Four digits typed without `#` are lost if you hang up within 5
+  key; if you forget `#`, the entry goes in 10 seconds after your last key.
+- **Press `#` before you hang up.** Four digits typed without `#` are lost if you hang up within 10
   seconds: the call ends as dropped (failed), and the core calls again about 5 minutes later while
   the case has attempts left.
 - **A slip? Press `*` and type all four again.** The agent says "Okay, let's start over." This
   costs nothing.
+- **Need time to find the digits? Take it.** After 20 seconds with no key and no word, the agent
+  says "Take your time. When you have the last four digits, enter them on your keypad, then press
+  the pound key." Type them then. With nothing for another 20 seconds, the call finishes without
+  digits and the case goes to review (NR06).
 - **Do not say the digits.** Spoken digits are never recorded. The agent asks once for the keypad
   ("Please don't say the digits..."); a second time, the call finishes without digits and the case
   goes to review (NR06).
@@ -229,7 +235,8 @@ releases it from the dashboard, and the state moves to `released` once the hold 
 
 **To try again**, after a call that ended in review or Not verified: the case is not called again
 (only a dropped call, or one that ended after two unclear answers at consent or the change
-question, is called again), so run sections 3 and 4 again (a new reset, load, request and change).
+question, or with no reply to a check-in before the keypad question, is called again), so run
+sections 3 and 4 again (a new reset, load, request and change).
 
 ## When it goes wrong
 
@@ -248,6 +255,7 @@ on the dashboard says "The voice service checked the call and did not place it (
 | It rings, then "an application error has occurred" | The TwiML fetch failed: a 401 (`DIALBACK_PUBLIC_BASE_URL` must be exactly the public `https://` address Twilio calls), a 404 (the voice service could not look the call up, for example its database is unreachable), or the AI/ML addendum is not accepted (95250) | The Twilio call log's error code, then the voice log |
 | Silence after the disclosure | The socket failed (`DIALBACK_WS_BASE_URL` must be `wss://` on the same domain), or the voice service rejected the socket's setup (`setup_rejected`) | Voice log |
 | "We won't continue" right after consent | Consent was read as a clear no | Voice log |
+| "Sorry, are you still there?", then "Thanks for your time. Goodbye." | Nothing was said or pressed for about 10 seconds after the check-in. The call ends `failed`, and the core calls again after its wait (2 hours) while the case has attempts left | Voice log |
 | "Sorry, let me ask that again", then "Thanks for your time. Goodbye." | Two answers to the consent question, or to the change question, could not be made out, or the model call failed twice (an invalid key, an API error, or a reply slower than 8 seconds). A missing key does not cause this. The call ends `failed`, and the core calls again after its wait (2 hours) while the case has attempts left | Voice log |
 | The call finishes, but the case goes to review or is blocked | One rule decided it | The decision page names the rule. Common ones: NR01 or V03 (not detected as a person), NR03 (the company answer had a refusal word such as "not", "never" or "reseller"), NV02 or NV03 (wrong digits, blocked), NR10 (a pressure word), NR14 (an answer not found in the turn it cites) |
 
