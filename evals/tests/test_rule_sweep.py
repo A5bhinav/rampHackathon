@@ -30,7 +30,7 @@ def _seen():
 def test_every_rule_is_seen_or_listed():
     listed = sweep.listed(UNREACHABLE)
     assert sweep.problems(_seen(), listed) == []
-    assert len(_seen()) == 37                                         # the whole table, blocks 0 to 3
+    assert len(_seen()) == 36                       # the whole table, blocks 0 to 3 (37 until V05 retired, D7b)
     assert sorted(r for r, by in _seen().items() if by) == sorted(set(_seen()) - set(listed))
 
 
@@ -48,12 +48,20 @@ def test_the_sweep_fails_on_an_unlisted_rule_and_on_a_stale_entry():
 
 def test_the_new_scenarios_each_isolate_their_rule():
     # A5's scenarios for rules an honest scripted call reaches: each fires its rule (lab run's expect_rule
-    # gate), and the ones whose removal can change an outcome are seen through them.
+    # gate), and the ones whose removal can change an outcome are seen through them. V05 is retired (spec 0082,
+    # D7b), so l22 isolates no rule now: it must verify.
     by_scenario = {s.name for by in (_seen()[r] for r in ("NV03_digits_match_old_account", "V01_number_eligible",
-                                                           "V05_company_matches", "V07_right_person_confirmed"))
+                                                           "V07_right_person_confirmed"))
                    for s in by}
-    assert {"l19-legit-reads-old-account", "l21-legit-pick-changed", "l22-legit-company-unclear",
-            "l23-legit-speaker-unknown"} <= by_scenario
+    assert {"l19-legit-reads-old-account", "l21-legit-pick-changed", "l23-legit-speaker-unknown"} <= by_scenario
+    assert "V05_company_matches" not in _seen()
+
+
+def test_nr03_is_seen_through_production_since_v05_is_retired():
+    # Spec 0082, D7b: NR03 fires only on a refusal, and V05 no longer fails with it, so removing NR03 lets a
+    # refusal verify. a09 (a negation) shows it, so NR03 is off UNREACHABLE.md.
+    assert "a09-company-negated" in {s.name for s in _seen()["NR03_wrong_company"]}
+    assert "NR03_wrong_company" not in sweep.listed(UNREACHABLE)
 
 
 # Spec 0048 review fix 6: a rule seen only through a stand-in (a contract-only report, or a scenario that rests on

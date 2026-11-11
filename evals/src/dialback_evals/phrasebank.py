@@ -33,6 +33,16 @@ CLASSES = {
 }
 
 
+# Spec 0082, D7a: a refusal says the person is not with the vendor, or only works with it. Every phrase in these
+# classes is one. A correction is one only in its "I mean" form; "Acme? No, Globex" holds no refusal word (D9).
+REFUSAL_CLASSES = ("negation", "reseller", "past_connection")
+
+
+def refuses(cls: str, said: str) -> bool:
+    """The generator's truth: does this answer, of phrase class `cls`, refuse (spec 0082, D7a)?"""
+    return cls in REFUSAL_CLASSES or (cls == "correction" and ", sorry, I mean " in said)
+
+
 def _singular(name: str) -> str | None:
     words = name.split()
     return " ".join([*words[:-1], words[-1][:-1]]) if words[-1].endswith("s") else None

@@ -217,14 +217,21 @@ def _reports(examples: int, seed: int, out_dir: Path, known_failures: Path | Non
         print(f"lab reports: contract-only future-state findings (not gated): {', '.join(done.future_state)}")
     if done.new_frozen:
         print(f"lab reports: new finding(s) frozen under {out_dir}: {', '.join(done.new_frozen)}")
-    from .phrasebank import CLASSES
+    from .phrasebank import CLASSES, REFUSAL_CLASSES
     for cls, truth in CLASSES.items():          # spec 0048 review fix 5: F3 per phrase class, reachable domain
-        accepted, total = done.per_class.get("reachable", {}).get(cls, [0, 0])
-        if total:
-            print(f"lab reports: F3 {cls} (truth {truth}): accepted {accepted} of {total} reachable answers")
+        counts = done.per_class.get("reachable", {}).get(cls, {})
+        if sum(counts.values()):
+            gate = "gated: must be False" if cls in REFUSAL_CLASSES else "reported"
+            print(f"lab reports: F3 {cls} (truth {truth}; {gate}): True {counts['true']}, unknown "
+                  f"{counts['unknown']}, False {counts['false']} of {sum(counts.values())} reachable answers")
     share = done.vendor_rejected / done.vendor_answers if done.vendor_answers else 0.0
     print(f"lab reports: over-blocking (reported, not gated): {done.vendor_rejected} of {done.vendor_answers} "
-          f"names-the-vendor answers rejected, both domains ({share:.1%})")
+          f"names-the-vendor answers flagged False, both domains ({share:.1%}); {done.vendor_unknown} unknown, "
+          "which blocks nothing (spec 0082, D7b and D10)")
+    other = done.other_accepted / done.other_answers if done.other_answers else 0.0
+    print(f"lab reports: other-company acceptance (reported, not gated): {done.other_accepted} of "
+          f"{done.other_answers} answers naming someone else read as the vendor, both domains ({other:.1%}); "
+          f"{done.other_unknown} more unknown, which pass too (spec 0082, D7b)")
     print(f"lab reports: {len(done.frozen_failing)} frozen report(s) failing, {len(done.gated)} reachable "
           f"label(s) (seed {seed}, {examples} reports per domain)")
     held = _held("lab-reports", known_failures, dict(done.frozen_failing), done.reachable_hits)

@@ -158,12 +158,27 @@ def _allowed_runs(ctx: GuardContext) -> set[str]:
     return allowed
 
 
+def _name_tokens(name: str) -> list[str]:
+    """A vendor name's words as the guard reads them: cleaned, runs of [a-z0-9], legal suffixes dropped."""
+    return [t for t in re.findall(r"[a-z0-9]+", _clean(name)) if t not in _COMPANY_SUFFIXES]
+
+
+def distinctive_first_word(name: str) -> str | None:
+    """The first word a multi-word name may be said by on its own ("acme" for "Acme Fasteners LLC"
+    or "The Acme Group"), or None. It must have at least 4 characters and not be a common first
+    word, so "First Solar Inc" and "Yes Energy LLC" have none (spec 0082, D2)."""
+    tokens = _name_tokens(name)
+    if len(tokens) > 1 and len(tokens[0]) >= 4 and tokens[0] not in _COMMON_FIRST_WORDS:
+        return tokens[0]
+    return None
+
+
 def vendor_variants(names: tuple[str, ...]) -> set[str]:
     """The ways a vendor's name can be said: without its legal suffix, run together, its first two
     words, and its first word when that word is distinctive."""
     variants = set()
     for name in names:
-        tokens = [t for t in re.findall(r"[a-z0-9]+", _clean(name)) if t not in _COMPANY_SUFFIXES]
+        tokens = _name_tokens(name)
         if not tokens:
             continue
         full = " ".join(tokens)
@@ -173,8 +188,9 @@ def vendor_variants(names: tuple[str, ...]) -> set[str]:
             variants.add("".join(tokens))
         if len(tokens) > 2:
             variants.add(" ".join(tokens[:2]))
-        if len(tokens) > 1 and len(tokens[0]) >= 4 and tokens[0] not in _COMMON_FIRST_WORDS:
-            variants.add(tokens[0])
+        first = distinctive_first_word(name)
+        if first is not None:
+            variants.add(first)
     return variants
 
 

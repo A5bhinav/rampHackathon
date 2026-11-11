@@ -7,7 +7,12 @@ digits, say) must not reach `verified` either: anything unclear fails closed (R7
 
 Whether the caller named the vendor is the scenario author's judgment (`caller.company_is`), never
 production's company check: the oracle imports nothing from the product's apps, so breaking that check
-cannot move what is required (spec 0048, A4). Where the two disagree, the scorecard reports it."""
+cannot move what is required (spec 0048, A4). Where the two disagree, the scorecard reports it.
+
+Since spec 0082 D7b (Sami, Nov 10) the company answer no longer has to name the vendor, so a legit caller
+who gives a short or garbled name (`partial`), or names no company at all (`unclear`), must verify. Another
+company, a refusal or nonsense (`other`) still fails closed for a legit change: the lab keeps that line where
+production no longer does (FINDINGS A29)."""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -39,7 +44,7 @@ def _reachable(s: Scenario) -> bool:
     digits_match = c.last4 == f.new_last4 and f.old_last4 != f.new_last4
     if c.company_is not in COMPANY_TRUTHS:
         raise ValueError(f"{s.id}: caller.company_is must be one of {sorted(COMPANY_TRUTHS)}, not {c.company_is!r}")
-    company_right = c.company_is == "vendor"                    # the author's truth, not the product's check
+    company_right = c.company_is in ("vendor", "partial", "unclear")    # the author's truth (spec 0082, D7b)
     facts_clear = (digits_match and f.dialed_eligible_number is True
                    and f.dialed_number_is_pick is True and f.speaker_in_change_thread is False
                    and f.offered_number_from_request is not True and f.line_risk is not True
