@@ -13,7 +13,7 @@ from typing import Any
 import httpx
 
 from .http import API, RampHttpAdapter
-from .port import RampAccount, RampAuditEvent, RampBill, RampError, RampHold, RampVendor
+from .port import RampAccount, RampAuditEvent, RampBill, RampError, RampHold, RampNotFound, RampVendor
 
 PAGE = 100  # Ramp's largest page
 PLACED, RELEASED = "Vendor placed on hold", "Vendor hold released"
@@ -26,6 +26,10 @@ RAMP_EVENT_NAMES = {"VENDOR_BANK_ACCOUNT_UPDATED": "Bill pay bank account update
 HELD_STATUS = "ON_HOLD"
 NOT_HELD_STATUSES = frozenset({"ACTIVE", "INACTIVE", "PENDING", "UNMANAGED"})
 ALREADY_HELD = "BILL_PAY_7284"  # Ramp's code for "Vendor is already on hold"
+# D6: events for a vendor's bank account being added or changed. On Ramp a bank change doesn't move the
+# vendor's updated_at (seen on approval), so the poll asks the audit log too.
+BANK_EVENTS = ("Bank account updated", "Bill pay bank account updated",
+               "Bill pay accepted sync for bank account from vendor network")
 FOUR_DIGITS = re.compile(r"^[0-9]{4}$")
 OLDEST = dt.datetime.min.replace(tzinfo=dt.UTC)
 
@@ -98,7 +102,24 @@ class RampSandboxAdapter(RampHttpAdapter):
 
     async def list_vendors_updated_since(self, since: dt.datetime | None) -> list[RampVendor]:
         params = {"page_size": PAGE} | ({"from_updated_at": since.isoformat()} if since else {})
-        return [vendor_from(v) for v in await self._all_pages("/vendors", params)]
+        vendors = [vendor_from(v) for v in await self._all_pages("/vendors", params)]
+        if since is None:
+            return vendors
+        # D6: a vendor whose bank account changed since then, though its updated_at didn't move.
+        events = await self._all_pages("/audit-logs/events", {"from_date": since.isoformat(),
+                                                              "event_types": ",".join(BANK_EVENTS), "page_size": PAGE})
+        listed = {v.id for v in vendors}
+        for e in events:
+            ref = e.get("primary_reference") or {}
+            vendor_id = ref.get("id")
+            if ref.get("resource_name") != VENDOR_RESOURCE or not vendor_id or vendor_id in listed:
+                continue
+            listed.add(vendor_id)
+            try:
+                vendors.append(vendor_from(await self._request("GET", f"{API}/vendors/{vendor_id}")))
+            except RampNotFound:  # merged or deleted: Ramp can't pay it
+                continue
+        return vendors
 
     async def list_vendor_accounts(self, vendor_id: str) -> list[RampAccount]:
         return [account_from(a, vendor_id) for a in await self._all_pages(f"/vendors/{vendor_id}/accounts", {"page_size": PAGE})]

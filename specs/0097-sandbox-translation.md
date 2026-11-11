@@ -60,6 +60,15 @@ None.
   reading, so a status Ramp adds later can't be misread. And a hold Ramp refuses with
   `BILL_PAY_7284` ("Vendor is already on hold") counts as placed: it is on, by Ramp's word, so the
   worker's retry goes on to read it back. Any other refusal still raises.
+- **D6. Vendors whose bank accounts changed, though `updated_at` didn't** (Q210). With a `since`,
+  `list_vendors_updated_since` also reads Ramp's audit log across the business from `since` for the
+  bank-account event names that can add or change a vendor's account (`Bank account updated`, seen
+  on approval; `Bill pay bank account updated`; `Bill pay accepted sync for bank account from vendor
+  network`, Ramp's automatic replacements), and adds each vendor one is filed under (`Vendor /
+  Merchant`) that the `updated_at` list missed, read by id. Listing a vendor too many is harmless:
+  detection only acts on accounts it hasn't seen. The core's poll already looks back two minutes
+  (`WATERMARK_OVERLAP`), which covers the audit log's seconds of lag. A full read (no `since`) is
+  unchanged. A change still pending writes no event (Q204), so it isn't found here; that is Q205's.
 
 ## Acceptance
 
@@ -75,6 +84,10 @@ None.
 - [x] D5: a vendor whose `status` is `ON_HOLD` is held, and one whose `status` is a known other value
       isn't, both without reading the audit log; a missing or unknown `status` reads the audit log as
       before; a hold refused with `BILL_PAY_7284` returns as placed, any other refusal raises.
+- [x] D6: with a `since`, a vendor with one of those events since then is listed though its
+      `updated_at` is older, once, and an event filed under anything but a vendor adds nothing;
+      without a `since`, the audit log isn't read; and the core's poll, given a watermark, finds a
+      new account on a vendor whose `updated_at` didn't move.
 
 ## Tests (written first)
 
@@ -183,6 +196,9 @@ None.
   vendors with a `Bank account updated` event since then (the audit log, seconds behind, is fine
   for a one-minute poll); and, for a change still pending (no event, no `updated_at`), a sweep
   every minute (95 vendors, one accounts read each, within Ramp's 100 requests per 10 seconds).
+  Built for approved changes as D6: the core's poll now finds a new account on a vendor whose
+  `updated_at` didn't move (`test_the_poll_finds_a_bank_change_*`). Not yet seen on the sandbox; a
+  change still pending is Q205's.
 - **Q207:** Ramp issued a token for a scope the app isn't allowed (`bills:write`) and refused only
   the call (HTTP 403). The core's login doesn't compare what Ramp granted with what it needs, so a
   sandbox dataset missing `bills:write` would hold and call normally, then fail every release when

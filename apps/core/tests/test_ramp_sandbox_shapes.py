@@ -18,6 +18,7 @@ from conftest import FINGERPRINT_KEY, core_settings
 from dialback_core.datasets import create_dataset
 from dialback_core.db import system_tx
 from dialback_core.detection import Keys, import_all
+from dialback_core.jobs import Jobs
 from dialback_core.ramp.connector import RampConnector
 from dialback_core.ramp.http import TokenBucket
 from dialback_core.ramp.login import RampLogin
@@ -109,12 +110,16 @@ class SandboxRamp:
                 asked = parse_qs(request.content.decode()).get("scope", [""])[0].split()
                 answer["scope"] = " ".join(s for s in asked if s not in self.ungranted)
             return httpx.Response(200, json=answer)
-        if path == "/vendors":
-            if "start" not in q:  # two pages, to show `page.next` is followed
-                return httpx.Response(200, json={"data": [self.vendors[V]], "page": {"next": f"{BASE}/developer/v1/vendors?start={V}&page_size=100"}})
-            return httpx.Response(200, json={"data": [self.vendors[OTHER]], "page": {"next": None}})
+        if path == "/vendors":  # two pages, to show `page.next` is followed; `from_updated_at` as Ramp filters it
+            since = dt.datetime.fromisoformat(q["from_updated_at"][0]) if "from_updated_at" in q else None
+            page = [self.vendors[OTHER]] if "start" in q else [self.vendors[V]]
+            data = [v for v in page if since is None or dt.datetime.fromisoformat(v["updated_at"]) >= since]
+            nxt = None if "start" in q else f"{BASE}/developer/v1/vendors?{urlencode({**q, 'start': [V]}, doseq=True)}"
+            return httpx.Response(200, json={"data": data, "page": {"next": nxt}})
         parts = path.strip("/").split("/")
         if parts[0] == "vendors" and len(parts) == 2:
+            if parts[1] not in self.vendors:
+                return ramp_error(404, "Vendor not found.")
             return httpx.Response(200, json=self.vendors[parts[1]])
         if parts[0] == "vendors" and parts[2] == "accounts":
             # Ramp's document: an account proposed in a vendor edit, pending approval, only with include_pending.
@@ -219,6 +224,42 @@ async def test_vendors_updated_since_sends_the_date_and_follows_pages(ramp):
     first, second = ramp.api("/vendors")
     assert query(first) == {"from_updated_at": ["2026-11-01T00:00:00+00:00"], "page_size": ["100"]}
     assert query(second)["start"] == [V]
+
+
+BANK_EVENT_NAMES = "Bank account updated,Bill pay bank account updated,Bill pay accepted sync for bank account from vendor network"
+
+
+async def test_a_vendor_whose_bank_account_changed_is_listed_though_its_updated_at_did_not_move(ramp):
+    # D6, Q210: on Ramp a bank change doesn't move the vendor's updated_at (09:00 here, before `since`).
+    since = dt.datetime(2026, 11, 10, 11, tzinfo=UTC)
+    ramp.events += [
+        event("ev-a", "Bank account updated", "2026-11-10T11:30:00+00:00"),  # Acme, as on approval
+        event("ev-b", "Bill pay accepted sync for bank account from vendor network", "2026-11-10T11:40:00+00:00",
+              about=OTHER, label="Brightline Office Supply Inc"),
+        event("ev-c", "Bank account updated", "2026-11-10T11:45:00+00:00", about="biz-1",
+              resource="Business bank account", label="Operating"),  # the business's own account: no vendor
+        event("ev-d", "Bank account updated", "2026-11-10T11:50:00+00:00"),  # Acme again: still listed once
+        event("ev-e", "Bank account updated", "2026-11-10T10:00:00+00:00", about="vendor-old"),  # before `since`
+        event("ev-f", "Bank account updated", "2026-11-10T11:55:00+00:00", about="vendor-gone"),  # merged away: 404
+    ]
+    vendors = await ramp.adapter.list_vendors_updated_since(since)
+    assert [v.id for v in vendors] == [V, OTHER] and vendors[1].name == "Brightline Office Supply Inc"
+    assert all(v.hold_id is None for v in vendors)
+    assert ramp.api("/vendors/biz-1") == [], "an event not filed under a vendor isn't followed"
+    [audit] = ramp.api("/audit-logs/events")
+    assert query(audit) == {"from_date": [since.isoformat()], "event_types": [BANK_EVENT_NAMES], "page_size": ["100"]}
+
+
+async def test_a_vendor_both_updated_and_with_a_bank_event_is_listed_once_and_not_read_again(ramp):
+    ramp.vendors[V]["updated_at"] = "2026-11-10T11:10:00+00:00"
+    ramp.events.append(event("ev-a", "Bank account updated", "2026-11-10T11:30:00+00:00"))
+    vendors = await ramp.adapter.list_vendors_updated_since(dt.datetime(2026, 11, 10, 11, tzinfo=UTC))
+    assert [v.id for v in vendors] == [V] and ramp.api(f"/vendors/{V}") == []
+
+
+async def test_a_full_read_lists_every_vendor_without_the_audit_log(ramp):
+    assert [v.id for v in await ramp.adapter.list_vendors_updated_since(None)] == [V, OTHER]
+    assert ramp.api("/audit-logs/events") == []
 
 
 # Bank accounts ------------------------------------------------------------------------------------
@@ -421,3 +462,17 @@ async def test_import_stores_a_sandbox_vendor_and_a_new_account_is_a_change_with
             "select e.changed_by, e.changed_by_ramp_user_id, n.ramp_account_id from app.bank_change_events e "
             "join app.bank_accounts n on n.id = e.new_account_id where e.dataset_id = %s", (d.id,))).fetchone()
     assert change == {"changed_by": None, "changed_by_ramp_user_id": None, "ramp_account_id": "acct-new"}
+
+
+async def test_the_poll_finds_a_bank_change_that_didnt_move_the_vendors_updated_at(pool, ramp):
+    # Q210 end to end: the core's 60-second poll, given a watermark after the vendor's updated_at.
+    d = await sandbox_dataset(pool)
+    connector = RampConnector(core_settings(ramp_sandbox=SANDBOX), ramp.http, limiter=TokenBucket(100_000),
+                              sleep=_no_sleep, pool=pool)
+    keys = Keys(FINGERPRINT_KEY)
+    await import_all(pool, connector.for_dataset(d.id), keys, d.id)  # what Dialback knows already
+    jobs = Jobs(pool, core_settings(ramp_sandbox=SANDBOX), connector, keys)
+    ramp.accounts[V].append(account("acct-new", "6666"))  # approved in Ramp: updated_at stays 09:00
+    ramp.events.append(event("ev-bank", "Bank account updated", "2026-11-10T11:30:00+00:00"))
+    found = await jobs.poll(d.id, {"watermark": dt.datetime(2026, 11, 10, 11, tzinfo=UTC)})
+    assert found.effects == 1 and found.result["changes_found"] == 1
