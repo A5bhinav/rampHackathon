@@ -28,21 +28,28 @@ None.
 - **D3. One vendor's error doesn't stop the others.** Every vendor is synced; then, if any failed,
   the first error (in the list's order) is raised, so the job fails and runs again, as it did when
   the first error stopped the loop. A vendor after a failing one is no longer skipped.
+- **D4. Scheduled jobs run beside the case steps, not in front of them.** In the first end-to-end
+  run a decision waited about 7 minutes behind a sweep, because each worker tick ran the jobs before
+  the commands. `run_forever` now runs two loops: one for webhooks, timers and commands, one for the
+  jobs. That is the same concurrency as two workers, which the jobs' claims and the case locks are
+  built for. An error in one loop is logged and doesn't stop either. Shutdown still waits for
+  what is running. `tick` keeps its order and still runs the jobs, for `drain`, tests and the lab.
 
 ## Acceptance
 
 - [x] A sweep and a first import read each listed vendor's accounts once and the vendor itself never.
 - [x] A sweep has more than one vendor in flight, and never more than five.
 - [x] A vendor's error leaves the others synced, and the sweep still fails with that error.
-- [ ] Everything else is unchanged: the core suite passes (309); the smoke run is still to run (its
-      ports were in use by an end-to-end run).
+- [x] While a job is running, case steps still run; a failing job doesn't stop later jobs; with
+      `run_jobs` off no job runs; shutdown waits for a running job; `tick` still runs the jobs.
+- [ ] Everything else is unchanged: the core suite and the smoke run pass.
 
 ## Tests (written first)
 
 | Acceptance item | Test |
 |---|---|
-| 1-3 | `apps/core/tests/test_sweep.py::test_*` |
-| 4 | `cd apps/core && uv run pytest`, `uv run python scripts/dev/stack.py --smoke` |
+| 1-4 | `apps/core/tests/test_sweep.py::test_*` |
+| 5 | `cd apps/core && uv run pytest`, `uv run python scripts/dev/stack.py --smoke` |
 
 ## Commands
 
