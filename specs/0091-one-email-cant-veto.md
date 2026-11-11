@@ -3,7 +3,9 @@
 **Owner:** Sami (in `packages/ledger`)  **Slice:** evidence  **Target day:** not set
 **Builds on:** spec 0079 (`sami/0079-guard`, #121). This lands after it, stacked on its branch once
 main is merged into that branch (the lab lives on main; the branch is 36 commits behind).
-**Status:** approved by Sami, Nov 10. The rule below is the one measured (prototype W4).
+**Status:** approved by Sami, Nov 10; the fourth revision of rule 3 approved Nov 11 (Q162). The rule
+below is that revision (prototype W5). The measured section below is still the third revision's (W4)
+until W5's numbers replace it.
 
 ## Goal
 
@@ -33,14 +35,17 @@ lookalike pull for support, near-miss logic, ranking, settings.
    change context in a counting channel, labeled or not (Q153). Otherwise a real line whose oldest
    sightings carry a label (the stub reader gives a plain "Tel:" line party `unknown`) stops
    anchoring a planted number one digit off it.
-3. **A label vetoes only when established.** The labels against a number veto it (reasons
-   `not_vendor_party`, `fax_line`, as today) only if their documents span at least
-   `min_source_types` (2) source types, and the earliest is at least `min_age_days` (90) before the
-   request. A labeling document counts only if it is in a counting channel (today's `counts`), and
-   is received at or before the request, is not the request, is not in its thread, is not under its
-   subject within 30 days of the request, and is not from a lookalike sender. Those facts belong to
-   the document, so the lookalike pull can't undo an honest label, and "the request" means
-   `min(requested_cutoff, request.received_at)`. (If an old lookalike email pulls the labeling
+3. **A label vetoes only when established.** A label against a number counts toward an established
+   veto only if its own document:
+   - is in a counting channel (today's `counts`);
+   - was received at least `min_age_days` (90) before the request time
+     `asked = min(requested_cutoff, request.received_at)`;
+   - is not from a lookalike sender.
+
+   A fresh document fails the age test whoever sent it, and an old one counts whatever thread or
+   subject a later request uses. Established: the counted labels span at least `min_source_types`
+   (2) channels. Then the labels veto the number (reasons `not_vendor_party`, `fax_line`, as today).
+   A case with no request has no established labels. (If an old lookalike email pulls the labeling
    documents into the change context, the guard in rule 5 withholds the case, as spec 0079 does
    today: the labeled number is still refused and nobody else is called.)
 4. **Weaker labels are ignored.** They neither veto nor support.
@@ -62,6 +67,8 @@ lookalike pull for support, near-miss logic, ranking, settings.
 | That label with no plant (an attacker who only wants to block) | nobody | nobody | 0142 |
 | An honest request that mentions 0142 (A2) | nobody | nobody | 0142 |
 | Vendor email plus a contract calling 0142 a bank's | nobody | nobody | nobody |
+| An old "Tel:" line plus one fresh email calling 0142 a fax | 0177 | 0177 | 0142 |
+| 0177 older than 0142, two honest warnings, the request replies on one's thread | 0142 | 0142 | nobody (a person checks) |
 | 0177 older than 0142, one honest "0177 isn't ours" on file | 0142 | 0142 | **0177** |
 
 **The accepted cost is the last row.** It needs the planted number to outrank the real one: the
@@ -88,15 +95,17 @@ addendum written before its run) have the three earlier versions and why each ch
 ## Contract touched
 
 None (my call): the same outcomes and reasons, and the schema's reason descriptions stay true.
-`reasons.py`'s text changes in one place: `too_few_source_types` says "seen as the vendor's" (a number
-seen in two channels, one calling it a bank's, now gets that reason). `not_vendor_party` and
+`reasons.py`'s text changes in two places, both because support is now only the vendor's (rule 2):
+`too_few_source_types` says "seen as the vendor's" (a number seen in two channels, one calling it a
+bank's, now gets that reason), and `younger_than_minimum_age` says "first seen as the vendor's number
+too recently" (its age runs from the first sighting labeled the vendor's). `not_vendor_party` and
 `fax_line` keep today's sentences: the dashboard serves the current text for every stored selection,
 whatever its rule version, and those sentences stay true for all of them. The web data that repeats
 them follows.
 
 ## Acceptance
 
-- [x] The table's six cases give the results shown, as fixed worlds.
+- [x] The table's eight cases give the results shown, as fixed worlds.
   (`test_label_bar.py::test_the_table`)
 - [x] On every label-free world (generated, corpus, demo), the result is `_select_v1`'s, field for
   field except `rule_version`, `number_selection_id` and `inputs_sha256`, against 0079's frozen copy.
@@ -121,7 +130,8 @@ them follows.
 
 | Item | Test |
 |---|---|
-| The six cases | `packages/ledger/tests/test_label_bar.py::test_the_table` |
+| The eight cases | `packages/ledger/tests/test_label_bar.py::test_the_table` |
+| The fourth revision (Q162) | `test_label_bar.py::test_one_fresh_email_cannot_complete_a_veto`, `::test_a_request_cannot_erase_old_warnings_by_its_thread`, `::test_the_requested_cutoff_bounds_the_label_age` |
 | Label-free equals today | `test_label_bar.py::test_no_labels_means_todays_rule` (with 0079's `select_v1_frozen.py`) |
 | The corpus and demo worlds equal today | `test_label_bar.py::test_corpus_and_demo_worlds_are_todays` |
 | Eligibility only grows | `test_label_bar.py::test_todays_eligible_stay_eligible_in_order` |
@@ -153,6 +163,11 @@ them follows.
   - **The version name:** `test_store.py`'s gate and `corpus-results.json` read `ledger-select-v4`.
   - **Planted breaks:** two entries in `evals/tests/test_breaks_selection.py` patch the near-miss
     loop's new key, and are still caught at the same worlds.
+  - **Lab tests that need a label to refuse a number** run on today's rule alone (the `_today_rule`
+    fixture, `DIALBACK_CONTEXT_GUARD=off`), with their assertions kept: `test_invariants.py::test_a_rule_that_refuses_the_case_passes_i12`,
+    `::test_fail_closed_fix_adds_no_violation_today_lacks`, `::test_context_blind_fix_opens_the_lookalike_hole`
+    and `::test_context_blind_rule_passes_the_planted_bank_label_world`, and `test_docgen.py::test_g7_sweeps_every_layout_of_the_real_number`
+    and `::test_stub_report_has_every_count`.
 
 ## Out of scope
 
@@ -183,6 +198,8 @@ them follows.
   makes today's rule call nobody, and it then calls the planted number too (predicted, then run).
   So its gain was an artifact of random test labels, and it costs more manual reviews. Sami, Nov 10:
   keep this rule (FINDINGS A4).
+- **Q162, resolved:** the fourth revision: each counted label must itself be 90+ days old, and the
+  request/thread/subject exclusions go. Sami, Nov 11.
 
 ## Commands
 
