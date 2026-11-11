@@ -10,7 +10,7 @@ import uuid
 
 import psycopg
 import pytest
-from _world import SCHEMA, at, calls, frozen, run, source_doc, world
+from _world import SCHEMA, at, calls, frozen, in_thread, provable, run, source_doc, world
 from dialback_ledger import select_number
 from dialback_ledger.ingest import ingest_all
 from dialback_ledger.reader import StubReader
@@ -26,18 +26,6 @@ A, B, C = "+14155550117", "+14155550169", "+14155550124"
 UNRELATED = "+18675550188"
 PICK_FIELDS = ("contact_point_id", "e164", "source_types", "alternates")
 VERSION_FIELDS = ("rule_version", "number_selection_id", "inputs_sha256")
-
-
-def provable(e164: str, days: int, **kw) -> list[dict]:
-    """Two counting sources, `days` before the request: provable on its own."""
-    return [{"e164": e164, "channel": ch, "days_before": days, "visibility": "visible", "role": "ar", "party": "vendor"} | kw
-            for ch in ("contract", "listing")]
-
-
-def in_thread(e164: str, days: int = 0, role: str = "ar", party: str = "vendor", **kw) -> dict:
-    """A sighting in the change request's thread: change context."""
-    return {"e164": e164, "channel": "email", "days_before": days, "visibility": "visible", "role": role, "party": party,
-            "thread": "req", "subject": "Re: Updated banking details"} | kw
 
 
 def without(out: dict, fields) -> dict:

@@ -7,7 +7,16 @@ two call lists (the pick, then up to two alternates) share. When they disagree o
 is called (`withheld`) and a person verifies. So it never calls a number today's rule wouldn't.
 DIALBACK_CONTEXT_GUARD=off runs `_select_v1` alone, for rollback.
 
-Today's rule, `_select_v1`:
+Spec 0091's label bar, `_select_rule(label_bar=True)` (`select()` doesn't run it yet): a label
+against a number (a visible sighting whose party isn't `vendor`, or whose role is `fax` in any case)
+is not support, and vetoes the number only when established: the labeling documents span
+`min_source_types` source types and the earliest is `min_age_days` before the request. A labeling
+document counts only by its own facts (a counting channel, at or before the request, and not the
+request, its thread, its subject within `same_subject_window_days`, or a lookalike's), so a
+lookalike's pull on the cutoff can't undo an honest label. Weaker labels are ignored. The near-miss
+check and `first_seen_at` keep today's first sighting, labeled or not.
+
+Today's rule, `_select_v1` (`_select_rule` with the label bar off):
 
 A pure function: sightings and their documents' custody in, a selection.schema.json document
 out. Code decides; no model output reaches here except role and party labels. A number needs
@@ -145,12 +154,18 @@ def change_context_documents(*, vendor_domains: Iterable[str], request: ChangeRe
     return [d for d in docs.values() if in_context(d)]
 
 
-def _select_v1(*, case_id: uuid.UUID, dataset_id: uuid.UUID, vendor_id: uuid.UUID, vendor_domains: Iterable[str],
-               request: ChangeRequest | None, requested_cutoff: dt.datetime, case_opened_at: dt.datetime,
-               documents: Sequence[DocumentRef], sightings: Sequence[Sighting], settings: Settings = DEFAULT,
-               rule_version: str = RULE_VERSION_V1) -> dict:
-    """Today's rule, ledger-select-v1, unchanged (spec 0079, decision 1). `rule_version` only names the
-    rule in the output, its id and its inputs hash."""
+def _vendors_own(s: Sighting) -> bool:
+    """Spec 0091, rule 1: labeled the vendor's and not a fax. Any other sighting is a label against."""
+    return s.party == "vendor" and str(s.role).strip().lower() != "fax"
+
+
+def _select_rule(*, case_id: uuid.UUID, dataset_id: uuid.UUID, vendor_id: uuid.UUID, vendor_domains: Iterable[str],
+                 request: ChangeRequest | None, requested_cutoff: dt.datetime, case_opened_at: dt.datetime,
+                 documents: Sequence[DocumentRef], sightings: Sequence[Sighting], settings: Settings = DEFAULT,
+                 rule_version: str, label_bar: bool) -> dict:
+    """The selection rule. With `label_bar` off it is today's rule, ledger-select-v1, unchanged (spec
+    0079, decision 1); on, it adds spec 0091's rules 1 to 4. `rule_version` only names the rule in the
+    output, its id and its inputs hash."""
     domains = tuple(d.strip().lower().rstrip(".") for d in vendor_domains)
     docs, cutoff, in_context = _frame(documents=documents, request=request, requested_cutoff=requested_cutoff,
                                       case_opened_at=case_opened_at, domains=domains, settings=settings)
@@ -163,6 +178,21 @@ def _select_v1(*, case_id: uuid.UUID, dataset_id: uuid.UUID, vendor_id: uuid.UUI
         sd = sender_domain(d.sender) if d.channel == "email" else None
         return d.channel != "email" or (sd is not None and any(sd == v or sd.endswith("." + v) for v in domains))
 
+    # Spec 0091, rule 3: "the request" is the earlier of the requested cutoff and the request's receipt,
+    # never the cutoff a lookalike pulls back.
+    asked = requested_cutoff if request is None else min(requested_cutoff, request.received_at)
+
+    def label_counts(d: DocumentRef) -> bool:
+        """May this document's label count toward an established veto? Read from the document alone."""
+        if request is None or d.received_at > asked or not counts(d):
+            return False
+        if (sd := sender_domain(d.sender)) and is_lookalike(sd, domains):
+            return False
+        if d.id == request.document_id or (request.thread_id is not None and d.thread_id == request.thread_id):
+            return False
+        return not (_subject(d.subject) == _subject(request.subject) != ""
+                    and asked - d.received_at <= dt.timedelta(days=settings.same_subject_window_days))
+
     numbers: dict[str, list[tuple[Sighting, DocumentRef, bool]]] = {}
     for s in rows:
         d = docs[s.document_id]
@@ -172,38 +202,48 @@ def _select_v1(*, case_id: uuid.UUID, dataset_id: uuid.UUID, vendor_id: uuid.UUI
     for e164, seen in numbers.items():
         visible = [(s, d, ctx) for s, d, ctx in seen if s.visibility == "visible"]
         outside = [d.received_at for _, d, ctx in visible if not ctx]
-        clean = [(s, d) for s, d, ctx in visible if not ctx and counts(d)]  # "seen": what age and rank rest on
+        counted = [(s, d) for s, d, ctx in visible if not ctx and counts(d)]  # today's "seen"
+        anchor = min((d.received_at for _, d in counted), default=None)     # near misses and first_seen_at (Q153)
+        # "Seen": what age and rank rest on. Spec 0091, rule 2: only the vendor's own sightings.
+        clean = [(s, d) for s, d in counted if _vendors_own(s)] if label_bar else counted
         first_clean = min((d.received_at for _, d in clean), default=None)
         first_ctx = min((d.received_at for _, d, ctx in visible if ctx), default=None)
         sources = sorted({d.channel for _, d in clean})
+        vetoes = True                                                         # today: any label vetoes
+        if label_bar:                                                         # spec 0091, rules 3 and 4
+            against = [d for s, d, _ in visible if not _vendors_own(s) and label_counts(d)]
+            vetoes = (bool(against) and len({d.channel for d in against}) >= settings.min_source_types
+                      and min(d.received_at for d in against) <= asked - dt.timedelta(days=settings.min_age_days))
         reasons = set()
         if not visible:
             reasons.add("hidden_text_only")
         elif first_ctx is not None and (not outside or first_ctx <= min(outside)):
             reasons.add("first_seen_in_change_context")
-        if visible and any(s.party != "vendor" for s, _, _ in visible):
+        if vetoes and visible and any(s.party != "vendor" for s, _, _ in visible):
             reasons.add("not_vendor_party")
-        if any(str(s.role).strip().lower() == "fax" for s, _, _ in visible):
+        if vetoes and any(str(s.role).strip().lower() == "fax" for s, _, _ in visible):
             reasons.add("fax_line")
         if len(sources) < settings.min_source_types:
             reasons.add("too_few_source_types")
         if first_clean is None or cutoff - first_clean < dt.timedelta(days=settings.min_age_days):
             reasons.add("younger_than_minimum_age")
-        shown = first_clean or min((d.received_at for _, d, _ in visible), default=None) or min(d.received_at for _, d, _ in seen)
+        shown = anchor or min((d.received_at for _, d, _ in visible), default=None) or min(d.received_at for _, d, _ in seen)
         roles = {s.role if s.role in ROLES else "unknown" for s, _, _ in visible}
         ranking_roles = {s.role for s, _ in clean}  # the change context can't reorder numbers
-        facts[e164] = {"seen": first_clean, "shown": shown, "sources": sources, "reasons": reasons, "roles": roles,
-                       "ranking_roles": ranking_roles,
+        facts[e164] = {"seen": first_clean, "anchor": anchor, "shown": shown, "sources": sources, "reasons": reasons,
+                       "roles": roles, "ranking_roles": ranking_roles,
                        "on_file": any(d.channel == "vendor_master" for _, d, _ in visible), "count": len(seen)}
 
+    # Near misses read today's first sighting, labeled or not (spec 0091, Q153): with the label bar off
+    # it is "seen" exactly, so this is today's check.
     established = dt.timedelta(days=settings.established_days)
     for a, fa in facts.items():
-        mine = fa["seen"] or fa["shown"]
+        mine = fa["anchor"] or fa["shown"]
         for b, fb in facts.items():
             # Older or first seen together: a one-off sibling in the same document flags both.
-            if b == a or fb["seen"] is None or fb["seen"] > mine or not near_miss(a, b, settings.near_miss_distance):
+            if b == a or fb["anchor"] is None or fb["anchor"] > mine or not near_miss(a, b, settings.near_miss_distance):
                 continue
-            if fa["seen"] is not None and cutoff - fa["seen"] >= established and cutoff - fb["seen"] >= established:
+            if fa["anchor"] is not None and cutoff - fa["anchor"] >= established and cutoff - fb["anchor"] >= established:
                 continue
             fa["reasons"].add("near_miss_of_older_number")
             fa.setdefault("near_miss_of", b)
@@ -244,6 +284,11 @@ def _select_v1(*, case_id: uuid.UUID, dataset_id: uuid.UUID, vendor_id: uuid.UUI
                 "reason": NO_REQUEST if request is None else NO_PICK.format(n=settings.min_source_types,
                                                                             d=settings.min_age_days)}
     return out
+
+
+def _select_v1(*, rule_version: str = RULE_VERSION_V1, **case) -> dict:
+    """Today's rule, ledger-select-v1, unchanged (spec 0079, decision 1): the label bar off."""
+    return _select_rule(**case, rule_version=rule_version, label_bar=False)
 
 
 def active_rule_version() -> str:

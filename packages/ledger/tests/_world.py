@@ -36,6 +36,18 @@ def world(rows: list[dict], *, opened: dt.datetime = T0 + dt.timedelta(hours=3))
             "documents": docs, "sightings": sightings}
 
 
+def provable(e164: str, days: int, **kw) -> list[dict]:
+    """Two counting sources, `days` before the request: provable on its own."""
+    return [{"e164": e164, "channel": ch, "days_before": days, "visibility": "visible", "role": "ar", "party": "vendor"} | kw
+            for ch in ("contract", "listing")]
+
+
+def in_thread(e164: str, days: int = 0, role: str = "ar", party: str = "vendor", **kw) -> dict:
+    """A sighting in the change request's thread: change context."""
+    return {"e164": e164, "channel": "email", "days_before": days, "visibility": "visible", "role": role, "party": party,
+            "thread": "req", "subject": "Re: Updated banking details"} | kw
+
+
 def run(w: dict) -> dict:
     return select(**w)
 
