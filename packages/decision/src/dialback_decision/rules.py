@@ -166,7 +166,10 @@ NOT_VERIFIED: tuple[Rule, ...] = (
 # Block 2: Needs review --------------------------------------------------------------------------
 
 NEEDS_REVIEW: tuple[Rule, ...] = (
-    Rule("NR03_wrong_company", "The company the person named does not match this vendor.",
+    # Spec 0082, D7b: company_matches is False only for an answer with a refusal word (D7a). The sentence is
+    # true under both meanings NR03 has had, so a decision-1.0.0 NR03 (no match) still reads correctly.
+    Rule("NR03_wrong_company",
+         "The company answer did not name this vendor, or said the person is not with it or only works with it.",
          lambda f, m: f.company_matches is False),
     Rule("NR04_speaker_from_change_thread", "The person first appeared in the change request thread.",
          lambda f, m: f.speaker_in_change_thread is True),
@@ -193,7 +196,7 @@ NEEDS_REVIEW: tuple[Rule, ...] = (
     Rule("NR17_split_speakers", "Two different names were given for the person speaking for the vendor.",
          lambda f, m: f.same_person_yes_and_digits is False or "speaker_changed" in f.flags),
     Rule("NR18_contradictory_answers", "The person gave conflicting answers about the change or their role.",
-         lambda f, m: _conflicting(f.change_requested) or _conflicting(f.speaker_role)),  # companies: NR03
+         lambda f, m: _conflicting(f.change_requested) or _conflicting(f.speaker_role)),  # not companies (spec 0082, D7b)
     Rule("NR19_earlier_call_concern", "An earlier call about this change raised a concern.",
          lambda f, m: _earlier(f, _earlier_concern)),
     Rule("NR20_manual_answers", "These answers were entered by hand, so a person must review them before release.",
@@ -216,8 +219,7 @@ VERIFIED: tuple[Rule, ...] = (
     Rule("V04_recording_consent", "The person agreed to the recorded call before anything else.",
          lambda f, m: _only(f.recording_consent, "yes") and f.consent_first is True,
          "Recording consent was not given first."),
-    Rule("V05_company_matches", "The person named this vendor.", lambda f, m: f.company_matches is True,
-         "The person did not clearly name this vendor."),
+    # V05_company_matches is retired (spec 0082, D7b): the company answer is no longer required.
     Rule("V06_speaker_identified", "The person gave their name and role.",
          lambda f, m: f.speaker_named is True and any(r.strip() for r in f.speaker_role),
          "The person did not give both their name and role."),
@@ -256,7 +258,7 @@ FIXED = {
 SLOT_RULES: dict[str, tuple[str, ...]] = {
     "recording_consent": ("V04_recording_consent", "V10_answers_grounded", "NR02_no_recording_consent",
                           "NR14_answer_not_in_transcript"),
-    "company_named": ("V05_company_matches", "NR03_wrong_company"),
+    "company_named": ("NR03_wrong_company",),
     "department": (),
     "speaker_name": ("V06_speaker_identified", "V07_right_person_confirmed", "V09_same_person", "V10_answers_grounded",
                      "NR04_speaker_from_change_thread", "NR14_answer_not_in_transcript", "NR17_split_speakers",

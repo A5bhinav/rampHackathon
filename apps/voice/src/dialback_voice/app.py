@@ -16,6 +16,7 @@ import asyncio
 import datetime as dt
 import hmac
 import logging
+import re
 import urllib.parse
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
@@ -106,10 +107,10 @@ async def _verified_twilio_params(twilio: TwilioDeps, request: Request) -> dict[
     return dict(pairs) if request.method == "POST" else dict(request.query_params)
 
 
-def _report_body(result: CallResult, call_id: UUID, dial: CallDial) -> dict[str, Any]:
+def report_body(result: CallResult, call_id: UUID, dial: CallDial) -> dict[str, Any]:
     """The CallEndedRequest body for a call that ran over the WebSocket (internal.yaml). Answers ride
     along only when the call recorded them; retry_at only when the result carries one (a requested
-    callback, or a dropped call to redial)."""
+    callback, or a dropped call to redial). Public so the attack lab chains it (spec 0048, A1)."""
     body: dict[str, Any] = {"call_id": str(call_id), "case_id": str(dial.case_id),
                             "result": result.result, "attempt": dial.attempt}
     _with_pick(body, dial.contact_point_id)
@@ -129,11 +130,34 @@ def _answered_by(detected: str) -> str | None:
     return None  # unknown or absent: nothing is claimed, so decide() can't count a live person (V03)
 
 
-def _with_connect_facts(body: dict[str, Any], setup: dict[str, Any], result: CallResult) -> None:
+# Twilio's documented AnsweredBy values (spec 0080, D3). Only these are logged as they are.
+_DOCUMENTED_ANSWERED_BY = frozenset({"human", "machine_start", "machine_end_beep", "machine_end_silence",
+                                     "machine_end_other", "fax", "unknown"})
+
+
+def _loggable_answered_by(value: str | None) -> str:
+    """The AnsweredBy value for the TwiML fetch's log line: a documented value as it is, "absent"
+    when missing or blank, else "other". The field is data (R9), so only a value from the fixed list
+    or one of the two fixed words reaches the log."""
+    if not value:
+        return "absent"
+    return value if value in _DOCUMENTED_ANSWERED_BY else "other"
+
+
+def _loggable_duration(value: str | None) -> str:
+    """The MachineDetectionDuration value for the same line: one to six ASCII digits as they are,
+    "absent" when missing or blank, else "other"."""
+    if not value:
+        return "absent"
+    return value if re.fullmatch(r"[0-9]{1,6}", value) else "other"
+
+
+def with_connect_facts(body: dict[str, Any], setup: dict[str, Any], result: CallResult) -> None:
     """The facts decide() reads, from code (spec 0030). The setup passed verify_setup, which checks the
     one-time token and that Twilio dialed the pick, so dialed_number_is_pick is that check's result.
     The direction is Twilio's own; answered_by is the machine detection our TwiML carried; the checks
-    are the policy's, computed from the transcript, never by the model."""
+    are the policy's, computed from the transcript, never by the model. Public so the attack lab
+    chains it (spec 0048, A1)."""
     body["dialed_number_is_pick"] = True
     direction = str(setup.get("direction") or "")
     if direction.startswith("outbound"):
@@ -222,9 +246,9 @@ async def run_relay_call(twilio: TwilioDeps, call_id: UUID, ws: Any) -> None:
 
     result = await run_relay(ctx, twilio.agent_for(), ws, verify=verify, clock=twilio.clock,
                              greeting=ctx.script.disclosure())  # welcomeGreeting spoke it; don't repeat (R8)
-    body = _report_body(result, call_id, dial)
+    body = report_body(result, call_id, dial)
     if verified:  # only a socket we placed and verified vouches for these (spec 0030; V02, V03, V10, V11)
-        _with_connect_facts(body, verified, result)
+        with_connect_facts(body, verified, result)
     await twilio.report_ended(body)
 
 
@@ -281,6 +305,12 @@ def create_app(*, store: CallStore, internal_api_token: bytes, agent_version: st
             params = await _verified_twilio_params(twilio, request)
             if params is None:
                 return _error(401, "unauthorized", "A valid Twilio signature is required.")
+            # One line per signed fetch, unknown calls included, to tune detection from real calls
+            # (spec 0080, D3). Our path call id and the two detection fields only: never the number,
+            # the token, the CallSid or any other parameter.
+            log.info("twiml fetch for call %s: AnsweredBy=%s MachineDetectionDuration=%s", call_id,
+                     _loggable_answered_by(params.get("AnsweredBy")),
+                     _loggable_duration(params.get("MachineDetectionDuration")))
             dial = await asyncio.to_thread(twilio.lookup_call, call_id)  # a DB read: off the event loop
             if dial is None:
                 return _error(404, "unknown_call", "No such call.")
@@ -289,7 +319,8 @@ def create_app(*, store: CallStore, internal_api_token: bytes, agent_version: st
             disclosure = Script(dial.customer_name, dial.callback_number).disclosure()
             xml = build_connect_twiml(ws_url=f"{twilio.ws_base_url}/twilio/relay/{call_id}",
                                       call_token=token, disclosure=disclosure,
-                                      answered_by=_answered_by(params.get("AnsweredBy", "")))
+                                      answered_by=_answered_by(params.get("AnsweredBy", "")),
+                                      vendor_names=dial.vendor_names)
             return Response(content=xml, media_type="application/xml")
 
         @app.post("/twilio/status/{call_id}")

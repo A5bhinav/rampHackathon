@@ -277,6 +277,7 @@ async def test_withheld_selection_goes_to_review(world, database_url, monkeypatc
     # its reason, and a person reviews.
     from dialback_core.timeline import summary
     from dialback_ledger.ingest import ingest_all
+    from dialback_ledger.reader import StubReader
     from dialback_ledger.select import WITHHELD
     from dialback_ledger.store import add_vendor_domain, mark_change_request, write_ingest
     monkeypatch.delenv("DIALBACK_READER", raising=False)
@@ -300,7 +301,7 @@ async def test_withheld_selection_goes_to_review(world, database_url, monkeypatc
                 subject="Updated banking details")]
     async with await psycopg.AsyncConnection.connect(database_url) as conn, conn.transaction():
         await write_ingest(conn, dataset_id=world.dataset.id, vendor_id=vendor,
-                           result=ingest_all(sources, extractor_version="test"))
+                           result=ingest_all(sources, extractor_version="test", reader=StubReader()))
         await add_vendor_domain(conn, dataset_id=world.dataset.id, vendor_id=vendor, domain="acme.example")
         await mark_change_request(conn, dataset_id=world.dataset.id, vendor_id=vendor, document_id="request")
     world.worker.resolver = LedgerResolver(ResolverMode.LEDGER)  # the real resolver and the real rule
@@ -445,17 +446,40 @@ async def test_a_change_context_failure_goes_to_a_person(world):
     assert alert["kind"] == "command_stuck" and "decide" in alert["message"]
 
 
-async def test_every_company_answer_must_match(world):
+# The clean call's decision, which test_a_bank_change_walks_all_the_way_to_release pins too.
+WITHOUT_THE_EXTRA_ANSWER = ("verified", [r.id for r in rules.VERIFIED])
+
+
+@pytest.mark.parametrize("extra", [None, "Globex Corporation"], ids=["without", "with-globex"])
+async def test_another_company_named_decides_as_the_call_would_without_it(world, extra):
+    """Spec 0082, D7b: another company named with no refusal word blocks nothing, so the same call
+    decides the same with or without it. The person who releases sees the answer."""
     await import_all(world.pool, world.ramp, world.keys, world.dataset.id)
     await change_and_detect(world)
     case = await case_of(world)
     call_id = world.voice.placed[0]["call_id"]
     answers = transit(call_id)
-    answers["answers"].append(answer("company_named", "Globex Corporation", 11))
+    if extra:
+        answers["answers"].append(answer("company_named", extra, 11))
     assert (await report(world, case["id"], call_id, answers=answers)).status_code == 204
     await world.worker.drain(world.dataset.id)
     decision = await one(world.pool, "select outcome, rules_fired from app.decisions where case_id = %s", case["id"])
-    assert decision["outcome"] == "needs_review" and "NR03_wrong_company" in decision["rules_fired"]
+    assert "NR03_wrong_company" not in decision["rules_fired"]
+    assert (decision["outcome"], list(decision["rules_fired"])) == WITHOUT_THE_EXTRA_ANSWER
+
+
+async def test_a_refusal_in_the_company_answer_goes_to_review(world):
+    """Spec 0082, D7a and D7b: a refusal word is the one company answer that still blocks (NR03)."""
+    await import_all(world.pool, world.ramp, world.keys, world.dataset.id)
+    await change_and_detect(world)
+    case = await case_of(world)
+    call_id = world.voice.placed[0]["call_id"]
+    answers = transit(call_id, company="Not Acme Fasteners, this is Globex")
+    assert (await report(world, case["id"], call_id, answers=answers)).status_code == 204
+    await world.worker.drain(world.dataset.id)
+    decision = await one(world.pool, "select outcome, rules_fired from app.decisions where case_id = %s", case["id"])
+    assert (decision["outcome"], list(decision["rules_fired"])) == ("needs_review", ["NR03_wrong_company"])
+    assert (await case_of(world))["state"] == "needs_review"
 
 
 async def test_without_the_ledgers_change_context_every_answer_is_unknown(world):
@@ -476,10 +500,11 @@ async def test_the_ledgers_change_context_counts_only_booleans(world, monkeypatc
     assert facts == ChangeFacts(offered_number_from_request=True), "a string 'no' is not False"
 
 
-def test_every_company_answer_must_match_and_an_unreadable_one_is_unknown():
+def test_a_refusal_in_any_company_answer_is_false_and_another_or_unreadable_one_is_unknown():
     from dialback_core.company import every_name_matches
     assert every_name_matches(["Acme Fasteners"], "Acme Fasteners LLC") is True
-    assert every_name_matches(["Acme Fasteners", "Globex"], "Acme Fasteners LLC") is False
+    assert every_name_matches(["Acme Fasteners", "Globex"], "Acme Fasteners LLC") is None, "spec 0082, D7b"
+    assert every_name_matches(["Acme Fasteners", "Not Acme, this is Globex"], "Acme Fasteners LLC") is False
     assert every_name_matches(["Acme Fasteners", "LLC"], "Acme Fasteners LLC") is None, "'LLC' alone names nobody"
     assert every_name_matches([], "Acme Fasteners LLC") is None
 

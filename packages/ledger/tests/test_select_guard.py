@@ -13,6 +13,7 @@ import pytest
 from _world import SCHEMA, at, calls, frozen, run, source_doc, world
 from dialback_ledger import select_number
 from dialback_ledger.ingest import ingest_all
+from dialback_ledger.reader import StubReader
 from dialback_ledger.select import RULE_VERSION, WITHHELD, change_context_documents
 from dialback_ledger.store import add_vendor_domain, mark_change_request, write_ingest
 from jsonschema import Draft202012Validator
@@ -231,7 +232,7 @@ def test_withheld_keeps_contact_point_status(database_url, monkeypatch):
     async def load():
         async with await psycopg.AsyncConnection.connect(database_url) as conn, conn.transaction():
             await write_ingest(conn, dataset_id=v["dataset_id"], vendor_id=v["vendor_id"],
-                               result=ingest_all(a1_documents(now), extractor_version="test"))
+                               result=ingest_all(a1_documents(now), extractor_version="test", reader=StubReader()))
             await add_vendor_domain(conn, dataset_id=v["dataset_id"], vendor_id=v["vendor_id"], domain="acme.example")
             await mark_change_request(conn, dataset_id=v["dataset_id"], vendor_id=v["vendor_id"], document_id="request")
     asyncio.run(load())

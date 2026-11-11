@@ -305,6 +305,7 @@ RISK = "/api/datasets/{dataset_id}/vendor-risk"
 
 async def test_the_vendor_risk_list_reads_the_ledger(world):
     from dialback_ledger.ingest import ingest_all
+    from dialback_ledger.reader import StubReader
     from dialback_ledger.store import add_vendor_domain, write_ingest
     await import_all(world.pool, world.ramp, world.keys, world.dataset.id)
     truth = json.loads((Path(__file__).resolve().parents[3] / "corpus/truth/C01.json").read_text())
@@ -312,7 +313,8 @@ async def test_the_vendor_risk_list_reads_the_ledger(world):
     async with world.pool.connection() as conn, conn.transaction():
         vendor = (await (await conn.execute("select id from app.vendors where dataset_id = %s order by legal_name limit 1",
                                             (world.dataset.id,))).fetchone())["id"]
-        await write_ingest(conn, dataset_id=world.dataset.id, vendor_id=vendor, result=ingest_all(docs, extractor_version="t"))
+        result = ingest_all(docs, extractor_version="t", reader=StubReader())   # spec 0049, decision 8
+        await write_ingest(conn, dataset_id=world.dataset.id, vendor_id=vendor, result=result)
         await add_vendor_domain(conn, dataset_id=world.dataset.id, vendor_id=vendor, domain=truth["vendor"]["domain"])
     body = await get(world, f"/api/datasets/{world.dataset.id}/vendor-risk", "clerk", RISK)
     (row,) = body["vendors"]                      # only vendors the ledger has documents for
@@ -326,6 +328,7 @@ async def test_the_vendor_risk_list_says_when_a_person_is_needed(world, monkeypa
     import datetime as dt
 
     from dialback_ledger.ingest import ingest_all
+    from dialback_ledger.reader import StubReader
     from dialback_ledger.risk import STATUS_TEXT
     from dialback_ledger.store import add_vendor_domain, write_ingest
     monkeypatch.delenv("DIALBACK_READER", raising=False)
@@ -350,7 +353,8 @@ async def test_the_vendor_risk_list_says_when_a_person_is_needed(world, monkeypa
     async with world.pool.connection() as conn, conn.transaction():
         vendor = (await (await conn.execute("select id from app.vendors where dataset_id = %s order by legal_name limit 1",
                                             (world.dataset.id,))).fetchone())["id"]
-        await write_ingest(conn, dataset_id=world.dataset.id, vendor_id=vendor, result=ingest_all(docs, extractor_version="t"))
+        result = ingest_all(docs, extractor_version="t", reader=StubReader())   # spec 0049, decision 8
+        await write_ingest(conn, dataset_id=world.dataset.id, vendor_id=vendor, result=result)
         await add_vendor_domain(conn, dataset_id=world.dataset.id, vendor_id=vendor, domain="acme.example")
     body = await get(world, f"/api/datasets/{world.dataset.id}/vendor-risk", "clerk", RISK)
     (row,) = body["vendors"]
@@ -385,8 +389,8 @@ async def test_the_case_shows_its_calls_answers_and_checks(world):
     assert "transcript" in script["note"]
 
     d = detail["decision"]
-    assert [c["status"] for c in d["checklist"]] == ["passed"] * 12
-    assert d["checklist"][7] == {"id": "V08_digits_match", "sentence": "The digits the person gave match the new account.",
+    assert [c["status"] for c in d["checklist"]] == ["passed"] * 11, "11 conditions since V05 was retired (spec 0082, D7b)"
+    assert d["checklist"][6] == {"id": "V08_digits_match", "sentence": "The digits the person gave match the new account.",
                                  "status": "passed"}
     assert {f["block"] for f in d["fired"]} == {"verified"} and "approver" in d["effect"]
 

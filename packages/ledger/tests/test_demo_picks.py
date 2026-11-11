@@ -9,6 +9,7 @@ import pytest
 from _world import calls, frozen, run
 from dialback_ledger.demo import load_seed
 from dialback_ledger.ingest import ingest_all
+from dialback_ledger.reader import StubReader
 from dialback_ledger.select import ChangeRequest, DocumentRef, Sighting
 
 SEED = load_seed()
@@ -20,7 +21,7 @@ def demo_world(ref: str) -> dict:
     """The vendor's history and its change request, ingested at the seed's own dates; the case opens
     ten minutes after the request arrives."""
     v = SEED["vendors"][ref]
-    result = ingest_all([*v["documents"], v["request"]], extractor_version="test")
+    result = ingest_all([*v["documents"], v["request"]], extractor_version="test", reader=StubReader())
 
     def when(t: str | dt.datetime) -> dt.datetime:
         return t if isinstance(t, dt.datetime) else dt.datetime.fromisoformat(t).astimezone(dt.UTC)

@@ -8,6 +8,7 @@ import psycopg
 from _world import source_doc
 from dialback_ledger.demo import load, load_seed
 from dialback_ledger.ingest import ingest_all
+from dialback_ledger.reader import StubReader
 from dialback_ledger.risk import STATUS_TEXT, risk_list
 from dialback_ledger.store import add_vendor_domain, write_ingest
 from psycopg.rows import dict_row
@@ -96,7 +97,8 @@ def test_a_vendor_the_rule_withholds_needs_a_person(database_url, monkeypatch):
     async def go():
         async with await psycopg.AsyncConnection.connect(database_url) as conn, conn.transaction():
             await write_ingest(conn, dataset_id=v["dataset_id"], vendor_id=v["vendor_id"],
-                               result=ingest_all(withheld_vendor(dt.datetime.now(dt.UTC)), extractor_version="test"))
+                               result=ingest_all(withheld_vendor(dt.datetime.now(dt.UTC)), extractor_version="test",
+                                                 reader=StubReader()))
             await add_vendor_domain(conn, dataset_id=v["dataset_id"], vendor_id=v["vendor_id"], domain="acme.example")
     asyncio.run(go())
     (row,) = as_person(database_url, v["dataset_id"])
