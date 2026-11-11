@@ -42,7 +42,7 @@ from dialback_core.flags import RampMode
 from dialback_core.ports import ChangeFacts, PreDialRefused, Selection
 from dialback_core.ramp import RampConnector
 from dialback_core.ramp.connector import mock_token
-from dialback_core.settings import Settings
+from dialback_core.settings import ConfigurationError, RampSandbox, Settings, _ramp_sandbox
 from pgtemp import migrated_database
 
 CORE_PORT, MOCK_PORT = 8001, 8003
@@ -187,6 +187,15 @@ async def seed(pool, settings: Settings) -> tuple[uuid.UUID, dict, dict]:
     return dataset.id, refs, users
 
 
+async def seed_sandbox(pool, settings: Settings) -> uuid.UUID:
+    """Spec 0093: a dataset on Ramp's sandbox, its vendors imported as what Dialback already knows."""
+    dataset = await create_dataset(pool, "dev", "Ramp sandbox", ramp="sandbox")
+    async with httpx.AsyncClient(timeout=30.0) as http:
+        await import_all(pool, RampConnector(settings, http, pool=pool).for_dataset(dataset.id),
+                         Keys(settings.fingerprint_key, settings.fingerprint_key_version), dataset.id)
+    return dataset.id
+
+
 async def bank_change(settings: Settings, dataset_id, vendor_id: str, account: str, actor: str | None) -> None:
     token = mock_token(settings.mock_ramp_secret or b"", dataset_id)
     body = {"routing_number": "026009593", "account_number": account} | ({"actor_user_id": actor} if actor else {})
@@ -194,11 +203,15 @@ async def bank_change(settings: Settings, dataset_id, vendor_id: str, account: s
         (await mock.post(f"/_mock/vendors/{vendor_id}/bank-change", json=body)).raise_for_status()
 
 
-def core_settings(url: str, backoff: float = 1.0, jobs_every: int = 30, supabase_url: str | None = None) -> Settings:
+def core_settings(url: str, backoff: float = 1.0, jobs_every: int = 30, supabase_url: str | None = None,
+                  sandbox: RampSandbox | None = None) -> Settings:
     s = SECRETS
     # With a Supabase project (or scripts/dev/fake_supabase_auth.py), the core trusts only its
     # signing keys; otherwise the dashboard's dev sign-in secret (spec 0010).
     return Settings(database_url=url, ramp_mode=RampMode.MOCK, ramp_base_url=MOCK_URL, supabase_url=supabase_url,
+                    ramp_sandbox=sandbox,
+                    # Spec 0093, D4: on Ramp's sandbox a change waiting for review is found only by the sweep.
+                    full_sweep_interval_seconds=60 if sandbox else 86_400,
                     ramp_webhook_secret=s["RAMP_WEBHOOK_SECRET"].encode(), fingerprint_key=s["FINGERPRINT_KEY"].encode(),
                     mock_ramp_secret=s["MOCK_RAMP_SECRET"].encode(), digits_key=s["DIGITS_KEY"].encode(),
                     internal_api_token=s["INTERNAL_API_TOKEN"].encode(),
@@ -227,7 +240,7 @@ async def run(url: str, args: argparse.Namespace) -> int:
     try:
         await wait_for(f"{MOCK_URL}/healthz")
         settings = core_settings(url, backoff=0.2 if args.smoke else 1.0, jobs_every=2 if args.smoke else 30,
-                                 supabase_url=args.supabase_url)
+                                 supabase_url=args.supabase_url, sandbox=args.ramp_sandbox)
         pool = await open_pool(url, max_size=10)
         voice = ScriptedVoice(pool, refuse={"Brightline Office Supply Inc"}, deny={"Cobalt Freight LLC"},
                               callback={"Delta Paper Co"})
@@ -240,6 +253,11 @@ async def run(url: str, args: argparse.Namespace) -> int:
         dev_users = ",".join(f"{uid}:{name}" for uid, name in users.values())
         print("\nThe walking skeleton is running.\n")
         print(f"  core      {CORE_URL}\n  ramp mock {MOCK_URL}\n  dataset   {dataset_id}\n")
+        if args.ramp_sandbox:
+            sandbox_id = await seed_sandbox(pool, settings)
+            print(f"  sandbox   {sandbox_id}  (Ramp's sandbox, {args.ramp_sandbox.base_url}; its vendors imported)")
+            print(f"  its cases http://localhost:3000/d/{sandbox_id}/cases, once the dashboard runs")
+            print("  A bank change entered in Ramp's dashboard opens a case within about a minute (spec 0093).\n")
         print("Start the dashboard in another terminal:\n")
         if args.supabase_url:
             print(f"  cd apps/web && CORE_URL={CORE_URL} SUPABASE_URL={args.supabase_url} \\")
@@ -285,7 +303,20 @@ def main() -> int:
     parser.add_argument("--smoke", action="store_true", help="run one case end to end, check it, and exit")
     parser.add_argument("--supabase-url", help="trust this Supabase project's signing keys instead of the dev sign-in "
                         "(e.g. http://127.0.0.1:54321 for scripts/dev/fake_supabase_auth.py)")
+    parser.add_argument("--sandbox", action="store_true",
+                        help="also run a dataset on Ramp's sandbox, with the credentials in RAMP_SANDBOX_* (spec 0093)")
     args = parser.parse_args()
+    args.ramp_sandbox = None
+    if args.sandbox:
+        try:
+            args.ramp_sandbox = _ramp_sandbox(dict(os.environ))
+        except ConfigurationError as exc:
+            print(exc)
+            return 2
+        if args.ramp_sandbox is None:
+            print("--sandbox needs RAMP_SANDBOX_CLIENT_ID and RAMP_SANDBOX_CLIENT_SECRET in this terminal "
+                  "(read -rs RAMP_SANDBOX_CLIENT_SECRET && export RAMP_SANDBOX_CLIENT_SECRET).")
+            return 2
     sys.path.insert(0, str(Path(__file__).parent))
     # A fresh, migrated database: on DATABASE_URL's server if set (CI), else a throwaway Postgres.
     with migrated_database() as url:

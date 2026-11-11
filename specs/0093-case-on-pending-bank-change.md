@@ -42,6 +42,12 @@ None. The database gains one column (D2).
   100 requests per 10 seconds).
 - **D5. Where the approver sees the verdict**: Dialback's case page. Ramp has no API to show it on
   the approval. The approver approves or rejects in Ramp; a person releases in Dialback (R5).
+- **D6. Running it end to end locally**: `scripts/dev/stack.py --sandbox`, with the developer's
+  `RAMP_SANDBOX_*` in the terminal, also makes a dataset on Ramp's sandbox and imports its vendors
+  (what Dialback knows), and sweeps every minute. The stack's stand-ins (a fixed contact point; a
+  vendor on the phone who confirms with the new account's last four) answer its calls, so the run
+  checks Ramp's side: detection, the hold, the release, the dates, the approval. Without the
+  credentials it says so and stops; without `--sandbox` nothing changes (the smoke run still passes).
 
 ## Acceptance
 
