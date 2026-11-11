@@ -1299,7 +1299,7 @@ components:
         rule_settings: { $ref: '../schemas/selection.schema.json#/$defs/RuleSettings' }
         as_of: { $ref: '#/components/schemas/Timestamp', description: 'When the rule ran, and the cutoff it was asked for.' }
         cutoff: { $ref: '#/components/schemas/Timestamp', description: 'The cutoff the rule used - as_of, or earlier if a lookalike domain wrote first.' }
-        outcome: { enum: [picked, no_provable_number] }
+        outcome: { $ref: '../schemas/selection.schema.json#/properties/outcome' }
         contact_point_id: { $ref: '../schemas/selection.schema.json#/$defs/Uuid', description: The number the rule would pick. Present only when outcome is picked. }
         alternates:
           type: array

@@ -890,8 +890,7 @@ export interface components {
             as_of: components["schemas"]["Timestamp"];
             /** @description The cutoff the rule used - as_of, or earlier if a lookalike domain wrote first. */
             cutoff: components["schemas"]["Timestamp"];
-            /** @enum {unknown} */
-            outcome: "picked" | "no_provable_number";
+            outcome: components["schemas"]["outcome"];
             /** @description The number the rule would pick. Present only when outcome is picked. */
             contact_point_id?: components["schemas"]["Uuid"];
             /** @description Eligible runners-up in rank order. Present only when outcome is picked. */
@@ -1065,6 +1064,11 @@ export interface components {
             /** @description A message with the request's subject line within this many days counts as change context (v1: 30). */
             same_subject_window_days: number;
         };
+        /**
+         * @description picked: call contact_point_id. no_provable_number: no call; the case goes to needs_review (R7).
+         * @enum {unknown}
+         */
+        outcome: "picked" | "no_provable_number";
         E164: string;
         /**
          * @description How a value reached us, from custody metadata, never from a model (ADR-13). All email counts as one source type. The old vendor master's number on file is never a source type; see Candidate.on_file.
