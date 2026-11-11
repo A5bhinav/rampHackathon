@@ -177,7 +177,7 @@ async def test_the_ledger_write_never_builds_the_configured_reader(door_world, m
     """Final review I4: ingest_all's default reader follows DIALBACK_READER, and `llm` is a synchronous model
     call on the event loop. The door's document is rebuilt phone lines only, so it passes the stub reader
     itself and no reader is built from the flag; the stored extractor_version is that reader's."""
-    import dialback_ledger.ingest as ingest
+    from dialback_ledger import ingest
 
     monkeypatch.setenv("DIALBACK_READER", "llm")
 

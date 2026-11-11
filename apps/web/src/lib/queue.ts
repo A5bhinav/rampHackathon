@@ -1,10 +1,11 @@
 // Who a case is waiting on (spec 0066, PR 3). One rule, shared by the inbox and the case page's lock
-// card: a person can act on a case when the core offers them a console (approve, reject or review).
+// card: a person can act on a case when the core offers them a console (approve, reject, review, or
+// dismiss a blocked email case, spec 0090).
 // The core computes those permissions (R5 among them: never the person who entered the change), and
 // Postgres refuses whatever the page shows; this only labels links. Unknown permissions fail closed.
 import type { CaseState } from "./api-types";
 
-type Permissions = { can_approve: boolean; can_reject: boolean; can_review: boolean };
+type Permissions = { can_approve: boolean; can_reject: boolean; can_review: boolean; can_dismiss?: boolean };
 
 export const NEEDS_A_PERSON: readonly CaseState[] = ["needs_review", "awaiting_release", "blocked"];
 
