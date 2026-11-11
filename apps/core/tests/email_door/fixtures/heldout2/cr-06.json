@@ -1,0 +1,8 @@
+{
+  "subject": "Brightline is now part of Pinnacle Workplace Solutions - payment instructions",
+  "sender": "Pinnacle Workplace Solutions <billing@pinnacleworkplace.com>",
+  "text": "Dear Brightline customer,\n\nWe are excited to share that Brightline Office Supply Inc. has been acquired by Pinnacle Workplace Solutions, and the integration of our two companies is now underway. You will continue to work with the same sales team and receive the same products and pricing.\n\nWhat changes for you:\n\n1. Beginning with invoices dated December 1, 2026, invoices will be issued by Pinnacle Workplace Solutions, Inc.\n2. All payments, including payments on open Brightline invoices, should be remitted to Pinnacle's account:\n\n   Pinnacle Workplace Solutions, Inc.\n   JPMorgan Chase Bank, N.A.\n   ABA 021000021\n   Account 3349920175\n\n3. A new W-9 for Pinnacle is attached. Please update your vendor records.\n\nWhat does not change: your customer account number, your sales rep, your delivery schedule.\n\nThank you for your loyalty. Questions can be directed to transition@pinnacleworkplace.com.\n\nPinnacle Workplace Solutions\nCustomer Transition Team",
+  "label": "change_request",
+  "vendor": "brightline",
+  "note": "Acquisition notice from the acquirer's domain. Routing matches the on-file bank (same 021000021) but the account and payee are new, so a routing-only comparison would miss it."
+}

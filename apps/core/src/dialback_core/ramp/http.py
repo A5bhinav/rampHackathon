@@ -91,11 +91,16 @@ class RampHttpAdapter:
         self._token = token  # the mock's fixed per-dataset token, or Ramp's login
         self._http, self._limiter, self._max_retries, self._sleep = http, limiter, max_retries, sleep
 
+    def _error_detail(self, response: httpx.Response) -> str:
+        """Extra words for an error message. None from the mock; Ramp's sandbox adapter adds Ramp's own."""
+        return ""
+
     async def _headers(self) -> dict[str, str]:
         bearer = self._token if isinstance(self._token, str) else await self._token.token()
         return {"Authorization": f"Bearer {bearer}", "Accept": "application/json"}
 
-    async def _request(self, method: str, url: str, **kwargs: Any) -> dict[str, Any]:
+    async def _request(self, method: str, url: str, *, empty_ok: bool = False, **kwargs: Any) -> dict[str, Any]:
+        """`empty_ok`: a 202 or 204 with no body is an answer (Ramp's hold and release, spec 0097)."""
         if url.startswith("/"):
             url = self.base_url + url
         elif urlsplit(url).netloc != self._host:
@@ -124,7 +129,10 @@ class RampHttpAdapter:
             if code == 404:
                 raise RampNotFound(f"{method} {url}: not found")
             if code >= 400:
-                raise RampError(f"{method} {url}: HTTP {code}", status=code, retryable=code == 429 or code >= 500)
+                raise RampError(f"{method} {url}: HTTP {code}{self._error_detail(response)}", status=code,
+                                retryable=code == 429 or code >= 500)
+            if empty_ok and not response.content:
+                return {}
             return response.json()
         raise AssertionError("unreachable")
 

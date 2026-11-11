@@ -1,0 +1,8 @@
+{
+  "subject": "Re: Invoice 1638",
+  "sender": "Dana Whitfield <ar@acme.example>",
+  "text": "We have moved our banking. Please pay the account ending 4821 from today.\nThank you",
+  "label": "change_request",
+  "vendor": "acme",
+  "note": "Verbatim demo_seed.json vendors.acme.request (span text joined by newlines); explicit move of banking, details only as last four digits."
+}

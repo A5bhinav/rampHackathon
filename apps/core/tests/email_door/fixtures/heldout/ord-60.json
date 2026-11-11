@@ -1,0 +1,8 @@
+{
+  "subject": "Invoice 301 and bank cutoff",
+  "sender": "Ned Brooks <ned@brooks-courier.example>",
+  "text": "Invoice 301 attached. Note that our bank's wire cutoff is 4pm Eastern, so ACH is fine for us as we always do.",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Mentions bank cutoff; no change."
+}

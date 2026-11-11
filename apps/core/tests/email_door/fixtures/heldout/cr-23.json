@@ -1,0 +1,8 @@
+{
+  "subject": "Updated: Cobalt vendor banking record",
+  "sender": "Dana Okafor <dokafor@cobalt.example>",
+  "text": "Attn: vendor maintenance\n\nPlease update the banking record for Cobalt Freight LLC with the following:\nRouting 021000022\nAccount 000077770000\nAppreciated.",
+  "label": "change_request",
+  "vendor": "cobalt",
+  "note": "Invalid ABA routing (fails checksum)."
+}

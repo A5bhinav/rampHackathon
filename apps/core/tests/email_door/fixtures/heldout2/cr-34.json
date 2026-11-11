@@ -1,0 +1,8 @@
+{
+  "subject": "Variazione IBAN per i pagamenti delle mie fatture",
+  "sender": "Giulia Ferrari <giulia.ferrari.traduzioni@gmail.com>",
+  "text": "Buongiorno,\n\nsono Giulia Ferrari, la traduttrice freelance che collabora con voi per i manuali tecnici. Vi scrivo per comunicarvi che ho cambiato banca. Vi chiedo cortesemente di effettuare i pagamenti delle mie prossime fatture sul nuovo conto:\n\nIntestatario: Giulia Ferrari\nBanca: Intesa Sanpaolo\nIBAN: IT60 X054 2811 1010 0000 0123 456\nBIC: BCITITMM\n\nIl vecchio conto verra chiuso a fine mese.\n\nGrazie mille e buona giornata,\nGiulia Ferrari",
+  "label": "change_request",
+  "vendor": null,
+  "note": "Italian-language request from an individual freelance contractor to change the account her invoices are paid to. Accents dropped."
+}

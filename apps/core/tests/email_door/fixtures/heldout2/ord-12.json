@@ -1,0 +1,8 @@
+{
+  "subject": "Request for updated Form W-9",
+  "sender": "Larkspur Tax <tax@larkspur-ind.com>",
+  "text": "Hello Brightline Office Supply,\n\nAs part of our year-end 1099 review, we are requesting an updated IRS Form W-9 from all active vendors. Please complete, sign, and return the current revision of Form W-9 to tax@larkspur-ind.com by December 1, 2026.\n\nPlease do not include bank account information in your reply; we do not need it for this request.\n\nThank you,\nLarkspur Industries Tax Department\ncc: ap@larkspur-ind.com",
+  "label": "ordinary",
+  "vendor": "brightline",
+  "note": "Outgoing W-9 request copied to the AP inbox; mentions 'bank account information' only to say it is not wanted."
+}

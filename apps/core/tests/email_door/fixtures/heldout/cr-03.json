@@ -1,0 +1,8 @@
+{
+  "subject": "Re: Re: Invoice 2301",
+  "sender": "Morgan Pryce <ar@cobalt.example>",
+  "text": "Understood on the timing. One more thing, I need the settlement account for Cobalt changed\nbefore this one goes out. Sending the new account in a follow-up from our treasury\nperson. Please do not release until you have it.",
+  "label": "change_request",
+  "vendor": "cobalt",
+  "note": "Thread reply, details deferred to a follow-up."
+}

@@ -1,0 +1,8 @@
+{
+  "subject": "Remittance advice - payment 900441",
+  "sender": "AP Automation <ap-noreply@tallismfg.com>",
+  "text": "REMITTANCE ADVICE\n\nPayer: Tallis Manufacturing Co.\nOriginating account: 000300991177\nOriginating ABA: 121000248\nPayee: Acme Fasteners LLC\nBeneficiary account: ****2222\nDate: 11/06/2026\nAmount: $9,060.00\nTrace: 121000245512009\n\nInvoices paid: 88102, 88377",
+  "label": "ordinary",
+  "vendor": "acme",
+  "note": "Non-on-file numbers belong to the payer, not the payee."
+}

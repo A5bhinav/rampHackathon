@@ -1,0 +1,8 @@
+{
+  "subject": "New banking details for Brightline Office Supply",
+  "sender": "Brightline Office Supply <accounting@brightlineoffice.com>",
+  "text": "Hello,\n\nPlease update your records with our new banking information effective immediately:\n\nBank: Huntington National Bank\nRouting: 044000023\nAccount: 01882301947\n\nAll open invoices should be paid to this account.\n\nThank you,\nBrightline Accounting",
+  "label": "change_request",
+  "vendor": "brightline",
+  "note": "Plain bank change whose routing number 044000023 fails the ABA checksum (intentionally invalid). Still a change request; validity of the number does not change the label."
+}

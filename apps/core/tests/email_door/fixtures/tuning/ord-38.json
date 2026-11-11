@@ -1,0 +1,8 @@
+{
+  "subject": "Please verify our details",
+  "sender": "Dana Whitfield <ar@acme.example>",
+  "text": "Can you confirm that routing 021000021 and account ending 2222 are what you hold for Acme?\nJust double checking before the quarter close.",
+  "label": "ordinary",
+  "vendor": "acme",
+  "note": "Near miss: asks to verify on-file details."
+}

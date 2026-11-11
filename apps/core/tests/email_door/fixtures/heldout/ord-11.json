@@ -1,0 +1,8 @@
+{
+  "subject": "Invoice 1760 timing",
+  "sender": "Dana Whitfield <ar@acme.example>",
+  "text": "Following up: has invoice 1760 been scheduled yet? We're closing our books Friday and\nwould like to know the expected pay date.",
+  "label": "ordinary",
+  "vendor": "acme",
+  "note": "Status."
+}

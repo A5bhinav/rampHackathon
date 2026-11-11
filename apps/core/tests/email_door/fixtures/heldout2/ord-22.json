@@ -1,0 +1,8 @@
+{
+  "subject": "Heads up: AP disbursements moving to new operating account",
+  "sender": "Nina Alvarez <nalvarez@larkspur-ind.com>",
+  "text": "Hi AP team,\n\nStarting with the December 1 payment run, all vendor ACH and wire payments will be funded from our new operating account at Meridian Commercial Bank (account ending 9020) instead of the old account ending 4471. Positive pay files will be set up on the new account by November 25.\n\nNothing changes for vendors, and you do not need to update any vendor records. Please make sure the payment file template points to the new funding account before the December run.\n\nThanks,\nNina Alvarez\nTreasury Manager",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "The company's own paying account changes (where money comes from), not any vendor's receiving account."
+}

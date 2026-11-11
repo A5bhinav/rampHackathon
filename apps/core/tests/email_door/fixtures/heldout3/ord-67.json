@@ -1,0 +1,8 @@
+{
+  "subject": "Where should we send invoices?",
+  "sender": "billing@cobaltfreight.com",
+  "text": "Hi,\n\nOur system shows invoices for Northgate going to kliu@northgate-mfg.com. Should we switch to a shared AP inbox? Let us know the preferred address and we will update our customer record.\n\nCobalt Billing",
+  "label": "ordinary",
+  "vendor": "cobalt",
+  "note": "Vendor asking where to send invoices; nothing about payment destination."
+}

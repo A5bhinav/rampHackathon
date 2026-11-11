@@ -1,0 +1,8 @@
+{
+  "subject": "Acme Fasteners LLC - invoice 1765",
+  "sender": "Dana Whitfield <ar@acme.example>",
+  "text": "Invoice 1765, amount $2,310.50, due Dec 1. Payment is via the usual ACH, account ending 2222.",
+  "label": "ordinary",
+  "vendor": "acme",
+  "note": "On-file ending."
+}

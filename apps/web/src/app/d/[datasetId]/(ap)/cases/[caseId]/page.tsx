@@ -14,24 +14,21 @@ import type { Alert, CaseDetail, Candidate, SelectionView } from "@/lib/api-type
 import { AlertBanners } from "@/components/alerts";
 import { alertsForCase } from "@/lib/alerts";
 import { CoreError, core } from "@/lib/core";
+import { flagLabel } from "@/lib/mail";
+import { formatAccount } from "@/lib/ramp-portal";
 import { brief, datasetNow, date, dueLabel, relative, when, words } from "@/lib/format";
 import { phone, seenBefore, sourceLabel, split } from "@/lib/lineage";
 import { REFRESH_STATES, currentVersion, stations } from "@/lib/stations";
 import { canWatchCall } from "@/lib/live-call";
-import { stateLabel } from "@/lib/states";
+import { actionNotice, stateLabel } from "@/lib/states";
 import { canAct } from "@/lib/queue";
 import { attemptRows, changeLine, decisionLine, holdLine, numberLine, openCard, trailLine } from "@/lib/case-cards";
 import { releaseAction, reviewAction } from "./actions";
 
 // Case detail and the action rail (specs 0009, 0036, 0041): the change, the hold, the number
 // chosen, the call, the decision, the evidence trail and (only for someone the rules allow)
-// release or review. The database refuses the changer whatever this page shows.
-const NOTICES: Record<string, string> = {
-  applied: "Done.",
-  already_applied: "That was already recorded.",
-  awaiting_second_approver: "Your approval is recorded. A second approver must release this change.",
-};
-
+// release or review. The database refuses the changer whatever this page shows. The sentence after an
+// action is states.ts's actionNotice.
 const account = (a: { routing_number: string; last4: string }) => `${a.routing_number} ····${a.last4}`;
 
 export default async function CaseDetailPage({ params, searchParams }: {
@@ -57,6 +54,7 @@ export default async function CaseDetailPage({ params, searchParams }: {
     ? detail.releases.find((r) => r.action === "approve" && r.case_version === c.version) : undefined;
   const lastStep = detail.timeline.at(-1);  // its summary is the core's template, so the reason is never guessed here
   const nextDue = dueLabel(c.next_payment_date, now);
+  const notice = actionNotice(done, to);   // the sentence for the action that redirected here
 
   const steps = stations(detail.timeline, c.state, decision?.outcome ?? null);
   const open = openCard(steps);  // the card for the station the case is at starts open; the rest start closed
@@ -94,9 +92,9 @@ export default async function CaseDetailPage({ params, searchParams }: {
         </span>
       </PageHead>
 
-      {done && NOTICES[done] ? (
+      {notice ? (
         <Callout tone="ok" role="status" className="page-notice">
-          <p>{NOTICES[done]}{to ? ` The case moved to ${stateLabel(to).toLowerCase()}.` : ""}</p>
+          <p>{notice}</p>
         </Callout>
       ) : null}
 
@@ -135,6 +133,26 @@ export default async function CaseDetailPage({ params, searchParams }: {
               </dl>
             </div>
           </FoldCard>
+
+          {change.email ? (
+            <FoldCard id="email-h" title="Email" open={open === "change"} line={<>From <span className="mono">{change.email.sender}</span></>}
+              meta={<>Opened by an email</>}>
+              <div className="card-body">
+                <dl className="facts">
+                  <dt>From</dt><dd className="mono">{change.email.sender}</dd>
+                  <dt>Subject</dt><dd>{change.email.subject ?? <span className="muted">(no subject)</span>}</dd>
+                  <dt>Received</dt><dd>{when(change.email.received_at)}</dd>
+                  <dt>Payment details asked for</dt><dd className="mono">{formatAccount(change.new_account)}</dd>
+                  <dt>Red flags</dt>
+                  <dd>
+                    {change.email.red_flags.length === 0 ? <span className="muted">None</span> : (
+                      <span className="tags">{change.email.red_flags.map((f) => <span key={f} className="badge tone-bad">{flagLabel(f)}</span>)}</span>
+                    )}
+                  </dd>
+                </dl>
+              </div>
+            </FoldCard>
+          ) : null}
 
           <HoldCard detail={detail} now={now} open={open === "hold"} />
           <NumberCard view={view} path={path} open={open === "number"} />
@@ -344,6 +362,19 @@ function ActionRail({ detail, path, datasetId, firstApproval, lastStepSummary }:
             {decision?.effect || lastStepSummary ? <Callout tone="bad"><p>{decision?.effect ?? lastStepSummary}</p></Callout>
               : <p className="muted sub">The hold stays on.</p>}
           </div>
+        </section>
+      ) : null}
+
+      {c.state === "blocked" && can.can_dismiss ? (
+        <section className="card action-card">
+          {/* Spec 0090: a dismissal is an approval from blocked; the database checks the case is email only. */}
+          <DecisionConsole
+            title="Dismiss case"
+            hint="This case came in by email and Ramp's account on file never changed. Two different approvers must each dismiss it; the second lifts the hold, so bills pay the account on file."
+            caseId={c.id} version={c.version} path={path} action={releaseAction}
+            summary={<p className="muted sub">{bills} · {stateLabel(c.state)}</p>}
+            buttons={[{ value: "approve", label: "Dismiss (Ramp never changed)", tone: "primary" }]}
+          />
         </section>
       ) : null}
 

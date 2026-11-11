@@ -1,0 +1,8 @@
+{
+  "subject": "Invoice 88412",
+  "sender": "Dana Whitfield <dwhitfield@acmefasteners.com>",
+  "text": "Invoice 88412 attached, $6,120.00, Net 30.\n\nACH: Routing 021000021, Account 000011112122\n\nDana",
+  "label": "change_request",
+  "vendor": "acme",
+  "note": "ON-FILE-ONLY: account 000011112122 vs on-file 000011112222 (one digit differs); no wording about a change."
+}

@@ -1,0 +1,8 @@
+{
+  "subject": "Your order 778120 has shipped",
+  "sender": "Brightline Office Supply <orders@brightlineoffice.com>",
+  "text": "Hi Larkspur Industries,\n\nGood news, your order is on its way.\n\nOrder: 778120\nPO: 45602\nShip to: Larkspur Industries, 900 Riverside Ave, Dock 3, Columbus, OH 43215\nCarrier: Brightline delivery truck\nEstimated delivery: Wednesday, November 11\n\nItems: 40 x Copy paper case, 12 x Toner HY black, 6 x Mesh desk organizer\n\nYou'll receive your invoice separately.\n\nBrightline Office Supply",
+  "label": "ordinary",
+  "vendor": "brightline",
+  "note": "Shipping notification."
+}

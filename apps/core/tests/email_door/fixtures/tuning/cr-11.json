@@ -1,0 +1,8 @@
+{
+  "subject": "please read",
+  "sender": "Tom Reyes <treyes@silverline-hvac.example>",
+  "text": "Hi,\nwe recently changed banks. Can you remove the old bank info from our vendor profile and\npay us by wire going forward? Our account is 7720 3318 5509. Thanks for your help\nTom, Silverline HVAC",
+  "label": "change_request",
+  "vendor": null,
+  "note": "Informal, no routing number given; unknown vendor."
+}

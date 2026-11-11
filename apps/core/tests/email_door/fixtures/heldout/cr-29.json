@@ -1,0 +1,8 @@
+{
+  "subject": "Acme: receivables moved to factor",
+  "sender": "Dana Whitfield <ar@acme.example>",
+  "text": "Acme Fasteners LLC has assigned its receivables to a financing partner. All payments on\nopen and future invoices must be made to the partner's lockbox account, notice of assignment\nattached. Payment to Acme directly will not discharge the obligation.",
+  "label": "change_request",
+  "vendor": "acme",
+  "note": "Notice of assignment redirecting payments (a real thing and also a known fraud pattern); label by content."
+}

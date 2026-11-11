@@ -1,0 +1,8 @@
+{
+  "subject": "Positive Pay exception requires decision by 2:00 PM ET",
+  "sender": "Meridian Commercial Bank <positivepay@meridiancommercial.com>",
+  "text": "Positive Pay Exception\n\nAccount: Larkspur Industries Operating ****4471\nCheck number: 30188\nPresented amount: $4,180.00\nIssued amount: $418.00\nPayee on issue file: Brightline Office Supply Inc\nException: Amount mismatch\n\nPlease log in to Treasury Online and choose Pay or Return before 2:00 PM ET today. If no decision is made, the default action for this account is Return.",
+  "label": "ordinary",
+  "vendor": "brightline",
+  "note": "Bank positive-pay exception about a Brightline check (likely altered). Fraud-related and urgent, but not a request to pay somewhere new."
+}

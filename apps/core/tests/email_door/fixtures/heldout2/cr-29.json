@@ -1,0 +1,8 @@
+{
+  "subject": "Please hold payments - account closed",
+  "sender": "Acme Fasteners LLC <ar@acmefasteners.com>",
+  "text": "Hello,\n\nPlease be advised that our account ending in 2222 has been closed. Any payments sent to it will be returned. Please place a hold on payments to Acme Fasteners until we provide our new banking details, which our controller will send early next week.\n\nWe apologize for the inconvenience.\n\nAcme Fasteners LLC\nAccounts Receivable",
+  "label": "change_request",
+  "vendor": "acme",
+  "note": "Borderline: no new destination yet, only 'stop paying the on-file account, new details to follow'. Counted as a change request because the vendor is announcing that future payments will go somewhere new."
+}

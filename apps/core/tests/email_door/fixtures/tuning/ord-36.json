@@ -1,0 +1,8 @@
+{
+  "subject": "Process question",
+  "sender": "Alex Wong <alex@kappa-tools.example>",
+  "text": "If we ever need to change our bank account, what is your procedure? Not changing anything\nnow, just planning ahead for next year.",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Near miss: asks about process, no request."
+}

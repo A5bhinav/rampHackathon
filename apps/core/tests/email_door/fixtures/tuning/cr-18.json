@@ -1,0 +1,8 @@
+{
+  "subject": "Time sensitive: do not pay old account",
+  "sender": "morgan.pryce@cobalt-freight.example",
+  "text": "Our CFO has instructed me to tell you that the Cobalt account ending 8888 has been\ncompromised. Stop all payments to it right now. Wire instructions for the replacement\naccount will follow shortly from our CFO's office. Do not call the old number, the line\nis being monitored.",
+  "label": "change_request",
+  "vendor": "cobalt",
+  "note": "Fraud-flavored urgency, refers to the real on-file account ending 8888, details to follow, tells reader not to call."
+}

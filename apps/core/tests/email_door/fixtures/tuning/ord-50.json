@@ -1,0 +1,8 @@
+{
+  "subject": "1099-NEC filing deadline reminder",
+  "sender": "Tax Notice <irs-notices@taxdesk.example>",
+  "text": "Your 1099-NEC forms are due Jan 31. Make sure vendor TINs are on file.",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Tax reminder."
+}

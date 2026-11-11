@@ -1,0 +1,8 @@
+{
+  "subject": "Wrong amount on remittance",
+  "sender": "Morgan Pryce <ar@cobalt.example>",
+  "text": "The payment we received was $200 short against invoice 2301. Can you check for a deduction we missed?",
+  "label": "ordinary",
+  "vendor": "cobalt",
+  "note": "Short pay."
+}

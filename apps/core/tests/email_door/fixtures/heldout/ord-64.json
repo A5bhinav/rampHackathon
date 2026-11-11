@@ -1,0 +1,8 @@
+{
+  "subject": "Refund for my cancelled order 55120",
+  "sender": "Gina Alvarez <gina.alvarez@mailbox.example>",
+  "text": "Hi, I cancelled order 55120 and was told I would get a refund by bank transfer. My bank\ndetails for the refund are routing 026009593 and account 3321 0987 6543. Could you process it this week? I am the customer, not a supplier.",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Customer gives their own bank details for a refund; not a vendor payment redirect, so ordinary."
+}

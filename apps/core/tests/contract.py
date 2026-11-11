@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from functools import cache
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
 import yaml
 from jsonschema import Draft202012Validator
@@ -23,7 +23,7 @@ def _load(path: Path):
 
 
 def _retrieve(uri: str) -> Resource:
-    path = CONTRACTS / "schemas" / uri[len(ID_PREFIX):] if uri.startswith(ID_PREFIX) else Path(urlparse(uri).path)
+    path = CONTRACTS / "schemas" / uri[len(ID_PREFIX):] if uri.startswith(ID_PREFIX) else Path(unquote(urlparse(uri).path))  # as_uri() escapes "+", spaces...; undo it
     return Resource.from_contents(_load(path), default_specification=DRAFT202012)
 
 

@@ -1,0 +1,8 @@
+{
+  "subject": "Wire Transfer Confirmation - Ref 20261109-WT-004417",
+  "sender": "Meridian Commercial Bank <wire-alerts@meridiancommercial.com>",
+  "text": "Your outgoing wire has been completed.\n\nReference: 20261109-WT-004417\nDate: 11/09/2026\nAmount: USD 6,840.00\nFrom account: Larkspur Industries Operating ****4471\nBeneficiary: Cobalt Freight LLC\nBeneficiary bank: JPMorgan Chase Bank, N.A., ABA 021000021\nBeneficiary account: 000077778888\nOBI: INV CF-21144 CF-21390 CF-21502 CF-21610\n\nIf you did not authorize this transaction, call Treasury Services at 1-800-555-0177 immediately.\n\nMeridian Commercial Bank",
+  "label": "ordinary",
+  "vendor": "cobalt",
+  "note": "Bank's wire confirmation naming the beneficiary account in full (the on-file one)."
+}

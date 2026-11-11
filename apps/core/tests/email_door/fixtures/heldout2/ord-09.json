@@ -1,0 +1,8 @@
+{
+  "subject": "Acme Fasteners is moving - new office address",
+  "sender": "Acme Fasteners LLC <info@acmefasteners.com>",
+  "text": "Dear Customers and Partners,\n\nWe're moving! Effective December 7, 2026, Acme Fasteners' office and warehouse will relocate to:\n\nAcme Fasteners LLC\n7720 Byers Road\nMiamisburg, OH 45342\n\nPlease update the address you use for correspondence, purchase orders sent by mail, and returns. Our phone numbers, email addresses, and banking and payment instructions are not changing.\n\nWe expect a brief pause in will-call pickups on December 4 and 5 while we move inventory.\n\nThank you,\nThe Acme Fasteners Team",
+  "label": "ordinary",
+  "vendor": "acme",
+  "note": "Physical address change; explicitly says banking and payment instructions do not change. Contrast with cr-22 (check lockbox move)."
+}

@@ -1,0 +1,8 @@
+{
+  "subject": "FINAL DEMAND - past due balance",
+  "sender": "Credit <credit@brightlineoffice.com>",
+  "text": "FINAL DEMAND\n\nYour account is 90 days past due in the amount of $1,020.00. If payment isn't received within 10 days, your account will be placed on credit hold and referred for collection. Please remit immediately using your usual payment method.\n\nBrightline Credit Department",
+  "label": "ordinary",
+  "vendor": "brightline",
+  "note": "Aggressive dunning, same destination."
+}

@@ -1,0 +1,8 @@
+{
+  "subject": "Cobalt Freight is now Cobalt Logistics Holdings - updated W-9 and remit-to",
+  "sender": "Cobalt Logistics Holdings <ar@cobaltlogistics.com>",
+  "text": "Hello,\n\nEffective November 15, 2026, Cobalt Freight LLC is doing business as part of Cobalt Logistics Holdings, Inc. Please find attached our updated W-9 under the new legal entity, EIN 88-4410217.\n\nAlong with the entity change, our remit-to has changed. Please pay all Cobalt Freight invoices, including open ones, to:\n\nCobalt Logistics Holdings, Inc.\nCitizens Bank\nABA 011500120\nAccount 6614 0029 8812\n\nOur phone numbers and dispatch contacts are unchanged.\n\nRegards,\nAccounts Receivable\nCobalt Logistics Holdings, Inc.",
+  "label": "change_request",
+  "vendor": "cobalt",
+  "note": "Rebrand plus W-9 (looks like tax mail) plus new payee entity and new account, from a new domain."
+}

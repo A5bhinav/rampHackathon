@@ -1,0 +1,8 @@
+{
+  "subject": "AP Fraud Alert: vendor impersonation sample from a member company",
+  "sender": "Institute of Payables Professionals <alerts@ipp-members.org>",
+  "text": "Member Alert 2026-41\n\nA member reported the following message, which closely imitated a real supplier. We share it so your team can recognise the pattern.\n\n--- begin sample ---\nSubject: Updated banking information\nDear Accounts Payable, Due to an audit of our accounts we have moved to a new bank. Please update our records and remit all pending invoices to Bank of America, routing 026009593, account 8800127734. Old account is closed. Confirm once updated. Regards, Accounts Receivable\n--- end sample ---\n\nIndicators: domain registered 9 days earlier, \"Regards\" where the real contact always signed with a name, request sent on a Friday afternoon.\n\nMembers are reminded that no change should be applied without out-of-band verification.\n\nIPP Fraud Working Group",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Fraud-awareness bulletin containing a full sample change-request email in quotation. Not a request to the reader."
+}

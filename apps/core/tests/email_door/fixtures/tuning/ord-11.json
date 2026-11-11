@@ -1,0 +1,8 @@
+{
+  "subject": "Payment status",
+  "sender": "Marisol Vega <mvega@brightline.example>",
+  "text": "Hello, checking on the status of PO 88213. Has it been approved for payment?",
+  "label": "ordinary",
+  "vendor": "brightline",
+  "note": "Status question."
+}

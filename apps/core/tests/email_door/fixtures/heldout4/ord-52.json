@@ -1,0 +1,8 @@
+{
+  "subject": "Annual vendor banking validation",
+  "sender": "Vendor Management <vendormgmt@tallismfg.com>",
+  "text": "Dear Supplier,\n\nAs part of our annual controls, please let us know if the banking information we hold for you is still correct. If your bank details have changed, do not send them by email: contact your buyer and we'll arrange verification by phone.\n\nVendor Management\nTallis Manufacturing Co.",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Outbound control message from the reader's own company."
+}

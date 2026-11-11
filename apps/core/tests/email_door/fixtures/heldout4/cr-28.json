@@ -1,0 +1,8 @@
+{
+  "subject": "Brightline - Payables pending settlement",
+  "sender": "Paralegal <cmurray@hollisreedlaw.example>",
+  "text": "Dear Sir or Madam:\n\nThis firm represents Brightline Office Supply Inc in connection with a pending commercial dispute. Pursuant to the parties' interim agreement, please direct all amounts payable to Brightline until further notice to this firm's IOLTA trust account:\n\nHollis & Reed LLP Attorney Trust Account\nRouting 071000013\nAccount 3390017742\n\nPlease confirm receipt of this letter.\n\nVery truly yours,\nColleen Murray, Paralegal\nHollis & Reed LLP\n\nThis communication may contain privileged attorney-client information.",
+  "label": "change_request",
+  "vendor": "brightline",
+  "note": ""
+}

@@ -1,0 +1,8 @@
+{
+  "subject": "vendor setup question",
+  "sender": "Jess Tran <jess@ourco.example>",
+  "text": "Brightline is already in the system, so no need to onboard them again. Just add the new cost center.",
+  "label": "ordinary",
+  "vendor": "brightline",
+  "note": "Internal."
+}

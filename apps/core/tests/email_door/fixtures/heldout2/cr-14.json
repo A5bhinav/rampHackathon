@@ -1,0 +1,8 @@
+{
+  "subject": "updating my direct deposit",
+  "sender": "Jordan Lee <jordan.lee.design@gmail.com>",
+  "text": "Hi Larkspur AP,\n\nI'm the freelance designer on the packaging refresh (contractor ID C-2291). I switched banks this month, so please update my direct deposit for my invoices starting with the November one.\n\nNew bank: Ally Bank\nRouting: 124003116\nChecking: 3317 7790 21\n\nThe old account at my credit union is closed now. Thanks so much!\n\nJordan",
+  "label": "change_request",
+  "vendor": null,
+  "note": "Payroll-style direct deposit change from an individual 1099 contractor (a payee, so a vendor in AP terms)."
+}

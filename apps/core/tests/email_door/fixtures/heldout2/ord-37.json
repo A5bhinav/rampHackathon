@@ -1,0 +1,8 @@
+{
+  "subject": "PO Acknowledgment - PO 45655",
+  "sender": "Acme Fasteners Order Desk <orders@acmefasteners.com>",
+  "text": "Thank you for your order. We have received and accepted PO 45655.\n\nSales order: SO-61207\nShip date: 11/12/2026\nShip via: Cobalt Freight LTL, prepaid and add\nLines: 3, all in stock\n\nPlease review the acknowledgment and contact us within 24 hours with any discrepancies.\n\nAcme Fasteners Order Desk",
+  "label": "ordinary",
+  "vendor": "acme",
+  "note": "PO acknowledgment; mentions a second known vendor (Cobalt) as the carrier."
+}

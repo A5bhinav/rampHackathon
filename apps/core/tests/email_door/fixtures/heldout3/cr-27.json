@@ -1,0 +1,8 @@
+{
+  "subject": "Statement of account - October 2026",
+  "sender": "Brightline Office Supply Inc <statements@brightlineoffice.com>",
+  "text": "Brightline Office Supply Inc\nStatement of Account\nCustomer: Northgate Manufacturing Inc (C-30187)\nStatement date: 10/31/2026\n\nInvoice     Date        Amount     Open\nBL-55102    10/02/2026  1,240.10   0.00\nBL-55210    10/14/2026    388.45   388.45\nBL-55277    10/28/2026  2,015.00   2,015.00\n\nBalance due: 2,403.45\n\nPlease remit to:\nBrightline Office Supply Inc\nRouting 021000021\nAccount 000044445556\n\nQuestions? ar@brightlineoffice.com",
+  "label": "change_request",
+  "vendor": "brightline",
+  "note": "ON-FILE-ONLY: statement lists the on-file routing number with an account number that differs from the record by one digit, and says nothing about a change."
+}

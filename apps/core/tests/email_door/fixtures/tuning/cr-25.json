@@ -1,0 +1,8 @@
+{
+  "subject": "Fwd: Bank details",
+  "sender": "Sam Ortiz <ar@brightline.example>",
+  "text": "FYI see below. Please process.\n\nBegin forwarded message:\n\n> From: Sam Ortiz <ar@brightline.example>\n> Subject: Bank details\n>\n> Hello. Brightline Office Supply Inc has opened an account with a new bank. All payments\n> from now on to routing 021000021, account 000 0444 9999.\n> Thanks",
+  "label": "change_request",
+  "vendor": "brightline",
+  "note": "Apple-mail style forward with quoted original; valid routing with account differing from on-file."
+}

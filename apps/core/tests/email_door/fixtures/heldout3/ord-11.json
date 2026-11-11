@@ -1,0 +1,8 @@
+{
+  "subject": "SECURITY NOTICE: Brightline email account compromise",
+  "sender": "Brightline Office Supply Inc <security@brightlineoffice.com>",
+  "text": "Dear Customer,\n\nOn November 3 we identified unauthorised access to one of our accounts receivable mailboxes. The attacker sent emails to some customers claiming that Brightline Office Supply Inc had changed its bank account and asking for payments to be sent to a new account at TD Bank.\n\nTHESE EMAILS ARE FRAUDULENT. Brightline has NOT changed its banking information. Our remittance details remain exactly as they appear on your invoices.\n\nIf you received such a message, please do not act on it, and forward it to security@brightlineoffice.com. If you already sent a payment to the fraudulent account, contact your bank immediately and then call us at (860) 555-0123.\n\nWe have reset credentials, enabled additional controls, and notified law enforcement.\n\nSincerely,\nBrightline Office Supply Inc",
+  "label": "ordinary",
+  "vendor": "brightline",
+  "note": "Warning about fraudulent change requests. Describes a bank change only to deny it."
+}

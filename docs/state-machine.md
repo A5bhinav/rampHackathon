@@ -45,6 +45,8 @@ stateDiagram-v2
     needs_review --> blocked: review_blocked [approver_reason] (person)
     needs_review --> awaiting_release: review_cleared [approver_reason_not_changer] (person)
     blocked --> held: change_detected
+    blocked --> releasing: release_approved [email_dismiss_four_eyes] (person)
+    blocked --> blocked: release_co_approved [email_dismiss_first] (person)
     releasing --> held: change_detected
     releasing --> needs_review: command_failed
     releasing --> released: hold_release_confirmed [readback_ok]
@@ -91,6 +93,8 @@ stateDiagram-v2
 | needs_review | `review_blocked` | **person** | `approver_reason` | blocked | Approver; written reason |
 | needs_review | `review_cleared` | **person** | `approver_reason_not_changer` | awaiting_release | Approver; not the changer; written reason |
 | blocked | `change_detected` | system | `always` | held | Another change: back to held, version + 1, decision void |
+| blocked | `release_approved` | **person** | `email_dismiss_four_eyes` | releasing | Email-only case, Ramp unchanged: second person dismisses; the hold is lifted |
+| blocked | `release_co_approved` | **person** | `email_dismiss_first` | blocked | Email-only case, Ramp unchanged: first of two people dismisses |
 | releasing | `change_detected` | system | `always` | held | Another change during release: back to held, version + 1 |
 | releasing | `command_failed` | system | `always` | needs_review | Release kept failing; hold stays on |
 | releasing | `hold_release_confirmed` | system | `readback_ok` | released | Read-back shows no hold |

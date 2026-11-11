@@ -1,0 +1,8 @@
+{
+  "subject": "Rate Confirmation - Load 7731-29",
+  "sender": "Cobalt Freight Dispatch <dispatch@cobaltfreight.com>",
+  "text": "RATE CONFIRMATION\n\nLoad #: 7731-29\nShipper: Acme Fasteners LLC, Dayton, OH\nConsignee: Larkspur Industries, Columbus, OH\nPickup: 11/12/2026 08:00\nDelivery: 11/12/2026 14:00\nEquipment: 53 ft dry van\nLinehaul: $640.00\nFuel surcharge (31.5%): $201.60\nTotal: $841.60\n\nPlease sign and return to dispatch@cobaltfreight.com. Billing will follow after delivery with POD.",
+  "label": "ordinary",
+  "vendor": "cobalt",
+  "note": "Freight rate confirmation; mentions Acme as shipper."
+}
