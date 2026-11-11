@@ -43,7 +43,7 @@ export function sourceLabel(source: string): string {
   return SOURCES[source] ?? source.replaceAll("_", " ");
 }
 
-// The lineage chart (spec 0041): one dot per candidate per source type at its first sighting,
+// The lineage chart (spec 0041): one dot per candidate per source type, at the candidate's first-seen date,
 // on a time axis from the January before the earliest sighting to just past the cutoff. Per-
 // sighting dots wait for the ledger's lineage endpoint (spec 0041, Q4).
 const LANE_ORDER: string[] = ["contract", "vendor_portal", "listing", "email", "paper_mail"];
