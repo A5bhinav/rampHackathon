@@ -813,6 +813,7 @@ export interface components {
                 younger_than_minimum_age: string;
                 near_miss_of_older_number: string;
                 hidden_text_only: string;
+                unconfirmed_digits_only: string;
                 not_vendor_party: string;
                 fax_line: string;
             };
@@ -1012,10 +1013,10 @@ export interface components {
          */
         "$defs-Role": "main" | "ar" | "billing" | "fax" | "unknown";
         /**
-         * @description Why a candidate isn't eligible. first_seen_in_change_context: R2. too_few_source_types: fewer than rule_settings.min_source_types before the cutoff. younger_than_minimum_age: first seen less than rule_settings.min_age_days before the cutoff. near_miss_of_older_number: one digit off, or two swapped digits away from, an older vendor number, and not an established sibling line. hidden_text_only: seen only in text a person couldn't see (white, tiny or off-page). not_vendor_party: labeled as the customer's or a bank's number. fax_line: labeled as a fax.
+         * @description Why a candidate isn't eligible. first_seen_in_change_context: R2. too_few_source_types: fewer than rule_settings.min_source_types before the cutoff. younger_than_minimum_age: first seen less than rule_settings.min_age_days before the cutoff. near_miss_of_older_number: one digit off, or two swapped digits away from, an older vendor number, and not an established sibling line. hidden_text_only: seen only in text a person couldn't see (white, tiny, off-page or no ink). unconfirmed_digits_only: seen where a person could see it, but only in text whose digits couldn't be confirmed against the page (spec 0092, Part B). not_vendor_party: labeled as the customer's or a bank's number. fax_line: labeled as a fax.
          * @enum {unknown}
          */
-        Reason: "first_seen_in_change_context" | "too_few_source_types" | "younger_than_minimum_age" | "near_miss_of_older_number" | "hidden_text_only" | "not_vendor_party" | "fax_line";
+        Reason: "first_seen_in_change_context" | "too_few_source_types" | "younger_than_minimum_age" | "near_miss_of_older_number" | "hidden_text_only" | "unconfirmed_digits_only" | "not_vendor_party" | "fax_line";
         /** @description The settings the rule ran with; the ablations vary these. */
         RuleSettings: {
             /** @description Independent source types needed before the cutoff (v1: 2). */
@@ -1121,10 +1122,10 @@ export interface components {
                     source_types: components["schemas"]["SourceTypes"];
                 };
                 /**
-                 * @description Why a candidate isn't eligible. first_seen_in_change_context: R2. too_few_source_types: fewer than rule_settings.min_source_types before the cutoff. younger_than_minimum_age: first seen less than rule_settings.min_age_days before the cutoff. near_miss_of_older_number: one digit off, or two swapped digits away from, an older vendor number, and not an established sibling line. hidden_text_only: seen only in text a person couldn't see (white, tiny or off-page). not_vendor_party: labeled as the customer's or a bank's number. fax_line: labeled as a fax.
+                 * @description Why a candidate isn't eligible. first_seen_in_change_context: R2. too_few_source_types: fewer than rule_settings.min_source_types before the cutoff. younger_than_minimum_age: first seen less than rule_settings.min_age_days before the cutoff. near_miss_of_older_number: one digit off, or two swapped digits away from, an older vendor number, and not an established sibling line. hidden_text_only: seen only in text a person couldn't see (white, tiny, off-page or no ink). unconfirmed_digits_only: seen where a person could see it, but only in text whose digits couldn't be confirmed against the page (spec 0092, Part B). not_vendor_party: labeled as the customer's or a bank's number. fax_line: labeled as a fax.
                  * @enum {unknown}
                  */
-                Reason: "first_seen_in_change_context" | "too_few_source_types" | "younger_than_minimum_age" | "near_miss_of_older_number" | "hidden_text_only" | "not_vendor_party" | "fax_line";
+                Reason: "first_seen_in_change_context" | "too_few_source_types" | "younger_than_minimum_age" | "near_miss_of_older_number" | "hidden_text_only" | "unconfirmed_digits_only" | "not_vendor_party" | "fax_line";
                 Candidate: {
                     contact_point_id: components["schemas"]["Uuid"];
                     e164: components["schemas"]["E164"];

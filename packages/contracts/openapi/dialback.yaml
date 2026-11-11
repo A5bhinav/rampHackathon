@@ -1203,13 +1203,14 @@ components:
           type: object
           description: The ledger's sentence for each reason code a candidate can carry.
           additionalProperties: false
-          required: [first_seen_in_change_context, too_few_source_types, younger_than_minimum_age, near_miss_of_older_number, hidden_text_only, not_vendor_party, fax_line]
+          required: [first_seen_in_change_context, too_few_source_types, younger_than_minimum_age, near_miss_of_older_number, hidden_text_only, unconfirmed_digits_only, not_vendor_party, fax_line]
           properties:
             first_seen_in_change_context: { type: string }
             too_few_source_types: { type: string }
             younger_than_minimum_age: { type: string }
             near_miss_of_older_number: { type: string }
             hidden_text_only: { type: string }
+            unconfirmed_digits_only: { type: string }
             not_vendor_party: { type: string }
             fax_line: { type: string }
         notes:

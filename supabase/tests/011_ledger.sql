@@ -194,4 +194,26 @@ begin
 end
 $$;
 
+
+-- Spec 0092: text in a PDF that leaves no ink on the page, and (Part B) text whose digits couldn't be
+-- confirmed. Both are hidden sightings: stored, never quoted.
+do $$
+declare
+  f     pg_temp.fx%rowtype;
+  v_doc uuid;
+begin
+  f := pg_temp.setup_fixture();
+  set local role service_role;
+  insert into ledger.documents (dataset_id, vendor_id, kind, sha256, custody_channel, received_at)
+    values (f.dataset, f.vendor, 'contract', repeat('7', 64), 'contract', '2024-02-01T00:00:00Z') returning id into v_doc;
+  insert into ledger.observations (dataset_id, document_id, vendor_id, kind, value_normalized, visibility, extractor_version)
+    values (f.dataset, v_doc, f.vendor, 'phone', '+14155550169', 'no_ink', 'pdf-1/test-0'),
+           (f.dataset, v_doc, f.vendor, 'phone', '+14155550170', 'unverified', 'pdf-1/test-0');
+  assert (select array_agg(visibility::text order by value_normalized) from ledger.observations
+           where document_id = v_doc and quote is null) = array['no_ink', 'unverified'],
+         'no_ink and unverified sightings are stored, unquoted';
+  reset role;
+end
+$$;
+
 rollback;
