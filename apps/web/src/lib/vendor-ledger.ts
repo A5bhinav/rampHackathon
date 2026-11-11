@@ -1,6 +1,7 @@
 // Pure helpers for a vendor's history in the Trust Ledger (spec 0104). They pick labels and links;
 // every sentence that explains a status or a reason comes from the API, written by the ledger.
-import { split, type RuleRun } from "./lineage.ts";
+import type { LedgerDocument } from "./api-types";
+import { laneKey, split, type RuleRun } from "./lineage.ts";
 
 export function ledgerHref(datasetId: string, vendorId: string): string {
   return `/d/${datasetId}/control/trust-ledger/${vendorId}`;
@@ -26,4 +27,21 @@ const HIDDEN: Record<string, string> = { white: "white text", tiny: "tiny text",
 /** null for text a person could see; otherwise how it was hidden. */
 export function hiddenLabel(visibility: string): string | null {
   return visibility === "visible" ? null : `hidden: ${HIDDEN[visibility] ?? visibility.replaceAll("_", " ")}`;
+}
+
+/** When each number was first seen in each source (spec 0104, D7): its earliest visible sighting in a
+ *  document of that channel received by the cutoff. The vendor master's channel is the chart's
+ *  "on_file" lane. Keyed by laneKey(e164, lane), for lanePoints. */
+export function laneDates(documents: LedgerDocument[], cutoff: string): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const d of documents) {
+    if (Date.parse(d.received_at) > Date.parse(cutoff)) continue;
+    const lane = d.custody_channel === "vendor_master" ? "on_file" : d.custody_channel;
+    for (const o of d.observations) {
+      const key = laneKey(o.e164, lane);
+      const seen = out.get(key);
+      if (o.visibility === "visible" && (!seen || Date.parse(d.received_at) < Date.parse(seen))) out.set(key, d.received_at);
+    }
+  }
+  return out;
 }

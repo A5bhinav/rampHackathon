@@ -6,7 +6,7 @@ import { CoreError, core } from "@/lib/core";
 import { date, when } from "@/lib/format";
 import { lanePoints, phone, sourceLabel } from "@/lib/lineage";
 import { statusLabel, statusTone } from "@/lib/risk";
-import { hiddenLabel, kindLabel, numberKinds, type NumberKind } from "@/lib/vendor-ledger";
+import { hiddenLabel, kindLabel, laneDates, numberKinds, type NumberKind } from "@/lib/vendor-ledger";
 
 // A vendor's history in the Trust Ledger (spec 0104): the rule as of now, the first-seen chart, every
 // number with the ledger's reasons, and the documents with the text each number was read from. Every
@@ -18,7 +18,7 @@ export default async function VendorLedgerPage({ params }: { params: Promise<{ d
     throw e;
   });
   const { risk, rule } = v;
-  const chart = lanePoints(rule);
+  const chart = lanePoints(rule, laneDates(v.documents, rule.cutoff));  // each dot at its own source's date (D7)
 
   return (
     <main>

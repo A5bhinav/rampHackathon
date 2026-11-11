@@ -45,9 +45,10 @@ export function sourceLabel(source: string): string {
   return SOURCES[source] ?? source.replaceAll("_", " ");
 }
 
-// The lineage chart (spec 0041): one dot per candidate per source type at its first sighting,
-// on a time axis from the January before the earliest sighting to just past the cutoff. Per-
-// sighting dots wait for the ledger's lineage endpoint (spec 0041, Q4).
+// The lineage chart (spec 0041): one dot per candidate per source type, on a time axis from the
+// January before the earliest sighting to just past the cutoff. A dot sits at the date `dates` gives
+// for that number and lane (the vendor page's per-source dates, spec 0104 D7), else at the number's
+// overall first-seen date (the case page: the selection has no per-source dates, spec 0104 Q224).
 const LANE_ORDER: string[] = ["contract", "vendor_portal", "listing", "email", "paper_mail"];
 const LANE_NOTE: Record<string, string> = { email: "counts once", on_file: "never counts" };
 
@@ -63,11 +64,19 @@ export type LaneChart = {
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-export function lanePoints(selection: RuleRun | null): LaneChart | null {
+export const laneKey = (e164: string, lane: string) => `${e164} ${lane}`;
+const DRAW = { refused: 0, alternate: 1, pick: 2 } as const;
+
+export function lanePoints(selection: RuleRun | null, dates?: Map<string, string>): LaneChart | null {
   if (!selection || selection.candidates.length === 0) return null;
   const pickId = split(selection).pick?.contact_point_id;
   const cutoff = Date.parse(selection.cutoff);
-  const seen = selection.candidates.map((c) => Date.parse(c.first_seen_at)).filter(Number.isFinite);
+  const dots = selection.candidates.flatMap((c) => {
+    const kind: LanePoint["kind"] = c.contact_point_id === pickId ? "pick" : c.eligible ? "alternate" : "refused";
+    return [...c.source_types, ...(c.on_file ? ["on_file"] : [])]
+      .map((lane) => ({ lane, e164: c.e164, kind, at: dates?.get(laneKey(c.e164, lane)) ?? c.first_seen_at }));
+  }).sort((a, b) => DRAW[a.kind] - DRAW[b.kind]);  // drawn in this order: on a shared spot the chosen dot shows
+  const seen = [...selection.candidates.map((c) => c.first_seen_at), ...dots.map((d) => d.at)].map(Date.parse).filter(Number.isFinite);
   const firstYear = new Date(Math.min(cutoff, ...seen)).getUTCFullYear();
   const start = Date.UTC(firstYear, 0, 1);
   const end = cutoff + Math.max((cutoff - start) * 0.025, 21 * DAY_MS);  // a sliver past the request
@@ -80,11 +89,7 @@ export function lanePoints(selection: RuleRun | null): LaneChart | null {
     key, label: key === "on_file" ? "Vendor master" : key === "contract" ? "Contract" : cap(sourceLabel(key)), note: LANE_NOTE[key],
   }));
 
-  const points = selection.candidates.flatMap((c) => {
-    const kind: LanePoint["kind"] = c.contact_point_id === pickId ? "pick" : c.eligible ? "alternate" : "refused";
-    const at = pct(Date.parse(c.first_seen_at));
-    return [...c.source_types, ...(c.on_file ? ["on_file"] : [])].map((lane) => ({ lane, e164: c.e164, kind, pct: at, at: c.first_seen_at }));
-  });
+  const points = dots.map(({ lane, e164, kind, at }) => ({ lane, e164, kind, pct: pct(Date.parse(at)), at }));
 
   const ticks: LaneChart["ticks"] = [];
   for (let y = firstYear; Date.UTC(y, 0, 1) <= end; y++) ticks.push({ label: String(y), pct: pct(Date.UTC(y, 0, 1)) });
