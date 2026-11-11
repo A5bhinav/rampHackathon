@@ -523,7 +523,9 @@ def _pieces(text: str, also_mask: Iterable[str] = ()) -> tuple[list[tuple[int, i
     of it. A remaining piece is an `account` when it repeats a found account or its nearest label is an
     account label, else `other` when it is a phone extension, else a `routing` number, else `other`.
     The kept phones are the keep-decision: a phone the ledger's matcher finds on its line (see _phones)
-    that does not repeat a found account or one in `also_mask`."""
+    that does not repeat a found account or one in `also_mask`, and whose national digits do not sit
+    inside one either (else the ledger would hold most of that account, and with the last four the
+    email's row keeps, all of it: final review finding I3)."""
     accounts = _accounts(text)
     secrets = {d for _, _, d in accounts} | {_ascii(a) for a in also_mask}
     secrets = {d for d in secrets if len(d) >= 5}   # four digits are the last four ADR-8 keeps anyway
@@ -535,8 +537,13 @@ def _pieces(text: str, also_mask: Iterable[str] = ()) -> tuple[list[tuple[int, i
         digits = _ascii(span)
         return any(digits[i:i + n] in secrets for n in lengths for i in range(len(digits) - n + 1))
 
+    def inside_an_account(e164: str) -> bool:
+        """Whether the phone's national digits are part of a found account (the account is longer)."""
+        national = phonenumbers.national_significant_number(phonenumbers.parse(e164))
+        return any(national in d for d in secrets)
+
     phones, extensions = _phones(text)
-    kept = [(s, e, e164) for s, e, e164 in phones if not repeats_an_account(text[s:e])]
+    kept = [(s, e, e164) for s, e, e164 in phones if not repeats_an_account(text[s:e]) and not inside_an_account(e164)]
     taken = bytearray(len(text))
     for s, e, _ in accounts + kept:
         taken[s:e] = b"\x01" * (e - s)

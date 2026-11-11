@@ -320,6 +320,32 @@ def test_a_phone_that_repeats_a_found_account_is_not_kept(text):
     assert ledger_text(text) == "" and find_routing(text) == []
 
 
+@pytest.mark.parametrize("text", [
+    "Account: 987654321098\nCall 765-432-1098",                                    # the review's inputs (I3)
+    "Account: 987654321098 / Call 765-432-1098",
+    "Routing 026009593 Account 4155550199123\nCall us at (415) 555-0199",
+    "Routing 026009593 Account 4155550199123 / Call us at (415) 555-0199",
+    "Account: 1 765 432 1098 55\nCall +1 (765) 432-1098",                           # grouped, with the country code
+    "Account 0007783110245\nCall 778-311-0245",                                    # a repeat without its leading zeros
+])
+def test_a_phone_inside_a_found_account_is_not_kept(text):
+    """The partial-account residual (final review I3): a phone whose national digits sit inside a found
+    account would put most of the account in the append-only ledger, and with the row's last four all of it."""
+    assert ledger_text(text) == ""
+    assert not any(numerics(quote) for quote, _ in stored(text))
+
+
+def test_a_phone_inside_an_account_found_in_another_field_is_not_kept():
+    assert ledger_text("Call 765-432-1098", also_mask=["987654321098"]) == ""
+    assert ledger_text("Call 765-432-1098", also_mask=["0007654321098"]) == ""
+
+
+def test_a_phone_beside_an_account_it_is_not_part_of_is_kept():
+    # The control: the new rule must not drop a phone that only sits beside an account.
+    assert ledger_text("Account: 987654321098\nCall 212-555-0199") == "Call (212) 555-0199"
+    assert ledger_text("Call 212-555-0199", also_mask=["987654321098"]) == "Call (212) 555-0199"
+
+
 def test_accounts_found_in_another_field_are_not_kept():
     # Task 8 may pass the body's accounts when it builds the subject's ledger text.
     assert ledger_text("Re: call 7783110245", also_mask=["7783110245"]) == ""
