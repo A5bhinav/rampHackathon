@@ -22,8 +22,10 @@ None.
   Empty by default, which changes nothing.
 - **D2. Where.** `list_vendors_updated_since`, with a `since`, also returns each watched vendor the
   list hasn't already got, read by id, so the core's poll syncs it. A full read (no `since`) already
-  has every vendor. A watched id Ramp doesn't know is skipped with a warning, so a typo can't stop
-  the poll, and can be seen in the log.
+  has every vendor. A watched id that can't be read, for any Ramp error, is skipped with a warning,
+  so a typo can't stop the poll, and can be seen in the log. The next poll reads it again. A vendor
+  named by a bank event is different: its read still fails the poll, because the poll's watermark
+  would otherwise move past the event and lose it.
 - **D3. Running it.** With a watch list, set `DIALBACK_POLL_SECONDS=5` and leave
   `DIALBACK_FULL_SWEEP_SECONDS` at its daily default: jobs run one after another, so a sweep would
   hold the poll up. The cost, accepted for a demo only: a pending change on a vendor not on the
@@ -37,7 +39,9 @@ None.
 - [x] The setting parses commas and spaces, and defaults to empty.
 - [x] With a `since`, a watched vendor is listed though nothing says it changed; once, if it is
       already listed; a full read adds no extra read; with no watch list nothing extra is read.
-- [x] A watched id Ramp doesn't know is skipped, with a warning naming it.
+- [x] A watched id that Ramp doesn't know, or can't answer for (400, 403, 422, 500), is skipped, with
+      a warning naming it, and the other vendors are still listed. A vendor named by a bank event
+      that can't be read still fails the poll.
 - [x] The core's poll opens a case for a pending change on a watched vendor, and doesn't without
       the watch list.
 
@@ -45,7 +49,7 @@ None.
 
 | Acceptance item | Test |
 |---|---|
-| 1-3 | `apps/core/tests/test_ramp_sandbox_shapes.py::test_watch_*` |
+| 1-3 | `apps/core/tests/test_ramp_sandbox_shapes.py::test_watch_*`, `::test_a_bank_event_vendor_*` |
 | 4 | `apps/core/tests/test_pending_bank_change.py::test_the_poll_*` |
 
 ## Commands

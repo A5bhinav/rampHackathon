@@ -133,8 +133,8 @@ class RampSandboxAdapter(RampHttpAdapter):
             listed.add(vendor_id)
             try:
                 vendors.append(vendor_from(await self._request("GET", f"{API}/vendors/{vendor_id}")))
-            except RampNotFound:
-                log.warning("RAMP_SANDBOX_WATCH_VENDORS names %s, which Ramp doesn't have", vendor_id)
+            except RampError as exc:  # the next poll reads it again; the bank events above can't be skipped like this
+                log.warning("RAMP_SANDBOX_WATCH_VENDORS names %s, which couldn't be read: %s", vendor_id, exc)
         return vendors
 
     async def list_vendor_accounts(self, vendor_id: str) -> list[RampAccount]:

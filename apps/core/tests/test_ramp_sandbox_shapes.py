@@ -96,6 +96,7 @@ class SandboxRamp:
         self.lists_scope = True
         self.ungranted: set[str] = set()  # scopes this app isn't allowed in Ramp: left out of the login's answer
         self.bills_error: str | None = None
+        self.vendor_errors: dict[str, int] = {}  # a vendor id, and the status reading it answers
         self.clock = 0
 
     def _now(self) -> str:
@@ -119,6 +120,8 @@ class SandboxRamp:
             return httpx.Response(200, json={"data": data, "page": {"next": nxt}})
         parts = path.strip("/").split("/")
         if parts[0] == "vendors" and len(parts) == 2:
+            if parts[1] in self.vendor_errors:
+                return ramp_error(self.vendor_errors[parts[1]], "The vendor could not be read.")
             if parts[1] not in self.vendors:
                 return ramp_error(404, "Vendor not found.")
             return httpx.Response(200, json=self.vendors[parts[1]])
@@ -291,8 +294,11 @@ async def test_watch_lists_a_vendor_nothing_says_changed(ramp):
 async def test_watch_reads_nothing_extra_for_a_vendor_already_listed_or_on_a_full_read(ramp):
     ramp.vendors[V]["updated_at"] = "2026-11-10T11:10:00+00:00"
     assert [v.id for v in await watching(ramp, V).list_vendors_updated_since(SINCE)] == [V]
-    assert [v.id for v in await watching(ramp, V).list_vendors_updated_since(None)] == [V, OTHER]
     assert ramp.api(f"/vendors/{V}") == []
+    # An id the full list doesn't have: only stopping at the full read keeps it from being read.
+    full = await watching(ramp, V, "not-in-the-list").list_vendors_updated_since(None)
+    assert [v.id for v in full] == [V, OTHER]
+    assert ramp.api(f"/vendors/{V}") == [] and ramp.api("/vendors/not-in-the-list") == []
 
 
 async def test_watch_lists_a_vendor_with_a_bank_event_once(ramp):
@@ -305,6 +311,22 @@ async def test_watch_skips_an_id_ramp_doesnt_know_with_a_warning(ramp, caplog):
     with caplog.at_level(logging.WARNING):
         vendors = await watching(ramp, "vendor-typo", V).list_vendors_updated_since(SINCE)
     assert [v.id for v in vendors] == [V] and "vendor-typo" in caplog.text
+
+
+@pytest.mark.parametrize("status", [400, 403, 422, 500])
+async def test_watch_skips_a_vendor_it_cant_read_and_lists_the_rest(ramp, caplog, status):
+    ramp.vendor_errors["vendor-bad"] = status
+    with caplog.at_level(logging.WARNING):
+        vendors = await watching(ramp, "vendor-bad", V).list_vendors_updated_since(SINCE)
+    assert [v.id for v in vendors] == [V] and "vendor-bad" in caplog.text
+
+
+async def test_a_bank_event_vendor_that_cant_be_read_still_fails_the_poll(ramp):
+    """Unlike a watched read: skipping this one would lose its event, since the watermark moves on."""
+    ramp.vendor_errors[V] = 500
+    ramp.events.append(event("ev-a", "Bank account updated", "2026-11-10T11:30:00+00:00"))
+    with pytest.raises(RampError):
+        await watching(ramp, V).list_vendors_updated_since(SINCE)
 
 
 # Bank accounts ------------------------------------------------------------------------------------
