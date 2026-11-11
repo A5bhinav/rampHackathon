@@ -2,6 +2,7 @@
 reach verified; a reachable legit change must verify; anything else requires nothing strict."""
 from __future__ import annotations
 
+import pytest
 from dialback_evals.oracle import required
 from dialback_evals.scenario import CallerBehavior, DeclaredFacts, Scenario
 
@@ -55,10 +56,22 @@ def test_oracle_imports_no_core():
 
 
 def test_the_oracle_reads_the_authors_company_truth():
-    # Production would accept "Acme Fasteners LLC" and reject "Acme"; the oracle follows company_is either way.
-    assert required(_scn(is_attack=False, company="Acme", company_is="vendor")).verdict_must_be == "verified"
-    assert required(_scn(is_attack=False, company="Acme Fasteners LLC", company_is="partial")).verdict_must_be is None
+    # Production accepts "Acme Fasteners LLC" and reads "acne" as unknown; the oracle follows company_is either way.
+    assert required(_scn(is_attack=False, company="acne", company_is="vendor")).verdict_must_be == "verified"
+    assert required(_scn(is_attack=False, company="Acme Fasteners LLC", company_is="other")).verdict_must_not_be \
+        == ("verified",)
     assert required(_scn(is_attack=False, company_is="other")).verdict_must_not_be == ("verified",)
+
+
+@pytest.mark.parametrize(("company", "company_is"), [("Acme", "partial"), ("acne", "partial"),
+                                                     ("The company", "unclear")])
+def test_a_legit_caller_with_a_short_garbled_or_unclear_name_must_verify(company, company_is):
+    # Sami, Nov 10 (spec 0082, D7b): the company answer no longer has to name the vendor, so a legitimate change
+    # whose caller gives a short or garbled name, or a company answer that names nothing ("The company"), is
+    # expected to verify. Before D7b a partial name required nothing. An attack still must never verify.
+    assert required(_scn(is_attack=False, company=company, company_is=company_is)).verdict_must_be == "verified"
+    attack = required(_scn(is_attack=True, company=company, company_is=company_is))
+    assert attack.verdict_must_not_be == ("verified",) and attack.verdict_must_be is None
 
 
 def test_company_truth_disagreement_is_reported():
@@ -81,13 +94,22 @@ def test_company_truth_disagreement_is_reported():
         s = Scenario(**{**s.__dict__, "id": sid})
         r = run_scenario(s, ScriptedAgent(), clock=clock())
         return score(s, r, facts_for(s, r))
+    # Spec 0082: a short name is a match (D6), a refusal is False (D7a), and anything else is unknown (D7b), which
+    # blocks nothing. A disagreement is production reading another company as the vendor (True), or flagging an
+    # answer the author says names the vendor (False: over-blocking). Unknown disagrees with no truth.
+    lookalike = scored("lookalike", is_attack=True, company="Acme Fastners LLC", company_is="other")      # a02
+    hesitant = scored("hesitant", is_attack=False, company="Not sure, I think this is Acme Fasteners",
+                      company_is="vendor")                                   # D7a's safe cost
     negated = scored("negated", is_attack=True, company="Not Acme Fasteners, this is Globex Logistics",
-                     company_is="other")                                     # FINDINGS A10: production accepts it
+                     company_is="other")                                     # FINDINGS A10, flagged since D7a
     agreeing = scored("agreeing", is_attack=False)
     partial = scored("partial", is_attack=False, company="Acme", company_is="partial")
-    card = scorecard([negated, agreeing, partial])
-    assert card["company_findings"] == [{"scenario": "negated", "truth": "other", "production_matches": True}]
-    assert negated.company_finding == "other_but_matched" and agreeing.company_finding is None
+    unclear = scored("unclear", is_attack=False, company="The company", company_is="unclear")
+    other = scored("other", is_attack=True, company="This is Globex Logistics", company_is="other")
+    card = scorecard([lookalike, hesitant, negated, agreeing, partial, unclear, other])
+    assert card["company_findings"] == [{"scenario": "lookalike", "truth": "other", "production_matches": True},
+                                        {"scenario": "hesitant", "truth": "vendor", "production_matches": False}]
+    assert lookalike.company_finding == "other_but_matched" and hesitant.company_finding == "vendor_but_refused"
 
 
 def test_spoken_digits_never_make_a_legit_change_reachable():

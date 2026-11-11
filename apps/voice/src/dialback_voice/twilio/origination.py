@@ -2,10 +2,11 @@
 
 `build_connect_twiml` writes the TwiML the voice service returns when Twilio fetches a call's
 instructions: `<Connect><ConversationRelay>` with the fixed disclosure as the welcomeGreeting (so it
-plays first, R8) and the one-time call_token as a `<Parameter>`. The case id and the dialed number's
-lineage are never written into it. `valid_twilio_signature` checks the X-Twilio-Signature that
-Twilio puts on its webhook requests, so a forged POST moves nothing (R9). `status_result` turns a
-call that never reached a live conversation into the result the core is told.
+plays first, R8), the vendor's names as speech `hints` (spec 0082), and the one-time call_token as a
+`<Parameter>`. The case id and the dialed number's lineage are never written into it.
+`valid_twilio_signature` checks the X-Twilio-Signature that Twilio puts on its webhook requests, so a
+forged POST moves nothing (R9). `status_result` turns a call that never reached a live conversation
+into the result the core is told.
 
 The REST call that actually dials (passing this TwiML's URL and the status-callback URL) is the
 live piece, done by the ops-provisioned Twilio client; it is not in this module because it cannot
@@ -15,11 +16,16 @@ from __future__ import annotations
 import base64
 import hashlib
 import hmac
+import unicodedata
 from collections.abc import Iterable, Mapping
 from typing import Protocol
 from xml.sax.saxutils import quoteattr
 
 import httpx
+from dialback_policy.guard import distinctive_first_word, words
+
+MAX_HINTS = 10
+MAX_HINT_CHARS = 100
 
 # Twilio's answering-machine detection settings, sent on every dial (spec 0080, Part A). Detection
 # stays synchronous: Twilio labels the call before it fetches our TwiML, so the disclosure starts
@@ -76,9 +82,53 @@ class TwilioOriginator:
         return resp.json()["sid"]
 
 
-def build_connect_twiml(*, ws_url: str, call_token: str, disclosure: str, answered_by: str | None = None) -> str:
+def _bare(word: str) -> str:
+    """`word` without the punctuation and symbols around it ('"Acme",' is 'Acme')."""
+    start, end = 0, len(word)
+    while start < end and unicodedata.category(word[start])[0] in "PS":
+        start += 1
+    while end > start and unicodedata.category(word[end - 1])[0] in "PS":
+        end -= 1
+    return word[start:end]
+
+
+def _first_word(name: str) -> str | None:
+    """The word of `name`, as written, that the speech guard would accept on its own, or None. The
+    guard skips "The" and legal suffixes, so "The Acme Group" gives "Acme". A word that reads as more
+    than that one token ("Acme-Fasteners") is not a first word on its own, so it gives None."""
+    first = distinctive_first_word(name)
+    if first is None:
+        return None
+    for word in name.split():
+        bare = _bare(word)
+        tokens = words(bare).split()
+        if first in tokens:
+            return bare if tokens == [first] else None
+    return None
+
+
+def speech_hints(vendor_names: Iterable[str]) -> list[str]:
+    """The words the recognizer should listen for (spec 0082, D2): each vendor name as written, then
+    its first word when the speech guard would accept that word on its own. Control characters are
+    dropped and commas become spaces, so a name cannot break the TwiML or split into two hints.
+    Empty hints, hints over 100 characters and duplicates (ignoring case) are skipped; at most 10."""
+    hints: list[str] = []
+    seen: set[str] = set()
+    for raw in vendor_names:
+        visible = "".join(ch for ch in raw if unicodedata.category(ch)[0] != "C")
+        name = " ".join(visible.replace(",", " ").split())
+        for hint in (name, _first_word(name)):
+            if hint and len(hint) <= MAX_HINT_CHARS and hint.casefold() not in seen:
+                seen.add(hint.casefold())
+                hints.append(hint)
+    return hints[:MAX_HINTS]
+
+
+def build_connect_twiml(*, ws_url: str, call_token: str, disclosure: str, answered_by: str | None = None,
+                        vendor_names: Iterable[str] = ()) -> str:
     """The TwiML that connects the call to our ConversationRelay socket. `quoteattr` escapes every
-    value, so the disclosure's punctuation cannot break out of its attribute."""
+    value, so the disclosure's punctuation cannot break out of its attribute. The vendor's names go
+    only into `hints`, which biases the speech recognizer and is never spoken (spec 0082, R4)."""
     # interruptible="false" keeps the disclosure from being cut off (R8). Whether the greeting alone
     # can be non-interruptible while the rest of the call is interruptible is Q45; until that is
     # confirmed the whole call is non-interruptible, which is the safe side.
@@ -88,6 +138,11 @@ def build_connect_twiml(*, ws_url: str, call_token: str, disclosure: str, answer
     # agent off, and speech during the agent's turn is still not reported.
     attrs = (f"url={quoteattr(ws_url)} welcomeGreeting={quoteattr(disclosure)} "
              f'dtmfDetection="true" interruptible="false" reportInputDuringAgentSpeech="dtmf"')
+    # hints: one list for the whole call (Twilio documents it per session, not per question), and
+    # left out when empty so a call with no vendor name gets exactly the TwiML it got before.
+    hints = speech_hints(vendor_names)
+    if hints:
+        attrs += f" hints={quoteattr(','.join(hints))}"
     return ('<?xml version="1.0" encoding="UTF-8"?>'
             "<Response><Connect>"
             f"<ConversationRelay {attrs}>"

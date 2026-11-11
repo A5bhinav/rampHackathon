@@ -349,8 +349,8 @@ async def test_the_case_shows_its_calls_answers_and_checks(world):
     assert "transcript" in script["note"]
 
     d = detail["decision"]
-    assert [c["status"] for c in d["checklist"]] == ["passed"] * 12
-    assert d["checklist"][7] == {"id": "V08_digits_match", "sentence": "The digits the person gave match the new account.",
+    assert [c["status"] for c in d["checklist"]] == ["passed"] * 11, "11 conditions since V05 was retired (spec 0082, D7b)"
+    assert d["checklist"][6] == {"id": "V08_digits_match", "sentence": "The digits the person gave match the new account.",
                                  "status": "passed"}
     assert {f["block"] for f in d["fired"]} == {"verified"} and "approver" in d["effect"]
 

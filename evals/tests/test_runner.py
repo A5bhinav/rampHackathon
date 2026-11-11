@@ -67,14 +67,18 @@ def test_dialed_out_follows_the_scenario_direction():
 
 
 def test_company_match_is_productions_rule():
-    # Production compares word sets after dropping legal suffixes (dialback_core.company): saying the
-    # whole name with a suffix matches, a part of it or a misspelling does not (review fix F2).
+    # The lab reads production's company check (dialback_core.company, review fix F2), as spec 0082 left it: the
+    # whole name with a suffix matches, and so does a distinctive first word (D6), even in a misspelled look-alike
+    # (FINDINGS A28); a refusal word is False (D7a); another company or a garbled name is unknown (D7b).
     def matched(said: str):
         s = dataclasses.replace(_legit(), caller=dataclasses.replace(_legit().caller, company=said))
         return facts_for(s, run_scenario(s, ScriptedAgent(), clock=_clock())).company_matches
     assert matched("Acme Fasteners LLC") is True
-    assert matched("Acme") is False
-    assert matched("Acme Fastners LLC") is False
+    assert matched("Acme") is True
+    assert matched("Acme Fastners LLC") is True
+    assert matched("Not Acme Fasteners, this is Globex Logistics") is False
+    assert matched("This is Globex Logistics") is None
+    assert matched("acne") is None
 
 
 def test_last_four_result_is_productions_comparison():

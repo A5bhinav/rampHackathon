@@ -319,7 +319,8 @@ def create_app(*, store: CallStore, internal_api_token: bytes, agent_version: st
             disclosure = Script(dial.customer_name, dial.callback_number).disclosure()
             xml = build_connect_twiml(ws_url=f"{twilio.ws_base_url}/twilio/relay/{call_id}",
                                       call_token=token, disclosure=disclosure,
-                                      answered_by=_answered_by(params.get("AnsweredBy", "")))
+                                      answered_by=_answered_by(params.get("AnsweredBy", "")),
+                                      vendor_names=dial.vendor_names)
             return Response(content=xml, media_type="application/xml")
 
         @app.post("/twilio/status/{call_id}")

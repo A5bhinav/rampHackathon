@@ -39,7 +39,7 @@ def build(example: dict):
 
 
 def test_there_are_worked_examples_for_the_spec():
-    assert len(EXAMPLES) == 26, "23 examples, three of them in two variants"
+    assert len(EXAMPLES) == 27, "24 examples, three of them in two variants (22 is spec 0082, D7b)"
 
 
 @pytest.mark.parametrize("path", EXAMPLES, ids=lambda p: p.stem)
