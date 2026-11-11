@@ -6,7 +6,7 @@
 
 Nothing tests the step where document text becomes labeled sightings:
 
-- The fuzz lab (spec 0033) writes sightings directly, so it skips that step.
+- The fuzz lab (spec 0083) writes sightings directly, so it skips that step.
 - The corpus (spec 0020) has 20 scenarios in one layout, `Label: number`, one number per line. That
   is exactly what the keyword stub reads well.
 - FINDINGS D names a document generator as the first piece of red-teaming the reader, and A1, A2,
@@ -118,10 +118,10 @@ None.
        - the attacker's change-request email and follow-ups, with varied text.
      - **The check:**
        - relabel every change-context sighting ingestion produced as the vendor's, and the call
-         list must not change (spec 0033's I12, removal half only, so only labels ingestion
+         list must not change (spec 0083's I12, removal half only, so only labels ingestion
          actually produced count);
        - no number first seen in the change context is eligible (I1).
-     - **Showing it can fail:** today's rule fails it on the frozen A1 world, and spec 0033's
+     - **Showing it can fail:** today's rule fails it on the frozen A1 world, and spec 0083's
        context-blind rule passes it.
 6. **Gating the stub: known failures by pattern.** The stub breaks G3 and G4 by design. It labels
    any role word as the vendor's: "Customer main line" comes back as the vendor's main line (A19),
