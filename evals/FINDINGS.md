@@ -170,6 +170,13 @@ Specs: 0017 (voice slice lab), 0083 (generative selection pressure; 0033 before 
     - Calls nobody: 878 of 2000 (today 816, 0079 948, WG4 743). Honest over-block rows calling
       nobody: 13 of 61 (today 29). Lab checks: the label probe 0, `M_lookalike_helped` 0,
       `M_shared_id_helped` 271, as W4 (its eligibility is W4's).
+    - **An attacker who knows the rule undoes its gain (addendum 6, predicted before the run, and
+      the prediction held).** In K-warn, adding one weak label to the real number ("Fax: 0142" in
+      the change request itself, or a bank label in a separate email the day before) makes today's
+      rule call nobody, so WMG falls back to WG4 and calls the planted number. So WMG's 37-to-0 is an
+      artifact of the generated worlds, whose labels are random rather than chosen by an attacker.
+      It still costs more manual reviews (A1 with a planted number goes to a person, where WG4 calls
+      the real number).
 - **Open question:** whether such documents reach `select()` depends on how ingestion attaches
   documents to a vendor (`ledger.documents.vendor_id`), which nobody has traced.
 
