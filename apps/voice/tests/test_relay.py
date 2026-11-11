@@ -36,13 +36,18 @@ class FakeWS:
     """A scripted ConversationRelay socket. `inbound` is the messages Twilio would send, in order;
     once they run out, receive_json raises WSClosed, standing in for a dropped call. An item
     `{"pause": seconds}` stands for the caller doing nothing for that long. `delivered_at` is the
-    monotonic time each message was handed over, and `sent_at` the time each line was sent."""
+    monotonic time each message was handed over, and `sent_at` the time each line was sent.
+    `sent` holds the spoken `text` tokens only; any other message the relay sends (the `end` of
+    spec 0094) goes to `control`, with its time in `control_at`. `log` is every send, in order."""
 
     def __init__(self, inbound: list) -> None:
         self._inbound = list(inbound)
         self._i = 0
         self.sent: list[dict] = []
         self.sent_at: list[float] = []
+        self.control: list[dict] = []
+        self.control_at: list[float] = []
+        self.log: list[tuple] = []
         self.closed = False
         self.delivered_at: list[float] = []
 
@@ -58,8 +63,14 @@ class FakeWS:
             await asyncio.sleep(msg["pause"])
 
     async def send_json(self, obj: dict) -> None:
-        self.sent.append(obj)
-        self.sent_at.append(time.monotonic())
+        if obj.get("type") == "text":
+            self.sent.append(obj)
+            self.sent_at.append(time.monotonic())
+            self.log.append(("text", obj.get("token")))
+        else:
+            self.control.append(obj)
+            self.control_at.append(time.monotonic())
+            self.log.append(("control", obj.get("type")))
 
     async def close(self) -> None:
         self.closed = True
@@ -737,3 +748,125 @@ def test_keys_after_the_digits_check_in_are_recorded_over_the_relay(make_ctx, cl
     sent = [m["token"] for m in ws.sent]
     assert DIGITS_CHECK_IN in sent and sent[-1] == ctx.script.close()
     assert r.result == "answers_recorded" and _by_value(r)["account_last4"] == ("4821", "keypad")
+
+
+# --- spec 0094: the closing line plays before the call ends -----------------------------------
+
+REFUSE = {"type": "prompt", "voicePrompt": "No, I'd rather not.", "last": True}   # ends at consent
+
+
+def _closing_relay(ctx, clock, inbound: list, *, on_end=None, estimate=None):
+    """A call that ends at consent with the refusal line, then whatever `inbound` holds after it."""
+    ws = FakeWS([_good_setup(), REFUSE, *inbound])
+    result = asyncio.run(run_relay(ctx, ScriptedAgent(), ws, verify=_verify, clock=clock(),
+                                   greeting=ctx.script.disclosure(), on_end=on_end,
+                                   estimate=estimate or _estimate(lead=0.4)))
+    return result, ws
+
+
+def test_end_tail_is_the_spec_value():  # D2
+    assert relay_module.END_TAIL_SECONDS == 0.5
+
+
+def test_the_closing_line_is_reported_then_played_then_ended(make_ctx, clock):  # G1, G2
+    ctx = make_ctx()
+    reported: list[tuple[str, float]] = []
+    ws = FakeWS([_good_setup(), REFUSE, {"pause": LONG}])
+
+    async def on_end(result) -> None:
+        reported.append((result.result, time.monotonic()))
+        ws.log.append(("report", result.result))
+
+    r = asyncio.run(run_relay(ctx, ScriptedAgent(), ws, verify=_verify, clock=clock(),
+                              greeting=ctx.script.disclosure(), on_end=on_end, estimate=_estimate(lead=0.4)))
+    assert r.result == "answers_recorded" and r.end.reason == "consent_refused"
+    assert ws.log[-3:] == [("text", ctx.script.consent_refused()), ("report", "answers_recorded"),
+                           ("control", "end")]
+    assert ws.control == [{"type": "end"}]
+    # The report went out as the line was sent, not after the wait; the end came at the estimate.
+    assert reported[0][1] - ws.sent_at[-1] < 0.2
+    assert _about(ws.control_at[0] - ws.sent_at[-1], 0.4)
+
+
+def test_end_follows_the_agent_stopping_or_the_estimate(make_ctx, clock):  # G3
+    on, off = _info("agentSpeaking", "on"), _info("agentSpeaking", "off")
+    # With an "on" then an "off" after the line, the end follows the "off" by the tail, long before
+    # the 3-second estimate.
+    _, ws = _closing_relay(make_ctx(), clock, [{"pause": 0.05}, on, {"pause": 0.2}, off, {"pause": 5.0}],
+                           estimate=_estimate(lead=3.0))
+    stopped = ws.delivered_at[-1]
+    assert ws.control == [{"type": "end"}]
+    assert _about(ws.control_at[0] - stopped, relay_module.END_TAIL_SECONDS)
+    # A lone "off", with no "on" since the line was sent, doesn't end it: the estimate does.
+    _, ws = _closing_relay(make_ctx(), clock, [{"pause": 0.05}, off, {"pause": 3.0}], estimate=_estimate(lead=0.6))
+    assert ws.control == [{"type": "end"}] and _about(ws.control_at[0] - ws.sent_at[-1], 0.6)
+    # With no speaker events at all, the end comes at the estimate.
+    _, ws = _closing_relay(make_ctx(), clock, [{"pause": 3.0}], estimate=_estimate(lead=0.6))
+    assert ws.control == [{"type": "end"}] and _about(ws.control_at[0] - ws.sent_at[-1], 0.6)
+
+
+def test_input_while_the_closing_line_plays_changes_nothing(make_ctx, clock):  # G4
+    quiet, _ = _closing_relay(make_ctx(), clock, [{"pause": 3.0}])
+    noisy, ws = _closing_relay(make_ctx(), clock, [{"pause": 0.05}, *_say("Wait, actually yes."), *_keys("4821#"),
+                                                   {"pause": 3.0}])
+    assert (noisy.result, noisy.end) == (quiet.result, quiet.end)
+    assert noisy.answers == quiet.answers and noisy.checks == quiet.checks
+    assert [(t.speaker, t.text) for t in noisy.transcript] == [(t.speaker, t.text) for t in quiet.transcript]
+    assert ws.sent[-1]["token"] == make_ctx().script.consent_refused()   # nothing more was said
+    assert ws.control == [{"type": "end"}]
+
+
+def test_a_drop_while_the_closing_line_plays_sends_no_end(make_ctx, clock):  # G5
+    started = time.monotonic()
+    r, ws = _closing_relay(make_ctx(), clock, [{"pause": 0.1}], estimate=_estimate(lead=5.0))
+    assert time.monotonic() - started < 2.0                  # the drop ended the wait, not the 5-second estimate
+    assert r.result == "answers_recorded" and ws.control == []
+
+
+def test_a_failed_report_still_plays_the_closing_line(make_ctx, clock):  # G6
+    import datetime as dt
+
+    from dialback_voice.app import CallDial, TwilioDeps, run_relay_call
+
+    dial = CallDial(case_id=CASE, attempt=ATTEMPT, number_e164=NUMBER, customer_name="Northwind Traders",
+                    callback_number="(415) 555-0100", vendor_names=("Acme Fasteners",))
+
+    class CoreDown(Exception):
+        pass
+
+    async def report(body: dict) -> None:
+        raise CoreDown("the core did not take the report")
+
+    deps = TwilioDeps(call_token_key=KEY, twilio_auth_token=b"auth", ws_base_url="wss://voice.example",
+                      public_base_url="https://voice.example", from_number="+14155550100", originator=None,
+                      lookup_call=lambda cid: dial if cid == CALL else None, report_ended=report,
+                      agent_for=ScriptedAgent, clock=lambda: dt.datetime(2026, 11, 1, 17, 0, tzinfo=dt.UTC))
+    on, off = _info("agentSpeaking", "on"), _info("agentSpeaking", "off")
+    ws = FakeWS([_good_setup(), REFUSE, {"pause": 0.05}, on, {"pause": 0.1}, off, {"pause": 5.0}])
+    with pytest.raises(CoreDown):
+        asyncio.run(run_relay_call(deps, CALL, ws))
+    assert ws.control == [{"type": "end"}]                   # the line still played, and the call still ended
+
+
+def test_no_closing_line_or_a_rejected_setup_sends_no_end(make_ctx, clock):  # G7
+    results: list = []
+
+    async def on_end(result) -> None:
+        results.append(result)
+
+    # A rejected setup: closed at once, reported, nothing spoken, no end.
+    ws = FakeWS([_setup("deadbeef"), {"pause": 5.0}])
+    started = time.monotonic()
+    r = asyncio.run(run_relay(make_ctx(), ScriptedAgent(), ws, verify=_verify, clock=clock(), on_end=on_end,
+                              estimate=_estimate(lead=5.0)))
+    assert time.monotonic() - started < 2.0
+    assert ws.closed is True and ws.sent == [] and ws.control == []
+    assert results == [r] and r.result == "failed"
+    # A call that ends with nothing to say (the caller hung up mid-call): no wait, no end.
+    results.clear()
+    ws = FakeWS([_good_setup(), *_say("Yes, that's fine.")])
+    started = time.monotonic()
+    r = asyncio.run(run_relay(make_ctx(), ScriptedAgent(), ws, verify=_verify, clock=clock(), on_end=on_end,
+                              estimate=_estimate(lead=5.0)))
+    assert time.monotonic() - started < 2.0
+    assert r.result == "failed" and r.end.reason == "dropped" and ws.control == [] and results == [r]
