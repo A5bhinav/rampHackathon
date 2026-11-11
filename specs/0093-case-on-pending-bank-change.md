@@ -31,7 +31,9 @@ None. The database gains one column (D2).
   pending and approved accounts share. A new active account is the approval of a pending one when
   the vendor has a mirror row that is `ramp_pending`, that a bank change recorded (Dialback saw it
   pending and opened a case), that Ramp no longer lists, and that has the same last four; each such
-  row matches one account. Then the active account is mirrored as current and nothing else is
+  row matches one account, and only in the sync that first finds it gone: that sync clears the
+  row's `ramp_pending`, approved or not, so a later account with the same last four is a new change
+  (a fraudster can choose the last four; found by review). Then the active account is mirrored as current and nothing else is
   written: the pending change's case carries on, and every case state but `released` keeps the
   vendor held. Anything else is a new change, as today: at worst a second verification, never a
   missed one. A pending account seen at a dataset's first import has no change, so its approval is

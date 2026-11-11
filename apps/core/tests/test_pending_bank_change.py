@@ -88,6 +88,23 @@ async def test_its_approval_is_not_a_second_change(world):
     assert (await mirror(world))["acct-a"] == (True, False), "the approved account is current"
 
 
+@pytest.mark.parametrize("outcome", ["approved", "rejected"])
+async def test_a_later_account_with_the_same_last_four_is_a_new_change(world, outcome):
+    # Found by review: the pending mark must be used up once, or a later account ending the same
+    # (a fraudster can choose the last four) would pass as "the approval", with no case and no hold.
+    await baseline(world)
+    world.fake.accounts[V].append(pending("acct-p", "4321"))
+    await sync(world)
+    kept = [a for a in world.fake.accounts[V] if a["id"] != "acct-p"]
+    world.fake.accounts[V] = kept + ([account("acct-a", "4321")] if outcome == "approved" else [])
+    assert await sync(world) == []
+    world.fake.accounts[V].append(account("acct-later", "4321"))
+    found = await sync(world)
+    assert [c.ramp_account_id for c in found] == ["acct-later"], "a later account is a new change"
+    assert (await changes(world))[-1] == "acct-later"
+    assert (await mirror(world))["acct-p"] == (False, False), "Ramp no longer lists it: used up"
+
+
 @pytest.mark.parametrize("case", ["other last four", "pending still listed", "pending seen before any change"])
 async def test_an_active_account_that_doesnt_follow_a_pending_change_is_a_change(world, case):
     if case == "pending seen before any change":

@@ -131,6 +131,11 @@ async def sync_vendor(pool: AsyncConnectionPool, ramp: RampPort, keys: Keys, dat
                 (dataset_id, vendor_id, a.id, a.routing_number, a.last4, fingerprint(keys, a), keys.fingerprint_key_version,
                  a.bank_name, a.account_type, (a.created_at or now) if baseline else now, now, a.is_active,
                  a.pending))).fetchone())["id"]
+        # Spec 0093, D3: a pending account Ramp no longer lists has been decided, approved or not. Its mark
+        # is used up here, so it matches only in this sync: a later account ending the same is a new change.
+        await conn.execute("update app.bank_accounts set ramp_pending = false "
+                           "where vendor_id = %s and ramp_pending and not (ramp_account_id = any(%s))",
+                           (vendor_id, list(listed)))
 
         for a in new_active:
             ramp_actor = actors.get(a.id)
