@@ -31,8 +31,8 @@ from .ramp.port import RampVendor
 log = logging.getLogger(__name__)
 
 POLICY_VERSION = "policy-v0"
-# Spec 0100, D2: five reads at about half a second each already exceed Ramp's ten requests a second
-# (the rate limiter holds them to it), and the ten database connections are shared with the API.
+# Spec 0100, D2: five reads at about half a second each are about 11 requests a second, near the rate
+# limiter's 15, and the ten database connections are shared with the API and the worker.
 SYNC_CONCURRENCY = 5
 BANK_CHANGE_EVENT = "VENDOR_BANK_ACCOUNT_UPDATED"  # confirm against Ramp's audit-log types
 
