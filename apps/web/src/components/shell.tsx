@@ -66,7 +66,7 @@ export async function Shell({ app, datasetId, children }: { app: AppKey; dataset
       </aside>
       <div className="main-col">
         <div className="utilbar">
-          <Crumbs datasetId={datasetId} />
+          <Crumbs datasetId={datasetId} app={app} />
           <AlertChip alerts={alerts} datasetId={datasetId} />
           {present.length ? (
             <details className="present">
