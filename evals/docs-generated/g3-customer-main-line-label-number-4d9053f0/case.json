@@ -1,0 +1,89 @@
+{
+  "name": "g3-customer-main-line-label-number-4d9053f0",
+  "patterns": [
+    "G3/customer_main_line/label_number",
+    "G4/customer_main_line/label_number"
+  ],
+  "why": "G3/customer_main_line/label_number: shrunk from doc-s0-00231, found by lab docs at seed 0 in 1000 documents",
+  "violations": [
+    {
+      "pattern": "G3/customer_main_line/label_number",
+      "number": "+12015550138",
+      "detail": "claim main, customer labeled main, vendor"
+    },
+    {
+      "pattern": "G4/customer_main_line/label_number",
+      "number": "+12015550138",
+      "detail": "claim main, customer labeled main, vendor"
+    }
+  ],
+  "plan": {
+    "type": "doc",
+    "id": "doc-s0-00231",
+    "kind": "change_request_email",
+    "author": "attacker",
+    "channel": "email",
+    "sender": "ar@acrne.example",
+    "thread": "t-doc-s0-00231",
+    "subject": "Updated banking details",
+    "received_at": "2026-06-30T16:00:00+00:00",
+    "filler": [],
+    "numbers": [
+      {
+        "e164": "+12015550138",
+        "owner": "customer",
+        "role": "main",
+        "party": "customer",
+        "phrasing": "customer_main_line",
+        "placement": "label_number",
+        "format": "paren",
+        "visibility": "visible",
+        "shares_line": false
+      }
+    ],
+    "quote": null
+  },
+  "documents": [
+    {
+      "id": "doc-s0-00231",
+      "kind": "change_request_email",
+      "custody": {
+        "channel": "email",
+        "received_at": "2026-06-30T16:00:00+00:00",
+        "sender": "ar@acrne.example",
+        "thread_id": "t-doc-s0-00231",
+        "subject": "Updated banking details",
+        "parent_document_id": null
+      },
+      "pages": [
+        {
+          "width": 612,
+          "height": 792,
+          "spans": [
+            {
+              "text": "Message",
+              "x": 72,
+              "y": 72,
+              "size": 10,
+              "color": "#000000"
+            },
+            {
+              "text": "Acme Fasteners",
+              "x": 72,
+              "y": 86,
+              "size": 10,
+              "color": "#000000"
+            },
+            {
+              "text": "Customer main line: (201) 555-0138",
+              "x": 72,
+              "y": 100,
+              "size": 10,
+              "color": "#000000"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

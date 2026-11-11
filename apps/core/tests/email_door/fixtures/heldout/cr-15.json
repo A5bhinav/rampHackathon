@@ -1,0 +1,8 @@
+{
+  "subject": "Cobalt Freight LLC: change of beneficiary account",
+  "sender": "treasury@cobalt-freight.example",
+  "text": "To whom it may concern,\n\nPlease process a change of beneficiary account for Cobalt Freight LLC (vendor number 11204).\nOld account ending 8888 to be closed. New account 000088889999 at routing 021000089.\nA signed authorization form is available on request.",
+  "label": "change_request",
+  "vendor": "cobalt",
+  "note": "Formal vendor-change language, valid routing; refers to close of the on-file account."
+}

@@ -90,7 +90,7 @@ async def rehearse(url: str) -> int:
         users = await accounts(url)
         seed = demo.load_seed(SEED)
         async with httpx.AsyncClient(base_url=MOCK_URL, timeout=15.0) as mock, httpx.AsyncClient(timeout=10.0) as http:
-            env = demo.DemoEnv(pool=pool, settings=settings, mock=mock, connector=RampConnector(settings, http), owner_url=url)
+            env = demo.DemoEnv(pool=pool, settings=settings, mock=mock, connector=RampConnector(settings, http, pool=pool), owner_url=url)
             code = await beats(env, seed, users)
         server.should_exit = True
         await serving

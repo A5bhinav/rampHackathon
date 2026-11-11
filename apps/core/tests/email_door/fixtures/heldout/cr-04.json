@@ -1,0 +1,8 @@
+{
+  "subject": "Wire instead of ACH",
+  "sender": "Ivan Petrov <ivan@petrov-welding.example>",
+  "text": "Hi, ACH has been bouncing at our old bank so I opened a new business checking at Chase.\nRouting 071000013, account 556 100 2987. Please pay there. Thanks, Ivan",
+  "label": "change_request",
+  "vendor": null,
+  "note": "New account because of bounces; space-grouped digits."
+}

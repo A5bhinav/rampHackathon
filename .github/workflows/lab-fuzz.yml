@@ -25,7 +25,7 @@ jobs:
       - name: Install the Python workspace
         run: uv sync --all-packages --locked
       - name: Lab checks that must stay green (L1 floor, oracle self-tests, coverage floor)
-        run: cd evals && uv run pytest -q -m "not selection_gate and not report_gate"
+        run: cd evals && uv run pytest -q -m "not selection_gate and not report_gate and not docs_gate"
       - name: Lab fuzz (frozen findings, then all 2000 worlds at seed 0, near misses reported, never gated)
         if: always()
         run: uv run lab fuzz --search archive --examples 2000 --seed 0 --out evals/corpus-generated

@@ -139,6 +139,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/datasets/{dataset_id}/mail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The mail Dialback received for this dataset, newest first (email door)
+         * @description One row per stored inbound email, newest first, at most 200. A row says what Dialback did
+         *     with the email (`outcome`), whether a reply went out (`reply`), the red flags it noticed,
+         *     and the vendor and case it led to, if any. The routing number and last four are shown when
+         *     the email gave a new account; a full account number never appears (ADR-8). The email body
+         *     is never returned.
+         */
+        get: operations["listMail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/datasets/{dataset_id}/vendors/{vendor_id}/bank-change": {
         parameters: {
             query?: never;
@@ -266,6 +290,184 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/people": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Everyone in the organisation, with their roles (admins only, spec 0095)
+         * @description Reads `app.admin_people()` as the signed-in user. Anyone without the admin role, a demo
+         *     account, or an admin whose access is off gets 403.
+         */
+        get: operations["listPeople"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/people/{user_id}/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Grant or take away one role (admins only)
+         * @description Calls `app.admin_set_role()`. Refused (409) when it changes nothing, when it would remove
+         *     the last admin, or when it grants admin to a demo account. Logged on the organisation chain.
+         */
+        post: operations["changeRole"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/people/{user_id}/ramp-link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Set or clear which Ramp user this person is (admins only)
+         * @description Calls `app.admin_set_ramp_link()`. An admin cannot change their own link, and a Ramp user
+         *     can be linked to one person only (R5). Who entered a change is fixed when the change is
+         *     detected, so a new link never changes an open case.
+         */
+        post: operations["changeRampLink"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/people/{user_id}/access": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Turn a person's access off or back on (admins only)
+         * @description Calls `app.admin_set_access()`. A person whose access is off gets 403 on every request;
+         *     their roles are kept. An admin cannot turn off their own access or the last admin's.
+         */
+        post: operations["changeAccess"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The organisation chain of admin actions, newest first, and whether it verifies (admins only) */
+        get: operations["getAdminLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/demo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The current demo dataset, its cases, chain, open alerts and chaos switch (admins only) */
+        get: operations["getDemoState"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/demo/reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Make a fresh demo dataset; with a clerk chosen, also load the Trust Ledger and Acme's request email (admins only)
+         * @description Runs `demo prepare` when `link_clerk_user_id` is given, else `demo reset` (spec 0011,
+         *     spec 0077). The team phone is never accepted here; it stays a shell option.
+         */
+        post: operations["resetDemo"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/demo/chaos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Turn spec 0008's chaos mode on or off for the current demo (admins only) */
+        post: operations["setDemoChaos"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/demo/tamper": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Rewrite one row of the current demo's evidence chain, to show the chain catching it (admins only)
+         * @description Acts only on the current demo dataset. Needs the typed confirmation `break the chain`;
+         *     it cannot be undone.
+         */
+        post: operations["tamperDemo"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -274,8 +476,11 @@ export interface components {
         Uuid: string;
         /** Format: date-time */
         Timestamp: string;
-        /** @enum {string} */
-        Role: "clerk" | "approver" | "auditor";
+        /**
+         * @description An admin also holds every power of the other three roles; R5 still applies (spec 0095).
+         * @enum {string}
+         */
+        Role: "clerk" | "approver" | "auditor" | "admin";
         Me: {
             user_id: components["schemas"]["Uuid"];
             display_name: string;
@@ -358,6 +563,47 @@ export interface components {
             routing_number: string;
             last4: string;
         };
+        /**
+         * @description What Dialback did with one inbound email. `pending` until it has been handled. `ramp_case_open`: the vendor's unfinished case has a change that did not come by email, so the email changed nothing (its `case_id` names that case).
+         * @enum {string}
+         */
+        MailOutcome: "pending" | "not_flagged" | "door_off" | "not_demo_vendor" | "no_vendor" | "several_vendors" | "no_routing_number" | "no_account_number" | "same_as_on_file" | "repeat_request" | "case_opened" | "joined_case" | "ramp_case_open" | "failed";
+        /**
+         * @description Whether the reply to the sender went out, and if not, why.
+         * @enum {string}
+         */
+        ReplyStatus: "not_flagged" | "sent" | "not_configured" | "unauthenticated" | "suppressed" | "rate_limited" | "failed";
+        /**
+         * @description A reason an email looks like fraud. Decided by code, never by a model.
+         * @enum {string}
+         */
+        RedFlag: "lookalike_domain" | "sender_off_domain" | "reply_to_differs" | "sender_unauthenticated" | "unknown_phone";
+        /** @description The email that started a case. Never its body. */
+        EmailInfo: {
+            sender: string;
+            subject: string | null;
+            received_at: components["schemas"]["Timestamp"];
+            red_flags: components["schemas"]["RedFlag"][];
+        };
+        /** @description One inbound email and what Dialback did with it. No body field, ever. */
+        MailItem: {
+            id: number;
+            received_at: components["schemas"]["Timestamp"];
+            sender: string;
+            subject: string | null;
+            /** @description Whether the email asks to change bank details. */
+            flagged: boolean;
+            outcome: components["schemas"]["MailOutcome"];
+            reply: components["schemas"]["ReplyStatus"];
+            red_flags: components["schemas"]["RedFlag"][];
+            vendor: {
+                id: components["schemas"]["Uuid"];
+                legal_name: string;
+            } | null;
+            case_id: components["schemas"]["Uuid"] | null;
+            routing_number: string | null;
+            last4: string | null;
+        };
         ChangeInfo: {
             /** @enum {string} */
             detected_via: "webhook" | "poll" | "email";
@@ -366,6 +612,8 @@ export interface components {
             new_account: components["schemas"]["AccountRef"];
             changed_by: components["schemas"]["Person"] | null;
             unknown_changer: boolean;
+            /** @description For a case an email opened (`detected_via` email), the email; otherwise absent or null. Optional. */
+            email?: components["schemas"]["EmailInfo"] | null;
         };
         HoldInfo: {
             status: components["schemas"]["HoldStatus"];
@@ -512,6 +760,8 @@ export interface components {
             can_approve: boolean;
             can_reject: boolean;
             can_review: boolean;
+            /** @description Whether the signed-in user may dismiss this case. Optional. */
+            can_dismiss?: boolean;
             /** @description Why an action is not offered, one templated sentence each. */
             reasons: string[];
         };
@@ -616,6 +866,93 @@ export interface components {
         BankChangeResult: {
             vendor_id: components["schemas"]["Uuid"];
             account: components["schemas"]["AccountRef"];
+        };
+        /** @description One person as an admin sees them (spec 0095). */
+        PersonAdminView: {
+            id: components["schemas"]["Uuid"];
+            display_name: string;
+            email: string | null;
+            roles: components["schemas"]["Role"][];
+            /** @description The Ramp user this person is; null when not linked. */
+            ramp_user_id: string | null;
+            /** @description A shared demo account (spec 0034); acts on demo data only and never holds admin. */
+            demo_only: boolean;
+            access_enabled: boolean;
+            last_sign_in_at: components["schemas"]["Timestamp"] | null;
+        };
+        People: {
+            people: components["schemas"]["PersonAdminView"][];
+        };
+        RoleChange: {
+            role: components["schemas"]["Role"];
+            /** @description true grants the role */
+            grant: boolean;
+            reason: string;
+        };
+        RampLinkChange: {
+            /** @description null clears the link; blank is refused. */
+            ramp_user_id: string | null;
+            reason: string;
+        };
+        AccessChange: {
+            enabled: boolean;
+            reason: string;
+        };
+        AdminLogEntry: {
+            seq: number;
+            type: components["schemas"]["AdminEventType"];
+            occurred_at: components["schemas"]["Timestamp"];
+            /** @description null when the team granted it with scripts/db/add_user.py. */
+            actor: components["schemas"]["Person"] | null;
+            subject: components["schemas"]["Person"] | null;
+            detail: Record<string, never>;
+            reason: string;
+        };
+        AdminLog: {
+            chain: components["schemas"]["ChainStatus"];
+            events: components["schemas"]["AdminLogEntry"][];
+        };
+        /** @description What `dialback-core demo status` prints, for the current demo dataset. */
+        DemoState: {
+            dataset: {
+                id: components["schemas"]["Uuid"];
+                label: string;
+                created_at: components["schemas"]["Timestamp"];
+            };
+            cases: {
+                id: components["schemas"]["Uuid"];
+                vendor: string;
+                state: components["schemas"]["CaseState"];
+                outcome: components["schemas"]["Outcome"] | null;
+            }[];
+            chain: {
+                ok: boolean;
+                checked: number;
+                first_bad_seq: number | null;
+                detail: string;
+            };
+            alerts: {
+                kind: string;
+                severity: string;
+                message: string;
+            }[];
+            chaos: boolean;
+            /** @description What the last reset warned about, for example a seeded user left unlinked (each release then needs two approvers). Empty otherwise. */
+            warnings: string[];
+        };
+        DemoResetRequest: {
+            /** @description The account the seed's clerk becomes; with one, the Trust Ledger and Acme's request email load too. */
+            link_clerk_user_id?: components["schemas"]["Uuid"] | null;
+            reason: string;
+        };
+        DemoChaosRequest: {
+            enabled: boolean;
+            reason: string;
+        };
+        DemoTamperRequest: {
+            /** @constant */
+            confirm: "break the chain";
+            reason: string;
         };
         Error: {
             /** @enum {string} */
@@ -822,6 +1159,8 @@ export interface components {
                 };
             };
         } & (unknown & unknown & unknown);
+        /** @enum {string} */
+        AdminEventType: "role_granted" | "role_revoked" | "ramp_link_set" | "access_disabled" | "access_enabled" | "demo_reset" | "demo_chaos" | "demo_tamper";
     };
     responses: {
         /** @description Missing, expired or invalid token */
@@ -885,6 +1224,7 @@ export interface components {
     parameters: {
         DatasetId: components["schemas"]["Uuid"];
         CaseId: components["schemas"]["Uuid"];
+        UserId: components["schemas"]["Uuid"];
     };
     requestBodies: never;
     headers: never;
@@ -1065,6 +1405,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["VendorAccounts"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listMail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dataset_id: components["parameters"]["DatasetId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "items": [
+                     *         {
+                     *           "id": 2,
+                     *           "received_at": "2026-11-10T15:04:05Z",
+                     *           "sender": "ar@acme-supply.example",
+                     *           "subject": "Updated remittance details",
+                     *           "flagged": false,
+                     *           "outcome": "no_vendor",
+                     *           "reply": "not_flagged",
+                     *           "red_flags": [],
+                     *           "vendor": null,
+                     *           "case_id": null,
+                     *           "routing_number": null,
+                     *           "last4": null
+                     *         },
+                     *         {
+                     *           "id": 1,
+                     *           "received_at": "2026-11-10T14:58:41Z",
+                     *           "sender": "billing@acme-suppIy.example",
+                     *           "subject": "Our bank account has changed",
+                     *           "flagged": true,
+                     *           "outcome": "case_opened",
+                     *           "reply": "sent",
+                     *           "red_flags": [
+                     *             "lookalike_domain",
+                     *             "reply_to_differs"
+                     *           ],
+                     *           "vendor": {
+                     *             "id": "3f6a9d2e-8b14-4c7a-a5e0-1d2c3b4a5f60",
+                     *             "legal_name": "Acme Supply Co"
+                     *           },
+                     *           "case_id": "7b1e4c2a-5d3f-4a8e-9c61-2f0d8b7a4e15",
+                     *           "routing_number": "026009593",
+                     *           "last4": "0001"
+                     *         }
+                     *       ]
+                     *     }
+                     */
+                    "application/json": {
+                        items: components["schemas"]["MailItem"][];
+                    };
                 };
             };
             401: components["responses"]["Unauthenticated"];
@@ -1276,6 +1682,289 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["InvalidRequest"];
+        };
+    };
+    listPeople: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["People"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    changeRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: components["parameters"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "role": "approver",
+                 *       "grant": true,
+                 *       "reason": "Riley covers releases while the controller is out this week."
+                 *     }
+                 */
+                "application/json": components["schemas"]["RoleChange"];
+            };
+        };
+        responses: {
+            /** @description Applied */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PersonAdminView"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["InvalidRequest"];
+        };
+    };
+    changeRampLink: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: components["parameters"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "ramp_user_id": "7c1d2e3f-0000-4000-8000-00000000c1e7",
+                 *       "reason": "Sam enters vendor changes in Ramp."
+                 *     }
+                 */
+                "application/json": components["schemas"]["RampLinkChange"];
+            };
+        };
+        responses: {
+            /** @description Applied */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PersonAdminView"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["InvalidRequest"];
+        };
+    };
+    changeAccess: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: components["parameters"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "enabled": false,
+                 *       "reason": "Left the company on Nov 10."
+                 *     }
+                 */
+                "application/json": components["schemas"]["AccessChange"];
+            };
+        };
+        responses: {
+            /** @description Applied */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PersonAdminView"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["InvalidRequest"];
+        };
+    };
+    getAdminLog: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminLog"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    getDemoState: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DemoState"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    resetDemo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "link_clerk_user_id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+                 *       "reason": "Fresh demo before the judges' run."
+                 *     }
+                 */
+                "application/json": components["schemas"]["DemoResetRequest"];
+            };
+        };
+        responses: {
+            /** @description Applied */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DemoState"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["InvalidRequest"];
+        };
+    };
+    setDemoChaos: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "enabled": true,
+                 *       "reason": "Show that a failed hold keeps the payment stopped."
+                 *     }
+                 */
+                "application/json": components["schemas"]["DemoChaosRequest"];
+            };
+        };
+        responses: {
+            /** @description Applied */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DemoState"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["InvalidRequest"];
+        };
+    };
+    tamperDemo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "confirm": "break the chain",
+                 *       "reason": "Showing the judges that a rewritten row breaks the chain."
+                 *     }
+                 */
+                "application/json": components["schemas"]["DemoTamperRequest"];
+            };
+        };
+        responses: {
+            /** @description Applied */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DemoState"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
             409: components["responses"]["Conflict"];
             422: components["responses"]["InvalidRequest"];
         };

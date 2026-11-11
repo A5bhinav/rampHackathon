@@ -1,0 +1,8 @@
+{
+  "subject": "Settlement option for open invoices",
+  "sender": "Cobalt Freight Treasury <treasury@cobalt-freight-llc.example>",
+  "text": "Dear partner,\n\nBecause of ongoing correspondent bank delays on domestic wires we are settling carrier invoices in USDT (TRC-20). Customers who remit in USDT receive a 2% discount on open invoices.\n\nPlease direct your next payment to wallet TQ5mXv8wGz1nHr3LkP9sYcA2dUe7BfJ4oN and send us the transaction hash.\n\nRegards,\nTreasury Desk\nCobalt Freight",
+  "label": "change_request",
+  "vendor": "cobalt",
+  "note": "Payment method that changes where the money lands."
+}

@@ -1,0 +1,8 @@
+{
+  "subject": "Cobalt Freight LLC - Invoice CF-20955",
+  "sender": "billing@cobaltfreight.com",
+  "text": "COBALT FREIGHT LLC\nInvoice CF-20955\nShip date: 10/29/2026\nLane: Cleveland OH to Nashville TN\nBOL 2208871, 22 pallets, 14,900 lb\n\nLinehaul                     1,620.00\nFuel surcharge (24.5%)         396.90\nLiftgate delivery               85.00\nTotal due                    2,101.90\n\nTerms: Net 30\n\nRemit to: Cobalt Freight LLC\nACH routing 021000021 / account 000077778888\nLockbox: PO Box 11048, Memphis TN 38111",
+  "label": "ordinary",
+  "vendor": "cobalt",
+  "note": "Routine invoice, on-file account."
+}

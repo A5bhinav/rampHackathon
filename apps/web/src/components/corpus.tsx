@@ -1,5 +1,5 @@
 import { Stats } from "./page";
-import { CHANNEL, CORPUS, REASON_SHORT, groups, numberVerdict, pickedPlanted, ruleResult, type CorpusCase } from "@/lib/corpus";
+import { CHANNEL, CORPUS, REASON_SHORT, groups, numberVerdict, pickedPlanted, plantedStat, ruleResult, type CorpusCase } from "@/lib/corpus";
 import { phone } from "@/lib/lineage";
 
 // The number-picking rule against the frozen corpus (specs 0038, 0063), shared by the public /corpus
@@ -14,7 +14,7 @@ export function CorpusStats() {
     <Stats label="Results" items={[
       { label: "Cases", value: all.length },
       { label: "Matches the frozen truth", value: `${matched} of ${all.length}`, tone: matched === all.length ? "ok" : undefined },
-      { label: "Picked a planted number", value: all.filter(pickedPlanted).length, tone: "bad" },
+      { label: "Picked a planted number", ...plantedStat(all) },
     ]} />
   );
 }

@@ -33,7 +33,7 @@ jobs:
       - name: Install the Python workspace
         run: uv sync --all-packages --locked
       - name: Lab tests
-        run: cd evals && uv run pytest -q -m "not selection_gate and not report_gate"   # the gates run in lab-fuzz and lab-reports
+        run: cd evals && uv run pytest -q -m "not selection_gate and not report_gate and not docs_gate"   # the gates run in lab-fuzz, lab-reports and lab-docs
       - name: Lab run (scripted callers, no spend)
         run: uv run lab run --split voice --max-usd 0
       - name: Rule-removal sweep (every decision rule seen, or listed in evals/UNREACHABLE.md)

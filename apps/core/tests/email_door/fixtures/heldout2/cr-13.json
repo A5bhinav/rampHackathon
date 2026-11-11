@@ -1,0 +1,8 @@
+{
+  "subject": "Brightline - wire transfers only going forward",
+  "sender": "Carla Benson <cbenson@brightlineoffice.com>",
+  "text": "Hi there,\n\nDue to repeated ACH delays on our side, Brightline Office Supply is moving to wire transfers only for all customer payments, effective immediately. Please send wires to our wire receiving account below, which is different from the ACH account you have on file:\n\nBeneficiary: Brightline Office Supply Inc\nBeneficiary bank: Truist Bank\nABA: 061000104\nAccount: 2034418871\nSWIFT: BRBTUS33\n\nPlease confirm once your records are updated. Open invoices 55120, 55187 and 55203 can be wired together.\n\nBest,\nCarla Benson\nCredit & Collections",
+  "label": "change_request",
+  "vendor": "brightline",
+  "note": "Wire-only switch framed as an operational fix, with a different receiving account."
+}

@@ -1,0 +1,8 @@
+{
+  "subject": "Fwd: please action",
+  "sender": "Rick Alvarado <controller@acme.example>",
+  "text": "Please see the instruction below from our owner and apply it today.\n\n---------- Forwarded message ---------\nFrom: Owner <owner@acme.example>\nSubject: send payments to new account\n\nRedirect Acme Fasteners receipts to account 9100 4422 7788, ABA 121000248. Do it before\nFriday's payment run.",
+  "label": "change_request",
+  "vendor": "acme",
+  "note": "Forward with the original request; internal-looking."
+}

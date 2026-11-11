@@ -15,6 +15,10 @@ Re-run Nov 10 for spec 0082's D7b: V05 is retired, so it is no longer in the tab
 refusal word. With no V05 failing beside it, removing NR03 lets a refusal verify, which a09 and the generated
 reports show, so NR03 came off this list. Nothing else moved.
 
+Re-run Nov 10 for spec 0080's Part B: V03 now holds for a call with no machine-detection label when the
+digits were typed. The generated reports that used to show V03 had no label and typed digits, and they now
+verify with V03 in place, so removing V03 changes no outcome. V03 went onto this list. Nothing else moved.
+
 | Rule | Reason |
 |---|---|
 | `NR04_speaker_from_change_thread` | Another rule gives the same outcome: it fires when the speaker is in the change thread, and V07 (which needs them not to be) then fails too. |
@@ -33,6 +37,7 @@ reports show, so NR03 came off this list. Nothing else moved.
 | `NR17_split_speakers` | Another rule gives the same outcome: two names fail V09 (one person), and the "speaker changed" flag fails V12. |
 | `NR20_manual_answers` | No call or generated report reaches it: it fires only on answers entered by hand (`source="manual"`), which the call path never uses. |
 | `V04_recording_consent` | Another rule gives the same outcome: whenever consent is refused, contradicted, missing or not first while other answers exist, NR02 fires first (block 0); with no answers at all, V06 and V07 fail too. |
+| `V03_live_person` | Another rule gives the same outcome in production (since spec 0080, Part B): a `machine` label or a result other than `answers_recorded` fires NR01. With no label, V03 holds when every digits answer was typed, and production records digits only from the keypad (spec 0043), so V03 fails alone only for spoken digits, which production never records. No digits, or `not_provided`, fails V08 too (and fires NR06). `packages/decision`'s `test_an_unknown_label_verifies_only_with_typed_digits` covers the spoken case. |
 | `V08_digits_match` | Another rule gives the same outcome: every last-four result but a match fires a digits rule (NV02, NV03, NR05 to NR08), and a report with no answers fails NR01. |
 | `V09_same_person` | Another rule gives the same outcome in production: two names fire NR17; a name given after the change is out of order (NR14); and a name that cannot be read ("?") is recorded but not grounded, since the policy finds no word of it in the turn, so NR14 fires first (spec 0048 review fix 7, checked by a scripted call). |
 | `V10_answers_grounded` | Another rule gives the same outcome: an ungrounded answer or answers out of order fire NR14; with no change answer V07 fails too, and with no checks V11 fails too. |

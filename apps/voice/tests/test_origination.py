@@ -240,14 +240,14 @@ def test_dial_request_carries_the_detection_settings():
         "MachineDetection": ["Enable"],
         "MachineDetectionSpeechThreshold": ["4500"],
         "MachineDetectionSpeechEndThreshold": ["1200"],
-        "MachineDetectionSilenceTimeout": ["5000"],
+        "MachineDetectionSilenceTimeout": ["2500"],           # spec 0080, Part C (C1): was 5000
     }                                                       # so no MachineDetectionTimeout either
     assert not [k for k in form if k.startswith("AsyncAmd")]  # detection stays synchronous (D1)
     # A2: the module's named constants hold these values; the next test shows the request is built
     # from them, not from literals.
     assert origination.AMD_SPEECH_THRESHOLD_MS == 4500
     assert origination.AMD_SPEECH_END_THRESHOLD_MS == 1200
-    assert origination.AMD_SILENCE_TIMEOUT_MS == 5000
+    assert origination.AMD_SILENCE_TIMEOUT_MS == 2500
 
 
 def test_dial_request_uses_the_named_detection_constants(monkeypatch):

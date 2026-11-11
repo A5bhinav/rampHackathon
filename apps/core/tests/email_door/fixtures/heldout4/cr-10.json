@@ -1,0 +1,8 @@
+{
+  "subject": "Please hold ACH",
+  "sender": "Cobalt Freight Billing <billing@cobaltfreight.com>",
+  "text": "AP team,\n\nPlease do not release any further ACH to the account ending 7888 until you hear from us. That account is being wound down. We will follow up shortly with where those payments should go instead.\n\nThank you for your patience,\nCobalt Freight Billing",
+  "label": "change_request",
+  "vendor": "cobalt",
+  "note": "Hold plus promise of replacement destination, no details yet."
+}

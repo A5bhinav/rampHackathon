@@ -1,0 +1,8 @@
+{
+  "subject": "Change of bank - please confirm receipt",
+  "sender": "Dana Whitfield <ar@acme.example>",
+  "text": "Hello,\nAs of this month Acme Fasteners LLC does business under a new account at\nFirst Meridian Bank. I have attached our signed bank letter. Please set up the new\nbeneficiary and stop payments to the Chase account.\nBest,\nD. Whitfield",
+  "label": "change_request",
+  "vendor": "acme",
+  "note": "Details are in an attachment; asks to stop paying old account."
+}

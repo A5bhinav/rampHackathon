@@ -1,0 +1,8 @@
+{
+  "subject": "Updated W-9 and payment info - Kestrel IT Consulting",
+  "sender": "Angela Moss <angela@kestrelit.co>",
+  "text": "Hello,\n\nKestrel IT Consulting converted from a sole proprietorship to an LLC on November 1. Attached is the new W-9 with our new EIN. Because the LLC has its own bank account, please also update where our invoices are paid:\n\nKestrel IT Consulting LLC\nRouting 063100277\nAccount 9020018845\n\nInvoices from this month onward will show the LLC name.\n\nThank you,\nAngela Moss",
+  "label": "change_request",
+  "vendor": null,
+  "note": "Entity change plus bank change from an unknown vendor; the tax paperwork is a plausible cover for the redirect."
+}

@@ -1,0 +1,8 @@
+{
+  "subject": "Fwd: approval needed for invoice 1744",
+  "sender": "Jess Tran <jess@ourco.example>",
+  "text": "Can someone in AP approve the attached? I already got the PO number from procurement.\n\n---------- Forwarded message ---------\nFrom: Dana Whitfield <ar@acme.example>\nSubject: Invoice 1744 from Acme Fasteners LLC\n\nPlease find invoice 1744 attached for $4,820.00.",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Forwarded message block but contents are just an invoice; trap for forward detection."
+}

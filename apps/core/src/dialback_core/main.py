@@ -32,14 +32,20 @@ from .ramp import RampConnector
 from .settings import Settings
 
 
-async def _new_dataset(settings: Settings, kind: str, label: str, sim_now: str | None) -> None:
-    if kind == "demo" and settings.ramp_mode is RampMode.SANDBOX:
+async def _new_dataset(settings: Settings, kind: str, label: str, sim_now: str | None, ramp: str | None = None) -> None:
+    """`ramp` defaults to what this server has: the mock, or with DIALBACK_RAMP=sandbox, the sandbox (spec 0096)."""
+    ramp = ramp or ("sandbox" if settings.ramp_mode is RampMode.SANDBOX else "mock")
+    if kind == "demo" and ramp == "sandbox":
         # Spec 0034: shared demo accounts may act on any demo dataset, so none may sit on Ramp's sandbox.
-        raise SystemExit("refused: a demo dataset can't be made against Ramp's sandbox (use DIALBACK_RAMP=mock)")
+        raise SystemExit("refused: a demo dataset can't be on Ramp's sandbox; demo datasets use the Ramp mock")
+    if ramp == "sandbox" and settings.ramp_sandbox is None:
+        raise SystemExit("refused: this server has no Ramp sandbox credentials (RAMP_SANDBOX_CLIENT_ID, RAMP_SANDBOX_CLIENT_SECRET)")
+    if ramp == "mock" and settings.ramp_mode is not RampMode.MOCK:
+        raise SystemExit("refused: this server has no Ramp mock (DIALBACK_RAMP=sandbox)")
     pool = await open_pool(settings.database_url, max_size=2)
     try:
-        d = await create_dataset(pool, kind, label, dt.datetime.fromisoformat(sim_now) if sim_now else None)
-        print(f"dataset {d.id}\nchain   {d.chain_id}")
+        d = await create_dataset(pool, kind, label, dt.datetime.fromisoformat(sim_now) if sim_now else None, ramp)
+        print(f"dataset {d.id}\nchain   {d.chain_id}\nramp    {d.ramp}")
     finally:
         await pool.close()
 
@@ -48,7 +54,7 @@ async def _import(settings: Settings, dataset_id: UUID) -> None:
     pool = await open_pool(settings.database_url, max_size=3)
     async with httpx.AsyncClient(timeout=10.0) as http:
         try:
-            n = await import_all(pool, RampConnector(settings, http).for_dataset(dataset_id),
+            n = await import_all(pool, RampConnector(settings, http, pool=pool).for_dataset(dataset_id),
                                  Keys(settings.fingerprint_key, settings.fingerprint_key_version), dataset_id)
             print(f"synced {n} vendors")
         finally:
@@ -59,7 +65,7 @@ async def _run_job(settings: Settings, dataset_id: UUID, job: str) -> None:
     pool = await open_pool(settings.database_url, max_size=3)
     async with httpx.AsyncClient(timeout=10.0) as http:
         try:
-            jobs = Jobs(pool, settings, RampConnector(settings, http),
+            jobs = Jobs(pool, settings, RampConnector(settings, http, pool=pool),
                         Keys(settings.fingerprint_key, settings.fingerprint_key_version), "cli")
             effects = await jobs.run(dataset_id, job, force=True)
             async with system_tx(pool) as conn:
@@ -81,7 +87,7 @@ async def _retire(settings: Settings, dataset_id: UUID) -> None:
 async def _demo(settings: Settings, args: argparse.Namespace) -> int:
     pool = await open_pool(settings.database_url, max_size=3)
     async with httpx.AsyncClient(base_url=settings.ramp_base_url, timeout=15.0) as mock, httpx.AsyncClient(timeout=10.0) as http:
-        env = demo.DemoEnv(pool=pool, settings=settings, mock=mock, connector=RampConnector(settings, http),
+        env = demo.DemoEnv(pool=pool, settings=settings, mock=mock, connector=RampConnector(settings, http, pool=pool),
                            owner_url=settings.database_url)
         try:
             if args.action == "reset":
@@ -96,13 +102,17 @@ async def _demo(settings: Settings, args: argparse.Namespace) -> int:
             elif args.action == "prepare":
                 links, seed = dict(_link(x) for x in args.link), demo.load_seed(args.seed)
                 phones = dict(_pair("--phone", x) for x in args.phone)
-                p = await demo.prepare(env, seed, links, phones=phones, requests=args.request or ["acme"])
+                door = args.email_door
+                requests = args.request or [r for r in ["acme"] if r not in door]
+                p = await demo.prepare(env, seed, links, phones=phones, requests=requests, email_door=door)
                 for w in p.reset.warnings:
                     print(f"warning: {w}")
                 print(f"dataset {p.reset.dataset.id}\nlinked  {', '.join(p.reset.linked) or 'nobody'}")
                 for ref, s in p.ledger["vendors"].items():  # never the phone itself: "team" or "fictional"
                     print(f"ledger  {ref:<11} {s['observations']:>3} sightings, AR line: {s['phone']}"
                           + (", change-request email in" if p.requests.get(ref) else ""))
+                if line := demo.describe_email_door(p.email_door, settings.inbox_address):
+                    print(f"email   {line}")
                 print("next    change the vendor's bank details in the dashboard: AP workspace, Demo, Ramp (mock)")
             elif args.action == "change":
                 account = await demo.change(env, demo.load_seed(args.seed), args.vendor, by=args.by, unknown=args.unknown)
@@ -149,6 +159,8 @@ def run() -> None:
     nd.add_argument("--kind", choices=("dev", "demo", "lab"), required=True)
     nd.add_argument("--label", required=True)
     nd.add_argument("--sim-now", help="lab only: start the dataset's simulated clock (ISO 8601)")
+    nd.add_argument("--ramp", choices=("mock", "sandbox"),
+                    help="the Ramp this dataset uses, for good (default: the mock, or the sandbox with DIALBACK_RAMP=sandbox)")
     for name in ("import-vendors", "retire-dataset"):
         sub.add_parser(name).add_argument("--dataset", type=UUID, required=True)
     rj = sub.add_parser("run-job")
@@ -166,6 +178,8 @@ def run() -> None:
                     help="that vendor's AR line becomes this team phone in the ledger (repeatable; never committed)")
     pr.add_argument("--request", action="append", default=[], metavar="REF",
                     help="vendors whose change-request email goes in (default: acme)")
+    pr.add_argument("--email-door", action="append", default=[], metavar="REF",
+                    help="vendors whose email door is turned on; the live email is their request, so none is loaded (repeatable)")
     ch = dm.add_parser("change", help="beat 2: the vendor's seeded bank change")
     ch.add_argument("--vendor", required=True)
     ch.add_argument("--seed", default=str(demo.DEFAULT_SEED))
@@ -186,7 +200,7 @@ def run() -> None:
     if args.cmd in (None, "serve"):
         uvicorn.run(create_app(settings), host=os.environ.get("HOST", "0.0.0.0"), port=int(os.environ.get("PORT", "8001")))
     elif args.cmd == "new-dataset":
-        asyncio.run(_new_dataset(settings, args.kind, args.label, args.sim_now))
+        asyncio.run(_new_dataset(settings, args.kind, args.label, args.sim_now, args.ramp))
     elif args.cmd == "import-vendors":
         asyncio.run(_import(settings, args.dataset))
     elif args.cmd == "retire-dataset":

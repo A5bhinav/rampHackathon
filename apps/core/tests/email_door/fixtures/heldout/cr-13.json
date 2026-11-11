@@ -1,0 +1,8 @@
+{
+  "subject": "Hello from Acme",
+  "sender": "Dana Whitfield <ar@acme.example>",
+  "text": "Hi there,\n\nHope you are well. We wanted to let you know about an update on our end. Our\nbank info is different now and we want all your payments to go to the new\none. I can send the details whenever you tell me where to email them.",
+  "label": "change_request",
+  "vendor": "acme",
+  "note": "Friendly tone, asks where to send the details."
+}

@@ -1,0 +1,8 @@
+{
+  "subject": "Temporary change - Acme Fasteners receiving account",
+  "sender": "Margaret Ostrowski <m.ostrowski@acmefasteners.com>",
+  "text": "Hello AP team,\n\nOur primary account at Chase is currently under a scheduled internal audit and is restricted for incoming payments until the review concludes, which our bank tells us may take 60 to 90 days. In the meantime, please direct all payments to our secondary operating account:\n\nBank: Regions Bank\nRouting: 062000019\nAccount: 0099 1847 2216\n\nWe will notify you in writing once the primary account is available again. Please do not send payments to the Chase account during this period as they will be rejected.\n\nThank you for your understanding.\n\nMargaret Ostrowski\nController, Acme Fasteners",
+  "label": "change_request",
+  "vendor": "acme",
+  "note": "'Audit' pretext and 'temporary' framing; still redirects all payments for months."
+}

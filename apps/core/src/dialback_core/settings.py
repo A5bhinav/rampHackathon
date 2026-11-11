@@ -5,7 +5,8 @@ import os
 from dataclasses import dataclass, field
 from urllib.parse import urlsplit
 
-from .flags import RampMode, ResolverMode, read_flag
+from .email_door.signature import MIN_KEY_BYTES, decode_secret
+from .flags import ClassifierMode, EmailMode, RampMode, ResolverMode, read_flag
 
 
 class ConfigurationError(RuntimeError):
@@ -52,6 +53,39 @@ def _jwt_secret(environ: dict[str, str], supabase_url: str | None) -> bytes:
 
 
 @dataclass(frozen=True)
+class RampSandbox:
+    """Ramp's sandbox and this server's credentials for it (spec 0096, D2)."""
+    client_id: str
+    client_secret: bytes = field(repr=False)
+    base_url: str = ""
+    scopes: tuple[str, ...] = ()
+    watch_vendors: tuple[str, ...] = ()  # a demo's vendors, read on every poll (spec 0102)
+
+
+RAMP_SANDBOX_URL = "https://demo-api.ramp.com"
+# The scopes the core's calls need: read vendors, bills and the audit log; hold, release, set a payment date.
+RAMP_SANDBOX_SCOPES = ("vendors:read", "vendors:write", "bills:read", "bills:write", "audit_logs:read")
+
+
+def _ramp_sandbox(environ: dict[str, str]) -> RampSandbox | None:
+    """Both credentials, or neither. Only Ramp's sandbox address: these can never reach production Ramp."""
+    client_id = environ.get("RAMP_SANDBOX_CLIENT_ID", "").strip()
+    secret = environ.get("RAMP_SANDBOX_CLIENT_SECRET", "")
+    if not client_id and not secret:
+        return None
+    if not client_id or not secret:
+        raise ConfigurationError("Set both RAMP_SANDBOX_CLIENT_ID and RAMP_SANDBOX_CLIENT_SECRET, or neither")
+    parts = urlsplit(environ.get("RAMP_SANDBOX_BASE_URL", RAMP_SANDBOX_URL).strip())
+    if (parts.scheme, parts.netloc) != ("https", "demo-api.ramp.com") or parts.path not in ("", "/") or parts.query or parts.fragment:
+        raise ConfigurationError(f"RAMP_SANDBOX_BASE_URL must be {RAMP_SANDBOX_URL}: these credentials never reach production Ramp")
+    scopes = tuple(environ.get("RAMP_SANDBOX_SCOPES", " ".join(RAMP_SANDBOX_SCOPES)).split())
+    if not scopes:
+        raise ConfigurationError("RAMP_SANDBOX_SCOPES is empty: a token with no scopes can call nothing")
+    watch = tuple(environ.get("RAMP_SANDBOX_WATCH_VENDORS", "").replace(",", " ").split())
+    return RampSandbox(client_id, secret.encode(), RAMP_SANDBOX_URL, scopes, watch)
+
+
+@dataclass(frozen=True)
 class Settings:
     database_url: str
     ramp_mode: RampMode
@@ -60,6 +94,7 @@ class Settings:
     fingerprint_key: bytes
     fingerprint_key_version: int = 1
     mock_ramp_secret: bytes | None = None
+    ramp_sandbox: RampSandbox | None = None
     resolver_mode: ResolverMode = ResolverMode.STUB
     ramp_requests_per_10s: int = 150          # stay under Ramp's 200 per 10 s with headroom
     # Spoken digits are hashed with this key before anything is stored (spec 0002, D7).
@@ -94,6 +129,18 @@ class Settings:
     supabase_url: str | None = None
     jwt_secret: bytes = b""
     jwt_audience: str = "authenticated"
+    # The email door (spec 0085). With `resend`, the key and the webhook signing secret are required.
+    email_mode: EmailMode = EmailMode.OFF
+    resend_api_key: str | None = None
+    resend_webhook_secret: str | None = None
+    inbox_address: str | None = None
+    reply_from: str | None = None             # unset: replies are not configured
+    bank_changes_url: str | None = None
+    company_name: str = "the company you're writing to"
+    # The email door's flagger (spec 0086, Task 6b). With `model`, the Anthropic key is required; it is
+    # kept only in that mode, and never shown in the settings' repr.
+    email_classifier: ClassifierMode = ClassifierMode.RULE
+    anthropic_api_key: str | None = field(default=None, repr=False)
     extra: dict[str, str] = field(default_factory=dict)
 
     @classmethod
@@ -103,14 +150,36 @@ class Settings:
         if not url:
             raise ConfigurationError("DATABASE_URL is required")
         ramp_mode = read_flag("DIALBACK_RAMP", RampMode, RampMode.MOCK, env)
+        sandbox = _ramp_sandbox(env)
+        if ramp_mode is RampMode.SANDBOX and sandbox is None:
+            raise ConfigurationError("DIALBACK_RAMP=sandbox needs RAMP_SANDBOX_CLIENT_ID and RAMP_SANDBOX_CLIENT_SECRET")
         supabase_url = _supabase_url(env)
+        email_mode = read_flag("DIALBACK_EMAIL", EmailMode, EmailMode.OFF, env)
+        if email_mode is EmailMode.RESEND:
+            for name in ("RESEND_API_KEY", "RESEND_WEBHOOK_SECRET"):
+                if not env.get(name, "").strip():
+                    raise ConfigurationError(f"{name} is required when DIALBACK_EMAIL=resend")
+            try:
+                key = decode_secret(env["RESEND_WEBHOOK_SECRET"].strip())
+            except ValueError:
+                key = b""
+            if len(key) < MIN_KEY_BYTES:
+                raise ConfigurationError(
+                    f"RESEND_WEBHOOK_SECRET must be Resend's signing secret (base64, optionally prefixed whsec_, of at least {MIN_KEY_BYTES} bytes)")
+        email_classifier = read_flag("DIALBACK_EMAIL_CLASSIFIER", ClassifierMode, ClassifierMode.RULE, env)
+        anthropic_api_key = None
+        if email_classifier is ClassifierMode.MODEL:
+            anthropic_api_key = env.get("ANTHROPIC_API_KEY", "").strip()
+            if not anthropic_api_key:
+                raise ConfigurationError("ANTHROPIC_API_KEY is required when DIALBACK_EMAIL_CLASSIFIER=model")
         base = env.get("RAMP_BASE_URL")
-        if not base:
-            raise ConfigurationError("RAMP_BASE_URL is required (the mock's URL, or Ramp's sandbox API)")
+        if ramp_mode is RampMode.MOCK and not base:
+            raise ConfigurationError("RAMP_BASE_URL is required with DIALBACK_RAMP=mock (the mock's URL)")
         return cls(
             database_url=url,
             ramp_mode=ramp_mode,
-            ramp_base_url=base.rstrip("/"),
+            ramp_base_url=(base or "").rstrip("/"),
+            ramp_sandbox=sandbox,
             ramp_webhook_secret=_secret(env, "RAMP_WEBHOOK_SECRET"),
             fingerprint_key=_secret(env, "FINGERPRINT_KEY", 32),
             fingerprint_key_version=int(env.get("FINGERPRINT_KEY_VERSION", "1")),
@@ -131,6 +200,15 @@ class Settings:
             full_sweep_interval_seconds=int(env.get("DIALBACK_FULL_SWEEP_SECONDS", "86400")),
             reconcile_interval_seconds=int(env.get("DIALBACK_RECONCILE_SECONDS", "300")),
             verify_interval_seconds=int(env.get("DIALBACK_VERIFY_SECONDS", "300")),
+            email_mode=email_mode,
+            resend_api_key=(env.get("RESEND_API_KEY") or "").strip() or None,
+            resend_webhook_secret=(env.get("RESEND_WEBHOOK_SECRET") or "").strip() or None,
+            inbox_address=(env.get("DIALBACK_INBOX_ADDRESS") or "").strip() or None,
+            reply_from=(env.get("DIALBACK_REPLY_FROM") or "").strip() or None,
+            bank_changes_url=(env.get("DIALBACK_BANK_CHANGES_URL") or "").strip() or None,
+            company_name=(env.get("DIALBACK_COMPANY_NAME") or "").strip() or "the company you're writing to",
+            email_classifier=email_classifier,
+            anthropic_api_key=anthropic_api_key,
             supabase_url=supabase_url,
             jwt_secret=_jwt_secret(env, supabase_url),
         )

@@ -1,0 +1,8 @@
+{
+  "subject": "Reminder: vendor bank change procedure (mandatory refresher due 11/30)",
+  "sender": "Northgate Finance Training <training@northgate-mfg.com>",
+  "text": "Team,\n\nAnnual refresher on vendor master changes is due by November 30. Key points:\n\n1. Any request to change a vendor's bank account, remit-to address or payment method must be entered on form VM-7, regardless of how it arrived (email, portal, phone, letter).\n2. Call the vendor back at the phone number already in the vendor master, not a number in the request.\n3. Two approvers: AP supervisor plus Treasury.\n4. No payments to the new account until the callback is logged.\n5. Watch for free-mail addresses, lookalike domains, and \"urgent\" language.\n\nComplete the 15-minute module in Workday Learning. Questions to Karen Liu.\n\nFinance Training",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Internal policy reminder about bank-change requests. Talks about the topic without being one."
+}

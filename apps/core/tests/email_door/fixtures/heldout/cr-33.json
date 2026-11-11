@@ -1,0 +1,8 @@
+{
+  "subject": "Invoice 3433 - Brightline Office Supply Inc",
+  "sender": "Brightline Billing <billing@brightline.example>",
+  "text": "INVOICE 3433\nBill to: your company\nQty 12  Ink cartridges, black       $318.00\nQty  5  Desk organizers              $142.50\nSubtotal                             $460.50\nTax                                   $36.84\nTOTAL DUE                            $497.34   Net 30\n\nIMPORTANT NOTICE: Effective this invoice our remittance bank has changed. Pay this invoice\nand all later ones to account 000 0555 8120, routing 021000089. Old account details are void.",
+  "label": "change_request",
+  "vendor": "brightline",
+  "note": "Request hidden in the footer of an otherwise routine invoice."
+}

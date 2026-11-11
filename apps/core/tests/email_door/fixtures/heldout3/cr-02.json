@@ -1,0 +1,8 @@
+{
+  "subject": "bank update",
+  "sender": "ar@brightlineoffice.com",
+  "text": "pls update our bank for the next payment run, new letter attached. thx",
+  "label": "change_request",
+  "vendor": "brightline",
+  "note": "Terse, no numbers in the body, details are only in an attachment the reader cannot see. Still a request to redirect future payments."
+}

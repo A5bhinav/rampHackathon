@@ -1,0 +1,8 @@
+{
+  "subject": "Updated contact details",
+  "sender": "accounting@acmefasteners.com",
+  "text": "Hello,\n\nPlease note our updated contact details:\nMain line: (216) 555-0100\nAR direct: (216) 555-0142\nFax: discontinued\nWeb: acmefasteners.com (new site launched this week)\n\nAll other details, including our remittance information, are unchanged.\n\nAcme Fasteners LLC",
+  "label": "ordinary",
+  "vendor": "acme",
+  "note": "Phone and website update, explicitly no remittance change."
+}

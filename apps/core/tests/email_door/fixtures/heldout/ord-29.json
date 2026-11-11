@@ -1,0 +1,8 @@
+{
+  "subject": "Friday runs",
+  "sender": "Ben Carter <ben@ourco.example>",
+  "text": "Can we move the ACH cutoff to noon? The bank is changing its processing window.",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Internal; bank mention is our bank."
+}

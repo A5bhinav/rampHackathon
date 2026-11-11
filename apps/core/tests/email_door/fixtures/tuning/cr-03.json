@@ -1,0 +1,8 @@
+{
+  "subject": "Re: Invoice 1326",
+  "sender": "Morgan Pryce <ar@cobalt.example>",
+  "text": "We have moved our banking. Please pay the account ending 4821 from today.\nThank you\nQuestions? Call me directly.\nAR direct: (617) 555-0143",
+  "label": "change_request",
+  "vendor": "cobalt",
+  "note": "Verbatim demo_seed.json vendors.cobalt.request (span text joined by newlines); explicit move of banking, details only as last four digits."
+}

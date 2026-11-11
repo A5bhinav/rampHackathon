@@ -1,0 +1,8 @@
+{
+  "subject": "Changement de coordonnees bancaires - Atelier Mercier",
+  "sender": "Comptabilite Atelier Mercier <compta@ateliermercier.fr>",
+  "text": "Madame, Monsieur,\n\nNous vous informons que nos coordonnees bancaires ont change. A compter de ce jour, nous vous remercions de bien vouloir effectuer tous vos reglements sur le compte suivant :\n\nTitulaire : Atelier Mercier SARL\nBanque : Societe Generale\nIBAN : FR76 3000 3035 4000 0503 1234 567\nBIC : SOGEFRPP\n\nVous trouverez ci-joint notre nouveau RIB. Merci de mettre a jour votre fichier fournisseurs et de nous confirmer la prise en compte de ce changement.\n\nNous vous prions d'agreer, Madame, Monsieur, nos salutations distinguees.\n\nService Comptabilite\nAtelier Mercier SARL",
+  "label": "change_request",
+  "vendor": null,
+  "note": "French-language IBAN change from an unknown vendor. Accents dropped to keep the file ASCII."
+}

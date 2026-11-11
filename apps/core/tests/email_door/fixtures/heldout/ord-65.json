@@ -1,0 +1,8 @@
+{
+  "subject": "Orchard Seeds invoice OS-4410, ACH enrollment copy",
+  "sender": "Billing <billing@orchard-seeds.example>",
+  "text": "Invoice OS-4410, $2,780.00, payable within 30 days.\n\nThis is the ACH information we gave you when you first signed up (copying it here for your convenience): bank Peoples Trust, routing 121000248, account 6680 1129 04.",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Unknown vendor invoice repeating its initial bank details; no change."
+}

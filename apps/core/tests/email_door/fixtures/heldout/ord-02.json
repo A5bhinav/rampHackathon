@@ -1,0 +1,8 @@
+{
+  "subject": "INVOICE 3420 / Brightline Office Supply Inc",
+  "sender": "Brightline Billing <billing@brightline.example>",
+  "text": "Bill to: your company\nItems: toner x6, binders x20\nTotal: $1,044.00\nACH to ABA 021000021, acct 000044445555 (same as all previous invoices)",
+  "label": "ordinary",
+  "vendor": "brightline",
+  "note": "Invoice with on-file; 'same as previous'."
+}

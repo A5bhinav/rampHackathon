@@ -1,0 +1,8 @@
+{
+  "subject": "Digest: FBI IC3 alert on business email compromise",
+  "sender": "AFP Daily Brief <brief@finance-pros.example>",
+  "text": "TODAY'S TOP STORY\n\nThe FBI's IC3 reported that criminals continue to impersonate suppliers and instruct customers to redirect invoice payments to fraudulent accounts. Reported BEC losses exceeded previous year totals. Recommended controls include verifying any change in account number by phone.\n\nAlso: CFOs expect slower hiring in 2027.",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Industry news digest."
+}

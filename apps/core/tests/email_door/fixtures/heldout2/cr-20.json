@@ -1,0 +1,8 @@
+{
+  "subject": "(no subject)",
+  "sender": "mike cobalt dispatch <mikeh.cobalt@gmail.com>",
+  "text": "hey its mike from cobalt dispatch. our bank froze the acct over some fraud thing on their end so ach wont go thru this week. can u zelle this weeks pmt to 614-555-0193 instead, its our ops manager's zelle. same amt as the invoice. thx\n\nSent from my iPhone",
+  "label": "change_request",
+  "vendor": "cobalt",
+  "note": "Text-message style from a free-mail address; new destination is a Zelle phone handle, not a bank account. No routing or account numbers."
+}

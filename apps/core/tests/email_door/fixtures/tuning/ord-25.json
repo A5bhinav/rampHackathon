@@ -1,0 +1,8 @@
+{
+  "subject": "Out of Office: Re: Invoice 3391",
+  "sender": "Sam Ortiz <ar@brightline.example>",
+  "text": "Thank you for your message. I'm away from my desk and will respond when I return Monday.",
+  "label": "ordinary",
+  "vendor": "brightline",
+  "note": "OOO."
+}

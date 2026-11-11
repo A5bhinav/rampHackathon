@@ -61,7 +61,10 @@ inside this package; the caller passes everything in.
 - A Hypothesis property: for random facts, `decide()` never raises, and anything it cannot classify is `needs_review`.
 - `inputs_hash` is stable across dict ordering (canonicalize with `rfc8785` before hashing).
 
-## What exists (`decision-1.1.0`)
+## What exists (`decision-1.2.0`)
+
+`decision-1.2.0` (spec 0080, Part B): V03 also holds for a call with no machine-detection label when every
+digits answer was typed on the keypad (`CaseFacts.digits_typed`, computed in `facts_from_answers`).
 
 - `rules.py`: the table above. Every rule carries the sentence the dashboard shows; sentences of retired ids (the skeleton's, and decision-1.0.0's V05) are kept in `engine.RETIRED`, so old decisions still render.
 - `decide(facts, *, strict=False, source="call")`: pure and total. It validates every fact first (NR97), then runs the blocks. `source="manual"` never verifies (NR20). `inputs_hash` is SHA-256 over the RFC 8785 form of the facts, the mode and the source.

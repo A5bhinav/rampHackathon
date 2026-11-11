@@ -1,0 +1,8 @@
+{
+  "subject": "Updated wire instructions",
+  "sender": "Morgan Pryce <ar@cobalt.example>",
+  "text": "Good afternoon,\n\nDue to an internal audit we are consolidating accounts. Please remit all outstanding and\nfuture payments to our new account:\n\nCobalt Freight LLC\nRouting: 123456789\nAccount: 4410099231\n\nCall me at 617-555-0188 if you want to verify. Thank you for your prompt attention.",
+  "label": "change_request",
+  "vendor": "cobalt",
+  "note": "Routing number fails ABA checksum; includes a phone to call to confirm (attacker-controlled)."
+}

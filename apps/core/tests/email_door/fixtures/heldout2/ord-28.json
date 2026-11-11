@@ -1,0 +1,8 @@
+{
+  "subject": "bank info on file?",
+  "sender": "Greg Hollis <greg.hollis.acme@gmail.com>",
+  "text": "Hi, this is Greg from Acme Fasteners, writing from my personal email since our server is acting up. Can you tell me what bank account and routing number you currently have on file for us? We're reconciling a few payments on our end.\n\nThanks\nGreg",
+  "label": "ordinary",
+  "vendor": "acme",
+  "note": "Borderline: suspicious reconnaissance from a free-mail address (a common precursor to BEC), but it asks for information and does not ask to send payments anywhere new. Ordinary under the label definition; a human should still be wary."
+}

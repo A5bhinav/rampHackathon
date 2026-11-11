@@ -1,0 +1,8 @@
+{
+  "subject": "The 5 BEC red flags your AP team should memorize",
+  "sender": "Ledgerly Blog <blog@ledgerly.io>",
+  "text": "Ledgerly Insights\n\n1. Reply-to mismatch\n2. Lookalike domains (cobalt-freight.com vs cobaltfreight.com)\n3. \"Our account was closed due to an audit\"\n4. Numbers that fail the ABA checksum (we see routing 123456789 in real attempts)\n5. Requests that arrive the week after a big invoice\n\nLedgerly validates every bank change against the vendor's history and flags anomalies before approval. See how: ledgerly.io/bec\n\nUnsubscribe",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Vendor-fraud content marketing with example lookalike domains and an example routing number."
+}

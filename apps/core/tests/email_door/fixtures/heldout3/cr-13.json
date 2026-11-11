@@ -1,0 +1,8 @@
+{
+  "subject": "Re: Payment received - wrong account?",
+  "sender": "Brightline AR <ar@brightlineoffice.com>",
+  "text": "Hi Karen,\n\nThanks for sending payment on invoice BL-55102. Unfortunately it looks like it went to our old account. We emailed your team on October 20 with our new bank details and did not hear back, so I am guessing it did not get processed.\n\nCould you update our record so the remaining open invoices go to the new account? I have pasted the details again below for convenience.\n\nBank: TD Bank\nRouting: 031101266\nAccount: 4400127789\nName: Brightline Office Supply Inc\n\nAppreciate your help,\nSam Okafor\nBrightline Office Supply Inc",
+  "label": "change_request",
+  "vendor": "brightline",
+  "note": "Phrased as a reminder about a change supposedly sent earlier; still a request to redirect remaining and future payments."
+}

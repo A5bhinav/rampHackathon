@@ -1,0 +1,8 @@
+{
+  "subject": "Audit confirmation request - Cobalt Freight LLC",
+  "sender": "Audit Confirmations <confirmations@brandtcpa.example>",
+  "text": "In connection with our audit of the financial statements of Cobalt Freight LLC as of September 30, 2026, please confirm directly to us the balance owed by you to Cobalt Freight LLC at that date. Our records indicate $28,114.20.\n\nPlease do not send any payment to us. This is not a request for payment.",
+  "label": "ordinary",
+  "vendor": "cobalt",
+  "note": "Audit confirmation from a third party."
+}

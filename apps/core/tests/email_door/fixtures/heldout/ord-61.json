@@ -1,0 +1,8 @@
+{
+  "subject": "Acme Fasteners LLC invoice 1779 - payment details",
+  "sender": "Acme Billing <billing@acme.example>",
+  "text": "Invoice 1779: 500 lb stainless hex bolts, $7,455.00, due Dec 12.\n\nHow to pay (unchanged since we started working together):\nAcme Fasteners LLC\nABA routing: 021000021\nAccount: 000011112222\nReference the invoice number on your ACH addenda, please.",
+  "label": "ordinary",
+  "vendor": "acme",
+  "note": "Invoice with the full on-file routing and account for Acme; explicitly unchanged, so ordinary."
+}

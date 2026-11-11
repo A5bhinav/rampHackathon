@@ -1,0 +1,8 @@
+{
+  "subject": "Brightline is going paperless - invoices by email starting December",
+  "sender": "Brightline Office Supply Inc <invoices@brightlineoffice.com>",
+  "text": "Dear Customer,\n\nStarting December 1, Brightline will stop mailing paper invoices. All invoices and statements will be emailed as PDFs from invoices@brightlineoffice.com to the billing contact on your account. If you'd like invoices sent to a different address (for example an AP intake mailbox), just reply with the address.\n\nHow you pay us is not changing.\n\nThank you for helping us cut paper waste,\nBrightline Office Supply",
+  "label": "ordinary",
+  "vendor": "brightline",
+  "note": "Invoice-delivery method change, not payment method."
+}

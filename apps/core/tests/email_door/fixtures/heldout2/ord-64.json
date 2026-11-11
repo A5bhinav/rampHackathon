@@ -1,0 +1,8 @@
+{
+  "subject": "RE: Question about changing banks",
+  "sender": "Carla Benson <cbenson@brightlineoffice.com>",
+  "text": "Hi Melissa,\n\nThanks for walking me through that. Given the callback and second-approval steps, we've decided not to move our receiving account after all; it isn't worth the disruption for our customers. Please keep everything as is. We'll stay with Chase.\n\nCarla\n\n> On Fri, Nov 6, 2026, Melissa Grant <mgrant@larkspur-ind.com> wrote:\n> Hi Carla, if Brightline does change banks, we'll need a signed request on letterhead, and we'll call you back at the number in our vendor file before making any change. Payments would be held until that's done.\n>\n>> On Thu, Nov 5, 2026, Carla Benson <cbenson@brightlineoffice.com> wrote:\n>> Hi Melissa, our treasurer is considering moving us to a different bank next year. Hypothetically, what would your process be if we did?",
+  "label": "ordinary",
+  "vendor": "brightline",
+  "note": "Borderline: the thread discusses a possible bank change, but the earliest message is only a hypothetical question and the latest message decides against it. No request to send payments elsewhere is ever made."
+}

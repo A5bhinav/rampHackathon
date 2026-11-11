@@ -1,0 +1,8 @@
+{
+  "subject": "International wire instruction",
+  "sender": "Dana Okafor <dokafor@cobalt.example>",
+  "text": "For all remittances to Cobalt Freight LLC please use wire only, to our European account:\n\nIBAN: DE89 3704 0044 0532 0130 00\nBIC: COBADEFFXXX\nBeneficiary: Cobalt Freight LLC\n\nNo US routing number applies. ACH will no longer be accepted.",
+  "label": "change_request",
+  "vendor": "cobalt",
+  "note": "Wire-only instruction with an IBAN and BIC and no ABA routing number at all."
+}

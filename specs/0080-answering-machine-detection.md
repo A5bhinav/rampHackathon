@@ -1,6 +1,7 @@
 # 0080: Answering-machine detection: fewer false "machine" labels, less dead air
 
-**Owner:** Sami (Parts A and C, `apps/voice`; Part B is a proposal for Abhi, who owns `packages/decision`)
+**Owner:** Sami (Parts A and C, `apps/voice`; Part B in `packages/decision`, which Abhi owns, built by
+Sami on Nov 10, see "Part B, as built")
 **Slice:** call and adversary  **Target day:** Tue Nov 10
 
 ## Goal
@@ -177,6 +178,82 @@ better than a two-second audio check does. A voicemail, fax or phone menu cannot
 - The lab cannot exercise this case. Its text line ends a `machine` persona at connect, and its
   personas never produce `unknown`. So it needs engine unit tests, not lab truth.
 
+### Part B, as built (Sami, Nov 10)
+
+Sami decided to build Part B as proposed above, and answered Q133's first part.
+
+1. **The precondition is a fact, `digits_typed`.** It is computed by code from the recorded
+   answers, not a refusal of spoken digits in the core.
+   - It lives on `CaseFacts` as `digits_typed: bool = False`, and `facts_from_answers` computes it.
+     So the core's `call_facts` and the lab both get it, with no change to the core.
+   - **True** only when there is at least one `account_last4` answer and **every** `account_last4`
+     answer has `capture_method` `keypad`.
+   - A missing or other `capture_method` counts as not typed (R7).
+   - **Why every one, not "at least one" as proposed:** `last_four_result` is computed from every
+     `account_last4` answer (`compare_last_four`). So a call with spoken digits and typed digits
+     must not count as typed.
+   - The stored answers keep `capture_method` (`protect` changes only the digits), so the fact
+     works on the stored report.
+2. **`V03_live_person`** holds when the result is `answers_recorded` and either:
+   - the label is `human`; or
+   - the label is absent, `digits_typed` is true, and `last_four_result` is set and is not
+     `not_provided`.
+
+   NR01 is unchanged, and so are both of V03's sentences. The API and the decision page render
+   today's sentences for every engine version, so a changed "not met" sentence would be false on
+   the 1.1.0 decisions that recorded it (review fix: the first draft's new sentence said the digits
+   weren't typed, and they almost always were). `SLOT_RULES["account_last4"]` gains V03, since V03
+   now reads the digits' capture method. So the dashboard lists V03 among the rules the digits
+   answer feeds.
+3. **`valid()` requires `digits_typed` to be a real boolean.** Anything else is NR97.
+4. **The engine version becomes `decision-1.2.0`.** Decisions made by 1.1.0 show the existing
+   "made by an older engine" note on their checklist (`views.checklist`), as for 1.1.0 in
+   spec 0082.
+5. **The lab follows the rule.** F1's oracle (`reports.unconfirmed`) restates the verify
+   conditions, so an absent label is no longer "missing" there when every `account_last4` answer
+   was typed.
+   - F2's `answerer_unknown` move now starts from `human` only. From `human`, no label asks for
+     everything `human` does plus typed digits, so the move still can't help.
+   - From `machine`, it would replace evidence against the change (NR01), which spec 0048 B4 lets
+     help.
+   - This narrowing, and listing V03 in `UNREACHABLE.md`, were both made after the first run's
+     results (58 F2 labels, and one sweep problem). `evals/FINDINGS.md` C15 records both, each
+     with its reason.
+6. **Q133's second part** (the status route and the `machine` race) stays open. It is out of
+   scope here.
+
+#### Acceptance, Part B
+
+- [ ] B1. `facts_from_answers` sets `digits_typed`:
+  - true for one or more `account_last4` answers, all `keypad`;
+  - false for none, for any `speech`, or for a missing `capture_method`.
+- [ ] B2. With the label absent, the effects table above holds: typed digits that match give
+  verified, with `V03_live_person` in `rules_fired`. Typed digits that mismatch give NV02, and
+  digits matching the old account give NV03. Spoken digits give needs review with
+  `V03_live_person_unmet`. No digits, which production records as `not_provided`, gives NR06
+  (corrected after the review: the first draft said V03 for no digits too).
+- [ ] B3. A `machine` label still gives NR01, typed digits or not. A `human` label is unchanged:
+  `digits_typed` doesn't matter.
+- [ ] B4. `digits_typed` that is not a real boolean gives NR97.
+- [ ] B5. `ENGINE_VERSION` is `decision-1.2.0`.
+- [ ] B6. A worked example: label absent, digits typed and matching, everything else clean, gives
+  verified (`23-unknown-label-typed-digits.json`).
+- [ ] B7. The lab: F1 holds with the new oracle (`lab reports`), the frozen findings re-run, and
+  `lab sweep` finds every rule seen or listed. Spec 0006's V03 row and `docs/live-call.md` say
+  what changed.
+
+#### Tests, Part B (written first)
+
+| Acceptance item | Test |
+|---|---|
+| B1 | `packages/decision/tests/test_facts.py::test_digits_typed_needs_every_digit_answer_on_the_keypad` |
+| B2, B3 | `packages/decision/tests/test_rules.py::test_an_unknown_label_verifies_only_with_typed_digits` |
+| B4 | `packages/decision/tests/test_rules.py::test_each_rule_fires_in_its_block` (an `ALSO` row) |
+| B5 | `packages/decision/tests/test_engine.py::test_a_clean_confirmation_is_verified_with_every_condition_named` (its version pin moves from 1.1.0) |
+| B6 | `packages/decision/tests/test_examples.py::test_worked_example[23-unknown-label-typed-digits]` |
+| B7 | `evals/tests/test_reports.py::test_an_unknown_label_with_typed_digits_is_an_honest_confirmation`, `::test_f2_unknown_never_replaces_a_machine_label`, `evals/tests/test_rule_sweep.py` |
+| D1 (stored shape) | `apps/core/tests/test_call_facts.py::test_typed_digits_survive_the_stored_shape` (review fix) |
+
 ### Part C (after Part B merges, `apps/voice`)
 
 Lower `MachineDetectionSilenceTimeout` from 5000 to **2500 ms**. Someone who picks up and waits
@@ -185,7 +262,28 @@ silently then hears the disclosure after about 2.5 seconds instead of 5.
   would send more good calls to review, so it waits.
 - **Risk:** someone who waits about 2.5 seconds and then says "Hello?" may overlap the first words
   of the disclosure. Check case (d) and the talk-over question cover this.
-- It gets its own small PR.
+- It gets its own small PR, stacked on Part B's and merged after it.
+
+#### Acceptance, Part C
+
+- [ ] C1. The dial request sends `MachineDetectionSilenceTimeout=2500`. The other detection
+  settings are unchanged (A1), and the constant's comment says why.
+- [ ] C2. `docs/live-call.md`: picking up in silence now gets the disclosure after about 2.5
+  seconds, and the check gains case (d), pick up and say nothing.
+  - **Pass:** the label is `unknown`, the whole disclosure is heard, and the call verifies with
+    typed digits.
+  - **Also record, once:** say "Hello?" at about 3 seconds, which lands on the disclosure, since it
+    starts at about 2.5 seconds. Note whether the disclosure was still heard in full. That is the
+    real R8 risk Part C adds. It isn't a pass condition, but a "no" is reported and revisits the
+    value.
+  - Corrected after the review: the first draft's bar ("the disclosure doesn't start over a 'Hello?'
+    at about 3 seconds") could not fail.
+
+#### Tests, Part C
+
+| Acceptance item | Test |
+|---|---|
+| C1 | `apps/voice/tests/test_origination.py::test_dial_request_carries_the_detection_settings` (its 5000 becomes 2500, on purpose) |
 
 ## Considered and rejected
 
@@ -211,7 +309,7 @@ Part A:
 
 - [ ] A1. The dial request sends `MachineDetection=Enable`, `MachineDetectionSpeechThreshold=4500`,
   `MachineDetectionSpeechEndThreshold=1200` and `MachineDetectionSilenceTimeout=5000`, and sends no
-  `AsyncAmd` and no `MachineDetectionTimeout`.
+  `AsyncAmd` and no `MachineDetectionTimeout`. (Part C's C1 supersedes the 5000: it is 2500.)
 - [ ] A2. The values are named constants in `twilio/origination.py`, each with its reason in a comment.
 - [ ] A3. A signed TwiML fetch logs exactly one INFO line on `dialback_voice.app` in D3's format,
   with our path call id, the `AnsweredBy` value and the duration. The TwiML returned is the same as
@@ -227,8 +325,7 @@ Part A:
   fine, where to read the log line, and carries the check above (cases (a) to (c)) for the
   teammate placing the first calls.
 
-Part B and Part C have no acceptance items here. Part B is Abhi's to accept, specify and build.
-Part C is its own PR, and adds case (d).
+Part B's acceptance is under "Part B, as built". Part C is its own PR, and adds case (d).
 
 ## Tests (written first)
 
@@ -243,7 +340,7 @@ Part C is its own PR, and adds case (d).
 
 ## Out of scope
 
-- Part B's rule change and Part C's lower silence timeout (above).
+- Part C's lower silence timeout, in its own PR (above). Part B is built here.
 - The status-report race for `machine` calls. It fails safe (a redial), and it is noted here and
   in Q133.
 - Making the relay play the voicemail line on a `machine` label.
@@ -251,10 +348,11 @@ Part C is its own PR, and adds case (d).
 
 ## Open questions
 
-- **Q133 (Abhi):**
-  - Accept Part B? If so, which precondition for `typed`: a `digits_typed` fact computed by the
-    core from `capture_method`, or the core refusing spoken `account_last4` answers?
-  - Separately: should the status route stop reporting `machine` for a call whose WebSocket was
+- **Q133:**
+  - ~~Accept Part B? If so, which precondition for `typed`?~~ Answered by Sami, Nov 10: yes, with a
+    `digits_typed` fact computed from `capture_method`, true only when every `account_last4`
+    answer was typed (see "Part B, as built").
+  - Still open: should the status route stop reporting `machine` for a call whose WebSocket was
     verified, so the race can't turn an answered call into a redial? That is an `apps/voice`
     change; Sami would build it.
 - **Q134 (Sami, first live call):** does the synchronous TwiML fetch carry
@@ -270,4 +368,9 @@ Part C is its own PR, and adds case (d).
 cd apps/voice && uv run pytest -q
 uv run --no-project --with ruff ruff check apps packages scripts corpus
 python3 scripts/ci/boundaries.py
+# Part B also:
+cd packages/decision && uv run pytest -q
+cd apps/core && uv run pytest -q          # the Postgres tests need a database (DATABASE_URL)
+cd evals && uv run pytest -q -m "not selection_gate and not report_gate"
+cd evals && uv run lab run --split voice && uv run lab reports --examples 2000 --seed 0 && uv run lab sweep
 ```

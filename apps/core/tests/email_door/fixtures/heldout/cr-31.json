@@ -1,0 +1,8 @@
+{
+  "subject": "RE: RE: FW: RE: Cobalt pickup schedule and billing",
+  "sender": "Morgan Pryce <ar@cobalt.example>",
+  "text": "Sounds good, thanks all.\n\nOn Wed, Nov 4, 2026 at 3:02 PM Ben Carter <ben@ourco.example> wrote:\n> Thursday works for pickup at the east dock.\n>\n> On Wed, Nov 4, 2026 at 11:40 AM Dispatch <dispatch@cobalt.example> wrote:\n>> We can do Thursday 2pm or Friday morning. Which do you prefer?\n>>\n>> On Tue, Nov 3, 2026 at 5:15 PM Ben Carter <ben@ourco.example> wrote:\n>>> Need to move the pickup from Monday. Can we reschedule?\n>>>\n>>> On Tue, Nov 3, 2026 at 9:02 AM Morgan Pryce <ar@cobalt.example> wrote:\n>>>> Re the pickup: one admin item. We changed banks, so starting with the November invoices\n>>>> payments to Cobalt Freight LLC go to account 0007 7778 5002, routing 011000138.\n>>>> Please ack. Pickup details to follow from dispatch.",
+  "label": "change_request",
+  "vendor": "cobalt",
+  "note": "The request is buried at the bottom of a long quoted chain; the top is routine scheduling."
+}

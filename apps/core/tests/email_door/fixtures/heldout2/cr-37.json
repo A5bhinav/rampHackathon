@@ -1,0 +1,8 @@
+{
+  "subject": "Payment allocation going forward",
+  "sender": "Angela Pruitt <apruitt@cobaltfreight.com>",
+  "text": "Hi Melissa,\n\nStarting with the December run, please split each Cobalt Freight payment as follows:\n\n- 60% to our existing operating account (Chase, ending 8888), no change there\n- 40% to our new fuel reserve account:\n    PNC Bank\n    Routing 043000096\n    Account 1022 4485 9301\n\nOur CFO set up the reserve account to manage fuel costs. Remittance detail can go to ar@cobaltfreight.com as usual.\n\nThank you!\nAngela",
+  "label": "change_request",
+  "vendor": "cobalt",
+  "note": "Split payment: part keeps going to the on-file account ('no change there'), part goes to a new account. Any portion going somewhere new makes it a change request."
+}

@@ -1,0 +1,8 @@
+{
+  "subject": "Payment to new entity",
+  "sender": "Walt Fisher <walt@fisherfabrication.example>",
+  "text": "Fisher Fabrication has been sold. Invoices from now on are issued by Fisher Industrial\nGroup, and payment goes to their account, routing 026009593, account 6620011893.",
+  "label": "change_request",
+  "vendor": null,
+  "note": "Entity sale with new payee account."
+}

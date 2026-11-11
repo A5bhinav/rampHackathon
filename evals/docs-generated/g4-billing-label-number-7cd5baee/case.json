@@ -1,0 +1,89 @@
+{
+  "name": "g4-billing-label-number-7cd5baee",
+  "patterns": [
+    "G3/billing/label_number",
+    "G4/billing/label_number"
+  ],
+  "why": "G4/billing/label_number: shrunk from doc-s0-00151, found by lab docs at seed 0 in 1000 documents",
+  "violations": [
+    {
+      "pattern": "G3/billing/label_number",
+      "number": "+14155550174",
+      "detail": "claim billing, customer labeled billing, vendor"
+    },
+    {
+      "pattern": "G4/billing/label_number",
+      "number": "+14155550174",
+      "detail": "claim billing, customer labeled billing, vendor"
+    }
+  ],
+  "plan": {
+    "type": "doc",
+    "id": "doc-s0-00151",
+    "kind": "contract_page",
+    "author": "customer",
+    "channel": "contract",
+    "sender": null,
+    "thread": null,
+    "subject": null,
+    "received_at": "2026-01-30T16:00:00+00:00",
+    "filler": [],
+    "numbers": [
+      {
+        "e164": "+14155550174",
+        "owner": "customer",
+        "role": "billing",
+        "party": "customer",
+        "phrasing": "billing",
+        "placement": "label_number",
+        "format": "paren",
+        "visibility": "visible",
+        "shares_line": false
+      }
+    ],
+    "quote": null
+  },
+  "documents": [
+    {
+      "id": "doc-s0-00151",
+      "kind": "contract_page",
+      "custody": {
+        "channel": "contract",
+        "received_at": "2026-01-30T16:00:00+00:00",
+        "sender": null,
+        "thread_id": null,
+        "subject": null,
+        "parent_document_id": null
+      },
+      "pages": [
+        {
+          "width": 612,
+          "height": 792,
+          "spans": [
+            {
+              "text": "Master supply agreement",
+              "x": 72,
+              "y": 72,
+              "size": 10,
+              "color": "#000000"
+            },
+            {
+              "text": "Example Customer Co",
+              "x": 72,
+              "y": 86,
+              "size": 10,
+              "color": "#000000"
+            },
+            {
+              "text": "Billing: (415) 555-0174",
+              "x": 72,
+              "y": 100,
+              "size": 10,
+              "color": "#000000"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

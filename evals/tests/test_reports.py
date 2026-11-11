@@ -237,6 +237,20 @@ def _without_company(case):
                              truth={**case.truth, "company": [], "company_class": []})
 
 
+def test_an_unknown_label_with_typed_digits_is_an_honest_confirmation():
+    # Spec 0080, Part B (Sami, Nov 10): typed digits show a live person, so an absent label (Twilio's
+    # "unknown") no longer blocks when every digit answer came from the keypad. F1's oracle restates that.
+    base = reports.honest()                                     # its digits are typed on the keypad
+    unknown = reports.with_case(base, answered_by=None)
+    assert reports.unconfirmed(unknown) == [] and reports.run(unknown).decision.outcome == "verified"
+    assert reports.check_f1([unknown]).violations == []
+    spoken = reports.with_case(unknown, answers=tuple({**a, "capture_method": "speech"} if a["slot"] == "account_last4"
+                                                      else a for a in unknown.answers))
+    assert reports.unconfirmed(spoken) == ["answered_by=unknown"]
+    assert reports.run(spoken).decision.outcome == "needs_review"
+    assert reports.unconfirmed(reports.with_case(base, answered_by="machine")) == ["answered_by=machine"]
+
+
 def test_f1_no_longer_asks_for_a_company_answer():
     # D7b: a missing company answer does not block, so it is not a condition of an honest confirmation either.
     dropped = _without_company(reports.honest())
@@ -430,6 +444,17 @@ def test_f2_never_replaces_a_refusal():
         assert reports.run(reports.with_company(refusing, "Globex Logistics", "other")).decision.outcome == "verified"
         assert reports.MOVES["company_negation"](refusing) is not None
     assert reports.MOVES["company_other"](base) is not None and reports.MOVES["company_negation"](base) is not None
+
+
+def test_f2_unknown_never_replaces_a_machine_label():
+    # Spec 0080, Part B: a "machine" label is evidence against the change (NR01). Replacing it with no label may
+    # help, as dropping a flag may (spec 0048, B4): with typed digits the call can now verify. So the move starts
+    # only from "human", where it is a step to a less certain value and still must never help (FINDINGS C15).
+    machine = reports.with_case(reports.honest(), answered_by="machine")
+    assert reports.MOVES["answerer_unknown"](machine) is None
+    assert reports.run(reports.with_case(machine, answered_by=None)).decision.outcome == "verified"
+    assert reports.MOVES["answerer_unknown"](reports.honest()) is not None
+    assert reports.MOVES["answerer_machine"](reports.with_case(reports.honest(), answered_by=None)) is not None
 
 
 def test_f2_retires_the_company_moves_spec_0082_makes_moot():

@@ -57,6 +57,7 @@ class CaseFacts:
     offered_number: bool = False                     # the callee asked us to call another number
     # Computed by code.
     last_four_result: str | None = None
+    digits_typed: bool = False                       # every account_last4 answer came from the keypad (spec 0080, B)
     company_matches: bool | None = None              # every company value against the vendor's names
     checks: CallChecks | None = None                 # computed by the voice service
     consent_first: bool | None = None                # D3
@@ -137,6 +138,14 @@ def same_person(answers: list[dict[str, Any]]) -> bool | None:
     return None
 
 
+def digits_typed(answers: list[dict[str, Any]]) -> bool:
+    """At least one digits answer, and every one typed on the keypad (spec 0080, Part B). A voicemail,
+    fax or phone menu can't type them, so they show a live person. Every one, not any one, because the
+    last-four result reads them all; a missing capture method counts as not typed (R7)."""
+    digits = [a for a in answers if a["slot"] == "account_last4"]
+    return bool(digits) and all(a.get("capture_method") == "keypad" for a in digits)
+
+
 def earlier_call(body: dict[str, Any]) -> EarlierCall:
     """Summarize a stored call_ended body (evidence-event.schema.json, CallEndedBody)."""
     answers = (body.get("answers") or {}).get("answers") or []
@@ -157,6 +166,7 @@ def facts_from_answers(answers: list[dict[str, Any]], **known: Any) -> CaseFacts
         speaker_role=values(answers, "speaker_role"),
         flags=values(answers, "flag"),
         offered_number=bool(values(answers, "offered_number")),
+        digits_typed=digits_typed(answers),
         consent_first=consent_first(answers) if timed else None,
         answers_in_order=answers_in_order(answers) if timed else None,
         same_person_yes_and_digits=same_person(answers) if timed else None,

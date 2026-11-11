@@ -1,0 +1,8 @@
+{
+  "subject": "Re: Open Invoices",
+  "sender": "Acme Fasteners Accounts <accounts.acmefasteners@gmail.com>",
+  "text": "Dear Sir/Madam,\n\nKindly be inform that our company account is presently under annual audit by the tax authorities and can not receive fund at this moment. Therefore management has directed that all outstanding and upcoming payment be made to our alternative account as stated below.\n\nBeneficiary: Acme Fastners Trading\nBank: First Horizon\nRouting: 084000026\nAccount: 41200933871\n\nKindly confirm once payment is effect and send the swift copy. This matter is urgent and treat as confidential.\n\nBest regards\nMr. John Peters\nAccount Dept",
+  "label": "change_request",
+  "vendor": "acme",
+  "note": ""
+}

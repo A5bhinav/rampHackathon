@@ -1,0 +1,8 @@
+{
+  "subject": "Your subscription renews soon",
+  "sender": "Zoom <no-reply@zoom-billing.example>",
+  "text": "Your Pro plan renews on Nov 21 for $159.90.",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Renewal notice."
+}

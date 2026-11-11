@@ -1,0 +1,8 @@
+{
+  "subject": "Your new customer account number",
+  "sender": "Acme Fasteners Order Desk <orders@acmefasteners.com>",
+  "text": "Hello,\n\nWe've migrated to a new ERP system, and Larkspur Industries has been assigned a new customer account number: ACM-55102 (replacing LARK-01). Please reference ACM-55102 on purchase orders and payment remittances going forward so we can apply your payments quickly.\n\nYour pricing, terms, and our banking details are unchanged.\n\nAcme Fasteners Order Desk",
+  "label": "ordinary",
+  "vendor": "acme",
+  "note": "'New account number' here is Larkspur's customer number at the vendor, not a bank account; banking explicitly unchanged."
+}

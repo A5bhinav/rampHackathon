@@ -1,0 +1,8 @@
+{
+  "subject": "Remittance advice request",
+  "sender": "Dana Okafor <dokafor@cobalt.example>",
+  "text": "Could you send a remittance advice for last week's payment? We cannot match it to an invoice.",
+  "label": "ordinary",
+  "vendor": "cobalt",
+  "note": "Asks for remittance advice; no destination change."
+}

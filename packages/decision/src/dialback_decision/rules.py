@@ -92,7 +92,7 @@ def valid(f: object, mode: Mode) -> bool:
     return (_member(f.call_result, CALL_RESULTS) and isinstance(f.dialed_eligible_number, bool)
             and _strings(f.recording_consent, CONSENT) and _strings(f.company_named)
             and _strings(f.change_requested, CHANGE) and isinstance(f.speaker_named, bool) and _strings(f.speaker_role)
-            and _strings(f.flags, FLAGS) and isinstance(f.offered_number, bool)
+            and _strings(f.flags, FLAGS) and isinstance(f.offered_number, bool) and isinstance(f.digits_typed, bool)
             and _optional(f.last_four_result, LAST_FOUR_RESULTS) and _optional(f.answered_by, ANSWERED_BY)
             and all(getattr(f, n) is None or isinstance(getattr(f, n), bool) for n in TRI_STATE)
             and _checks_ok(f.checks) and isinstance(f.earlier_calls, tuple) and all(map(_earlier_ok, f.earlier_calls))
@@ -213,8 +213,14 @@ VERIFIED: tuple[Rule, ...] = (
     Rule("V02_outbound_dial", "We placed the call, outbound, to the number we chose.",
          lambda f, m: f.dialed_out is True and f.dialed_number_is_pick is True,
          "We could not confirm the call was outbound to the number we chose."),
+    # Spec 0080, Part B: with no label (Twilio's "unknown", silence at pickup), digits typed on the keypad
+    # show a live person; a machine can't type them. A "machine" label still goes to review (NR01). Both
+    # sentences are unchanged, so they stay true for decisions earlier engine versions recorded.
     Rule("V03_live_person", "A person, not a machine, answered and gave the answers.",
-         lambda f, m: f.call_result == "answers_recorded" and f.answered_by == "human",
+         lambda f, m: f.call_result == "answers_recorded" and (
+             f.answered_by == "human"
+             or (f.answered_by is None and f.digits_typed is True
+                 and f.last_four_result not in (None, "not_provided"))),
          "We could not confirm a person, not a machine, answered."),
     Rule("V04_recording_consent", "The person agreed to the recorded call before anything else.",
          lambda f, m: _only(f.recording_consent, "yes") and f.consent_first is True,
@@ -267,7 +273,9 @@ SLOT_RULES: dict[str, tuple[str, ...]] = {
     "change_requested": ("V07_right_person_confirmed", "V09_same_person", "V10_answers_grounded", "NV01_vendor_denied_change",
                          "NR09_change_unsure", "NR14_answer_not_in_transcript", "NR17_split_speakers",
                          "NR18_contradictory_answers"),
-    "account_last4": ("V08_digits_match", "V10_answers_grounded", "NV02_digits_mismatch", "NV03_digits_match_old_account",
+    # V03 reads the digits' capture method since spec 0080, Part B (an unlabeled call verifies with typed digits).
+    "account_last4": ("V03_live_person", "V08_digits_match", "V10_answers_grounded", "NV02_digits_mismatch",
+                      "NV03_digits_match_old_account",
                       "NR05_digits_near_miss", "NR06_digits_not_provided", "NR07_digits_ambiguous", "NR08_digits_inconsistent",
                       "NR14_answer_not_in_transcript"),
     "offered_number": ("V12_no_flags", "NV04_offered_number_from_request", "NR13_another_number"),

@@ -1,0 +1,8 @@
+{
+  "subject": "Action Required: Supplier bank account change pending approval",
+  "sender": "SupplierHub Notifications <no-reply@supplierhub-portal.com>",
+  "text": "SupplierHub\n\nSupplier profile change pending your approval\n\nSupplier: Cobalt Freight LLC\nSupplier ID: SUP-004417\nChange type: Remittance bank account\nSubmitted by: r.teller@cobaltfreight.com\nSubmitted on: 11/09/2026 08:14 PM ET\n\nField                Current              Requested\nBank name            JPMorgan Chase       PNC Bank\nRouting number       *****0021            *****0016\nAccount number       ********8888         ********3021\nRemit-to name        Cobalt Freight LLC   Cobalt Freight LLC\n\nThe requested remittance details will be used for all payments released after approval.\n\nReview and approve: https://app.supplierhub-portal.com/approvals/CHG-77310\n\nYou are receiving this message because you are an approver for Larkspur Industries.",
+  "label": "change_request",
+  "vendor": "cobalt",
+  "note": "Supplier-portal notification of a pending remittance bank change; numbers are masked. Asks the reader to approve the new destination."
+}

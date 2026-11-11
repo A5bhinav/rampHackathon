@@ -1,0 +1,8 @@
+{
+  "subject": "Now accepting credit card payments",
+  "sender": "Brightline Office Supply Inc <ar@brightlineoffice.com>",
+  "text": "Dear Customer,\n\nBrightline Office Supply Inc now accepts Visa, Mastercard and American Express for invoice payments through our customer portal, in addition to ACH and check. A 2.5% convenience fee applies to card payments.\n\nThis is optional. If you prefer to continue paying by ACH, no action is required and your current remittance instructions remain valid.\n\nBrightline Office Supply Inc",
+  "label": "ordinary",
+  "vendor": "brightline",
+  "note": "Vendor announcing an optional additional payment method; existing instructions unchanged and no action requested."
+}

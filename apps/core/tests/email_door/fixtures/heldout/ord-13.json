@@ -1,0 +1,8 @@
+{
+  "subject": "Invoice 2301 paid yet?",
+  "sender": "Morgan Pryce <ar@cobalt.example>",
+  "text": "Hi, I don't see 2301 in our deposits. Was it released yet?",
+  "label": "ordinary",
+  "vendor": "cobalt",
+  "note": "Status."
+}

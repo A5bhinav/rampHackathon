@@ -15,7 +15,7 @@ from dialback_core import api
 from dialback_core.db import system_tx
 from dialback_core.detection import import_all
 from dialback_core.flags import RampMode
-from flows import case_of, report, transit
+from flows import assert_nowhere, case_of, report, transit
 from psycopg.types.json import Jsonb
 from test_api import get, token
 
@@ -109,14 +109,7 @@ async def test_the_full_account_number_is_never_stored_returned_or_logged(demo, 
     await demo.worker.drain(demo.dataset.id)
     assert ACCOUNT not in str(result)
     assert ACCOUNT not in caplog.text
-    async with system_tx(demo.pool) as conn:
-        tables = await (await conn.execute(
-            "select table_schema, table_name from information_schema.tables "
-            "where table_schema in ('app', 'audit', 'ledger', 'voice', 'lab') and table_type = 'BASE TABLE'")).fetchall()
-        for t in tables:
-            hit = await (await conn.execute(
-                f'select count(*) as n from "{t["table_schema"]}"."{t["table_name"]}" x where x::text like %s', (f"%{ACCOUNT}%",))).fetchone()
-            assert hit["n"] == 0, f"{t['table_schema']}.{t['table_name']} holds the full account number"
+    await assert_nowhere(demo.pool, caplog, ACCOUNT)
 
 
 @pytest.mark.parametrize("body", [
@@ -125,6 +118,8 @@ async def test_the_full_account_number_is_never_stored_returned_or_logged(demo, 
     {"routing_number": ROUTING, "account_number": "123"},           # too short
     {"routing_number": ROUTING, "account_number": "12345678901234567890"},  # too long
     {"routing_number": ROUTING, "account_number": "1234-5678"},     # not digits
+    {"routing_number": ROUTING + "\n", "account_number": ACCOUNT},  # a trailing newline
+    {"routing_number": ROUTING, "account_number": ACCOUNT + "\n"},
 ])
 async def test_a_malformed_number_is_refused_without_echoing_it(demo, body):
     before = await mock_accounts(demo)

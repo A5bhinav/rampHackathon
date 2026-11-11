@@ -1,0 +1,8 @@
+{
+  "subject": "Vendor information form",
+  "sender": "Dana Whitfield <ar@acme.example>",
+  "text": "Our compliance team requires an updated W-9 and a vendor information form from you. Please\nfill in the attached and return it.",
+  "label": "ordinary",
+  "vendor": "acme",
+  "note": "W-9 / vendor info form request toward AP's company."
+}

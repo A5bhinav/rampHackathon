@@ -62,13 +62,16 @@ export type Asked = { slot: string; wording: string; answers: CallAnswerView[] }
 
 /** The script's questions in order, each with the answers recorded for its slot (by turn), and
  *  any answer outside the script's questions (a flag, an offered number) after them. */
-// One question asks for both the name and the role; the name completes it (dialback_policy.script).
-const ALSO: Record<string, string[]> = { speaker_name: ["speaker_role"] };
+// Before spec 0034 D2 one question asked for both the name and the role, and the name completed it.
+// A script that old has no role question, so the role is listed under the name. Today's script asks
+// the role on its own (dialback_policy.script), and then each question lists only its own slot.
+const FOLDED: Record<string, string[]> = { speaker_name: ["speaker_role"] };
 
 export function conversation(script: CallScript | undefined, answers: readonly CallAnswerView[]): { asked: Asked[]; extra: CallAnswerView[] } {
   const byTurn = [...answers].sort((x, y) => x.turn_id - y.turn_id);
-  const of = (slot: string) => [slot, ...(ALSO[slot] ?? [])];
   const questions = script?.questions ?? [];  // no script from an older core: every answer is listed on its own
+  const ownQuestion = new Set(questions.map((q) => q.slot));
+  const of = (slot: string) => [slot, ...(FOLDED[slot] ?? []).filter((s) => !ownQuestion.has(s))];
   const asked = questions.map((q) => ({ ...q, answers: byTurn.filter((x) => of(q.slot).includes(x.slot)) }));
   const slots = new Set(questions.flatMap((q) => of(q.slot)));
   return { asked, extra: byTurn.filter((x) => !slots.has(x.slot)) };

@@ -1,0 +1,8 @@
+{
+  "subject": "Refund for duplicate payment - our bank details",
+  "sender": "Lena Fischer <l.fischer@osprey-automation.com>",
+  "text": "Hi,\n\nYour AR team confirmed we paid invoice NG-10198 twice ($3,450.00 on 10/02 and again 10/09). Rather than a credit, we would prefer a refund. Please send the $3,450.00 to:\n\nOsprey Automation GmbH, US branch\nBank: Citibank N.A.\nRouting 021000089\nAccount 3100887722\n\nLet me know when it has been sent so I can match it.\n\nThanks,\nLena Fischer\nOsprey Automation",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "A customer providing their own bank details to receive a refund. Not a vendor payment redirect; AP would pay them once, for our own overpayment."
+}

@@ -1,0 +1,89 @@
+{
+  "name": "g4-remittance-questions-clock-time-ef3cd443",
+  "patterns": [
+    "G3/remittance_questions/clock_time",
+    "G4/remittance_questions/clock_time"
+  ],
+  "why": "G4/remittance_questions/clock_time: shrunk from doc-s0-00527, found by lab docs at seed 0 in 1000 documents",
+  "violations": [
+    {
+      "pattern": "G3/remittance_questions/clock_time",
+      "number": "+14155550126",
+      "detail": "claim ar, customer labeled main, vendor"
+    },
+    {
+      "pattern": "G4/remittance_questions/clock_time",
+      "number": "+14155550126",
+      "detail": "claim ar, customer labeled main, vendor"
+    }
+  ],
+  "plan": {
+    "type": "doc",
+    "id": "doc-s0-00527",
+    "kind": "email_body",
+    "author": "customer",
+    "channel": "email",
+    "sender": "ap@customer.example",
+    "thread": "t-doc-s0-00527",
+    "subject": "Following up",
+    "received_at": "2026-08-27T16:00:00+00:00",
+    "filler": [],
+    "numbers": [
+      {
+        "e164": "+14155550126",
+        "owner": "customer",
+        "role": "ar",
+        "party": "customer",
+        "phrasing": "remittance_questions",
+        "placement": "clock_time",
+        "format": "paren",
+        "visibility": "visible",
+        "shares_line": false
+      }
+    ],
+    "quote": null
+  },
+  "documents": [
+    {
+      "id": "doc-s0-00527",
+      "kind": "email_body",
+      "custody": {
+        "channel": "email",
+        "received_at": "2026-08-27T16:00:00+00:00",
+        "sender": "ap@customer.example",
+        "thread_id": "t-doc-s0-00527",
+        "subject": "Following up",
+        "parent_document_id": null
+      },
+      "pages": [
+        {
+          "width": 612,
+          "height": 792,
+          "spans": [
+            {
+              "text": "Message",
+              "x": 72,
+              "y": 72,
+              "size": 10,
+              "color": "#000000"
+            },
+            {
+              "text": "Example Customer Co",
+              "x": 72,
+              "y": 86,
+              "size": 10,
+              "color": "#000000"
+            },
+            {
+              "text": "Office hours 9:00-5:00, Remittance questions: (415) 555-0126",
+              "x": 72,
+              "y": 100,
+              "size": 10,
+              "color": "#000000"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

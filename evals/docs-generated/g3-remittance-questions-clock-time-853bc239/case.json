@@ -1,0 +1,83 @@
+{
+  "name": "g3-remittance-questions-clock-time-853bc239",
+  "patterns": [
+    "G3/remittance_questions/clock_time"
+  ],
+  "why": "G3/remittance_questions/clock_time: shrunk from doc-s0-00276, found by lab docs at seed 0 in 1000 documents",
+  "violations": [
+    {
+      "pattern": "G3/remittance_questions/clock_time",
+      "number": "+18675550179",
+      "detail": "claim ar, None labeled main, vendor"
+    }
+  ],
+  "plan": {
+    "type": "doc",
+    "id": "doc-s0-00276",
+    "kind": "email_body",
+    "author": "unrelated",
+    "channel": "email",
+    "sender": "info@other.example",
+    "thread": "t-doc-s0-00276",
+    "subject": "Following up",
+    "received_at": "2025-12-10T16:00:00+00:00",
+    "filler": [],
+    "numbers": [
+      {
+        "e164": "+18675550179",
+        "owner": "unrelated",
+        "role": "ar",
+        "party": null,
+        "phrasing": "remittance_questions",
+        "placement": "clock_time",
+        "format": "paren",
+        "visibility": "visible",
+        "shares_line": false
+      }
+    ],
+    "quote": null
+  },
+  "documents": [
+    {
+      "id": "doc-s0-00276",
+      "kind": "email_body",
+      "custody": {
+        "channel": "email",
+        "received_at": "2025-12-10T16:00:00+00:00",
+        "sender": "info@other.example",
+        "thread_id": "t-doc-s0-00276",
+        "subject": "Following up",
+        "parent_document_id": null
+      },
+      "pages": [
+        {
+          "width": 612,
+          "height": 792,
+          "spans": [
+            {
+              "text": "Message",
+              "x": 72,
+              "y": 72,
+              "size": 10,
+              "color": "#000000"
+            },
+            {
+              "text": "Other Example Logistics",
+              "x": 72,
+              "y": 86,
+              "size": 10,
+              "color": "#000000"
+            },
+            {
+              "text": "Office hours 9:00-5:00, Remittance questions: (867) 555-0179",
+              "x": 72,
+              "y": 100,
+              "size": 10,
+              "color": "#000000"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

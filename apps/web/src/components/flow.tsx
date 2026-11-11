@@ -13,7 +13,7 @@ import { Icon } from "./icons";
 export function QueueRail({ counts }: { counts: StationCount[] }) {
   return (
     <section className="rail-card" aria-labelledby="rail-h">
-      <h2 id="rail-h" className="sr-only">Where every change stands</h2>
+      <h2 id="rail-h" className="rail-title">Cases now at each step</h2>
       <ol className="rail rail-7">
         {counts.map((s, i) => (
           <li key={s.key} className={`station ${s.count ? "has-count" : "is-empty"}`}>

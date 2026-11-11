@@ -63,12 +63,13 @@ second owner (the partner) who reviews it.
 | Corpus: committed files match the generator, truth unchanged | `python3 corpus/generator/build.py --check` |
 | Call policy tests (script, tools, speech guard) | `cd packages/policy && uv run pytest` |
 | Voice service tests (text line, agent port, fail-closed) | `cd apps/voice && uv run pytest` |
-| Attack lab tests (the checks that must stay green; the gates run in their own jobs) | `cd evals && uv run pytest -q -m "not selection_gate and not report_gate"` |
+| Attack lab tests (the checks that must stay green; the gates run in their own jobs) | `cd evals && uv run pytest -q -m "not selection_gate and not report_gate and not docs_gate"` |
 | Attack lab: run the voice scenarios (scripted callers, no spend) | `uv run lab run --split voice` |
 | Attack lab: re-freeze the voice scenarios' hashes and required outcomes after a reviewed change | `uv run lab freeze --split voice` |
 | Attack lab: re-run the frozen selection findings, then search every generated world (near misses in `evals/out/`) | `uv run lab fuzz --search archive --examples 2000 --seed 0 --out evals/corpus-generated` |
 | Attack lab: the known-limit frontier and the over-block sweep (measurement, not gates) | `uv run lab frontier`, `uv run lab overblock` |
 | Attack lab: re-run the frozen call-report findings, then check generated call reports | `uv run lab reports --examples 2000 --seed 0` |
+| Attack lab: re-run the frozen document findings, then check generated documents through real ingestion and `select()` (stub reader) | `uv run lab docs --examples 1000 --seed 0` |
 | Attack lab: remove each decision rule in turn; every one is seen or listed in `evals/UNREACHABLE.md` | `uv run lab sweep` |
 | Run the whole skeleton locally (Postgres, Ramp mock, core with worker; seeded demo dataset) | `uv run python scripts/dev/stack.py --changes` |
 | End-to-end smoke run (the demo-smoke CI job) | `uv run python scripts/dev/stack.py --smoke` |
@@ -109,13 +110,15 @@ falls back to the safe path.
 
 | Flag | Values | Safe default |
 |------|--------|--------------|
-| `DIALBACK_RAMP` | `mock`, `sandbox` | `mock` |
+| `DIALBACK_RAMP` | `mock`, `sandbox` (whether the server has the mock; each dataset picks its Ramp, spec 0096) | `mock` |
 | `DIALBACK_VOICE` | `text`, `live` | `text` |
 | `DIALBACK_READER` | `stub`, `llm` | `stub` |
 | `DIALBACK_RESOLVER` | `stub`, `ledger` | `stub` |
 | `DIALBACK_LAB_ATTACKER` | `scripted`, `llm` | `scripted` |
 | `DIALBACK_CONTEXT_GUARD` | `on`, `off` | `on` (spec 0079: `off` runs today's selection rule alone, for rollback only) |
 | `DIALBACK_LABEL_BAR` | `on`, `off` | `on` (spec 0091: `off` runs spec 0079's rule exactly; `DIALBACK_CONTEXT_GUARD=off` still runs today's rule alone) |
+| `DIALBACK_EMAIL` | `off`, `resend` | `off` |
+| `DIALBACK_EMAIL_CLASSIFIER` | `rule`, `model` | `rule` |
 
 ## Key dates
 

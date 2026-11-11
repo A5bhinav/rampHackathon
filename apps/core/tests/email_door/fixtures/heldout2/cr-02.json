@@ -1,0 +1,8 @@
+{
+  "subject": "bank update",
+  "sender": "Tom Reyes <treyes@brightlineoffice.com>",
+  "text": "Hi - pls update our bank info before your next run. New acct below.\n\nRouting 121000248\nAcct 7788123401\n\nThx\nTom\nBrightline",
+  "label": "change_request",
+  "vendor": "brightline",
+  "note": "Terse informal request with new routing and account; vendor named only as 'Brightline' in the signature."
+}

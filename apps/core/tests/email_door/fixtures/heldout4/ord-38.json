@@ -1,0 +1,8 @@
+{
+  "subject": "ACH Return Notification",
+  "sender": "Treasury Alerts <alerts@wellsbank.example>",
+  "text": "ACH RETURN NOTIFICATION\n\nCompany ID: 1341998810\nBatch: 20261106-02\nReceiver: BRIGHTLINE OFFICE SUPPLY\nReturn reason: R04 Invalid Account Number\nAmount: $2,148.50\nTrace: 021000021884123\n\nLog in to Treasury Portal to view details.",
+  "label": "ordinary",
+  "vendor": "brightline",
+  "note": "Bank return alert. Trace number begins with a routing-like string."
+}

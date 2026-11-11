@@ -1,0 +1,8 @@
+{
+  "subject": "Remittance address change",
+  "sender": "Greg Holt <accounting@holtmetals.example>",
+  "text": "Please note that we have moved our payment processing to a lockbox. All checks and ACH\npayments should now be sent to Holt Metals, PO Box 40817, Cincinnati OH 45240, ACH via\nFifth Third routing 042000314 acct 7783110245. Thank you.",
+  "label": "change_request",
+  "vendor": null,
+  "note": "Moves remittance to lockbox plus new ACH details."
+}
