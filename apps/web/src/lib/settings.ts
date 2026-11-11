@@ -2,6 +2,7 @@
 // (the nine guarantees and where they're enforced) is allowed; everything else comes from the core,
 // and what the API doesn't report yet says so rather than showing a guess.
 import type { CallScript, Me, Selection } from "./api-types";
+import { roleLabels } from "./people.ts";
 
 export const NOT_REPORTED = "not reported yet";
 
@@ -41,10 +42,10 @@ export function integrationRows({ kind, chain, lastCheck, alerts }: {
 
 export function peopleRows(me: Me, demo: boolean): { name: string; roles: string; note: string }[] {
   return [
-    { name: me.display_name, roles: me.roles.join(", ") || "no role", note: "You" },
+    { name: me.display_name, roles: roleLabels(me.roles), note: "You" },
     ...(demo ? [
-      { name: "Demo clerk", roles: "clerk", note: "Shared demo account behind \"Viewing as\"" },
-      { name: "Demo approver", roles: "approver", note: "Shared demo account behind \"Viewing as\"" },
+      { name: "Demo clerk", roles: roleLabels(["clerk"]), note: "Shared demo account behind \"Viewing as\"" },
+      { name: "Demo approver", roles: roleLabels(["approver"]), note: "Shared demo account behind \"Viewing as\"" },
     ] : []),
   ];
 }

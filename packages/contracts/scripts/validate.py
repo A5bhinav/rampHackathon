@@ -84,7 +84,7 @@ def check_schemas_and_examples() -> int:
             continue
         data = load(ex)
         errors = errors_for(schemas[schema_path], data)
-        if stem in ("evidence-event", "selection"):  # both are hashed; floats are refused
+        if stem in ("evidence-event", "selection", "admin-event"):  # all three are hashed; floats are refused
             errors += integers_only(data)
         if errors:
             failures += 1

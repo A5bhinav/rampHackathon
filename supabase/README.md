@@ -53,7 +53,7 @@ migrates a fresh database the same way. Put `scripts/db` on pytest's `pythonpath
 
 | Object | Role |
 |---|---|
-| `audit.chains` | One chain per dataset. A demo reset starts a new chain rather than deleting rows. |
+| `audit.chains` | One chain per dataset, plus one organisation chain (`app.org_settings.chain_id`) for admin actions (spec 0095). A demo reset starts a new chain rather than deleting rows. |
 | `audit.evidence_events` | Append-only. `body_jcs` is the exact canonical JSON that was hashed; `content_hash`, `prev_hash`, `hash` form the chain. Unique `(chain_id, prev_hash)` rules out forks. No update or delete grant for anyone, and triggers refuse all three. |
 | `audit.jcs(jsonb)` | RFC 8785 canonical JSON in SQL (keys by UTF-8 bytes, Postgres string escaping, integers only). |
 | `audit.append_evidence(chain, envelope, expected_hash?)` | The only way to write evidence: canonicalize, hash, lock the chain, link to the tip, insert. |
@@ -66,7 +66,7 @@ Core tables: `datasets`, `vendors`, `bank_accounts` (last four and a keyed finge
 never the number), `bank_change_events`, `cases`, `holds`, `releases`, `decisions`.
 Plumbing: `case_transitions` (the state machine as rows), `case_event_receipts`
 (idempotency), `outbox` (commands the worker claims with `FOR UPDATE SKIP LOCKED`),
-`timers`, `inbound_webhooks`, `alerts`, `user_profiles`, `user_roles`.
+`timers`, `inbound_webhooks`, `alerts`, `user_profiles`, `user_roles`, `org_settings` (spec 0095: the organisation chain; `user_profiles` gains `disabled_at`, `disabled_by` and `ramp_linked_by`, `bank_change_events` gains `changed_by_linker`).
 
 | Function | Role |
 |---|---|

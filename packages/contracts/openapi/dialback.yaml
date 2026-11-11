@@ -401,6 +401,205 @@ paths:
         '409': { $ref: '#/components/responses/Conflict' }
         '422': { $ref: '#/components/responses/InvalidRequest' }
 
+  /api/people:
+    get:
+      operationId: listPeople
+      summary: Everyone in the organisation, with their roles (admins only, spec 0095)
+      description: |
+        Reads `app.admin_people()` as the signed-in user. Anyone without the admin role, a demo
+        account, or an admin whose access is off gets 403.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/People' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/people/{user_id}/roles:
+    post:
+      operationId: changeRole
+      summary: Grant or take away one role (admins only)
+      description: |
+        Calls `app.admin_set_role()`. Refused (409) when it changes nothing, when it would remove
+        the last admin, or when it grants admin to a demo account. Logged on the organisation chain.
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RoleChange' }
+            example: { role: approver, grant: true, reason: Riley covers releases while the controller is out this week. }
+      responses:
+        '200':
+          description: Applied
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PersonAdminView' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/InvalidRequest' }
+
+  /api/people/{user_id}/ramp-link:
+    post:
+      operationId: changeRampLink
+      summary: Set or clear which Ramp user this person is (admins only)
+      description: |
+        Calls `app.admin_set_ramp_link()`. An admin cannot change their own link, and a Ramp user
+        can be linked to one person only (R5). Who entered a change is fixed when the change is
+        detected, so a new link never changes an open case.
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RampLinkChange' }
+            example: { ramp_user_id: 7c1d2e3f-0000-4000-8000-00000000c1e7, reason: Sam enters vendor changes in Ramp. }
+      responses:
+        '200':
+          description: Applied
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PersonAdminView' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/InvalidRequest' }
+
+  /api/people/{user_id}/access:
+    post:
+      operationId: changeAccess
+      summary: Turn a person's access off or back on (admins only)
+      description: |
+        Calls `app.admin_set_access()`. A person whose access is off gets 403 on every request;
+        their roles are kept. An admin cannot turn off their own access or the last admin's.
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AccessChange' }
+            example: { enabled: false, reason: Left the company on Nov 10. }
+      responses:
+        '200':
+          description: Applied
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PersonAdminView' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/InvalidRequest' }
+
+  /api/admin/log:
+    get:
+      operationId: getAdminLog
+      summary: The organisation chain of admin actions, newest first, and whether it verifies (admins only)
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 500, default: 100 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminLog' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/admin/demo:
+    get:
+      operationId: getDemoState
+      summary: The current demo dataset, its cases, chain, open alerts and chaos switch (admins only)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DemoState' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /api/admin/demo/reset:
+    post:
+      operationId: resetDemo
+      summary: Make a fresh demo dataset; with a clerk chosen, also load the Trust Ledger and Acme's request email (admins only)
+      description: |
+        Runs `demo prepare` when `link_clerk_user_id` is given, else `demo reset` (spec 0011,
+        spec 0077). The team phone is never accepted here; it stays a shell option.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DemoResetRequest' }
+            example: { link_clerk_user_id: c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f, reason: Fresh demo before the judges' run. }
+      responses:
+        '200':
+          description: Applied
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DemoState' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/InvalidRequest' }
+
+  /api/admin/demo/chaos:
+    post:
+      operationId: setDemoChaos
+      summary: Turn spec 0008's chaos mode on or off for the current demo (admins only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DemoChaosRequest' }
+            example: { enabled: true, reason: Show that a failed hold keeps the payment stopped. }
+      responses:
+        '200':
+          description: Applied
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DemoState' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/InvalidRequest' }
+
+  /api/admin/demo/tamper:
+    post:
+      operationId: tamperDemo
+      summary: Rewrite one row of the current demo's evidence chain, to show the chain catching it (admins only)
+      description: |
+        Acts only on the current demo dataset. Needs the typed confirmation `break the chain`;
+        it cannot be undone.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DemoTamperRequest' }
+            example: { confirm: break the chain, reason: Showing the judges that a rewritten row breaks the chain. }
+      responses:
+        '200':
+          description: Applied
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DemoState' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/InvalidRequest' }
+
 components:
   securitySchemes:
     userJwt:
@@ -417,6 +616,11 @@ components:
       schema: { $ref: '../schemas/evidence-event.schema.json#/$defs/Uuid' }
     CaseId:
       name: case_id
+      in: path
+      required: true
+      schema: { $ref: '../schemas/evidence-event.schema.json#/$defs/Uuid' }
+    UserId:
+      name: user_id
       in: path
       required: true
       schema: { $ref: '../schemas/evidence-event.schema.json#/$defs/Uuid' }
@@ -459,7 +663,8 @@ components:
 
     Role:
       type: string
-      enum: [clerk, approver, auditor]
+      description: An admin also holds every power of the other three roles; R5 still applies (spec 0095).
+      enum: [clerk, approver, auditor, admin]
 
     Me:
       type: object
@@ -1078,6 +1283,162 @@ components:
       properties:
         vendor_id: { $ref: '../schemas/evidence-event.schema.json#/$defs/Uuid' }
         account: { $ref: '#/components/schemas/AccountRef' }
+
+    PersonAdminView:
+      description: One person as an admin sees them (spec 0095).
+      type: object
+      additionalProperties: false
+      required: [id, display_name, email, roles, ramp_user_id, demo_only, access_enabled, last_sign_in_at]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        display_name: { type: string }
+        email: { type: [string, 'null'] }
+        roles:
+          type: array
+          items: { $ref: '#/components/schemas/Role' }
+        ramp_user_id: { type: [string, 'null'], description: The Ramp user this person is; null when not linked. }
+        demo_only: { type: boolean, description: A shared demo account (spec 0034); acts on demo data only and never holds admin. }
+        access_enabled: { type: boolean }
+        last_sign_in_at:
+          oneOf: [{ $ref: '#/components/schemas/Timestamp' }, { type: 'null' }]
+
+    People:
+      type: object
+      additionalProperties: false
+      required: [people]
+      properties:
+        people:
+          type: array
+          items: { $ref: '#/components/schemas/PersonAdminView' }
+
+    RoleChange:
+      type: object
+      additionalProperties: false
+      required: [role, grant, reason]
+      properties:
+        role: { $ref: '#/components/schemas/Role' }
+        grant: { type: boolean, description: true grants the role, false takes it away. }
+        reason: { type: string, minLength: 1, maxLength: 2000 }
+
+    RampLinkChange:
+      type: object
+      additionalProperties: false
+      required: [ramp_user_id, reason]
+      properties:
+        ramp_user_id: { type: [string, 'null'], minLength: 1, maxLength: 200, pattern: '\S', description: null clears the link; blank is refused. }
+        reason: { type: string, minLength: 1, maxLength: 2000 }
+
+    AccessChange:
+      type: object
+      additionalProperties: false
+      required: [enabled, reason]
+      properties:
+        enabled: { type: boolean }
+        reason: { type: string, minLength: 1, maxLength: 2000 }
+
+    AdminLogEntry:
+      type: object
+      additionalProperties: false
+      required: [seq, type, occurred_at, actor, subject, detail, reason]
+      properties:
+        seq: { type: integer, minimum: 1 }
+        type: { $ref: '../schemas/admin-event.schema.json#/$defs/AdminEventType' }
+        occurred_at: { $ref: '#/components/schemas/Timestamp' }
+        actor:
+          oneOf: [{ $ref: '#/components/schemas/Person' }, { type: 'null' }]
+          description: null when the team granted it with scripts/db/add_user.py.
+        subject:
+          oneOf: [{ $ref: '#/components/schemas/Person' }, { type: 'null' }]
+        detail: { type: object }
+        reason: { type: string }
+
+    AdminLog:
+      type: object
+      additionalProperties: false
+      required: [chain, events]
+      properties:
+        chain: { $ref: '#/components/schemas/ChainStatus' }
+        events:
+          type: array
+          items: { $ref: '#/components/schemas/AdminLogEntry' }
+
+    DemoState:
+      description: What `dialback-core demo status` prints, for the current demo dataset.
+      type: object
+      additionalProperties: false
+      required: [dataset, cases, chain, alerts, chaos, warnings]
+      properties:
+        dataset:
+          type: object
+          additionalProperties: false
+          required: [id, label, created_at]
+          properties:
+            id: { $ref: '#/components/schemas/Uuid' }
+            label: { type: string }
+            created_at: { $ref: '#/components/schemas/Timestamp' }
+        cases:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [id, vendor, state, outcome]
+            properties:
+              id: { $ref: '#/components/schemas/Uuid' }
+              vendor: { type: string }
+              state: { $ref: '../schemas/evidence-event.schema.json#/$defs/CaseState' }
+              outcome:
+                oneOf: [{ $ref: '../schemas/evidence-event.schema.json#/$defs/Outcome' }, { type: 'null' }]
+        chain:
+          type: object
+          additionalProperties: false
+          required: [ok, checked, first_bad_seq, detail]
+          properties:
+            ok: { type: boolean }
+            checked: { type: integer, minimum: 0 }
+            first_bad_seq:
+              oneOf: [{ type: integer, minimum: 1 }, { type: 'null' }]
+            detail: { type: string }
+        alerts:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [kind, severity, message]
+            properties:
+              kind: { type: string }
+              severity: { type: string }
+              message: { type: string }
+        chaos: { type: boolean }
+        warnings:
+          type: array
+          items: { type: string }
+          description: What the last reset warned about, for example a seeded user left unlinked (each release then needs two approvers). Empty otherwise.
+
+    DemoResetRequest:
+      type: object
+      additionalProperties: false
+      required: [reason]
+      properties:
+        link_clerk_user_id:
+          oneOf: [{ $ref: '#/components/schemas/Uuid' }, { type: 'null' }]
+          description: The account the seed's clerk becomes; with one, the Trust Ledger and Acme's request email load too.
+        reason: { type: string, minLength: 1, maxLength: 2000 }
+
+    DemoChaosRequest:
+      type: object
+      additionalProperties: false
+      required: [enabled, reason]
+      properties:
+        enabled: { type: boolean }
+        reason: { type: string, minLength: 1, maxLength: 2000 }
+
+    DemoTamperRequest:
+      type: object
+      additionalProperties: false
+      required: [confirm, reason]
+      properties:
+        confirm: { const: break the chain }
+        reason: { type: string, minLength: 1, maxLength: 2000 }
 
     Error:
       type: object

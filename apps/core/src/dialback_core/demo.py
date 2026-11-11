@@ -177,7 +177,9 @@ async def reset(env: DemoEnv, seed: dict[str, Any], links: dict[str, str], today
         await conn.execute("update app.datasets set retired_at = now() where kind = 'demo' and retired_at is null")
         await conn.execute("update app.datasets set demo_refs = %s, retired_at = null where id = %s", (Jsonb(demo_refs), dataset.id))
         for ref, user_id in accounts.items():
-            await conn.execute("update app.user_profiles set ramp_user_id = %s where user_id = %s", (refs[ref], user_id))
+            # A link the team sets from the shell is nobody's (spec 0095, D5): ramp_linked_by is cleared.
+            await conn.execute("update app.user_profiles set ramp_user_id = %s, ramp_linked_by = null where user_id = %s",
+                               (refs[ref], user_id))
     return ResetResult(dataset, refs, accounts, warnings)
 
 
@@ -204,13 +206,32 @@ async def prepare(env: DemoEnv, seed: dict[str, Any], links: dict[str, str], *, 
     except ledger_demo.DemoError as exc:
         raise DemoError(str(exc)) from None
     result = await reset(env, seed, links, today=today)
-    try:
-        loaded = await ledger_demo.load(env.owner_url, phones=e164, dataset_id=result.dataset.id)
-        sent = {ref: await ledger_demo.request(env.owner_url, vendor=ref, dataset_id=result.dataset.id) for ref in requests}
-    except ledger_demo.DemoError as exc:
-        raise DemoError(f"the demo was reset ({result.dataset.id}) but the Trust Ledger refused: {exc}. "
-                        "Run `dialback-ledger demo load` and `dialback-ledger demo request` by hand, before any bank change.") from None
+    loaded, sent = await load_ledger(env, result.dataset.id, e164, requests)
     return PrepareResult(result, loaded, sent)
+
+
+def check_ledger(phones: dict[str, str], requests: list[str]) -> dict[str, str]:
+    """prepare's checks on the ledger side, before anything is reset. Returns the phones in E.164."""
+    from dialback_ledger import demo as ledger_demo
+
+    try:
+        return ledger_demo.check(phones, requests)
+    except ledger_demo.DemoError as exc:
+        raise DemoError(str(exc)) from None
+
+
+async def load_ledger(env: DemoEnv, dataset_id: UUID, e164: dict[str, str], requests: list[str]) -> tuple[dict, dict]:
+    """prepare's second half: the Trust Ledger's history, then each vendor's change-request email.
+    The dashboard's reset (spec 0095) runs it after linking the clerk through app.admin_set_ramp_link."""
+    from dialback_ledger import demo as ledger_demo
+
+    try:
+        loaded = await ledger_demo.load(env.owner_url, phones=e164, dataset_id=dataset_id)
+        sent = {ref: await ledger_demo.request(env.owner_url, vendor=ref, dataset_id=dataset_id) for ref in requests}
+    except ledger_demo.DemoError as exc:
+        raise DemoError(f"the demo was reset ({dataset_id}) but the Trust Ledger refused: {exc}. "
+                        "Run `dialback-ledger demo load` and `dialback-ledger demo request` by hand, before any bank change.") from None
+    return loaded, sent
 
 
 async def change(env: DemoEnv, seed: dict[str, Any], vendor_ref: str, by: str = "clerk", unknown: bool = False) -> str:
