@@ -18,7 +18,10 @@ Specs: 0017 (voice slice lab), 0083 (generative selection pressure; 0033 before 
 - **Status:** confirmed (ran), through real ingestion (`ingest_all` with the stub reader), then
   `select()` at default settings. Frozen as `planted-number-picked-after-in-thread-bank-label`.
 - **Fix status:** fixed by spec 0091 when it merges (`sami/label-bar`): a label in the change email
-  is ignored, so the real number is called.
+  is ignored, so the real number is called. With main merged in, `lab docs` at seed 0 shows 0 of 204
+  G7 worlds moving the call, and 0 left with nobody called, so A1's 81 `lab-docs` entries came off
+  the list (46 remain, all A19 and A20). With `DIALBACK_CONTEXT_GUARD=off` (today's rule) the same run
+  still fails all 81, so the check can fail. The 81 frozen `g7-*` cases stay as regressions.
 - **Where:** `packages/ledger/src/dialback_ledger/select.py`, lines 169-172. The party and fax
   checks read every visible sighting, including those in the change context. Spec 0021 says the
   same thing in its acceptance list ("eligible only if every visible sighting is labeled the vendor's
