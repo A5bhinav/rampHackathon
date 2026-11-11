@@ -427,6 +427,16 @@ def test_a_pattern_entry_needs_every_field(tmp_path):
         known.load(path)
 
 
+
+def test_another_seed_never_writes_to_the_committed_cases():
+    # The fresh review: exploring seed 1 the plain way froze 16 cases into evals/docs-generated, which the
+    # seed-0 gate then re-ran and failed on. Without --out, only the gate's seed writes there.
+    from dialback_evals import cli
+    assert cli._docs_out(None, SEED) == FROZEN
+    assert cli._docs_out(None, 1) == ROOT / "evals" / "out" / "docs-generated-seed1"
+    assert "evals/out/" in (ROOT / ".gitignore").read_text(encoding="utf-8").splitlines()
+    assert cli._docs_out("somewhere/else", 1) == Path("somewhere/else")
+
 # --- The stub report ---------------------------------------------------------------------------------
 
 def test_stub_report_has_every_count(tmp_path, capsys):

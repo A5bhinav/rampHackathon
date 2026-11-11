@@ -107,7 +107,8 @@ def main(argv: list[str] | None = None) -> int:
     dc = sub.add_parser("docs", help="re-run frozen document findings, then check generated documents (spec 0052)")
     dc.add_argument("--examples", type=int, default=1000)
     dc.add_argument("--seed", type=int, default=0)
-    dc.add_argument("--out", default=str(_REPO / "evals" / "docs-generated"))
+    dc.add_argument("--out", default=None, help="where frozen cases live (default: evals/docs-generated at the gate's "
+                    "seed, evals/out/docs-generated-seed<N> at any other, so exploring never touches the gate)")
     dc.add_argument("--report", default=str(_REPO / "evals" / "out" / "docs-report.json"))
     dc.add_argument("--known-failures", default="auto", help=_KNOWN_HELP)
     freeze = sub.add_parser("freeze", help="record each scenario's hash and required outcome (expected.lock.json)")
@@ -137,8 +138,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "sweep":
         return _sweep(Path(args.scenarios_root) / args.split, args.examples, args.seed, Path(args.unreachable))
     if args.command == "docs":
-        return _docs(args.examples, args.seed, Path(args.out), Path(args.report),
-                     _known(args.known_failures, Path(args.out), _REPO / "evals" / "docs-generated"))
+        out = _docs_out(args.out, args.seed)
+        return _docs(args.examples, args.seed, out, Path(args.report),
+                     _known(args.known_failures, out, _REPO / "evals" / "docs-generated"))
     if args.command == "reports":
         return _reports(args.examples, args.seed, Path(args.out),
                         _known(args.known_failures, Path(args.out), _REPO / "evals" / "reports-generated"))
@@ -249,6 +251,19 @@ def _reports(examples: int, seed: int, out_dir: Path, known_failures: Path | Non
           f"label(s) (seed {seed}, {examples} reports per domain)")
     held = _held("lab-reports", known_failures, dict(done.frozen_failing), done.reachable_hits)
     return (1 if done.frozen_failing or done.gated else 0) if held is None else held
+
+
+DOCS_GATE_SEED = 0   # the seed lab-docs gates on; its frozen cases are the committed ones
+
+
+def _docs_out(out: str | None, seed: int) -> Path:
+    """Where `lab docs` keeps frozen cases: `out` when given; else the committed folder at the gate's seed,
+    and a gitignored one per seed otherwise, so a run at another seed never adds cases the gate re-runs."""
+    if out is not None:
+        return Path(out)
+    if seed == DOCS_GATE_SEED:
+        return _REPO / "evals" / "docs-generated"
+    return _REPO / "evals" / "out" / f"docs-generated-seed{seed}"
 
 
 def _docs(examples: int, seed: int, out_dir: Path, report_path: Path, known_failures: Path | None = None) -> int:
