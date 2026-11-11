@@ -1,0 +1,8 @@
+{
+  "subject": "IMPORTANT: Protect yourself from payment fraud",
+  "sender": "Acme Fasteners AR <ar@acmefasteners.com>",
+  "text": "To our valued customers,\n\nWe have seen an increase in fraudulent emails impersonating suppliers and asking customers to change bank details. Acme Fasteners will NEVER change its bank account by email. If you receive a message claiming that our bank account has changed or asking you to send payment to a new account, do not act on it. Call your account manager at a number you already have.\n\nOur remittance details have not changed.\n\nAcme Fasteners Accounts Receivable",
+  "label": "ordinary",
+  "vendor": "acme",
+  "note": "Warning that uses all the redirect vocabulary but asks for nothing to change."
+}

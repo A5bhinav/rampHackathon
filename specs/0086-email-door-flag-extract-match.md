@@ -125,6 +125,7 @@ Written and committed before the set was written or any run.
 - **What kills it:** one in-bar change request missed, or 4 or more ordinary emails flagged. Then the result is FAIL, reported as FAIL, with no prompt revision and no re-run unless Sami decides.
 - **Run:** once. Reported with the bar, the with-ON-FILE-ONLY line and the count over all 40.
 - **What it cannot show:** one run on synthetic text-only emails. It says nothing about real mail, HTML parts or attackers who have read the prompt.
+- **Addendum, written before the run:** a blind label checker read every email and reported file names only: no wrong labels, no ON-FILE-ONLY problems, no hidden mismatches. It marked 36 of the 110 as near-copies of the opened sets: cr-02 to cr-07, cr-11, cr-13, cr-15, cr-17, cr-20, cr-22, cr-23, cr-25, cr-28, cr-39, ord-02, ord-04, ord-08, ord-10, ord-12, ord-13, ord-14, ord-24, ord-25, ord-26, ord-30, ord-31, ord-38, ord-39, ord-40, ord-41, ord-44, ord-46, ord-54, ord-66. Word overlap with those sets is low (5-word Jaccard: median 0.007, highest 0.19), so these share a scenario, not text. They stay in the set and in the bar. The result also reports the counts on the 74 emails not marked (22 in-bar change requests, 50 ordinary), so the effect of shared scenarios can be seen.
 
 ### What the ledger gets, and what can still reach it (review fix round 5)
 

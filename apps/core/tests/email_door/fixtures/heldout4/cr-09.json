@@ -1,0 +1,8 @@
+{
+  "subject": "Heads up for Q1",
+  "sender": "Greg Lindqvist <glindqvist@acmefasteners.com>",
+  "text": "Renee,\n\nWe are in the middle of moving our banking relationship. I won't have numbers until the accounts are open in January, but I wanted to ask what you need from us so that your payments can go there from February on. Is there a form, or does someone need to call you?\n\nThanks,\nGreg",
+  "label": "change_request",
+  "vendor": "acme",
+  "note": "No details yet; announces where payments will go and asks how to do it."
+}

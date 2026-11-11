@@ -1,0 +1,8 @@
+{
+  "subject": "Check 10442 never arrived",
+  "sender": "Office <office@tricountyjanitorial.example>",
+  "text": "Hi, our October check (#10442, $1,860) never showed up. Can you put a stop on it and reissue? Same address as always.\n\nMarlene",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Reissue to the same destination."
+}

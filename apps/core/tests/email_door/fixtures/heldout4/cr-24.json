@@ -1,0 +1,8 @@
+{
+  "subject": "SSI refresh - beneficiary coordinates (ref 2026/Q4/118)",
+  "sender": "Treasury Middle Office <tmo@halvorsen-group.example>",
+  "text": "Counterparty Operations,\n\nPlease be advised of a refresh of our Standard Settlement Instructions for USD. The below supersedes all prior SSIs held for Halvorsen Group entities with value date on or after 15-Dec-2026.\n\n  Field 57A (Account With Institution): BOFAUS3N\n  Field 59  (Beneficiary): /4471009923 Halvorsen Group Treasury AS\n  Field 70  (Remittance Info): Inv ref\n\nKindly amend your static data accordingly and acknowledge by return.\n\nTreasury Middle Office\nThis message is confidential and intended solely for the addressee.",
+  "label": "change_request",
+  "vendor": null,
+  "note": "Treasury jargon; no plain mention of a bank change."
+}

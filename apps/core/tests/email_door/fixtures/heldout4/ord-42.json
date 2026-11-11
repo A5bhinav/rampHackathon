@@ -1,0 +1,8 @@
+{
+  "subject": "Zahlungserinnerung Rechnung 2026-4471",
+  "sender": "Buchhaltung <buchhaltung@rheinwerk-technik.example>",
+  "text": "Sehr geehrte Damen und Herren,\n\nunsere Rechnung 2026-4471 ueber EUR 12.840,00 ist seit dem 15.10. faellig. Bitte ueberweisen Sie den Betrag innerhalb von 7 Tagen auf das Ihnen bekannte Konto. Unsere Bankverbindung ist unveraendert.\n\nMit freundlichen Gruessen\nPetra Vogel",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "German reminder, bank details stated unchanged."
+}

@@ -1,0 +1,8 @@
+{
+  "subject": "Please correct bill-to",
+  "sender": "Billing <billing@acmefasteners.com>",
+  "text": "Hi, your purchasing team says invoices should now be billed to Tallis Holdings rather than Tallis Manufacturing. Please confirm and we'll re-issue 88377 with the correct bill-to entity.\n\nAcme Billing",
+  "label": "ordinary",
+  "vendor": "acme",
+  "note": "Who is billed, not who is paid."
+}

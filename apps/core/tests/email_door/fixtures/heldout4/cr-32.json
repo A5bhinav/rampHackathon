@@ -1,0 +1,8 @@
+{
+  "subject": "Payee name on checks",
+  "sender": "Dave Stroud <dstroud@acmefasteners.com>",
+  "text": "Renee, small admin item. Could checks from now on be made payable to AF Holdings Group rather than Acme Fasteners LLC? Same address. Our bank's gotten picky.\n\nDave",
+  "label": "change_request",
+  "vendor": "acme",
+  "note": "Payee only; no bank detail."
+}
