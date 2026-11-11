@@ -303,7 +303,8 @@ async def test_the_selection_of_an_unknown_case_is_not_found(world):
 RISK = "/api/datasets/{dataset_id}/vendor-risk"
 
 
-async def test_the_vendor_risk_list_reads_the_ledger(world):
+async def ingest_c01(world):
+    """The first vendor, with corpus C01's history in the ledger. Returns the vendor, the truth and the documents."""
     from dialback_ledger.ingest import ingest_all
     from dialback_ledger.reader import StubReader
     from dialback_ledger.store import add_vendor_domain, write_ingest
@@ -316,6 +317,11 @@ async def test_the_vendor_risk_list_reads_the_ledger(world):
         result = ingest_all(docs, extractor_version="t", reader=StubReader())   # spec 0049, decision 8
         await write_ingest(conn, dataset_id=world.dataset.id, vendor_id=vendor, result=result)
         await add_vendor_domain(conn, dataset_id=world.dataset.id, vendor_id=vendor, domain=truth["vendor"]["domain"])
+    return vendor, truth, docs
+
+
+async def test_the_vendor_risk_list_reads_the_ledger(world):
+    vendor, truth, _ = await ingest_c01(world)
     body = await get(world, f"/api/datasets/{world.dataset.id}/vendor-risk", "clerk", RISK)
     (row,) = body["vendors"]                      # only vendors the ledger has documents for
     assert row["vendor_id"] == str(vendor) and row["status"] == "missing" and row["number_on_file"] is None
@@ -324,6 +330,52 @@ async def test_the_vendor_risk_list_reads_the_ledger(world):
 
 async def test_the_vendor_risk_list_of_an_unknown_dataset_is_not_found(world):
     await get(world, f"/api/datasets/{uuid.uuid4()}/vendor-risk", "clerk", RISK, status=404)
+
+
+# One vendor's history (spec 0104) ------------------------------------------------------------------
+
+LEDGER = "/api/datasets/{dataset_id}/vendors/{vendor_id}/ledger"
+
+
+async def test_the_vendor_ledger_shows_the_risk_row_the_rule_and_the_documents(world):
+    from dialback_ledger.reasons import REASON_TEXT
+    vendor, truth, docs = await ingest_c01(world)
+    body = await get(world, f"/api/datasets/{world.dataset.id}/vendors/{vendor}/ledger", "clerk", LEDGER)
+    (row,) = (await get(world, f"/api/datasets/{world.dataset.id}/vendor-risk", "clerk", RISK))["vendors"]
+    assert body["risk"] == row and body["reason_text"] == REASON_TEXT
+    assert body["rule"]["outcome"] == "picked" and body["rule"]["rule_version"] == "ledger-select-v1"
+    assert [c["e164"] for c in body["rule"]["candidates"] if c.get("rank") == 1] == [truth["expected"]["pick"]]
+    assert body["document_count"] == len(body["documents"]) == len(docs)
+    assert any(o["quote"] for d in body["documents"] for o in d["observations"])
+
+
+async def test_the_vendor_ledger_of_an_unknown_or_foreign_vendor_is_not_found(world):
+    await import_all(world.pool, world.ramp, world.keys, world.dataset.id)
+    async with world.pool.connection() as conn, conn.transaction():
+        vendor = (await (await conn.execute("select id from app.vendors where dataset_id = %s order by legal_name limit 1",
+                                            (world.dataset.id,))).fetchone())["id"]
+        chain = (await (await conn.execute("insert into audit.chains (label) values ('other') returning id")).fetchone())["id"]
+        other = (await (await conn.execute("insert into app.datasets (kind, label, chain_id) values ('dev', 'other', %s) "
+                                           "returning id", (chain,))).fetchone())["id"]
+        foreign = (await (await conn.execute("insert into app.vendors (dataset_id, ramp_vendor_id, legal_name) "
+                                             "values (%s, 'ven_other', 'Other') returning id", (other,))).fetchone())["id"]
+    here = f"/api/datasets/{world.dataset.id}/vendors"
+    await get(world, f"/api/datasets/{uuid.uuid4()}/vendors/{vendor}/ledger", "clerk", LEDGER, status=404)
+    await get(world, f"{here}/{uuid.uuid4()}/ledger", "clerk", LEDGER, status=404)
+    await get(world, f"{here}/{foreign}/ledger", "clerk", LEDGER, status=404)     # a vendor of another dataset
+    body = await get(world, f"{here}/{vendor}/ledger", "clerk", LEDGER)          # on this dataset, no documents yet
+    assert body["documents"] == [] and body["risk"]["status"] == "missing" and body["rule"]["candidates"] == []
+
+
+async def test_the_vendor_ledger_reads_as_the_person(world, database_url):
+    """A demo account can't see a dev dataset, so its vendor's history is not found for it (spec 0034): the
+    endpoint reads under the person's token, whatever the ledger's own read policies allow."""
+    vendor, _, _ = await ingest_c01(world)
+    async with await psycopg.AsyncConnection.connect(database_url, autocommit=True) as owner:
+        await owner.execute("insert into app.demo_accounts (user_id) values (%s)", (world.users["approver1"],))
+    url = f"/api/datasets/{world.dataset.id}/vendors/{vendor}/ledger"
+    await get(world, url, "approver1", LEDGER, status=404)
+    assert (await get(world, url, "clerk", LEDGER))["documents"]
 
 
 async def test_the_case_shows_its_calls_answers_and_checks(world):

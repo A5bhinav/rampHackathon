@@ -17,7 +17,7 @@ from uuid import UUID
 
 from dialback_decision.engine import TEMPLATES
 from dialback_ledger.reasons import NOTES, REASON_TEXT
-from dialback_ledger.risk import risk_list
+from dialback_ledger.risk import risk_list, vendor_ledger
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import JSONResponse
 from psycopg import AsyncConnection, errors
@@ -261,6 +261,19 @@ async def vendor_risk(dataset_id: UUID, request: Request, user: UserDep):
             return problem(404, "not_found", "No such dataset.")
         rows = await risk_list(conn, dataset_id)
     return {"vendors": rows}
+
+
+@router.get("/datasets/{dataset_id}/vendors/{vendor_id}/ledger")
+async def get_vendor_ledger(dataset_id: UUID, vendor_id: UUID, request: Request, user: UserDep):
+    """One vendor's history in the Trust Ledger (spec 0104), read under the person's token. The rule
+    runs as of now, as the risk list runs it; nothing is stored. Phone observations only (ADR-8)."""
+    async with person_tx(request.app.state.pool, user.user_id, user.claims) as conn:
+        if await (await conn.execute("select 1 from app.datasets where id = %s", (dataset_id,))).fetchone() is None:
+            return problem(404, "not_found", "No such dataset.")
+        body = await vendor_ledger(conn, dataset_id, vendor_id)
+    if body is None:
+        return problem(404, "not_found", "No such vendor on this dataset.")
+    return body | {"reason_text": REASON_TEXT}
 
 
 @router.get("/datasets/{dataset_id}/alerts")
