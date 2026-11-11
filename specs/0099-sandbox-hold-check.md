@@ -57,7 +57,10 @@ None.
   among them, and any other); and each unpaid bill's status and payment date. The release's
   read-backs now read the bills too. Parts within one read are read one after another, a second or
   two apart on the sandbox, so the timeline is coarse; a part that changes reads earlier than one
-  that doesn't is still plain.
+  that doesn't is still plain. Since spec 0097 D5 the layer reads a vendor's `status` when it has
+  one, so the check reads the audit log on its own for that column (and reuses the layer's reading
+  when the vendor has no `status`), and reports a second hold Ramp refused as already on (D5 reads
+  it as placed) with Ramp's own answer, not as "accepted".
 
 ## Found on the sandbox, 2026-11-10 (first run, one vendor: DocuSign, one unpaid bill)
 

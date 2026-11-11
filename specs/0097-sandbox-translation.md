@@ -51,6 +51,15 @@ None.
   `Bill pay bank account updated` and answers under the core's name. A core name with no Ramp
   equivalent is a `RampError`. Ramp doesn't document `event_details` for this event, so the change's
   author stays unknown, and the release needs two approvers (ADR-10).
+- **D5. The hold from the vendor's own `status`** (added after the sandbox runs of spec 0099 showed
+  the audit log about 7 seconds behind, both ways, and the vendor's `status` right at once; Q209).
+  Ramp's vendor answer carries an undocumented `status`; its help center names the vendor statuses
+  Active, Inactive, On hold, Pending and Unmanaged. `ON_HOLD` is a hold (`hold_id` is
+  `status:ON_HOLD`, since Ramp gives a hold no id); `ACTIVE`, `INACTIVE`, `PENDING` and `UNMANAGED`
+  are not. Anything else (no field, null, a value not in that list) falls back to D3's audit-log
+  reading, so a status Ramp adds later can't be misread. And a hold Ramp refuses with
+  `BILL_PAY_7284` ("Vendor is already on hold") counts as placed: it is on, by Ramp's word, so the
+  worker's retry goes on to read it back. Any other refusal still raises.
 
 ## Acceptance
 
@@ -63,6 +72,9 @@ None.
 - [x] Importing a sandbox dataset's vendors stores them and their accounts, with an empty routing
       number and Ramp's last four.
 - [x] Everything else is unchanged: the core and SQL suites and the smoke run pass.
+- [x] D5: a vendor whose `status` is `ON_HOLD` is held, and one whose `status` is a known other value
+      isn't, both without reading the audit log; a missing or unknown `status` reads the audit log as
+      before; a hold refused with `BILL_PAY_7284` returns as placed, any other refusal raises.
 
 ## Tests (written first)
 
@@ -148,8 +160,10 @@ None.
   (+7.0 s). (One run each way: the pattern is plain, the seconds are coarse.) So the layer could read
   the hold from the vendor's `status` (undocumented, so falling back to the audit log if it's
   missing), and treat `BILL_PAY_7284` as the hold being on; then the worker's quick read-backs
-  would pass at once, with no change to the worker. Not built: that is spec 0097's layer, a
-  change of its own.
+  would pass at once, with no change to the worker. Built as D5: the worker's own read-back
+  (`Worker._read_back_hold`) now passes on its first read against a fake whose audit log is ten
+  reads behind, and misses without the status (`test_the_workers_own_read_back_*`). Still to see
+  on the sandbox: run the hold check again.
 - **Q207:** Ramp issued a token for a scope the app isn't allowed (`bills:write`) and refused only
   the call (HTTP 403). The core's login doesn't compare what Ramp granted with what it needs, so a
   sandbox dataset missing `bills:write` would hold and call normally, then fail every release when

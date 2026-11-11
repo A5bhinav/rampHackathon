@@ -9,6 +9,7 @@ from __future__ import annotations
 import datetime as dt
 import json
 import uuid
+from types import SimpleNamespace
 from urllib.parse import parse_qs, urlencode
 
 import httpx
@@ -23,6 +24,7 @@ from dialback_core.ramp.login import RampLogin
 from dialback_core.ramp.port import RampAccount, RampAuditEvent, RampBill, RampError, RampHold, RampVendor
 from dialback_core.ramp.sandbox import RampSandboxAdapter
 from dialback_core.settings import RampSandbox
+from dialback_core.worker import Worker
 
 pytestmark = pytest.mark.anyio
 
@@ -66,9 +68,9 @@ def event(event_id: str, event_type: str, when: str, about: str = V, actor: str 
             "primary_reference": {"id": about, "label": label, "resource_name": resource, "url": "/x"}}
 
 
-def ramp_error(status: int, message: str) -> httpx.Response:
+def ramp_error(status: int, message: str, code: str = "DEVELOPER_7000") -> httpx.Response:
     """Ramp's DeveloperApiErrorResponse."""
-    return httpx.Response(status, json={"error_v2": {"error_code": "DEVELOPER_7000", "error_id": "0a1b2c3d", "message": message,
+    return httpx.Response(status, json={"error_v2": {"error_code": code, "error_id": "0a1b2c3d", "message": message,
                                                      "notes": "", "additional_info": {}}})
 
 
@@ -123,6 +125,13 @@ class SandboxRamp:
             held = parts[2] == "hold"
             if not held and self.release_error:
                 return ramp_error(self.release_error, "The vendor's hold could not be released.")
+            # The sandbox, as spec 0099's runs saw it: a vendor that carries `status` changes it at once,
+            # and a second hold is refused. A vendor without `status` (as Ramp's document has it) doesn't.
+            shown = self.vendors.get(parts[1], {})
+            if "status" in shown:
+                if held and shown["status"] == "ON_HOLD":
+                    return ramp_error(400, "Vendor is already on hold", code="BILL_PAY_7284")
+                shown["status"] = "ON_HOLD" if held else "ACTIVE"
             made = event(f"ev-{len(self.events) + len(self.delayed) + 1}",
                          "Vendor placed on hold" if held else "Vendor hold released", self._now(), about=parts[1])
             if self.lag:
@@ -280,6 +289,69 @@ async def test_a_hold_reads_back_as_the_worker_needs_and_a_release_lifts_it(ramp
     [released] = ramp.api("/release")
     assert released.method == "POST"
     assert (await ramp.adapter.get_vendor(V)).hold_id is None, "the release reads back as lifted"
+
+
+# D5: the hold from the vendor's own status, which Ramp's sandbox updates at once ---------------------
+
+async def test_a_vendors_status_says_whether_it_is_held_without_the_lagging_audit_log(ramp):
+    ramp.vendors[V]["status"] = "ACTIVE"
+    ramp.lag = 3  # the audit log is seconds behind, as on the sandbox
+    await ramp.adapter.place_vendor_hold(V, "Bank details changed")
+    assert (await ramp.adapter.get_vendor(V)).hold_id == "status:ON_HOLD", "held on the first read"
+    await ramp.adapter.release_vendor_hold(V)
+    assert (await ramp.adapter.get_vendor(V)).hold_id is None, "released on the first read"
+    assert ramp.api("/audit-logs/events") == [], "the audit log wasn't read"
+
+
+@pytest.mark.parametrize("status", ["ACTIVE", "INACTIVE", "PENDING", "UNMANAGED"])
+async def test_a_known_status_other_than_on_hold_is_no_hold_whatever_the_audit_log_says(ramp, status):
+    ramp.vendors[V]["status"] = status
+    ramp.events.append(event("ev-late", "Vendor placed on hold", "2026-11-10T12:00:00+00:00"))  # not yet caught up
+    assert (await ramp.adapter.get_vendor(V)).hold_id is None
+
+
+@pytest.mark.parametrize("status", [None, "", "FROZEN", 7, "on_hold", ["ON_HOLD"]])
+async def test_a_missing_or_unknown_status_falls_back_to_the_audit_log(ramp, status):
+    if status is not None:
+        ramp.vendors[V]["status"] = status
+    ramp.events.append(event("ev-late", "Vendor placed on hold", "2026-11-10T12:00:00+00:00"))
+    assert (await ramp.adapter.get_vendor(V)).hold_id == "ev-late"
+    assert len(ramp.api("/audit-logs/events")) == 1
+
+
+async def test_the_workers_own_read_back_passes_at_once_with_the_status_and_not_without_it(ramp):
+    # Q209's stall: the audit log far behind (a lag of 10 audit reads), the worker's three quick reads.
+    sleeps: list[float] = []
+
+    async def counted(seconds: float) -> None:
+        sleeps.append(seconds)
+
+    worker = SimpleNamespace(_sleep=counted)  # _read_back_hold uses nothing else of the worker
+    ramp.lag = 10
+    ramp.vendors[V]["status"] = "ACTIVE"
+    await ramp.adapter.place_vendor_hold(V, "Bank details changed")
+    assert await Worker._read_back_hold(worker, ramp.adapter, V) == (True, 2) and sleeps == [], "first read"
+    await ramp.adapter.release_vendor_hold(V)
+    del ramp.vendors[V]["status"]  # the same hold, read the old way: from the audit log alone
+    ramp.delayed = []  # start the second case clean: the audit log's newest is ev-2, a release
+    await ramp.adapter.place_vendor_hold(V, "Bank details changed")
+    assert await Worker._read_back_hold(worker, ramp.adapter, V) == (False, 0) and len(sleeps) == 3, \
+        "without the status, the worker's read-back misses a hold the audit log hasn't caught up with"
+
+
+async def test_a_hold_ramp_refuses_as_already_on_counts_as_placed_and_other_refusals_raise(ramp):
+    ramp.vendors[V]["status"] = "ON_HOLD"  # someone, or an earlier try, already held it
+    assert await ramp.adapter.place_vendor_hold(V, "Bank details changed") == RampHold(id="", vendor_id=V, placed_at=None)
+    [refused] = ramp.api("/hold")
+    assert refused.method == "POST"  # Ramp answered 400 BILL_PAY_7284, read as the hold being on
+
+    def other(request: httpx.Request) -> httpx.Response:
+        return ramp_error(400, "Vendor is inactive.", code="BILL_PAY_7300")
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(other)) as http:
+        adapter = RampSandboxAdapter(BASE, "token", http, TokenBucket(100_000), sleep=_no_sleep)
+        with pytest.raises(RampError, match="BILL_PAY_7300"):
+            await adapter.place_vendor_hold(V, "Bank details changed")
 
 
 # Audit events --------------------------------------------------------------------------------------

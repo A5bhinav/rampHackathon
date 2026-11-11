@@ -21,6 +21,11 @@ PLACED, RELEASED = "Vendor placed on hold", "Vendor hold released"
 # sandbox answers 422 otherwise, as the probe's first run showed). The core only asks about vendors.
 VENDOR_RESOURCE = "Vendor / Merchant"
 RAMP_EVENT_NAMES = {"VENDOR_BANK_ACCOUNT_UPDATED": "Bill pay bank account updated"}  # the core's name: Ramp's (D4)
+# D5: the vendor's own (undocumented) status, which the sandbox updates at once; the audit log lags.
+# Ramp's help center names Active, Inactive, On hold, Pending and Unmanaged. Anything else: the audit log.
+HELD_STATUS = "ON_HOLD"
+NOT_HELD_STATUSES = frozenset({"ACTIVE", "INACTIVE", "PENDING", "UNMANAGED"})
+ALREADY_HELD = "BILL_PAY_7284"  # Ramp's code for "Vendor is already on hold"
 FOUR_DIGITS = re.compile(r"^[0-9]{4}$")
 OLDEST = dt.datetime.min.replace(tzinfo=dt.UTC)
 
@@ -73,7 +78,13 @@ class RampSandboxAdapter(RampHttpAdapter):
         return f" ({words}: {message})" if words or message else ""
 
     async def get_vendor(self, vendor_id: str) -> RampVendor:
-        return vendor_from(await self._request("GET", f"{API}/vendors/{vendor_id}"), await self._hold_id(vendor_id))
+        j = await self._request("GET", f"{API}/vendors/{vendor_id}")
+        status = j.get("status")
+        if status == HELD_STATUS:  # D5: Ramp gives a hold no id
+            return vendor_from(j, f"status:{HELD_STATUS}")
+        if isinstance(status, str) and status in NOT_HELD_STATUSES:
+            return vendor_from(j, None)
+        return vendor_from(j, await self._hold_id(vendor_id))  # no status, or one we don't know: D3
 
     async def _hold_id(self, vendor_id: str) -> str | None:
         """D3: Ramp's vendor has no hold field, so the newest hold or release event for it says."""
@@ -97,7 +108,12 @@ class RampSandboxAdapter(RampHttpAdapter):
         return [b for b in bills if b.vendor_id == vendor_id]  # filter in code too, in case Ramp ignores vendor_id
 
     async def place_vendor_hold(self, vendor_id: str, reason: str) -> RampHold:
-        await self._request("POST", f"{API}/vendors/{vendor_id}/hold", json={"reason": reason}, empty_ok=True)
+        try:
+            await self._request("POST", f"{API}/vendors/{vendor_id}/hold", json={"reason": reason}, empty_ok=True)
+        except RampError as exc:
+            # D5: "Vendor is already on hold" is Ramp's word that it is on (a worker retry, a reconcile).
+            if ALREADY_HELD not in str(exc):
+                raise
         return RampHold(id="", vendor_id=vendor_id, placed_at=None)  # Ramp answers 202 or 204, with no hold id
 
     async def release_vendor_hold(self, vendor_id: str) -> None:
