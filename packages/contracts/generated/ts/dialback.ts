@@ -874,9 +874,9 @@ export interface components {
             risk: components["schemas"]["VendorRisk"];
             rule: components["schemas"]["VendorLedgerRule"];
             reason_text: components["schemas"]["SelectionView"]["reason_text"];
-            /** @description The vendor's ledger documents, newest first by our receive time, each email before its attachments; at most 500. */
+            /** @description The vendor's ledger documents recorded before as_of (the rows the rule read), newest first by our receive time, each email before its attachments; at most 500. */
             documents: components["schemas"]["LedgerDocument"][];
-            /** @description How many ledger documents the vendor has in all. */
+            /** @description How many ledger documents recorded before as_of the vendor has in all. */
             document_count: number;
         };
         /**
@@ -912,8 +912,11 @@ export interface components {
             received_at: components["schemas"]["Timestamp"];
             /** @description The date printed on the document. Shown only; the rule never reads it. */
             claimed_date: string | null;
+            /** @description As stored, with any run of 7 or more digits replaced by "[digits removed]". */
             sender: string | null;
+            /** @description As stored, with any run of 7 or more digits replaced by "[digits removed]". */
             subject: string | null;
+            /** @description As stored, with any run of 7 or more digits replaced by "[digits removed]". */
             thread_id: string | null;
             /** @description For an attachment, the email it came with. */
             parent_document_id: components["schemas"]["Uuid"] | null;

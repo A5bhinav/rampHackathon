@@ -25,12 +25,15 @@ seen, by source" chart, and the vendor's documents with the exact text each numb
   those name a stored selection, and this isn't one.
 - **D2. Phone observations only** (ADR-8). Bank, email and domain observations are left out; a
   bank observation's stored form is routing, last four and a fingerprint, and the page needs none.
-- **D3. Quotes are redacted on read.** Every run of 7 or more digits in a quote that isn't part of
-  a phone number is replaced with `[digits removed]`, by the function the LLM reader already uses
-  (`llm_reader.for_the_model`), so a stored line that carries an account number never reaches the
-  page. Quotes are returned as data and rendered as plain text (R9). Hidden text has no quote.
-- **D4. Order and cap.** Documents newest first by our receive time, each email before its
-  attachments; at most 500, with `document_count` the vendor's total.
+- **D3. Document text is redacted on read.** Every run of 7 or more digits in a quote, subject,
+  sender or thread id that isn't part of a phone number is replaced with `[digits removed]`, by the
+  function the LLM reader already uses (`llm_reader.for_the_model`), so a stored line that carries
+  an account number never reaches the page. Known limit: digits split into groups ("0001 2345 6789")
+  pass. Text is returned as data and rendered as plain text (R9). Hidden text has no quote.
+- **D4. Order and cap.** Only rows recorded before `as_of`, the ones the rule read, so every number
+  listed is one the rule judged. Documents newest first by our receive time, each email before its
+  attachments (one level; nested attachments aren't ordered); at most 500, with `document_count`
+  the total.
 - **D5. Words.** Every explanation is the ledger's: `status_text` (risk.py) and `reason_text`
   (reasons.py). Labels and empty states are the page's. "Provable" or "not provable", never "safe".
 - **D6. Reuse.** The lane chart and the every-number table move from the case lineage page into a
@@ -39,17 +42,18 @@ seen, by source" chart, and the vendor's documents with the exact text each numb
 ## Acceptance
 
 - [ ] 1. `dialback_ledger.risk.vendor_ledger(conn, dataset_id, vendor_id)` returns `None` when the
-      vendor isn't on that dataset as the caller sees it. Otherwise: `risk` equals the vendor's
+      vendor isn't on that dataset, or the caller can't see the dataset (a demo account on a dev one). Otherwise: `risk` equals the vendor's
       `risk_list` row at the same `now` (a vendor with no documents yet reads `missing`); `rule` holds `rule_version`, `rule_settings`, `as_of`,
       `cutoff`, `outcome`, `candidates` (exactly `select()`'s), and `contact_point_id` and
       `alternates` when picked.
-- [ ] 2. `documents` lists every ledger document of the vendor on that dataset (D4), each with
+- [ ] 2. `documents` lists every ledger document of the vendor recorded before `as_of` (D4), each with
       `document_id`, `kind`, `custody_channel`, `received_at`, `claimed_date`, `sender`, `subject`,
       `thread_id`, `parent_document_id` and its phone observations (`e164`, `role`, `party`,
       `visibility`, `quote`). No bank, email or domain observation appears.
-- [ ] 3. A quote holding a 12-digit run comes back with `[digits removed]` and its phone number intact (D3).
-- [ ] 4. The endpoint matches the contract; returns 404 for an unknown dataset, an unknown vendor
-      and a vendor of another dataset; reads under the person's token (`person_tx`).
+- [ ] 3. A quote or subject holding a 12-digit run comes back with `[digits removed]`, the phone number intact (D3).
+- [ ] 4. The endpoint matches the contract; returns 404 for an unknown dataset, an unknown vendor,
+      a vendor of another dataset, and a dataset the person can't see; reads under the person's token
+      (`person_tx`).
 - [ ] 5. Reading writes nothing: no `ledger.contact_points` or `ledger.number_selections` row is added.
 - [ ] 6. The page `/d/[datasetId]/control/trust-ledger/[vendorId]` shows the vendor's status badge
       and `status_text`, the lane chart and every-number table with `reason_text` sentences, and the

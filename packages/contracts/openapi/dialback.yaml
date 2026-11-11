@@ -1283,9 +1283,9 @@ components:
         documents:
           type: array
           maxItems: 500
-          description: The vendor's ledger documents, newest first by our receive time, each email before its attachments; at most 500.
+          description: The vendor's ledger documents recorded before as_of (the rows the rule read), newest first by our receive time, each email before its attachments; at most 500.
           items: { $ref: '#/components/schemas/LedgerDocument' }
-        document_count: { type: integer, minimum: 0, description: How many ledger documents the vendor has in all. }
+        document_count: { type: integer, minimum: 0, description: How many ledger documents recorded before as_of the vendor has in all. }
 
     VendorLedgerRule:
       type: object
@@ -1331,9 +1331,9 @@ components:
         claimed_date:
           description: The date printed on the document. Shown only; the rule never reads it.
           oneOf: [{ type: string, format: date }, { type: 'null' }]
-        sender: { type: [string, 'null'] }
-        subject: { type: [string, 'null'] }
-        thread_id: { type: [string, 'null'] }
+        sender: { type: [string, 'null'], description: 'As stored, with any run of 7 or more digits replaced by "[digits removed]".' }
+        subject: { type: [string, 'null'], description: 'As stored, with any run of 7 or more digits replaced by "[digits removed]".' }
+        thread_id: { type: [string, 'null'], description: 'As stored, with any run of 7 or more digits replaced by "[digits removed]".' }
         parent_document_id:
           description: For an attachment, the email it came with.
           oneOf: [{ $ref: '#/components/schemas/Uuid' }, { type: 'null' }]
