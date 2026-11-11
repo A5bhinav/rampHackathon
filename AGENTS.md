@@ -115,6 +115,7 @@ falls back to the safe path.
 | `DIALBACK_RESOLVER` | `stub`, `ledger` | `stub` |
 | `DIALBACK_LAB_ATTACKER` | `scripted`, `llm` | `scripted` |
 | `DIALBACK_CONTEXT_GUARD` | `on`, `off` | `on` (spec 0079: `off` runs today's selection rule alone, for rollback only) |
+| `DIALBACK_LABEL_BAR` | `on`, `off` | `on` (spec 0091: `off` runs spec 0079's rule exactly; `DIALBACK_CONTEXT_GUARD=off` still runs today's rule alone) |
 
 ## Key dates
 
