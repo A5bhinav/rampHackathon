@@ -97,7 +97,15 @@ None.
   First try, 2026-11-10: a bank change made by hand in the sandbox's dashboard (its ownership check
   failed; saved without verifying) showed no new account and no event under the vendor's id. Ramp
   showed it as "pending review". The probe now lists pending accounts and recent events from the
-  whole business (spec 0098, D7) to find where it went.
+  whole business (spec 0098, D7) to find where it went. In Ramp's dashboard (read 2026-11-10):
+  the change is a vendor-edit proposal (`d85f2735-9946-431f-a9ac-f6846d03d0b4`, "Requested edits
+  to vendor details: Added ACH bank account", the requester's own entry, 2:40 PM) adding an
+  account ending 4321 (routing 021000021). Ramp's ownership check gave "No ownership result" (no
+  account holder name was available), and its verification history reads "Manually verified:
+  Confirmed with vendor directly", by the requester: the person's word that Dialback's call
+  replaces. Approval is "in progress", by "Any Admin", and the requester, an admin, is offered
+  Approve. What Ramp's API shows for it (the pending account's `proposal_id`, any audit event) is
+  still to be read with the probe.
 - **Q205:** a bank change can wait for approval in Ramp, and until then the proposed account shows
   only with `include_pending`, under an id Ramp replaces when it approves the change (Ramp's
   document). The layer reads without `include_pending`, so it sees the change only once approved,

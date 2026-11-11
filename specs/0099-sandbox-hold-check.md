@@ -63,8 +63,11 @@ None.
   login answer lists its scopes (not yet seen). The bill was left with no payment date.
 - The release didn't give the date back by itself, as Ramp's help center says.
 - The bill was waiting for a transfer match (paid by direct debit; `status` OPEN until matched), not
-  a scheduled Ramp payment; matched by hand afterwards, it was paid. Salesforce's unpaid bill is the
-  same kind, so the only scheduled bills in this sandbox are AWS's two, under a hold placed by hand.
+  a scheduled Ramp payment; matched by hand afterwards, it was paid. Every bill in this sandbox is
+  direct debit (read in Ramp's dashboard: AWS's two on hold, Salesforce's waiting for a match, three
+  paid), so none is a payment Ramp sends, and no run here can test setting a date back until a bill
+  Ramp pays (ACH) is added. A direct debit is pulled by the vendor, so a bank change doesn't
+  redirect it; what a vendor hold does to one isn't known.
 
 ## Acceptance
 
