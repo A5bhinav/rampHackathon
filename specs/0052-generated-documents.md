@@ -55,7 +55,7 @@ None.
      a label: what the text says about a number.
    - **Owner and claim differ on purpose.** An attacker's text can claim its own number is the
      vendor's. For the reader, the truth is the claim. For `select()`, the truth is the owner.
-2. **Hand-written lists** in `evals/src/dialback_evals/docbank.py` (Q119).
+2. **Hand-written lists** in `evals/src/dialback_evals/docbank.py` (Q155).
    - **Phrasings,** each with the role and party it states, if any. Examples: "Accounts
      receivable", "Remittance questions", "for payment inquiries call", "Main office", "call us at",
      "Fax", "send forms by fax to", "verify with First Example Bank at", "Customer main line", "our
@@ -187,7 +187,7 @@ None.
 
 None open. Sami approved the spec and every call in it as written on Nov 10:
 
-- **Q119, resolved:** the phrase and placement lists start from the corpus's labels and spec 0049's
+- **Q155, resolved:** the phrase and placement lists start from the corpus's labels and spec 0049's
   hard cases. Inesh reviews them, since a list's gaps are this suite's blind spots.
 - **Q120, resolved:** the stub is gated by known failures keyed by pattern (decision 6), extending
   Sami's Q101 decision from cases to patterns.

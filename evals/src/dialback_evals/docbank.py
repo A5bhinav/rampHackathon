@@ -1,4 +1,4 @@
-"""Spec 0052, decision 2: the hand-written lists the document generator draws from (Q119).
+"""Spec 0052, decision 2: the hand-written lists the document generator draws from (Q155).
 
 They start from the corpus's labels ("Accounts receivable", "Main", "AR direct", "Billing", "Verified
 callback") and spec 0049's hard cases ("call us at", mentions with no label, the label on the line
