@@ -1,0 +1,8 @@
+{
+  "subject": "Annual vendor recertification",
+  "sender": "Compliance <compliance@harbor-marine.example>",
+  "text": "Please recertify your W-9 and your ownership details by Dec 1 through the link below.",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Recertification."
+}

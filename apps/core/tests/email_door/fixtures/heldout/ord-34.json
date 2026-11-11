@@ -1,0 +1,8 @@
+{
+  "subject": "Printer jam on 3",
+  "sender": "Facilities <facilities@ourco.example>",
+  "text": "Someone left a jam in the third floor printer again.",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Noise."
+}

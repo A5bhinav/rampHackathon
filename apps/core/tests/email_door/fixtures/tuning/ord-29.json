@@ -1,0 +1,8 @@
+{
+  "subject": "payment run friday",
+  "sender": "Ben Carter <ben@ourco.example>",
+  "text": "Reminder that the Friday payment run closes at 3pm. Acme's invoice is in, Brightline's is\nstill waiting on a receiving doc.",
+  "label": "ordinary",
+  "vendor": "acme",
+  "note": "Internal AP chatter."
+}

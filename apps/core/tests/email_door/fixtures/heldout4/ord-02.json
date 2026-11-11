@@ -1,0 +1,8 @@
+{
+  "subject": "Invoice 88377",
+  "sender": "Billing <billing@acmefasteners.com>",
+  "text": "Invoice 88377 attached. $2,940.00 Net 30, PO 55120.\n\nRemit by ACH to routing 021000021, account 000011112222.\n\nThank you,\nAcme Fasteners LLC",
+  "label": "ordinary",
+  "vendor": "acme",
+  "note": "Bank details match the account on file."
+}

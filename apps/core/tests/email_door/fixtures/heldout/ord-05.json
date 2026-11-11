@@ -1,0 +1,8 @@
+{
+  "subject": "Statement",
+  "sender": "Receivables <ar@gordon-glass.example>",
+  "text": "Your account is current. Nothing due this month.",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Statement."
+}

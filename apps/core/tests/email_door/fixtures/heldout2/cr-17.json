@@ -1,0 +1,8 @@
+{
+  "subject": "RE: Remit-to confirmation for 2027 vendor file refresh",
+  "sender": "Raymond Teller <rteller@cobaltfreight.com>",
+  "text": "Hi Marcus,\n\nGood timing on this. Our remit-to is changing for 2027. Please update to the following for all payments dated January 1 forward:\n\nCobalt Freight LLC\nU.S. Bank\nRouting 091000022\nAccount 1-530-0991-7724\n\nThe Chase account will stay open through year end for anything already in flight.\n\nThanks,\nRay\n\n> From: Marcus Bell <mbell@larkspur-ind.com>\n> Sent: Friday, November 6, 2026 9:02 AM\n> Subject: Remit-to confirmation for 2027 vendor file refresh\n>\n> Hi Ray,\n>\n> We're doing our annual vendor master refresh. Can you confirm the remit-to information we have for Cobalt is still correct for 2027? We show ACH to JPMorgan Chase, routing 021000021, account ending 8888.\n>\n> Thanks,\n> Marcus Bell\n> Larkspur Industries | Accounts Payable",
+  "label": "change_request",
+  "vendor": "cobalt",
+  "note": "Vendor answers AP's own verification request with a new remit-to. The quoted part contains the on-file routing; the new details are in the reply."
+}

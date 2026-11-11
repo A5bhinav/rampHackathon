@@ -1,0 +1,8 @@
+{
+  "subject": "Status of ACH",
+  "sender": "Karen Li <kli@caldwell-security.example>",
+  "text": "Our bank shows no deposit yet from the ACH you said went out Monday. Can you share the trace number?",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Asks for ACH trace; no change of account."
+}

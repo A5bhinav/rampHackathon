@@ -1,0 +1,8 @@
+{
+  "subject": "Cobalt Freight - split remittance request",
+  "sender": "Teresa Vance <tvance@cobaltfreight.com>",
+  "text": "Hi Karen,\n\nFor the Memphis lane we are now using a partner carrier, and under our agreement they are paid directly. Starting with invoice CF-21004, please split each Cobalt Freight payment:\n\n- 60% to Cobalt Freight LLC at the account you have on file\n- 40% to Delta Line Carriers Inc, Regions Bank, routing 062000019, account 5510027730\n\nI know this is unusual, happy to provide the agreement if needed.\n\nThanks,\nTeresa",
+  "label": "change_request",
+  "vendor": "cobalt",
+  "note": "Partial redirect: a portion of every future payment to a third party's account. The on-file account is still mentioned, which could mislead a detector into calling it ordinary."
+}

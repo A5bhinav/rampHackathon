@@ -1,0 +1,8 @@
+{
+  "subject": "Payment failed",
+  "sender": "Billing <billing@cloudhost.example>",
+  "text": "Your card ending 1881 was declined for invoice CH-223110. Update your card to avoid interruption.",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Card issue for a SaaS; card, not vendor bank change."
+}

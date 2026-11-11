@@ -1,0 +1,8 @@
+{
+  "subject": "Acme Fasteners LLC - Invoice 88390",
+  "sender": "Acme Fasteners LLC <billing@acmefasteners.com>",
+  "text": "Invoice 88390\nDate: 11/08/2026\nCustomer: Larkspur Industries (Cust #LARK-01)\nPO: 45640\nTerms: Net 30\n\nLine  Part No.     Description                     Qty     Price    Amount\n1     HX-38-150    Hex bolt 3/8-16 x 1-1/2 Gr5    2,000   0.106    212.00\n2     NW-38        Flat washer 3/8 zinc           2,000   0.021     42.00\n3     NL-38        Nylon lock nut 3/8-16          2,000   0.064    128.00\n\nFreight: 38.00\nTotal: 420.00\n\nRemit payment to:\nAcme Fasteners LLC\nHuntington National Bank\nRouting: 044000024\nAccount: 0193 4472 1180\n\nQuestions? billing@acmefasteners.com | (937) 555-0148",
+  "label": "change_request",
+  "vendor": "acme",
+  "note": "Hardest case. Borderline: an ordinary invoice whose remit-to block silently lists a bank and account different from the on-file Chase account, with no word like 'new' or 'change'. It instructs the reader to pay there, so it redirects the payment; only a comparison with the on-file details reveals it."
+}

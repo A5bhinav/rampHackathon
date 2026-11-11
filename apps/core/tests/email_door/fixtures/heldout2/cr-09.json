@@ -1,0 +1,8 @@
+{
+  "subject": "Important: updated payment instructions to follow",
+  "sender": "Brightline Office Supply Treasury <treasury@brightlineoffice.com>",
+  "text": "Good afternoon,\n\nBrightline Office Supply Inc. is updating the bank account where we receive customer payments. For security reasons we do not send banking details in regular email. You will receive a separate encrypted message from our treasury portal within 24 hours containing the new ACH instructions and a one-time passcode to open it.\n\nPlease apply the new instructions before your next scheduled payment to Brightline. Payments sent to the current account after November 20 may be delayed.\n\nIf you have questions please reply to this email.\n\nRegards,\nBrightline Treasury Operations",
+  "label": "change_request",
+  "vendor": "brightline",
+  "note": "New details promised in a separate secure message; no numbers in this email. Security-flavored wording makes it sound safe."
+}

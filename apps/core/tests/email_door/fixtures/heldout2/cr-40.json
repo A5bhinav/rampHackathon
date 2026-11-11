@@ -1,0 +1,8 @@
+{
+  "subject": "RE: RE: Confirming bank details before year-end run",
+  "sender": "Raymond Teller <rteller@cobaltfreight.com>",
+  "text": "Marcus,\n\nPlease disregard Angela's note below, she wasn't looped in yet. We did move banks last week. Hold the year-end payment until our controller calls you with the new account and routing numbers tomorrow; please send it there instead of the Chase account.\n\nRay\n\n-----Original Message-----\nFrom: Angela Pruitt <apruitt@cobaltfreight.com>\nSent: Tuesday, November 10, 2026 9:15 AM\nTo: Marcus Bell <mbell@larkspur-ind.com>\nSubject: RE: Confirming bank details before year-end run\n\nHi Marcus, yes, nothing has changed. Chase, routing 021000021, account 000077778888 is still correct.\n\nAngela\n\n-----Original Message-----\nFrom: Marcus Bell <mbell@larkspur-ind.com>\nSent: Monday, November 9, 2026 4:48 PM\nTo: billing@cobaltfreight.com\nSubject: Confirming bank details before year-end run\n\nHi Cobalt team, before we release the year-end payment, can you confirm the account we have on file (Chase, ending 8888) is still current?\n\nThanks, Marcus",
+  "label": "change_request",
+  "vendor": "cobalt",
+  "note": "Thread where an earlier reply confirms 'nothing has changed' with the full on-file numbers, then the latest message reverses it; new details promised by phone. The only full numbers in the email are the on-file ones."
+}

@@ -1,0 +1,8 @@
+{
+  "subject": "Supplier profile updated: Brightline Office Supply Inc",
+  "sender": "SupplierHub Notifications <no-reply@supplierhub-portal.com>",
+  "text": "SupplierHub\n\nA supplier has updated their profile.\n\nSupplier: Brightline Office Supply Inc\nSupplier ID: SUP-002190\nChange type: Contact information\nSubmitted by: cbenson@brightlineoffice.com\n\nField              Previous                   New\nMain phone         614-555-0170               614-555-0188\nAR contact email   ar@brightlineoffice.com    collections@brightlineoffice.com\n\nNo approval is required for contact changes. Remittance and banking details were not modified.\n\nView supplier: https://app.supplierhub-portal.com/suppliers/SUP-002190",
+  "label": "ordinary",
+  "vendor": "brightline",
+  "note": "Supplier-portal profile change in the same format as cr-11, but the change is contact info only."
+}

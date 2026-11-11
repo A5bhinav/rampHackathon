@@ -1,0 +1,8 @@
+{
+  "subject": "Acme Fasteners LLC has requested a change to how they get paid",
+  "sender": "PayNet Connect <notifications@paynetconnect.com>",
+  "text": "Hi Larkspur Industries,\n\nAcme Fasteners LLC, one of your suppliers on PayNet Connect, has requested to receive your future payments through PayNet Instant Pay instead of ACH to their bank account on file.\n\nWith Instant Pay, funds are deposited to the supplier's PayNet wallet within minutes and can be withdrawn by the supplier at any time.\n\nWhat you need to do:\nApprove this request so that payments to Acme Fasteners LLC are routed through PayNet Instant Pay.\n\n[Approve request]   [Decline]\n\nIf you do not recognize this request, contact PayNet Connect support.\n\nPayNet Connect, Inc.",
+  "label": "change_request",
+  "vendor": "acme",
+  "note": "Payment-network notification: switch from ACH to a network wallet, which changes where the money lands. No bank numbers."
+}

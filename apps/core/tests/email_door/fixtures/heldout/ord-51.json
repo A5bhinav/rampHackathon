@@ -1,0 +1,8 @@
+{
+  "subject": "Early pay discount",
+  "sender": "Dana Whitfield <ar@acme.example>",
+  "text": "We offer 2 percent off if invoice 1771 is paid within 10 days. All other terms are as per contract.",
+  "label": "ordinary",
+  "vendor": "acme",
+  "note": "Discount offer."
+}

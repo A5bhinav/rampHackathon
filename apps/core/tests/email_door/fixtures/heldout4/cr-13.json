@@ -1,0 +1,8 @@
+{
+  "subject": "Cobalt Freight joins the Meridian Logistics family",
+  "sender": "Integration Office <integration@meridianlogistics-holdings.example>",
+  "text": "Dear Valued Customer,\n\nWe are delighted to share that Cobalt Freight LLC has become part of Meridian Logistics Holdings. You will continue to work with the same drivers, dispatchers and account managers you know.\n\nAs we bring our organizations together, invoices issued on or after January 4 will carry the Meridian name. Those invoices should be paid to Meridian Logistics Holdings Inc. at the remit-to information printed on them, and not to Cobalt Freight's existing account. An updated W-9 is attached.\n\nWe look forward to serving you as one company.\n\nWarm regards,\nThe Integration Office",
+  "label": "change_request",
+  "vendor": "cobalt",
+  "note": "Payee moves to acquirer, wrapped in marketing tone."
+}

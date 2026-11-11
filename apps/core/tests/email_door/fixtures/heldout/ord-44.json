@@ -1,0 +1,8 @@
+{
+  "subject": "Sales tax exemption certificates",
+  "sender": "Tax <tax@ourco.example>",
+  "text": "Please collect exemption certificates from all vendors who charge us sales tax.",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Internal."
+}

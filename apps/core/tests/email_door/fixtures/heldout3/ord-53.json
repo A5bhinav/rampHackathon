@@ -1,0 +1,8 @@
+{
+  "subject": "Facture CF-21010 - Cobalt Freight LLC",
+  "sender": "facturation@cobaltfreight.com",
+  "text": "COBALT FREIGHT LLC\nFacture CF-21010\nDate d'expedition : 06/11/2026\nTrajet : Montreal QC a Cleveland OH\n\nTransport                     2,980.00\nSurcharge carburant             730.10\nTotal a payer                 3,710.10\n\nConditions : 30 jours net\n\nMerci d'effectuer le paiement a Cobalt Freight LLC, routage ABA 021000021, compte 000077778888.\n\nNous vous remercions de votre confiance.",
+  "label": "ordinary",
+  "vendor": "cobalt",
+  "note": "French-language routine invoice listing the on-file account."
+}

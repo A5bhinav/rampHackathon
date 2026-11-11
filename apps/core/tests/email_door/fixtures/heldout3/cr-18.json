@@ -1,0 +1,8 @@
+{
+  "subject": "Paying Cobalt Freight by PayPal going forward",
+  "sender": "Teresa Vance <tvance@cobaltfreight.com>",
+  "text": "Hi,\n\nTo speed things up on our side we have set up a PayPal Business account. Please send all future Cobalt Freight payments to cobaltfreight.payments@gmail.com via PayPal instead of ACH. You can keep the ACH on file as a backup but PayPal should be the default.\n\nThanks,\nTeresa",
+  "label": "change_request",
+  "vendor": "cobalt",
+  "note": "Payment-method switch to a PayPal account (a gmail address); money would land outside the account on file."
+}

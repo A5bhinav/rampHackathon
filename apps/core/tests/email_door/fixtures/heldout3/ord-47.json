@@ -1,0 +1,8 @@
+{
+  "subject": "RE: Acme invoice 88301 bank check",
+  "sender": "Jen Park <jpark@northgate-mfg.com>",
+  "text": "Karen,\n\nChecked: the account on invoice 88301 matches what is in the vendor master. The Acme bank change we processed back in March (callback logged 3/14 with James Whitfield, VM-7 #0231) is what is on file now, so nothing new here. OK to pay on the regular run.\n\nJen\n\n> From: Karen Liu\n> Subject: Acme invoice 88301 bank check\n> Jen, can you compare the remit block on 88301 against the vendor master before we release it?",
+  "label": "ordinary",
+  "vendor": "acme",
+  "note": "Internal thread discussing a past, already-verified bank change. Mentions a bank change but requests nothing new."
+}

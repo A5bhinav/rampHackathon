@@ -1,0 +1,8 @@
+{
+  "subject": "Fwd: your question",
+  "sender": "Dana Whitfield <ar@acme.example>",
+  "text": "Forwarding the shipping update to your team.\n\n---------- Forwarded message ---------\nFrom: Logistics <logistics@acme.example>\nSubject: Shipment update\n\nYour order left the warehouse today and arrives Thursday.",
+  "label": "ordinary",
+  "vendor": "acme",
+  "note": "Forwarded message block, not a bank item."
+}

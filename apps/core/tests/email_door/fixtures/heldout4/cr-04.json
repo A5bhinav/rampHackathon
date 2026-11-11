@@ -1,0 +1,8 @@
+{
+  "subject": "Notice of Assignment - Brightline Office Supply Inc",
+  "sender": "Portfolio Operations <noa@summitbridgecapital.example>",
+  "text": "NOTICE OF ASSIGNMENT AND DIRECTION TO PAY\n\nTo: Accounts Payable, Tallis Manufacturing Co.\nRe: Brightline Office Supply Inc (\"Seller\")\n\nPlease be advised that Seller has sold and assigned to Summit Bridge Capital LLC (\"Factor\") all of its present and future accounts receivable, including all amounts now or hereafter owing by you to Seller.\n\nYou are hereby irrevocably directed to make all payments on such accounts solely to Factor as follows:\n\n  Summit Bridge Capital LLC FBO Brightline Office Supply Inc\n  ABA 061000104\n  Account 8800221945\n\nPayment to any other party will not discharge your obligation. This direction may be revoked only by a writing signed by Factor. See UCC 9-406.\n\nPlease sign and return the acknowledgment below within 5 business days.\n\nAcknowledged by: ________________  Title: ____________  Date: ________\n\nPortfolio Operations\nSummit Bridge Capital LLC",
+  "label": "change_request",
+  "vendor": "brightline",
+  "note": "Factoring notice. May be legitimate, but it directs future payments to a new payee, so it is a change request."
+}

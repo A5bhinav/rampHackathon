@@ -1,0 +1,8 @@
+{
+  "subject": "Disregard email from brightlineoffice-inc.com",
+  "sender": "Sam Okafor <s.okafor@brightlineoffice.com>",
+  "text": "Hi Karen,\n\nA customer told us they received an email from \"ar@brightlineoffice-inc.com\" (note the extra -inc) saying we switched banks. That domain is not ours. Our ACH account is unchanged and we are not planning any change. If you get anything like that please forward it to me and do not act on it.\n\nThanks,\nSam",
+  "label": "ordinary",
+  "vendor": "brightline",
+  "note": "Vendor denying a change and warning about a lookalike domain."
+}

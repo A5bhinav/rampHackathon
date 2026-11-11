@@ -24,6 +24,7 @@ from psycopg import AsyncConnection, errors
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from .auth import Principal, current_user
+from .bank import aba_valid
 from .db import person_tx
 from .events import NotAllowed, TransitionRefused, VersionConflict, apply_event, person
 from .flags import RampMode
@@ -139,8 +140,11 @@ def holds(roles: list[str], role: str) -> bool:
     return role in roles or "admin" in roles
 
 
-def permissions(case: dict[str, Any], user: UUID, roles: list[str], approved_this_version: bool) -> dict[str, Any]:
-    """A hint for the page. The database enforces every one of these again."""
+def permissions(case: dict[str, Any], user: UUID, roles: list[str], approved_this_version: bool,
+                email_only: bool = False, dismissed: bool = False) -> dict[str, Any]:
+    """A hint for the page. The database enforces every one of these again. `email_only` is
+    app.case_email_only for the case; `dismissed` is whether this person is in
+    app.blocked_approvers, so an approval from before the case was blocked doesn't count (spec 0090)."""
     reasons: list[str] = []
     is_changer = user in (case["changer_ids"] or [])
     is_reviewer = case["reviewed_by"] == user
@@ -158,12 +162,17 @@ def permissions(case: dict[str, Any], user: UUID, roles: list[str], approved_thi
         reasons.append("This change has no known author, so it needs two approvers; you have already approved.")
     if case["state"] == "released":
         reasons.append("This case is released; the hold is off and nothing is left to decide.")
+    elif case["state"] == "blocked" and email_only and dismissed:   # spec 0090: the first of two dismissals
+        reasons.append("You have dismissed this case. A second, different approver must also dismiss it before the hold is lifted.")
     elif not awaiting and case["state"] != "needs_review":
         reasons.append(f"This case is {case['state'].replace('_', ' ')}; there is nothing to release or review yet.")
     return {
         "can_approve": awaiting and approver and not is_changer and not is_reviewer and not approved_this_version,
         "can_reject": awaiting and approver and not is_changer,
         "can_review": case["state"] == "needs_review" and approver and not is_changer,  # spec 0028
+        # Spec 0090: two different approvers dismiss a blocked email-only case, as eval_guard checks.
+        "can_dismiss": case["state"] == "blocked" and approver and email_only and not dismissed
+                       and not is_changer and not is_reviewer,
         "reasons": reasons,
     }
 
@@ -299,6 +308,9 @@ async def get_case(case_id: UUID, request: Request, user: UserDep):
                  from app.bank_change_events ce join app.bank_accounts n on n.id = ce.new_account_id
                  left join app.bank_accounts o on o.id = ce.old_account_id where ce.id = %s""",
             (c["change_event_id"],))).fetchone()
+        email = await (await conn.execute(
+            "select sender, subject, received_at, red_flags from app.inbound_emails "
+            "where change_event_id = %s order by received_at desc, id desc limit 1", (c["change_event_id"],))).fetchone()
         hold = await (await conn.execute(
             "select status::text as status, ramp_ref, placed_at, confirmed_at, released_at, original_schedule, last_error "
             "from app.holds where case_id = %s order by (released_at is null) desc, created_at desc limit 1", (case_id,))).fetchone()
@@ -320,7 +332,14 @@ async def get_case(case_id: UUID, request: Request, user: UserDep):
         names = await people(conn, ids)
         voice = {r["id"]: r for r in await (await conn.execute(
             "select id::text as id, provider, reason from voice.calls where case_id = %s", (case_id,))).fetchall()}
+        dismiss = None
+        if c["state"] == "blocked":   # spec 0090: only a blocked case can be dismissed
+            dismiss = await (await conn.execute(
+                "select app.case_email_only(c) as email_only, app.blocked_approvers(c) as approvers "
+                "from app.cases c where c.id = %s", (case_id,))).fetchone()
 
+    # The release's own check (awaiting_release, ADR-10's two approvers): any approval of this version. Not the
+    # dismiss check, which counts only approvals made while the case is blocked (dismiss["approvers"], spec 0090).
     approved = any(r["actor_id"] == user.user_id and r["action"] == "approve" and r["case_version"] == c["version"] for r in releases)
     timeline, call_events, strict = [], [], False
     for e in events:
@@ -334,7 +353,7 @@ async def get_case(case_id: UUID, request: Request, user: UserDep):
             "seq": e["seq"], "type": e["type"], "occurred_at": ts(e["occurred_at"]),
             "actor": {"kind": e["actor_kind"], "id": str(e["actor_id"]) if e["actor_id"] else None, "display_name": actor_name},
             "from_state": envelope.get("from_state"), "to_state": envelope["to_state"], "version": envelope["version"],
-            "summary": summary(e["type"], envelope.get("body") or {}, actor_name), "hash": e["hash"],
+            "summary": summary(e["type"], envelope.get("body") or {}, actor_name, envelope.get("from_state")), "hash": e["hash"],
         })
     return {
         "case": case_summary(c),
@@ -346,6 +365,8 @@ async def get_case(case_id: UUID, request: Request, user: UserDep):
             "new_account": {"routing_number": change["new_routing"], "last4": change["new_last4"]},
             "changed_by": person_json(change["changed_by"], names),
             "unknown_changer": c["has_unknown_changer"],
+            "email": None if email is None else {"sender": email["sender"], "subject": email["subject"],
+                                                 "received_at": ts(email["received_at"]), "red_flags": list(email["red_flags"])},
         },
         "hold": None if hold is None else {
             "status": hold["status"], "ramp_ref": hold["ramp_ref"], "placed_at": ts(hold["placed_at"]),
@@ -362,7 +383,8 @@ async def get_case(case_id: UUID, request: Request, user: UserDep):
                       "case_version": r["case_version"], "created_at": ts(r["created_at"])} for r in releases],
         "timeline": timeline,
         "chain": chain,
-        "permissions": permissions(c, user.user_id, roles, approved),
+        "permissions": permissions(c, user.user_id, roles, approved, email_only=bool(dismiss and dismiss["email_only"]),
+                                   dismissed=bool(dismiss and user.user_id in (dismiss["approvers"] or []))),
         "calls": calls(call_events, voice),
         "call_script": call_script(),
     }
@@ -451,18 +473,9 @@ async def review(case_id: UUID, body: ReviewRequest, request: Request, user: Use
 
 
 # A clerk's bank change from the dashboard (spec 0077) ----------------------------------------------
-ROUTING = re.compile(r"^[0-9]{9}$")
-ACCOUNT = re.compile(r"^[0-9]{4,17}$")
+ACCOUNT = re.compile(r"[0-9]{4,17}")  # used with fullmatch: "$" would accept a trailing newline
 CHANGE_EVERY_SECONDS = 60  # one change a minute per dataset: a shared demo account can't set off a run of calls
 _last_sent: dict[UUID, float] = {}  # dataset -> when this process last sent a change (the core is one container)
-
-
-def aba_valid(routing: str) -> bool:
-    """The ABA routing-number checksum: 3, 7, 1 weights over the nine digits, a multiple of 10."""
-    if not ROUTING.match(routing):
-        return False
-    d = [int(c) for c in routing]
-    return sum(w * x for w, x in zip([3, 7, 1] * 3, d)) % 10 == 0
 
 
 async def change_access(conn: AsyncConnection, settings: Any, dataset: dict[str, Any]) -> tuple[str | None, str | None]:
@@ -512,6 +525,29 @@ async def vendor_accounts(dataset_id: UUID, request: Request, user: UserDep):
             "can_change": ramp_user is not None, "reason": reason}
 
 
+MAIL_LIMIT = 200
+
+
+@router.get("/datasets/{dataset_id}/mail")
+async def list_mail(dataset_id: UUID, request: Request, user: UserDep):
+    """What the email door did with each inbound email, newest first (spec 0089). The table holds
+    no body and no full account number, and none is selected."""
+    async with person_tx(request.app.state.pool, user.user_id, user.claims) as conn:
+        if await (await conn.execute("select 1 from app.datasets where id = %s", (dataset_id,))).fetchone() is None:
+            return problem(404, "not_found", "No such dataset.")
+        rows = await (await conn.execute(
+            "select m.id, m.received_at, m.sender, m.subject, m.flagged, m.outcome, m.reply, m.red_flags, m.case_id, "
+            "       m.routing_number, m.last4, v.id as vendor_id, v.legal_name "
+            "from app.inbound_emails m left join app.vendors v on v.id = m.vendor_id "
+            "where m.dataset_id = %s order by m.received_at desc, m.id desc limit %s", (dataset_id, MAIL_LIMIT))).fetchall()
+    return {"items": [{
+        "id": r["id"], "received_at": ts(r["received_at"]), "sender": r["sender"], "subject": r["subject"],
+        "flagged": r["flagged"], "outcome": r["outcome"], "reply": r["reply"], "red_flags": list(r["red_flags"]),
+        "vendor": None if r["vendor_id"] is None else {"id": str(r["vendor_id"]), "legal_name": r["legal_name"]},
+        "case_id": str(r["case_id"]) if r["case_id"] else None, "routing_number": r["routing_number"], "last4": r["last4"],
+    } for r in rows]}
+
+
 @router.post("/datasets/{dataset_id}/vendors/{vendor_id}/bank-change")
 async def change_bank_account(dataset_id: UUID, vendor_id: UUID, body: BankChangeRequest, request: Request, user: UserDep):
     """A clerk changes a vendor's bank details in the Ramp mock, as their linked Ramp user (spec 0077).
@@ -519,7 +555,7 @@ async def change_bank_account(dataset_id: UUID, vendor_id: UUID, body: BankChang
     never stored, logged or returned (ADR-8); a refusal sends nothing to Ramp."""
     if not aba_valid(body.routing_number):
         return problem(422, "invalid_request", "The routing number must be nine digits with a valid checksum.")
-    if not ACCOUNT.match(body.account_number):
+    if not ACCOUNT.fullmatch(body.account_number):
         return problem(422, "invalid_request", "The account number must be 4 to 17 digits.")
     settings = request.app.state.settings
     async with person_tx(request.app.state.pool, user.user_id, user.claims) as conn:

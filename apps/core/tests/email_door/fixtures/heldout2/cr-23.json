@@ -1,0 +1,8 @@
+{
+  "subject": "Alteracao de dados bancarios para pagamento",
+  "sender": "Financeiro Ferragens Paulista <financeiro@ferragenspaulista.com.br>",
+  "text": "Prezados,\n\nInformamos que, a partir desta data, os pagamentos referentes as nossas faturas deverao ser feitos na nova conta bancaria abaixo:\n\nBanco: Itau Unibanco (341)\nAgencia: 0912\nConta corrente: 45871-3\nFavorecido: Ferragens Paulista Ltda\nCNPJ: 12.345.678/0001-90\n\nPedimos a gentileza de atualizar o cadastro e confirmar o recebimento deste e-mail.\n\nAtenciosamente,\n\nMarcos Oliveira\nDepartamento Financeiro\nFerragens Paulista Ltda",
+  "label": "change_request",
+  "vendor": null,
+  "note": "Portuguese-language bank change from an unknown Brazilian vendor (agency and account, no IBAN). Accents dropped."
+}

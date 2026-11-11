@@ -1,0 +1,8 @@
+{
+  "subject": "Re: payment instructions - auto reply",
+  "sender": "Auto-Reply <noreply@northgate-logistics.example>",
+  "text": "This mailbox is not monitored. Do not send payment instructions to this address. For\nchanges to bank details, call your account manager.",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Auto-reply that mentions bank changes but is not a request."
+}

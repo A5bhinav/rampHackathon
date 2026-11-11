@@ -1,0 +1,8 @@
+{
+  "subject": "New acct",
+  "sender": "treyes@brightlineoffice.com",
+  "text": "New acct for Brightline: 011000138 / 5502918833. Use from now on pls.",
+  "label": "change_request",
+  "vendor": "brightline",
+  "note": "One-line request; numbers given as routing / account without labels."
+}

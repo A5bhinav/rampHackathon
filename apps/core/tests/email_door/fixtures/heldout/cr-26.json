@@ -1,0 +1,8 @@
+{
+  "subject": "Quick favour",
+  "sender": "Marisol Vega <mvega@brightline.example>",
+  "text": "Could you route this month's payment to a different bank account than usual? Our usual\naccount is under review. I'll text you the number.",
+  "label": "change_request",
+  "vendor": "brightline",
+  "note": "Single-payment redirect request; details later."
+}

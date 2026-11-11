@@ -1,0 +1,8 @@
+{
+  "subject": "Cobalt Freight - invoicing entity for transatlantic lanes",
+  "sender": "Finance Shared Services <fss@cobaltfreight.com>",
+  "text": "Dear Customer,\n\nFor tax-structuring reasons, transatlantic lane invoices from next month will be settled through our UK affiliate, Cobalt Freight Europe Ltd. Please remit those invoices to:\n\nIBAN GB33 BUKB 2020 1555 5555 55\nBIC BUKBGB22\n\nDomestic lanes are not affected.\n\nKind regards,\nFinance Shared Services",
+  "label": "change_request",
+  "vendor": "cobalt",
+  "note": "Partial redirect to an overseas affiliate."
+}

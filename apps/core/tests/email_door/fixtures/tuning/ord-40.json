@@ -1,0 +1,8 @@
+{
+  "subject": "change of contact",
+  "sender": "Sue Park <accounts@parkdental.example>",
+  "text": "Please send invoices queries to my colleague Raj from now on, raj@parkdental.example. Payment details remain the same.",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Contact change; payments explicitly same."
+}

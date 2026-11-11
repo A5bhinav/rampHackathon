@@ -1,0 +1,8 @@
+{
+  "subject": "Banking change - what do you need from us?",
+  "sender": "Angela Pruitt <apruitt@cobaltfreight.com>",
+  "text": "Hello,\n\nCobalt Freight is changing banks at the end of this month, so we will need you to start sending our payments to the new account. Could you send me whatever vendor update or ACH authorization form your company requires? I'll fill it out with our new account details and get it back to you this week.\n\nThanks,\nAngela Pruitt\nBilling Coordinator\nCobalt Freight LLC",
+  "label": "change_request",
+  "vendor": "cobalt",
+  "note": "No numbers at all; the vendor states a bank change and asks for the form to submit it. Still a change request by definition."
+}

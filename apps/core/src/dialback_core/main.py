@@ -102,13 +102,17 @@ async def _demo(settings: Settings, args: argparse.Namespace) -> int:
             elif args.action == "prepare":
                 links, seed = dict(_link(x) for x in args.link), demo.load_seed(args.seed)
                 phones = dict(_pair("--phone", x) for x in args.phone)
-                p = await demo.prepare(env, seed, links, phones=phones, requests=args.request or ["acme"])
+                door = args.email_door
+                requests = args.request or [r for r in ["acme"] if r not in door]
+                p = await demo.prepare(env, seed, links, phones=phones, requests=requests, email_door=door)
                 for w in p.reset.warnings:
                     print(f"warning: {w}")
                 print(f"dataset {p.reset.dataset.id}\nlinked  {', '.join(p.reset.linked) or 'nobody'}")
                 for ref, s in p.ledger["vendors"].items():  # never the phone itself: "team" or "fictional"
                     print(f"ledger  {ref:<11} {s['observations']:>3} sightings, AR line: {s['phone']}"
                           + (", change-request email in" if p.requests.get(ref) else ""))
+                if line := demo.describe_email_door(p.email_door, settings.inbox_address):
+                    print(f"email   {line}")
                 print("next    change the vendor's bank details in the dashboard: AP workspace, Demo, Ramp (mock)")
             elif args.action == "change":
                 account = await demo.change(env, demo.load_seed(args.seed), args.vendor, by=args.by, unknown=args.unknown)
@@ -174,6 +178,8 @@ def run() -> None:
                     help="that vendor's AR line becomes this team phone in the ledger (repeatable; never committed)")
     pr.add_argument("--request", action="append", default=[], metavar="REF",
                     help="vendors whose change-request email goes in (default: acme)")
+    pr.add_argument("--email-door", action="append", default=[], metavar="REF",
+                    help="vendors whose email door is turned on; the live email is their request, so none is loaded (repeatable)")
     ch = dm.add_parser("change", help="beat 2: the vendor's seeded bank change")
     ch.add_argument("--vendor", required=True)
     ch.add_argument("--seed", default=str(demo.DEFAULT_SEED))

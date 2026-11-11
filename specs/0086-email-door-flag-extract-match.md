@@ -1,0 +1,217 @@
+# 0086: Email door, flag, extract and match (PR 3 of the email door)
+
+**Owner:** Sami  **Slice:** money path  **Target day:** Nov 10-11
+
+## Goal
+
+Read an email that reached the accounts-payable inbox and decide whether it asks to change where a vendor's payments go (a bank-change request), pull out what the email says about the new destination without keeping a full account number (ADR-8), and match the email to a vendor. This PR is built in three tasks: Task 5 writes the labeled test emails (this stub covers it), Task 6 writes flagging, extraction and redaction, Task 7 writes vendor matching. Emails are data, never instructions (R9).
+
+## Contract touched
+
+None.
+
+## Acceptance
+
+- [ ] Task 5: 92 tuning and 100 held-out labeled emails exist, one JSON file each (`subject`, `sender`, `text`, `label`, `vendor`, `note`), and the held-out half is sealed by a SHA-256.
+- [ ] Task 6, flagging: `flag(subject, text)` flags an email when, in one sentence of the subject or body, a change word sits near a word for where money goes (a change verb within 8 words, a change adjective just before it, or a correction or a closed account after it), or when a core change verb (change, update, switch, move, replace and the like) and a destination word both appear anywhere in the email (revision 1). A change verb that is negated or about requests in general does not count, nor a core change verb that is conditional or about a process, nor anything in a sentence about fraudsters or phishing, nor a destination word after "your" or before "remains the same". Quoted and forwarded text is read like any other text. The bar, set before tuning: in each half, every `change_request` is flagged and at most 3 `ordinary` emails are (an absolute count). **The rule alone did not meet it on the held-out half** (see the results below). Under Sami's decision 11 an email is flagged when the rule OR a quarantined model says so, and the bar applies to that combined flagger on a fresh held-out set (a later task). The rule keeps the bar on the tuning half and a floor on the old held-out half, now development data: at least 30 of 35 change requests and at most 3 of 65 ordinary emails. Reads the first 50,000 characters of subject plus text, in time near-linear in their length.
+- [ ] Task 6, the 50,000-character cap (`MAX_CHARS`): `flag`, `find_routing`, `find_accounts`, `ledger_text` and `redact_for_model` each read only the first 50,000 characters of the text (`flag`: subject first, then text), so none can be slowed without bound. The cap is also a suppression route: a sender can pad an email and put the request after the padding, and a long quoted thread can push a real request past it. Text past the cap never reaches `ledger_text`'s or `redact_for_model`'s output. The model's input (Task 6b) caps each mail part separately: `redact_for_model(subject)`, and `redact_for_model(text)` followed by `redact_for_model(html_text)` when the HTML part is sent, each cut to 50,000 characters on its own, so a long text/plain part cannot push the HTML part out of the model's input.
+- [ ] Task 6, extraction: `find_routing` returns each run of exactly nine digits with a valid ABA checksum (`aba_valid`, moved to `dialback_core/bank.py`). `find_accounts` returns each run of 4 to 17 digits that starts within 40 characters after an account label (`Account`, `Acct`, `A/C`, with only label words such as "number", "#", "is" between), grouped by `masking.py`'s separators, as digits only. A last-four reference ("the account ending 8888") is not an account. `find_routing` never returns a run taken for an account (below). `find_accounts` is the only function that returns a full account number; nothing logs. `aba_valid` refuses a trailing newline, and so does the clerk route's account check.
+- [ ] Task 6, the ledger's text (ADR-8): the ledger never ingests the email's text, masked or not. `ledger_text(text, also_mask=())` builds the ledger's document from rebuilt lines only: one line per phone number the keep-decision keeps, holding the words of the phone's original line before it (letters, colons and apostrophes only, so the stub reader's role words such as `AR line:` survive; nothing numeric, `str.isnumeric`; every other character a space; whitespace collapsed; the last 80 characters), a space, and the phone formatted by phonenumbers from the parsed number, national format for a US number (`(212) 555-0199`) and international otherwise (`+44 20 7946 0958`). Nothing else from the email goes in, lines are joined with `\n`, and a text with no kept phone gives the empty string. So every line is words plus one canonical phone by construction, and the stub reader, which stores a line on which it finds exactly one phone, stores every rebuilt line and nothing but words and that phone. The keep-decision: phones are found line by line with the ledger's own matcher; a phone is not kept when it repeats a found account (or one passed in `also_mask`, such as the body's accounts when building the subject's text), however grouped, when its national digits sit inside such an account of 5 or more digits (`Account: 987654321098` and `Call 765-432-1098`: otherwise the ledger would hold 10 of the 12 digits, and with the row's last four all of them; final review finding I3), or when it sits on a line with a payment word (account, acct, routing, ABA, wire, ACH, remit, pay, bank, IBAN, deposit, beneficiary) and no phone word (call, phone, tel, mobile, cell, fax, contact, reach, text, ext), where it is taken for an account. A line of digits and punctuation only takes the payment and phone words of the last line before it that has letters (line breaks as `str.splitlines` counts them). Payment words do not include "accounts payable", "accounts receivable", "account manager" or "payable", and "ph" is a phone word, so signature lines keep their phones. A phone extension is never part of the phone (read only after `ext`, `x` or `#`, not a bare comma, up to 12 digits and never into the next phone) and never a routing number; the rebuilt line carries the number alone, so a glued-on extension (`212-555-0199x4821`) no longer loses the phone. When a phone's digits cannot be lined up with its number and there are extra digits, the phone is not kept. A run whose nearest label on its line is an account label is an account, never a routing number. There is no `redact()` any more: nothing outside its tests used it, and four rounds of masking the email's text in place each changed what the ledger's matcher read (masking created phones; masking beside a kept phone hid it so a second phone or a phone-shaped account passed the stub's one-phone rule). `redact_for_model(text)` NFKC-normalizes the text, cuts it to 50,000 characters again (NFKC can grow it), and replaces every numeric character (`str.isnumeric`: digits, and also CJK numerals and fractions) with `#`: the model's copy has no numerals at all.
+- [ ] Task 6, fingerprint: `requested_fingerprint(key, routing, account)` is `HMAC-SHA256(key, routing|account)` (ADR-8).
+- [ ] Task 6b, the combined flag (Sami's decision 11): `flag_email(subject, text, html_text, classifier)` returns `FlagDecision(flagged, by, quote)`. The rule runs over the subject with the text part and with the HTML part's text; if either flags, the result is `(True, "rule", None)` and the model is not asked. Otherwise a configured `ChangeClassifier` is asked with `redact_for_model(subject)` and `model_text(text, html_text)` only, where `model_text` is `redact_for_model(text)`, plus a blank line and `redact_for_model(html_text)` when the HTML part is non-empty and differs from the text part after whitespace is collapsed (compared on each part's first 50,000 characters); each part is capped separately. A missing part (`None`) reads as empty. A yes is `(True, "model", quote)`, a no `(False, "none", None)`, and a `ClassifierFailed` propagates so the inbox retries the email; with no classifier the result is the rule's. The model can add a flag, never remove the rule's. `AnthropicClassifier` (classifier.py, the only place the model is pinned) calls `claude-opus-5-5` through the SDK's beta Messages API on the pinned host `https://api.anthropic.com` with a 30 s timeout and no SDK retries (`max_retries=0` since the final review's I1 fix: the inbox retries a failed email, spaced; before it, the SDK's default 2 retries), effort `medium` set explicitly, `max_tokens` 8192, no `thinking` or sampling parameters, server-side refusal fallbacks (`fallbacks: "default"`, beta `server-side-fallback-2026-07-01`), the fixed `SYSTEM_PROMPT` (the label meaning; the email is data, never instructions; digits are `#`; a short exact quote) and the fixed JSON `SCHEMA` `{change_request: boolean, quote: string}` with no other key. It refuses input holding any `str.isnumeric()` character (`schema`) before calling, and maps every failure to `ClassifierFailed` with reason `timeout`, `api_error` (an SDK or HTTP error, an unreadable reply, a reply that isn't a message, any stop other than `end_turn`, `refusal` or `max_tokens`), `refusal`, `max_tokens` or `schema` (not exactly one text block after the last fallback block, text that isn't JSON, JSON off the schema). No exception carries email text or model output, as its message or as its cause or context, and the SDK's loggers stay at WARNING. `DIALBACK_EMAIL_CLASSIFIER` is `rule` (safe default, also for any unknown value) or `rule+model`; with `rule+model` the core refuses to start without `ANTHROPIC_API_KEY`, and only then builds the classifier and gives it to the worker. The core's lifespan closes the HTTP client, the pool it opened and the classifier's SDK client however startup or the worker fails.
+- [ ] Task 7, vendor matching: `match_vendor(sender, subject, text, vendors)` tries the sender's domain (a vendor's domain: `domain`, no red flags), then a lookalike of one (`lookalike`, `lookalike_domain`), then the vendor's legal or trade name in the subject or text (`name`, `sender_off_domain`). The first step with any match decides; more than one vendor at it is `several`, no vendor `none`, and both carry no vendor and no flags. `name_in_text` folds accents and smart quotes, uses `company.words`' tokens, drops legal suffixes from the name only, and needs the remaining words together and in order ("and" and "the" are dropped from the text too; other suffix words from the name only), in linear time over the first 50,000 characters (`MAX_CHARS`). "Acme Fasteners" matches "Acme Fasteners LLC"; "Acme" alone does not; a name with no words left never matches.
+
+## Tests (written first)
+
+Fixtures live in `apps/core/tests/email_door/fixtures/`.
+
+- `tuning/`: 30 `change_request` and 62 `ordinary` emails (`cr-NN.json`, `ord-NN.json`). Three of the change requests are the `vendors.*.request` emails of `packages/ledger/src/dialback_ledger/demo_seed.json`, span text joined by newlines. The flagging code may be tuned against these.
+- `heldout/`: 35 `change_request` and 65 `ordinary` emails, written to the same brief with no sentence shared with the tuning half. Five of the change requests (cr-31..35) use scenarios absent from the tuning half, and several ordinary emails carry full routing and account digits. Not to be read or run against until the flagging code is final.
+- `heldout.sha256` holds the output of `cat $(ls heldout/*.json | sort) | shasum -a 256`, so any later edit to the held-out half is visible:
+
+```
+6235aebe8431bfa4a907b6022e85af011c596480bc2885ec646f86ef39242edb  -
+```
+
+| Acceptance item | Test |
+|---|---|
+| 1 | `apps/core/tests/email_door/test_flag_bar.py` (both tests check the label counts; the development-half test first recomputes the hash) |
+| 2 | `test_rules.py::test_flag_pairs_a_change_word_with_a_payment_destination_in_a_sentence_or_a_core_verb_in_the_email`, `::test_flag_skips_negated_hypothetical_and_how_to_sentences`, `::test_an_invoice_with_remit_to_details_is_not_flagged`, `::test_forwarded_request_is_flagged`, `::test_a_correction_to_the_details_is_a_change`, `::test_flag_examples`, `::test_quoted_paragraphs_split_like_plain_ones`, `::test_flag_is_fast_on_a_long_unpunctuated_email`, `::test_flag_reads_only_the_first_50000_characters`, `::test_every_text_function_reads_only_the_first_50000_characters`; `test_flag_bar.py::test_tuning_half_meets_the_bar`, `::test_rule_alone_keeps_its_floor_on_the_development_half` |
+| 3 | `test_rules.py::test_aba_valid_refuses_a_trailing_newline`, `::test_routing_needs_the_aba_checksum`, `::test_a_comma_after_a_phone_is_not_an_extension`, `::test_an_extension_is_never_a_routing_number`, `::test_accounts_are_found_grouped_or_labeled`, `::test_accounts_need_a_label_and_four_to_seventeen_digits`, `::test_a_last_four_reference_is_not_an_account`, `::test_a_loosely_labeled_account_is_not_a_routing_number`; `apps/core/tests/test_clerk_change.py::test_a_malformed_number_is_refused_without_echoing_it` (uses `aba_valid`; trailing-newline cases) |
+| 4 | `test_rules.py::test_the_ledger_line_is_the_words_before_the_phone_and_the_phone_in_canonical_form`, `::test_the_words_before_the_phone_are_its_last_80_characters`, `::test_role_words_reach_the_stub_reader`, `::test_signature_lines_keep_their_phones`, `::test_a_phone_on_a_line_with_a_phone_word_or_no_payment_word_is_kept`, `::test_a_phone_shaped_number_on_a_payment_line_without_a_phone_word_is_not_kept`, `::test_a_phone_that_repeats_a_found_account_is_not_kept`, `::test_a_phone_inside_a_found_account_is_not_kept`, `::test_a_phone_inside_an_account_found_in_another_field_is_not_kept`, `::test_a_phone_beside_an_account_it_is_not_part_of_is_kept`, `::test_accounts_found_in_another_field_are_not_kept`, `::test_an_extension_is_never_part_of_the_phone`, `::test_a_prefixed_phone_keeps_only_its_number`, `::test_a_number_alone_on_a_line_takes_the_words_of_the_line_before`, `::test_a_phone_alone_on_a_line_after_a_phone_word_is_kept`, `::test_nothing_else_on_a_phone_line_reaches_the_ledger`, `::test_every_stored_quote_is_words_and_one_phone` (the repros of every fix round), `::test_the_round_4_repros_hold_no_phone_so_the_ledger_gets_nothing`, `::test_the_generator_produces_the_bug_class_on_the_original_text` (the guard: the same generator leaks through the stub reader on the original text), `::test_every_stored_line_is_words_and_one_kept_phone` (the property test, 200 fixed seeds), `::test_the_property_test_runs_in_a_few_seconds`, `::test_the_phone_scan_is_fast_on_one_long_line_of_phones`, `::test_the_phone_scan_is_fast_on_many_phone_lines`, `::test_ledger_text_is_fast_on_a_long_email`, `::test_every_text_function_reads_only_the_first_50000_characters`, `::test_the_model_sees_no_run_of_five_digits`, `::test_the_model_copy_has_no_digit_at_all`, `::test_the_model_copy_is_cut_to_50000_characters_after_normalizing` |
+| 5 | `test_rules.py::test_fingerprint_matches_adr8_material` |
+| 6 | `test_classifier.py` (all of it: fake classifiers and a fake client, plus the real SDK on a mock transport; nothing reaches the network) |
+| 7 | to be completed by Task 7 |
+
+## Out of scope
+
+Opening cases from flagged emails, replying to the sender, and any change to the receiving route (spec 0085).
+
+## Open questions
+
+- Whether a new-vendor onboarding email that carries first-time bank details counts as a change request. The fixtures avoid this case.
+
+## Commands
+
+```bash
+cat $(ls apps/core/tests/email_door/fixtures/heldout/*.json | sort) | shasum -a 256
+```
+
+## Task 6 flagging results (every rule version)
+
+The bar is fixed: in each half, every `change_request` flagged and at most 3 `ordinary` flagged. Versions 1 to 5 were designed on the tuning half plus probe sentences the builder wrote (none taken from either half); the held-out half was not opened. Version 5 was declared final and run on the held-out half once.
+
+| Version | What changed | Tuning: change requests flagged | Tuning: ordinary flagged | Held-out: change requests flagged | Held-out: ordinary flagged |
+|---|---|---|---|---|---|
+| 1 | change word near a destination word in one sentence; negated, conditional, how-to and fraud-awareness sentences skipped | 30/30 | 0/62 | not run | not run |
+| 2 | closed or frozen accounts, "from today"; the reader's own ("your") payment method, customer accounts, online banking, remittance advice and bare "remittance" (verbs only) no longer count | 30/30 | 0/62 | not run | not run |
+| 3 | "modified"; "please process" is not a process noun; "change requests" in general and "remains the same" do not count | 30/30 | 0/62 | not run | not run |
+| 4 | "bankers", "remittances", "previous" and "former", an address for checks | 30/30 | 0/62 | not run | not run |
+| 5 (final) | "routing" only before a number word, digits or a colon; "SWIFT" only as SWIFT code; "New York" and "Old National" are names | 30/30 | 0/62 | **25/35** (missed cr-02, cr-08, cr-11, cr-13, cr-14, cr-24, cr-29, cr-32, cr-34, cr-35) | 1/65 (ord-29) |
+
+Version 5 fails the held-out bar on recall. Per the stop rule, at most two revisions follow, designed on the tuning half only, each re-run on the held-out half. Any result after the first held-out run is exploratory: the held-out file names of the misses are now known, though their text is not.
+
+| Version | What changed | Tuning: change requests flagged | Tuning: ordinary flagged | Held-out: change requests flagged | Held-out: ordinary flagged |
+|---|---|---|---|---|---|
+| 6 (revision 1) | a core change verb (change, update, switch, replace, move, redirect, modify, migrate, transition, amend, alter, revise) anywhere in the email pairs with a destination word anywhere in it (the noun "any update" excluded); "payee", "particulars"; a change adjective on "details", "instructions" or "information"; "different" after a destination word; "future", "from now on" and the like near "payments", "remittances" or "funds" | 30/30 | 0/62 | **29/35** (missed cr-08, cr-11, cr-14, cr-24, cr-32, cr-35) | 2/65 (ord-29, ord-54) |
+| 7 (revision 2, in the code) | change words "merged", "acquired", "opened", "transferred", "relocated", "rerouted", and "not ... anymore" or "any longer"; "credit union" and "financial institution" as destinations; "error", "mistake", "misprint", "inaccurate" after a destination word; the conditional, process and "for" filters apply to core change verbs only | 30/30 | 0/62 | **30/35** (missed cr-08, cr-14, cr-24, cr-32, cr-35) | 2/65 (ord-29, ord-54) |
+
+**Stopped.** Version 7 still fails the held-out bar on recall after the two revisions the stop rule allows, so no further revision was tried. Versions 6 and 7 were designed after seeing version 5's held-out misses by file name (never their text), so their held-out numbers are exploratory, not a clean held-out result. Precision held throughout (at most 2 of 65 ordinary emails flagged); recall did not. Decision for Sami: how to proceed (for example a fresh, unseen held-out set for a new approach, or a ruling on the bar).
+
+### After the stop
+
+- **The rule alone did not meet the bar.** The only clean held-out result is version 5's: 25/35 change requests and 1/65 ordinary. Versions 6 and 7 (29/35 and 2/65; 30/35 and 2/65) are exploratory.
+- **Sami's decision 11:** an email is flagged when the rule OR a quarantined model says so (a later task builds the model). The bar now applies to the combined flagger, judged on a fresh held-out set. The old held-out half is development data: `test_rule_alone_keeps_its_floor_on_the_development_half` keeps its hash check and requires the rule alone to flag at least 30 of 35 change requests and at most 3 of 65 ordinary emails. `test_tuning_half_meets_the_bar` is unchanged.
+- **"The rule said no" is never evidence.** The rule can be switched off on purpose: one sentence about fraud skips everything in it, so "Due to a recent phishing attempt, we have changed our bank. Routing 026009593, account 000123454821." is not flagged, while the same email without that opening clause is.
+- **Change made after the stop (review fix round 1, found by code reading, not by any result):** the time phrase "moving forward" had counted as the core change verb "move", because the core-verb check matched only a prefix. It now matches whole terms. Afterwards, on both halves: tuning 30/30 and 0/62; development 30/35 (missed cr-08, cr-14, cr-24, cr-32, cr-35) and 2/65 (ord-29, ord-54), the same as version 7. The same round made flagging near-linear and capped at 50,000 characters (outputs on the tuning half and the builder's probe sentences byte-for-byte unchanged), and tightened extraction and redaction (no flagging decision changed).
+- **Decision 12 (supersedes decision 11's "rule OR model"):** the flagger under evaluation is now model-decides: with a classifier, `flag_email` returns the model's answer alone (`(True, "model", quote)` or `(False, "none", None)`), the rule is not consulted, and a `ClassifierFailed` propagates; with no classifier the rule decides as before. `DIALBACK_EMAIL_CLASSIFIER` is `rule` (safe default) or `model`; `rule+model` is gone. The email door's on-file mismatch check is unchanged: an unflagged email from a door vendor naming bank details that differ from the account on file still opens a case. The pre-registered procedure (set before any run): Haiku (`claude-haiku-5-5`), prompt v1; the tuning set, the dev set and `heldout2` are exploratory (at most 2 prompt revisions, judged on `heldout2`, which is no longer sealed); `heldout3` is sealed and runs once per model. Bar on `heldout3`: every change request flagged except the `ON-FILE-ONLY:` ones (reported separately, with a second line that counts them), and at most 3 of the 70 ordinary emails flagged; a failure counts as not flagged. If any prompt revision uses `heldout2`, `heldout3`'s cr-04 and cr-10 are excluded from the bar and reported separately. If the bar fails, stop and report to Sami.
+
+### Decision 12: exploratory runs (Haiku)
+
+| Prompt | Run (stamp) | tuning CR | tuning ordinary | dev CR | dev ordinary | heldout2 CR | heldout2 ordinary |
+|---|---|---|---|---|---|---|---|
+| v1 | 2026-11-11T003936Z | 30/30 | 0/62 | 35/35 | 2/65 | 39/39 | 4/70 |
+| v2 | 2026-11-11T004244Z | 30/30 | 0/62 | 35/35 | 0/65 | 39/39 | 0/70 |
+| v2 (repeat) | 2026-11-11T004419Z | 30/30 | 0/62 | 35/35 | 0/65 | 39/39 | 0/70 |
+| v2 (audit's run) | 2026-11-11T034257Z | 30/30 | 0/62 | 35/35 | 0/65 | 39/39 | 0/70 |
+
+No failures in any run; heldout2's cr-36 (reported separately) was not flagged in any run. v1's six false flags: two customers giving their own account for a refund (heldout2 ord-06, ord-39), a brand-new vendor setup (ord-38), a vendor's new outbound account with "keep paying us as today" (ord-25), a hypothetical process question (dev ord-36) and a declined-card notice (dev ord-47). Root cause in v1: its first line said every sender "was written by, or claims to be from, one of the company's vendors". v2 (revision 1 of at most 2, pre-registered before it ran) says the sender may be anyone, defines the request as paying a vendor somewhere new in place of where the company pays it today, and lists five example exclusions. The exclusions were drawn from these six false flags, so v2's zero false flags here are exploratory, not evidence; the check that could have failed here was recall, which held. Because v2 was judged on heldout2, heldout3 runs with `--heldout2-revised` (cr-04 and cr-10 reported separately), as pre-registered.
+
+### Decision 12: the heldout3 run (Task 6f, once; exploratory, see the correction below)
+
+Stated in the ledger before it started: Haiku (`claude-haiku-5-5`), prompt v2 (`prompt_sha256` starts `168990eec3fdf1a2`), `--confirm-heldout3 --heldout2-revised`, the pre-registered bar. Run stamp `2026-11-11T005711Z`, result file in `eval_results/`.
+
+| Measure | Result | Bar |
+|---|---|---|
+| Change requests in the bar | 35/35 flagged | all |
+| Ordinary emails | 0/70 flagged | at most 3 |
+| Failures (counted as not flagged) | none | |
+| ON-FILE-ONLY cr-26, cr-27, cr-31 (separate) | 0/3 flagged | not in the bar |
+| cr-04, cr-10 (separate, after the heldout2 revision) | 2/2 flagged | not in the bar |
+| All 40 change requests | 37/40 flagged | not the bar |
+| The with-ON-FILE-ONLY line | FAIL | not the bar |
+| Cost, latency | $0.0129 for 110 calls; p50 0.82 s, p95 1.58 s | |
+
+**Result: met the bar, but exploratory, not confirmed.** Correction after an independent audit: heldout3 was not cleanly sealed. The agent that checked its labels read all 110 emails, and its report to the session that later wrote prompt v2 listed the ordinary emails by category, including refunds and new-vendor onboarding, which are two of v2's five exclusions. That report had left the session's working context by the time v2 was written, and each exclusion traces to a logged false flag on dev or heldout2, but influence cannot be ruled out. heldout3 must not be used to confirm anything further, for any model. The re-test below replaces it. Every number above this section is exploratory too. Caveats: one run of one model on one sealed set of 110 synthetic emails written by a coding agent (not real fraud mail); with 0 of 70 false flags the one-sided 95% upper bound on the false-flag rate is still about 4.2%, and with 35 of 35 the one-sided 95% lower bound on recall is about 92%. The three ON-FILE-ONLY requests carry no wording that gives them away, and the model did not flag them, as expected: an email door case for them depends on the door's on-file mismatch check, which unit and door tests cover but which was not run on these three emails.
+
+### Decision 12: the re-test (heldout4, pre-registered before the set exists)
+
+Written and committed before the set was written or any run.
+
+- **Question:** does Haiku (`claude-haiku-5-5`) with prompt v2, frozen at `prompt_sha256` `168990eec3fdf1a2...`, meet the bar on emails that did not exist when v2 was frozen?
+- **Why this is clean where heldout3 was not:** the set is written after v2 is frozen, so its contents cannot have shaped v2. The agents that write and check it report only counts and file names, never what an email says. No prompt change is allowed after it is written.
+- **Set:** `heldout4`, 40 change requests and 70 ordinary emails, written by a fresh agent that never sees the prompt or the classifier. `cr-38`, `cr-39` and `cr-40` are fixed in advance as the ON-FILE-ONLY requests, and no others may be. Sealed by sha256 before any run.
+- **Bar (unchanged from heldout3):** every change request flagged except those three, and at most 3 of 70 ordinary emails flagged. A failure counts as not flagged. Nothing else is excluded.
+- **What kills it:** one in-bar change request missed, or 4 or more ordinary emails flagged. Then the result is FAIL, reported as FAIL, with no prompt revision and no re-run unless Sami decides.
+- **Run:** once. Reported with the bar, the with-ON-FILE-ONLY line and the count over all 40.
+- **What it cannot show:** one run on synthetic text-only emails. It says nothing about real mail, HTML parts or attackers who have read the prompt.
+- **Addendum, written before the run:** a blind label checker read every email and reported file names only: no wrong labels, no ON-FILE-ONLY problems, no hidden mismatches. It marked 36 of the 110 as near-copies of the opened sets: cr-02 to cr-07, cr-11, cr-13, cr-15, cr-17, cr-20, cr-22, cr-23, cr-25, cr-28, cr-39, ord-02, ord-04, ord-08, ord-10, ord-12, ord-13, ord-14, ord-24, ord-25, ord-26, ord-30, ord-31, ord-38, ord-39, ord-40, ord-41, ord-44, ord-46, ord-54, ord-66. Word overlap with those sets is low (5-word Jaccard: median 0.007, highest 0.19), so these share a scenario, not text. They stay in the set and in the bar. The result also reports the counts on the 74 emails not marked (22 in-bar change requests, 50 ordinary), so the effect of shared scenarios can be seen.
+
+### Decision 12: the re-test result (heldout4, run once)
+
+Haiku, prompt v2 (`prompt_sha256` starts `168990eec3fdf1a2`), `--confirm-heldout4`. Run stamp `2026-11-11T041834Z`, result file in `eval_results/`.
+
+| Measure | Result | Bar |
+|---|---|---|
+| Change requests in the bar | 36/37 flagged (missed: cr-31) | all |
+| Ordinary emails | 1/70 flagged (ord-05) | at most 3 |
+| Failures (counted as not flagged) | none | |
+| ON-FILE-ONLY cr-38, cr-39, cr-40 (separate) | 0/3 flagged | not in the bar |
+| All 40 change requests | 36/40 flagged | not the bar |
+| The with-ON-FILE-ONLY line | FAIL | not the bar |
+| The 74 emails not marked as near-copies | 21/22 change requests, 1/50 ordinary | reported only |
+| Cost, latency | $0.0134 for 110 calls; p50 0.98 s, p95 2.38 s | |
+
+**Result: FAIL, by one missed change request.** This is the first cleanly sealed result for this flagger. False flags met the bar; recall did not. Both errors are in emails the checker did not mark as near-copies. As pre-registered: no prompt revision and no re-run unless Sami decides. Nobody has opened cr-31 or ord-05. Caveats as for the pre-registration: one run, synthetic text-only emails.
+
+### Decision 12: the Opus run on heldout4 (pre-registered before it ran)
+
+Sami chose one Opus run after Haiku's FAIL. Written and committed before it ran.
+
+- **Run:** `claude-opus-5-5`, prompt v2 unchanged (`168990eec3fdf1a2`), the same sealed `heldout4`, the same bar, once. Nobody has opened the set's emails since Haiku's run.
+- **Bar:** unchanged: every change request except `cr-38` to `cr-40` flagged, at most 3 of 70 ordinary flagged, a failure counts as not flagged.
+- **What kills it:** one in-bar miss, or 4 or more ordinary flagged. Then it is FAIL, with no further run.
+- **How to read a pass:** Opus is the second model tried on this set, chosen after seeing that Haiku failed it. Two attempts, both reported; a pass is weaker than a first-try pass, because picking the better of two on one set flatters it slightly.
+
+### Decision 12: the Opus result (heldout4, run once)
+
+`claude-opus-5-5`, prompt v2 (`168990eec3fdf1a2`). Run stamp `2026-11-11T042537Z`, result file in `eval_results/`.
+
+| Measure | Opus | Haiku (same set) | Bar |
+|---|---|---|---|
+| Change requests in the bar | 37/37 | 36/37 | all |
+| Ordinary emails flagged | 1/70 (ord-05) | 1/70 (ord-05) | at most 3 |
+| Failures (counted as not flagged) | none | none | |
+| ON-FILE-ONLY cr-38, cr-39, cr-40 (separate) | 0/3 | 0/3 | not in the bar |
+| All 40 change requests | 37/40 | 36/40 | not the bar |
+| The with-ON-FILE-ONLY line | FAIL | FAIL | not the bar |
+| The 74 emails not marked as near-copies | 22/22, 1/50 | 21/22, 1/50 | reported only |
+| Cost for 110 calls | $0.4546 | $0.0134 | |
+| Model-call latency p50, p95 | 2.11 s, 5.14 s | 0.98 s, 2.38 s | |
+
+**Result: PASS for Opus, on the pre-registered bar.** Caveats: Opus was the second model tried on this set, chosen after Haiku failed it, so two attempts are reported and the pass is a little weaker than a first-try pass. One run on 110 synthetic text-only emails. One-sided 95% bounds: recall at least 92% (37/37) and false flags at most 6.6% (1/70), for emails like these. The 3 silent on-file requests are still missed by design and depend on the on-file check. The difference between the models is one email, which one run cannot separate from chance.
+
+**Sami's decision after this result:** the shipped model is Opus (`MODEL` in `classifier.py`). Haiku stays available as an explicit option in the eval script, whose default remains Haiku to keep exploratory runs cheap.
+
+### What the ledger gets, and what can still reach it (review fix round 5)
+
+The model's copy (`redact_for_model`) has no numeric characters at all (`str.isnumeric`, since Task 6b's fix round 1; before it, no `str.isdigit` characters). The ledger stores only rebuilt phone lines: `ledger_text` emits one line per kept phone, made of the words before it (letters, colons and apostrophes; nothing numeric) and the phone in phonenumbers' canonical form, and nothing else from the email. Rounds 2 to 4 masked the email's text in place for the ledger and each round's masking changed what the ledger's matcher read (masking created a phone where there was none; masking beside a kept phone hid it so a second phone, or a phone-shaped account, passed the stub reader's one-phone rule: `Ph 212-555-0199, 77777/(617) 555-0143x51826279-` stored 6175550143 and `Account (call 212-555-0199 to confirm): 7783110245x1` stored the account). The property test over 200 fixed seeds (phones in every format the rounds found, `(digits)` glue, extensions, `~` `|` and middle-dot joins, phone-shaped labeled and unlabeled accounts, CJK and fullwidth numerals, several phones per line) now checks that every line the stub reader would store is words plus exactly the digits of one phone the keep-decision kept, and its guard shows the same generator leaks through the stub reader on the original text.
+
+The remaining residual is a phone-shaped account number that the keep-decision keeps as a phone, so the ledger stores it as one (on a rebuilt line, with the words before it):
+
+- One on a line that has a phone word and no account label the extractor reads, for example `Account (call us to confirm): 7783110245` (the words between the label and the digits are not label words, so `find_accounts` finds nothing and the phone-shaped number is kept), or `Call or wire 7783110245`.
+- An unlabeled one on a line with no payment word (`Please use 7783110245 from now on.`): indistinguishable from a phone.
+
+Closed by the final review's finding I3: a phone whose national digits sit inside a found account is no longer kept. That was the partial-account residual (`Account: 987654321098` with `Call 765-432-1098` stored 10 of the 12 digits, and with the row's last four all of them), and it also covers a phone-shaped repeat of a found account written without its leading zeros (`Account 0007783110245`, repeated as `778-311-0245`), which this list used to name.
+
+What no longer reaches the ledger at all: anything on a line without a kept phone (labeled accounts in any format, CJK numerals, routing numbers, extensions), and anything on a phone's line other than the words before it. An unlabeled nine-digit number that passes the ABA checksum is still returned by `find_routing`, but is never in the ledger's text. Lines about accounts payable keep phone-shaped numbers ("Accounts Payable: 7783110245" is kept as a phone), "Ph.D." counts as a phone word, and a number line with any letter ("7783110245 (checking)") does not take the words of the line before it. The LLM reader (PR #113) is not line-based and must keep its own long-digit-run replacement if it ever reads anything but `ledger_text`'s output.
+
+**For Task 8:** ingest `ledger_text(strip_nul(text))` unchanged: no joins, no normalization and no other text after it, since every guarantee above is about that exact string read line by line. `ledger_text` reads the first 50,000 characters of the text, so the ledger's document for a longer email comes from its first 50,000 characters only.
+
+`test_ledger_text_is_fast_on_a_long_email` mostly checks the 50,000-character cap: the input is 431 KB, so the cap does most of the bounding, not the linear repeat check.
+
+## Evaluation (Task 6c)
+
+The procedure is fixed here before any model run. The script is `apps/core/tests/email_door/eval_flagger.py`; it runs the combined flagger (`flag_email` with the model) and reports counts and file names only. Every run spends money, so Sami approves each one.
+
+1. Haiku (`claude-haiku-5-5`) runs first, on the tuning set and the development set (the old held-out half). These runs are exploratory. The prompt may be revised at most twice, judged on those two sets, and every revision and its result is logged here, including the ones that did not help.
+2. After the prompt is frozen, Haiku runs on the sealed fresh held-out set (`heldout2`) once. The script checks `fixtures/heldout2.sha256` first and refuses on a mismatch.
+3. The bar: every change request flagged, not counting `cr-36.json`, and at most 3 ordinary emails flagged. `cr-36.json` is reported separately, and the result is shown both with and without it. A model failure (timeout, refusal, bad reply) counts as not flagged, so on a change request it is a miss.
+4. If Haiku fails the bar on `heldout2`, Opus (`claude-opus-5-5`) runs once on `heldout2` with the identical prompt. Choosing between two pre-named models on the same held-out set makes the chosen number slightly optimistic, and that is stated with the result.
+5. If neither passes, stop and report to Sami. No prompt change follows any `heldout2` run.
+
+Results (prompt v1, never revised):
+
+| Model | Set | Change requests flagged | Ordinary flagged | Failures | cr-36 | Bar | Cost |
+|---|---|---|---|---|---|---|---|
+| claude-haiku-5-5 | tuning (exploratory) | 30/30 (rule 30, model 0) | 0/62 | 0 | n/a | met | $0.0046 |
+| claude-haiku-5-5 | dev (exploratory) | 35/35 (rule 30, model 5) | 2/65 (rule 2: ord-29, ord-54) | 0 | n/a | met | $0.0053 |
+| claude-haiku-5-5 | heldout2 (confirmation, once) | 39/39 (rule 32, model 7) | 23/70 (rule 20, model 3) | 0 | not flagged | **FAIL** (precision) | $0.0059 |
+
+Model-call latency: p50 about 1.0 s, p95 1.4 to 3.1 s.
+
+The Opus run in step 4 was not made: the model is asked only when the rule says no, so the rule's 20 false flags on `heldout2` happen whatever the model, and no model could bring the ordinary count to 3 or fewer. Running it would have spent money to confirm a determined failure. Per step 5, this stopped for Sami's decision.
+
+Exploratory reading of `heldout2`'s 23 false flags (after the run; descriptive, not a confirmation): the rule's 20 are ordinary emails dense with bank-change vocabulary that request no change (fraud-awareness newsletters, security training quoting sample scams, "nothing changed" confirmations, a mailbox-compromise warning, address, terms and portal-contact changes, spam, a policy reminder, a customer's own bank switch). The model's 3 are two customer refund emails with the customer's own bank details and one new-vendor onboarding. None of the 23 carries new bank details for a known vendor (one lists the account on file), so none would open a case; a false flag costs the fixed reply when replies are on.
+
+Notes on the numbers (Task 6c, fix round 1). The Opus run uses the server-side fallback `"default"`, so an email the model refuses may be answered by another model; the result is for "Opus with its fallbacks", not Opus alone. The reported cost is a lower bound: it counts the tokens of the replies received, not retries or timed-out attempts. The result files in `apps/core/tests/email_door/eval_results/` (counts and file names only, with a `failed` map of file to failure reason) are committed as the record, and a result file is never overwritten.

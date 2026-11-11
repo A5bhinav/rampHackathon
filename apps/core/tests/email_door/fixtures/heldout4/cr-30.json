@@ -1,0 +1,8 @@
+{
+  "subject": "Facture F-2026-1183 - reglement",
+  "sender": "Service Comptable <compta@ateliers-morvan.example>",
+  "text": "Bonjour,\n\nSuite a un blocage temporaire de notre compte chez Credit Agricole, nous vous remercions de bien vouloir regler la facture F-2026-1183, pour cette fois seulement, sur le compte de notre societe soeur:\n\nIBAN FR76 3000 6000 0112 3456 7890 189\nBIC AGRIFRPP\n\nVous remerciant par avance.\n\nCordialement,\nMme Girard\nService Comptable",
+  "label": "change_request",
+  "vendor": null,
+  "note": "French; a one-off, but the pending payment still goes somewhere new."
+}

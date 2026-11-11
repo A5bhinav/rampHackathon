@@ -1,0 +1,8 @@
+{
+  "subject": "RE: Payment advice - ACH 2026-11-06 - Acme Fasteners",
+  "sender": "Denise Caruso <dcaruso@acmefasteners.com>",
+  "text": "Thanks Karen, received.\n\nOne thing: from the next payment on, could you send to our new account instead? We are winding down the old one.\n\nHuntington National Bank\nRouting 044000024\nAccount 6600128873\nAcme Fasteners LLC\n\nDenise\n\n> From: Karen Liu\n> Subject: Payment advice - ACH 2026-11-06 - Acme Fasteners\n> Payment of $4,118.00 was sent today by ACH to your account on file for invoices 88213 and 88240.",
+  "label": "change_request",
+  "vendor": "acme",
+  "note": "A casual reply to our own remittance advice that slips in a request to redirect future payments."
+}

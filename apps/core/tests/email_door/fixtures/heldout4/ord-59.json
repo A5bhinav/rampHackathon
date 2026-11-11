@@ -1,0 +1,8 @@
+{
+  "subject": "Enroll in AutoPay and save",
+  "sender": "Customer Care <customercare@midstateenergy.example>",
+  "text": "Tired of mailing checks? Enroll in AutoPay and we'll automatically draft your bank account on your due date. You can change your bank information any time at midstateenergy.example/autopay.",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Vendor pulls from the reader's account; the destination does not change."
+}

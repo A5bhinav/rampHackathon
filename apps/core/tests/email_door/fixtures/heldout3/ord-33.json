@@ -1,0 +1,8 @@
+{
+  "subject": "Positive Pay exception - check 10233",
+  "sender": "Treasury Services <alerts@treasury.firstmeridianbank.com>",
+  "text": "A check presented for payment did not match your issue file.\n\nCheck number: 10233\nPayee on check: Cobalt Freight LLC\nAmount presented: $2,101.90\nAmount on issue file: $2,101.90\nException reason: Payee name mismatch (issue file: COBALT FREIGHT)\n\nDecision required by 1:00 PM ET today. Log in to Treasury Online to pay or return.",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Bank control alert about a check to Cobalt. No request to change anything."
+}

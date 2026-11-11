@@ -1,0 +1,8 @@
+{
+  "subject": "Expense report 0412",
+  "sender": "Rita Gomez <rgomez@ourco.example>",
+  "text": "Submitting my expense report for the Denver trip. Receipts attached.",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Employee expenses."
+}

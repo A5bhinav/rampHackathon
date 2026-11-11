@@ -1,0 +1,8 @@
+{
+  "subject": "Your 2026 volume rebate - payment change on our side",
+  "sender": "Brightline Office Supply Inc <accounting@brightlineoffice.com>",
+  "text": "Hello Larkspur team,\n\nGood news: your 2026 volume rebate of $1,842.00 will be issued in January. This year, rebate payments will be sent by ACH from our new disbursement account at Fifth Third Bank rather than by paper check, so you may see an unfamiliar originator name (\"BRIGHTLINE DISB\") on your bank statement.\n\nThis change affects only money we send to you. Please keep paying Brightline invoices exactly as you do today; our receiving account has not changed.\n\nTo receive the rebate by ACH, please have your AR team reply with Larkspur's receiving account details.\n\nThank you,\nBrightline Accounting",
+  "label": "ordinary",
+  "vendor": "brightline",
+  "note": "Vendor's new bank is for money flowing to Larkspur (rebates), not for Larkspur's payments to the vendor. Also asks for Larkspur's own bank details, which is not a redirect of vendor payments."
+}

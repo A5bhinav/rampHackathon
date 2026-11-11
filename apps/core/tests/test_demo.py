@@ -350,3 +350,55 @@ async def test_prepare_checks_everything_before_it_resets(demo):
         await prepare(demo.env, load_seed(SEED), {}, phones={"acme": TEAM}, requests=["acme"], today=TODAY)
     current = await one(demo.pool, "select id from app.datasets where kind = 'demo' and retired_at is null order by created_at desc limit 1")
     assert current["id"] == before.dataset.id, "a refused prepare leaves the current demo as it was"
+
+
+# `demo prepare --email-door`: the email beat runs on Cobalt, whose canned change-request email is
+# NOT loaded (the live email is the request); the clerk portal beat runs on Acme.
+async def _door(demo, dataset_id):
+    return (await one(demo.pool, "select email_door_vendors from app.datasets where id = %s", dataset_id))["email_door_vendors"]
+
+
+async def test_prepare_turns_on_the_email_door_for_cobalt_only(demo):
+    from dialback_core.demo import prepare
+    r = await prepare(demo.env, load_seed(SEED), {"clerk": demo.emails["clerk"]}, phones={"acme": TEAM},
+                      requests=["acme"], email_door=["cobalt"], today=TODAY)
+    assert r.email_door == ["cobalt"] and r.requests == {"acme": True}
+    cobalt = await one(demo.pool, "select id from app.vendors where dataset_id = %s and ramp_vendor_id = %s",
+                       r.reset.dataset.id, r.reset.refs["cobalt"])
+    assert await _door(demo, r.reset.dataset.id) == [cobalt["id"]]
+    n = await one(demo.pool, "select count(*) as n from app.vendors where dataset_id = %s", r.reset.dataset.id)
+    assert n["n"] > 1, "only Cobalt's id is listed, not every vendor"
+
+
+async def test_prepare_without_the_flag_leaves_the_email_door_off(demo):
+    from dialback_core.demo import prepare
+    r = await prepare(demo.env, load_seed(SEED), {"clerk": demo.emails["clerk"]}, phones={"acme": TEAM},
+                      requests=["acme"], today=TODAY)
+    assert r.email_door == [] and await _door(demo, r.reset.dataset.id) == []
+
+
+async def test_prepare_refuses_a_vendor_that_is_both_email_door_and_request(demo):
+    from dialback_core.demo import prepare
+    before = await fresh(demo)
+    with pytest.raises(DemoError, match="cobalt"):
+        await prepare(demo.env, load_seed(SEED), {"clerk": demo.emails["clerk"]}, phones={},
+                      requests=["cobalt"], email_door=["cobalt"], today=TODAY)
+    current = await one(demo.pool, "select id from app.datasets where kind = 'demo' and retired_at is null order by created_at desc limit 1")
+    assert current["id"] == before.dataset.id
+
+
+async def test_prepare_refuses_an_unknown_email_door_vendor_before_resetting(demo):
+    from dialback_core.demo import prepare
+    before = await fresh(demo)
+    with pytest.raises(DemoError, match="nobody"):
+        await prepare(demo.env, load_seed(SEED), {"clerk": demo.emails["clerk"]}, phones={},
+                      requests=["acme"], email_door=["nobody"], today=TODAY)
+    current = await one(demo.pool, "select id from app.datasets where kind = 'demo' and retired_at is null order by created_at desc limit 1")
+    assert current["id"] == before.dataset.id
+
+
+def test_the_prepare_command_prints_the_email_door_and_the_inbox_address():
+    from dialback_core.demo import describe_email_door
+    assert describe_email_door(["cobalt"], "inbox@in.example") == "email door on for cobalt: send the change request to inbox@in.example"
+    assert "DIALBACK_INBOX_ADDRESS is unset" in describe_email_door(["cobalt"], None)
+    assert describe_email_door([], "inbox@in.example") is None
