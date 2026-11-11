@@ -30,11 +30,11 @@ from pathlib import Path
 import reportlab
 from PIL import Image
 from reportlab.lib.colors import PCMYKColorSep
+from reportlab.lib.pdfencrypt import StandardEncryption
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen import canvas
-from reportlab.lib.pdfencrypt import StandardEncryption
 
 FONT_PATH = Path(reportlab.__file__).resolve().parent / "fonts" / "Vera.ttf"
 TRICKS = ("cover_rect", "cover_image", "invisible", "clipped")
