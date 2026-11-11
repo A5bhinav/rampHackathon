@@ -18,7 +18,7 @@ export default async function VendorLedgerPage({ params }: { params: Promise<{ d
     throw e;
   });
   const { risk, rule } = v;
-  const chart = lanePoints(rule, laneDates(v.documents, rule.cutoff));  // each dot at its own source's date (D7)
+  const chart = lanePoints(rule, laneDates(v.documents, rule.cutoff, v.document_count));  // each dot at its own source's date (D7)
 
   return (
     <main>

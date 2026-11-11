@@ -31,12 +31,15 @@ export function hiddenLabel(visibility: string): string | null {
 
 /** When each number was first seen in each source (spec 0104, D7): its earliest visible sighting in a
  *  document of that channel received by the cutoff. The vendor master's channel is the chart's
- *  "on_file" lane. Keyed by laneKey(e164, lane), for lanePoints. */
-export function laneDates(documents: LedgerDocument[], cutoff: string): Map<string, string> {
+ *  "on_file" lane, which takes no cutoff, as the ledger's on_file doesn't. Keyed by laneKey(e164, lane),
+ *  for lanePoints. Undefined when the list is cut at its cap (`total` documents in all): the missing
+ *  ones are the oldest, so every lane falls back to the number's first-seen date. */
+export function laneDates(documents: LedgerDocument[], cutoff: string, total: number): Map<string, string> | undefined {
+  if (documents.length < total) return undefined;
   const out = new Map<string, string>();
   for (const d of documents) {
-    if (Date.parse(d.received_at) > Date.parse(cutoff)) continue;
     const lane = d.custody_channel === "vendor_master" ? "on_file" : d.custody_channel;
+    if (lane !== "on_file" && Date.parse(d.received_at) > Date.parse(cutoff)) continue;
     for (const o of d.observations) {
       const key = laneKey(o.e164, lane);
       const seen = out.get(key);
