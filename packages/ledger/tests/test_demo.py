@@ -89,6 +89,31 @@ def test_a_team_phone_replaces_the_ar_line(database_url):
     assert n == 0, "the fictional AR line is gone everywhere the rule reads"
 
 
+def test_a_real_vendor_takes_a_seed_vendors_history(database_url):
+    """Spec 0103: a demo on Ramp's sandbox has no demo_refs and only real vendors."""
+    d = demo_dataset(database_url, refs=("acme",))
+    team = "+12025550100"
+    with psycopg.connect(database_url, autocommit=True, row_factory=dict_row) as c:
+        c.execute("update app.datasets set demo_refs = null where id = %s", (d["dataset_id"],))
+        ramp_id = c.execute("select ramp_vendor_id from app.vendors where id = %s", (d["vendors"]["acme"],)).fetchone()["ramp_vendor_id"]
+    out = run(load(database_url, phones={"acme": team}, with_requests=True, dataset_id=d["dataset_id"],
+                   real={"acme": (ramp_id, "Asana")}))
+    assert list(out["vendors"]) == ["acme"]
+    assert selection(database_url, d, "acme")["e164"] == team
+    with psycopg.connect(database_url) as c:
+        quotes = [r[0] for r in c.execute("select quote from ledger.observations where vendor_id = %s and quote is not null",
+                                          (d["vendors"]["acme"],)).fetchall()]
+        domains = [r[0] for r in c.execute("select domain from ledger.vendor_domains where vendor_id = %s",
+                                           (d["vendors"]["acme"],)).fetchall()]
+    assert not any("Acme" in q for q in quotes) and domains == ["asana.example"]
+
+
+def test_a_real_vendor_must_name_a_seed_vendor(database_url):
+    d = demo_dataset(database_url, refs=("acme",))
+    with pytest.raises(DemoError, match="zenith"):
+        run(load(database_url, phones={}, dataset_id=d["dataset_id"], real={"zenith": ("ven_x", "Asana")}))
+
+
 def test_loading_and_requesting_twice_adds_nothing(database_url):
     d = demo_dataset(database_url, refs=("acme",))
     for _ in range(2):

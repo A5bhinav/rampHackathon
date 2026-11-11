@@ -219,9 +219,16 @@ async def test_create_dataset_stores_its_ramp(pool):
     assert (d.ramp, m.ramp) == ("sandbox", "mock")
 
 
-def test_new_dataset_refuses_a_demo_on_the_sandbox():
-    with pytest.raises(SystemExit, match="demo"):
-        asyncio.run(_new_dataset(core_settings(ramp_sandbox=SANDBOX), "demo", "Demo", None, "sandbox"))
+@pytest.mark.anyio
+async def test_new_dataset_makes_a_demo_on_the_sandbox(pool, database_url, capsys):
+    """Spec 0103 reversed spec 0034's rule. Retired after, so later tests' current demo isn't this one."""
+    retire = "update app.datasets set retired_at = now() where ramp = 'sandbox' and retired_at is null"
+    async with system_tx(pool) as conn:
+        await conn.execute(retire)
+    await _new_dataset(core_settings(ramp_sandbox=SANDBOX, database_url=database_url), "demo", "Demo", None, "sandbox")
+    assert "ramp    sandbox" in capsys.readouterr().out
+    async with system_tx(pool) as conn:
+        await conn.execute(retire)
 
 
 def test_new_dataset_refuses_the_sandbox_without_credentials():
