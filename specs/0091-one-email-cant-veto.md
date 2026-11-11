@@ -149,7 +149,15 @@ bank's, now gets that reason). The web copy that repeats them follows.
 - **Q153, resolved:** the near-miss check keeps today's "which number is older". Sami, Nov 10
   ("Yes, fix it"); measured again as W4 above.
 - **Q154, open:** accept `M_shared_id_helped` rising from 230 to 271, all through A5's latent
-  duplicate ids, or fix A5 first?
+  duplicate ids, or fix A5 first? Proposed: accept, since production can't file two documents
+  under one id, and A5 gets its own fix.
+- **Q155, resolved: the middle option is rejected.** It used this rule only where today's rule
+  calls nobody, and otherwise called what both rules agree on, else nobody. In generated worlds it
+  sent the honest-warning case (the table's last row) to a person instead of the planted number.
+  But an attacker who adds one weak label to the real number ("Fax: 0142" in the change request)
+  makes today's rule call nobody, and it then calls the planted number too (predicted, then run).
+  So its gain was an artifact of random test labels, and it costs more manual reviews. Sami, Nov 10:
+  keep this rule (FINDINGS A4).
 
 ## Commands
 
