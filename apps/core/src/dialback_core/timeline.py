@@ -68,8 +68,13 @@ def _plural(n: int, word: str) -> str:
     return f"{n} {word}" + ("" if n == 1 else "s")
 
 
-def summary(event_type: str, body: dict[str, Any], actor_name: str) -> str:
+def summary(event_type: str, body: dict[str, Any], actor_name: str, from_state: str | None = None) -> str:
     b = body or {}
+    # Spec 0090: approving a blocked case is a dismissal of an email case (Ramp never changed).
+    if from_state == "blocked" and event_type == "release_co_approved":
+        return f"Dismissed by {actor_name}: Ramp never changed, so the hold can be lifted."
+    if from_state == "blocked" and event_type == "release_approved":
+        return "Second person dismissed: the hold is being lifted."
     match event_type:
         case "change_detected":
             return f"A bank-detail change was detected for this vendor (via {b.get('detected_via', 'Ramp')})."

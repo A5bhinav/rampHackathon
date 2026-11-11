@@ -291,7 +291,7 @@ function ActionRail({ detail, path, datasetId, firstApproval, lastStepSummary }:
   detail: CaseDetail; path: string; datasetId: string; firstApproval: CaseDetail["releases"][number] | undefined; lastStepSummary?: string;
 }) {
   const { case: c, change, decision, permissions: can, hold } = detail;
-  const consoles = can.can_approve || can.can_reject || can.can_review;
+  const consoles = can.can_approve || can.can_reject || can.can_review || can.can_dismiss;
   const need = c.unknown_changer ? 2 : 1;
   const approvals = detail.releases.filter((r) => r.action === "approve" && r.case_version === c.version).length;
   const releasedBy = detail.releases.find((r) => r.action === "approve" && r.case_version === c.version);
@@ -354,6 +354,19 @@ function ActionRail({ detail, path, datasetId, firstApproval, lastStepSummary }:
             {decision?.effect || lastStepSummary ? <Callout tone="bad"><p>{decision?.effect ?? lastStepSummary}</p></Callout>
               : <p className="muted sub">The hold stays on.</p>}
           </div>
+        </section>
+      ) : null}
+
+      {c.state === "blocked" && can.can_dismiss ? (
+        <section className="card action-card">
+          {/* Spec 0090: a dismissal is an approval from blocked; the database checks the case is email only. */}
+          <DecisionConsole
+            title="Dismiss case"
+            hint="This case came in by email and Ramp's account on file never changed. Two different approvers must each dismiss it; the second lifts the hold, so bills pay the account on file."
+            caseId={c.id} version={c.version} path={path} action={releaseAction}
+            summary={<p className="muted sub">{bills} · {stateLabel(c.state)}</p>}
+            buttons={[{ value: "approve", label: "Dismiss (Ramp never changed)", tone: "primary" }]}
+          />
         </section>
       ) : null}
 

@@ -134,8 +134,11 @@ async def roles_of(conn: AsyncConnection) -> list[str]:
     return [r["role"] for r in rows]
 
 
-def permissions(case: dict[str, Any], user: UUID, roles: list[str], approved_this_version: bool) -> dict[str, Any]:
-    """A hint for the page. The database enforces every one of these again."""
+def permissions(case: dict[str, Any], user: UUID, roles: list[str], approved_this_version: bool,
+                email_only: bool = False, dismissed: bool = False) -> dict[str, Any]:
+    """A hint for the page. The database enforces every one of these again. `email_only` is
+    app.case_email_only for the case; `dismissed` is whether this person is in
+    app.blocked_approvers, so an approval from before the case was blocked doesn't count (spec 0090)."""
     reasons: list[str] = []
     is_changer = user in (case["changer_ids"] or [])
     is_reviewer = case["reviewed_by"] == user
@@ -159,6 +162,9 @@ def permissions(case: dict[str, Any], user: UUID, roles: list[str], approved_thi
         "can_approve": awaiting and approver and not is_changer and not is_reviewer and not approved_this_version,
         "can_reject": awaiting and approver and not is_changer,
         "can_review": case["state"] == "needs_review" and approver and not is_changer,  # spec 0028
+        # Spec 0090: two different approvers dismiss a blocked email-only case, as eval_guard checks.
+        "can_dismiss": case["state"] == "blocked" and approver and email_only and not dismissed
+                       and not is_changer and not is_reviewer,
         "reasons": reasons,
     }
 
@@ -318,6 +324,11 @@ async def get_case(case_id: UUID, request: Request, user: UserDep):
         names = await people(conn, ids)
         voice = {r["id"]: r for r in await (await conn.execute(
             "select id::text as id, provider, reason from voice.calls where case_id = %s", (case_id,))).fetchall()}
+        dismiss = None
+        if c["state"] == "blocked":   # spec 0090: only a blocked case can be dismissed
+            dismiss = await (await conn.execute(
+                "select app.case_email_only(c) as email_only, app.blocked_approvers(c) as approvers "
+                "from app.cases c where c.id = %s", (case_id,))).fetchone()
 
     approved = any(r["actor_id"] == user.user_id and r["action"] == "approve" and r["case_version"] == c["version"] for r in releases)
     timeline, call_events, strict = [], [], False
@@ -332,7 +343,7 @@ async def get_case(case_id: UUID, request: Request, user: UserDep):
             "seq": e["seq"], "type": e["type"], "occurred_at": ts(e["occurred_at"]),
             "actor": {"kind": e["actor_kind"], "id": str(e["actor_id"]) if e["actor_id"] else None, "display_name": actor_name},
             "from_state": envelope.get("from_state"), "to_state": envelope["to_state"], "version": envelope["version"],
-            "summary": summary(e["type"], envelope.get("body") or {}, actor_name), "hash": e["hash"],
+            "summary": summary(e["type"], envelope.get("body") or {}, actor_name, envelope.get("from_state")), "hash": e["hash"],
         })
     return {
         "case": case_summary(c),
@@ -362,7 +373,8 @@ async def get_case(case_id: UUID, request: Request, user: UserDep):
                       "case_version": r["case_version"], "created_at": ts(r["created_at"])} for r in releases],
         "timeline": timeline,
         "chain": chain,
-        "permissions": permissions(c, user.user_id, roles, approved),
+        "permissions": permissions(c, user.user_id, roles, approved, email_only=bool(dismiss and dismiss["email_only"]),
+                                   dismissed=bool(dismiss and user.user_id in (dismiss["approvers"] or []))),
         "calls": calls(call_events, voice),
         "call_script": call_script(),
     }

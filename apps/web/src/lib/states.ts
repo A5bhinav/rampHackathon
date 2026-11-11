@@ -61,7 +61,7 @@ export const EDGES: Edge[] = [
   e("awaiting_release", "release_co_approved", "awaiting_release"), e("awaiting_release", "release_rejected", "blocked"),
   e("needs_review", "change_detected", "held"), e("needs_review", "review_blocked", "blocked"),
   e("needs_review", "review_cleared", "awaiting_release"),
-  e("blocked", "change_detected", "held"),
+  e("blocked", "change_detected", "held"), e("blocked", "release_approved", "releasing"), e("blocked", "release_co_approved", "blocked"),
   e("releasing", "change_detected", "held"), e("releasing", "command_failed", "needs_review"),
   e("releasing", "hold_release_confirmed", "released"),
 ];

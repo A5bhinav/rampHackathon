@@ -34,3 +34,8 @@ test("every edge is copied from the doc", () => {
   assert.deepEqual(EDGES.map(key).sort(), rows.filter((r) => r.from !== "(new)").map(key).sort());
   for (const e of EDGES) assert.equal(e.person, PERSON_EVENTS.includes(e.event), key(e));
 });
+
+test("a person's only ways out of blocked are the two dismissals of an email case (spec 0090)", () => {
+  const moves = EDGES.filter((e) => e.from === "blocked" && e.person).map((e) => `${e.event} -> ${e.to}`).sort();
+  assert.deepEqual(moves, ["release_approved -> releasing", "release_co_approved -> blocked"]);
+});

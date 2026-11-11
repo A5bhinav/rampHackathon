@@ -28,7 +28,8 @@ from dialback_core.email_door.resend import ReceivedEmail
 from dialback_core.email_door.rules import flag_email, requested_fingerprint
 from dialback_core.flags import EmailMode, ResolverMode
 from dialback_core.ports import LedgerResolver
-from flows import RESEND_SECRET, FakeResend, assert_nowhere, deliver, one, received
+from flows import RESEND_SECRET, FakeResend, assert_nowhere, deliver, one, received, report, transit
+from test_api import get, post
 
 pytestmark = pytest.mark.anyio
 
@@ -793,3 +794,108 @@ async def test_an_unreadable_stored_sender_counts_toward_the_sender_limit(door_w
                values (%s, 'garbled', 'no address at all', app.now(%s), false, 'case_opened', true, 'sent')""",
             (door_world.demo_id, door_world.demo_id))
     assert (await arrive(door_world))["reply"] == "rate_limited"
+
+
+# Dismissing a blocked email case (spec 0090, Task 14) --------------------------------------------
+
+CASE = "/api/cases/{case_id}"
+RELEASE = "/api/cases/{case_id}/release"
+
+
+async def answered(w, case_id, change: str, digits: str = "4821") -> dict:
+    """Cobalt, called on the ledger's number, answers; the worker runs until idle. Returns the case."""
+    call_id = w.voice.placed[-1]["call_id"]
+    picked = await selection(w, case_id)
+    answers = transit(call_id, digits=digits, company="Cobalt Freight", change=change)
+    r = await report(w, case_id, call_id, answers=answers, contact_point=picked["contact_point_id"])
+    assert r.status_code == 204, r.text
+    await w.worker.drain(w.demo_id)
+    (case,) = await cases(w)
+    return case
+
+
+async def not_verified(w) -> dict:
+    """The Cobalt email opens a case; Cobalt says it asked for no change."""
+    row = await arrive(w)
+    case = await answered(w, row["case_id"], change="no")
+    assert (case["state"], case["outcome"]) == ("blocked", "not_verified")
+    return case
+
+
+async def test_a_not_verified_email_case_is_dismissed_by_two_people_and_the_hold_lifts(door_world):
+    w = door_world
+    ramp = w.connector.for_dataset(w.demo_id)
+    cobalt = w.demo_refs["cobalt"]
+    dates = {b.id: b.payment_date for b in await ramp.list_bills_for_vendor(cobalt)}
+    assert len(dates) == 2 and None not in dates.values()
+
+    case = await not_verified(w)
+    assert all(b.is_on_hold and b.payment_date is None for b in await ramp.list_bills_for_vendor(cobalt)), "held"
+    url, release = CASE.format(case_id=case["id"]), RELEASE.format(case_id=case["id"])
+
+    async def can_dismiss(who: str) -> bool:
+        return (await get(w, url, who, CASE))["permissions"]["can_dismiss"]
+
+    assert await can_dismiss("clerk") is False, "a clerk is not an approver"
+    assert await can_dismiss("approver1") is True
+
+    body = {"expected_version": case["version"], "action": "approve",
+            "reason": "Cobalt said on its own number that it asked for no change; Ramp never changed."}
+    first = await post(w, release, "approver1", RELEASE, body)
+    assert (first["status"], first["to_state"]) == ("awaiting_second_approver", "blocked")
+    assert await can_dismiss("approver1") is False, "approver1 has dismissed already"
+    assert await can_dismiss("clerk") is False
+    assert await can_dismiss("approver2") is True
+    detail = await get(w, url, "approver2", CASE)
+    assert detail["timeline"][-1]["summary"] == "Dismissed by Approver1: Ramp never changed, so the hold can be lifted."
+    assert (await ramp.get_vendor(cobalt)).hold_id is not None, "one dismissal lifts nothing"
+
+    second = await post(w, release, "approver2", RELEASE, body)
+    assert (second["status"], second["to_state"]) == ("applied", "releasing")
+    await w.worker.drain(w.demo_id)
+
+    detail = await get(w, url, "approver2", CASE)
+    assert (detail["case"]["state"], detail["hold"]["status"]) == ("released", "released")
+    dismissals = [e for e in detail["timeline"] if e["type"] in ("release_co_approved", "release_approved")]
+    assert [(e["from_state"], e["to_state"], e["summary"]) for e in dismissals] == [
+        ("blocked", "blocked", "Dismissed by Approver1: Ramp never changed, so the hold can be lifted."),
+        ("blocked", "releasing", "Second person dismissed: the hold is being lifted.")]
+    assert [r["actor"]["display_name"] for r in detail["releases"]] == ["Approver1", "Approver2"]
+    assert not any([await can_dismiss(who) for who in ("clerk", "approver1", "approver2")]), "a released case has nothing to dismiss"
+
+    assert (await ramp.get_vendor(cobalt)).hold_id is None, "the hold is lifted in Ramp"
+    restored = await ramp.list_bills_for_vendor(cobalt)
+    assert {b.id: b.payment_date for b in restored} == dates and not any(b.is_on_hold for b in restored), "dates restored"
+    accounts = await ramp.list_vendor_accounts(cobalt)
+    assert [(a.routing_number, a.last4) for a in accounts if a.is_active] == [(ON_FILE[0], "0000")], "bills pay the account on file"
+
+
+async def test_a_blocked_case_a_ramp_change_opened_offers_no_dismiss(door_world):
+    w = door_world
+    await change(w.env, load_seed(SEED), "cobalt")   # the clerk's change in Ramp, and its webhook
+    await w.worker.drain(w.demo_id)
+    (case,) = await cases(w)
+    assert (case["state"], case["detected_via"]) == ("needs_review", "webhook"), "the Ramp-opened case waits for a person"
+    url = CASE.format(case_id=case["id"])
+    await post(w, f"{url}/review", "approver2", "/api/cases/{case_id}/review",
+               {"expected_version": case["version"], "action": "block", "reason": "Not provable."})
+    (case,) = await cases(w)
+    assert case["state"] == "blocked"
+    assert (await get(w, url, "approver1", CASE))["permissions"]["can_dismiss"] is False, "Ramp changed: not email only"
+
+
+async def test_an_approval_given_before_the_case_was_blocked_is_not_a_dismissal(door_world):
+    """Spec 0090 path A: approver1 approves the release, approver2 rejects it, and the case is blocked at the
+    same version. Only approvals made while blocked count, so approver1 may still dismiss."""
+    w = door_world
+    row = await arrive(w)
+    case = await answered(w, row["case_id"], change="yes")
+    assert (case["state"], case["outcome"]) == ("awaiting_release", "verified")
+    release = RELEASE.format(case_id=case["id"])
+    body = {"expected_version": case["version"], "reason": "Checked on the ledger's number."}
+    assert (await post(w, release, "approver1", RELEASE, body | {"action": "approve"}))["status"] == "awaiting_second_approver"
+    assert (await post(w, release, "approver2", RELEASE, body | {"action": "reject"}))["to_state"] == "blocked"
+    (blocked,) = await cases(w)
+    assert (blocked["state"], blocked["version"]) == ("blocked", case["version"])
+    for who in ("approver1", "approver2"):
+        assert (await get(w, CASE.format(case_id=case["id"]), who, CASE))["permissions"]["can_dismiss"] is True, who
