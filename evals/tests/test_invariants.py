@@ -241,9 +241,10 @@ def test_first_seen_probe_catches_a_rule_that_ignores_it(monkeypatch):
 @pytest.fixture
 def _today_rule(monkeypatch):
     """The broken doubles below are today's rule with one defect, built by calling select(). Spec 0079's
-    guard (DIALBACK_CONTEXT_GUARD, on by default once it lands) would make every one of them refuse to
-    move the call, leaving I12 nothing to catch, so the tests that need a double to move the call run the
-    rule unguarded. Before spec 0079 the flag is ignored and the rule is today's anyway."""
+    guard would make every one of them refuse to move the call, and spec 0091's label bar would leave
+    most labels nothing to refuse (both on by default), so a test that needs a label to refuse a number
+    or move the call would have nothing to catch. Those tests run today's rule alone:
+    DIALBACK_CONTEXT_GUARD=off gives it whatever DIALBACK_LABEL_BAR says."""
     monkeypatch.setenv("DIALBACK_CONTEXT_GUARD", "off")
 
 
@@ -364,6 +365,7 @@ def _labels_under(rule, world) -> set[str]:
         inv.run = real
 
 
+@pytest.mark.usefixtures("_today_rule")
 def test_a_rule_that_refuses_the_case_passes_i12():
     # Refusing the case when attacker text would change who is called is a valid fix: the call goes
     # nowhere, and the refusal is a schema-valid no_provable_number (review 2, B2).
@@ -389,6 +391,7 @@ def test_fail_closed_fix_adds_no_violation_today_lacks():
     check()
 
 
+@pytest.mark.usefixtures("_today_rule")
 def test_context_blind_fix_opens_the_lookalike_hole():
     # Why ignoring change-context labels is not a valid fix, though it passes I12: an attacker's
     # lookalike email pulls the cutoff earlier, a clean listing that calls X a bank's line lands in
@@ -404,8 +407,8 @@ def test_context_blind_fix_opens_the_lookalike_hole():
 def test_context_blind_rule_passes_the_planted_bank_label_world(monkeypatch):
     # The attacker's in-thread email names the real number as a bank line, and a planted provable
     # number ranks below the real one. Ignoring change-context labels keeps the call on the real
-    # number, and the oracle must accept that output (I3 reads labels from outside the context only),
-    # even though the shape is not a valid fix overall (the test above).
+    # number, and the oracle must accept that output (a label in the request's thread is never
+    # established), even though the shape is not a valid fix overall (the test above).
     world = overblock_world("bank_label_in_thread", 0, planted=True)
     assert _context_blind(world)["e164"] == REAL
     monkeypatch.setattr("dialback_evals.invariants.run", _context_blind)
