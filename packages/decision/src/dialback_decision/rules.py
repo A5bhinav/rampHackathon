@@ -92,7 +92,7 @@ def valid(f: object, mode: Mode) -> bool:
     return (_member(f.call_result, CALL_RESULTS) and isinstance(f.dialed_eligible_number, bool)
             and _strings(f.recording_consent, CONSENT) and _strings(f.company_named)
             and _strings(f.change_requested, CHANGE) and isinstance(f.speaker_named, bool) and _strings(f.speaker_role)
-            and _strings(f.flags, FLAGS) and isinstance(f.offered_number, bool)
+            and _strings(f.flags, FLAGS) and isinstance(f.offered_number, bool) and isinstance(f.digits_typed, bool)
             and _optional(f.last_four_result, LAST_FOUR_RESULTS) and _optional(f.answered_by, ANSWERED_BY)
             and all(getattr(f, n) is None or isinstance(getattr(f, n), bool) for n in TRI_STATE)
             and _checks_ok(f.checks) and isinstance(f.earlier_calls, tuple) and all(map(_earlier_ok, f.earlier_calls))
@@ -213,9 +213,15 @@ VERIFIED: tuple[Rule, ...] = (
     Rule("V02_outbound_dial", "We placed the call, outbound, to the number we chose.",
          lambda f, m: f.dialed_out is True and f.dialed_number_is_pick is True,
          "We could not confirm the call was outbound to the number we chose."),
+    # Spec 0080, Part B: with no label (Twilio's "unknown", silence at pickup), digits typed on the keypad
+    # show a live person; a machine can't type them. A "machine" label still goes to review (NR01).
     Rule("V03_live_person", "A person, not a machine, answered and gave the answers.",
-         lambda f, m: f.call_result == "answers_recorded" and f.answered_by == "human",
-         "We could not confirm a person, not a machine, answered."),
+         lambda f, m: f.call_result == "answers_recorded" and (
+             f.answered_by == "human"
+             or (f.answered_by is None and f.digits_typed is True
+                 and f.last_four_result not in (None, "not_provided"))),
+         "We could not confirm a person, not a machine, answered: the call was not labeled a person, "
+         "and the digits were not typed on the keypad."),
     Rule("V04_recording_consent", "The person agreed to the recorded call before anything else.",
          lambda f, m: _only(f.recording_consent, "yes") and f.consent_first is True,
          "Recording consent was not given first."),
