@@ -154,6 +154,22 @@ Specs: 0017 (voice slice lab), 0083 (generative selection pressure; 0033 before 
       probe 0, `M_lookalike_helped` 0, `M_shared_id_helped` 271 (today 230), all 41 extra worlds
       from duplicate ids (A5).
   - **Spec 0091** (`sami/label-bar-spec`) writes up W4 inside spec 0079's guard.
+  - **The cost was worse than first described.** In all 37 pinned worlds where W4 inside the guard
+    (WG4) picks a planted number and today's rule doesn't, today's rule called a legitimate number
+    (16 of 18 unpinned; 2 went to a person). Spec 0079 sent 35 of the 37 to a person.
+  - **The middle option (WMG; plan addendum 5, written before the run):** if today's rule calls
+    nobody, call what WG4 calls; otherwise call only the common prefix of today's list and WG4's
+    (nobody if they disagree on the pick).
+    - A1's three cases, the day-before email, the label in the thread, and the honest-warning case
+      go to a person. A label sent only to block, and an honest mention, call the real number.
+      The near-miss worlds call nobody. Corpus and demo unchanged.
+    - Picks a planted number where today's rule doesn't: 0 in every set except 2 unpinned draws
+      (1 world), which fails the K1 bar. In that world the real number isn't provable (a
+      lookalike email froze the evidence before it appeared), the planted number predates the
+      pull, and a label in the request's thread calls it a bank's. Today's rule calls nobody.
+    - Calls nobody: 878 of 2000 (today 816, 0079 948, WG4 743). Honest over-block rows calling
+      nobody: 13 of 61 (today 29). Lab checks: the label probe 0, `M_lookalike_helped` 0,
+      `M_shared_id_helped` 271, as W4 (its eligibility is W4's).
 - **Open question:** whether such documents reach `select()` depends on how ingestion attaches
   documents to a vendor (`ledger.documents.vendor_id`), which nobody has traced.
 
