@@ -2,7 +2,9 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { hiddenLabel, kindLabel, ledgerHref, numberKinds } from "../src/lib/vendor-ledger.ts";
+import type { LedgerDocument } from "../src/lib/api-types.ts";
+import { lanePoints, type RuleRun } from "../src/lib/lineage.ts";
+import { hiddenLabel, kindLabel, laneDates, ledgerHref, numberKinds } from "../src/lib/vendor-ledger.ts";
 
 const example = (name: string) =>
   JSON.parse(readFileSync(new URL(`../../../packages/contracts/examples/selection.${name}.json`, import.meta.url), "utf8"));
@@ -36,4 +38,54 @@ test("the page renders document text as plain text, never as HTML (R9)", () => {
 
 test("the page says provable or not provable, never safe", () => {
   assert.ok(!/\bsafe/i.test(source));
+});
+
+// Spec 0104, D7. Acme in the demo seed: the vendor master record (Aug 2022) lists the main line; the
+// contract (Mar 2023) lists the main and AR lines, and is where the rule first counts either of them.
+const MAIN = "+12065550117", AR = "+12065550142";
+const doc = (channel: LedgerDocument["custody_channel"], received_at: string, numbers: string[], visibility = "visible"): LedgerDocument => ({
+  document_id: `${channel}-${received_at}`, kind: "other", custody_channel: channel, received_at, claimed_date: null, sender: null,
+  subject: null, thread_id: null, parent_document_id: null,
+  observations: numbers.map((e164) => ({ e164, role: "unknown", party: "vendor", visibility, quote: null })),
+});
+const FIRST = "2023-03-11T16:00:00.000000Z";
+const rule: RuleRun = {
+  rule_settings: { min_source_types: 2, min_age_days: 90, near_miss_distance: 1, same_subject_window_days: 30 },
+  cutoff: "2026-11-11T00:00:00.000000Z", outcome: "picked", contact_point_id: "cp-ar",
+  alternates: [{ contact_point_id: "cp-main", e164: MAIN, source_types: ["contract", "listing"] }],
+  candidates: [
+    { contact_point_id: "cp-ar", e164: AR, first_seen_at: FIRST, source_types: ["contract", "email"], on_file: false, eligible: true, rank: 1, reasons: [] },
+    { contact_point_id: "cp-main", e164: MAIN, first_seen_at: FIRST, source_types: ["contract", "listing"], on_file: true, eligible: true, rank: 2, reasons: [] },
+  ],
+};
+const documents = [
+  doc("email", "2026-12-01T00:00:00.000000Z", [AR]),          // after the cutoff: never dates a dot
+  doc("email", "2024-05-02T16:00:00.000000Z", [AR]),
+  doc("listing", "2023-07-20T16:00:00.000000Z", [MAIN]),
+  doc("contract", FIRST, [MAIN, AR]),
+  doc("vendor_master", "2022-08-23T16:00:00.000000Z", [MAIN]),
+  doc("email", "2021-01-05T16:00:00.000000Z", [AR], "white"),  // hidden text: never dates a dot
+];
+const at = (chart: ReturnType<typeof lanePoints>, e164: string, lane: string) =>
+  chart!.points.find((p) => p.e164 === e164 && p.lane === lane)!;
+
+test("each dot sits at the number's first sighting in that source: Acme's vendor master dot at its record's date", () => {
+  const chart = lanePoints(rule, laneDates(documents, rule.cutoff));
+  assert.equal(at(chart, MAIN, "on_file").at, "2022-08-23T16:00:00.000000Z");   // not the contract's date
+  assert.equal(at(chart, MAIN, "contract").at, FIRST);
+  assert.equal(at(chart, MAIN, "listing").at, "2023-07-20T16:00:00.000000Z");   // a later source is drawn later
+  assert.equal(at(chart, AR, "email").at, "2024-05-02T16:00:00.000000Z");       // not the hidden or the late email
+  assert.ok(at(chart, MAIN, "on_file").pct < at(chart, MAIN, "contract").pct);
+  assert.equal(chart!.start, "2022-01-01");                                    // the axis reaches the record
+});
+
+test("a lane the documents don't date falls back to the number's first-seen date, as the case page draws it", () => {
+  assert.ok(lanePoints(rule)!.points.every((p) => p.at === FIRST));
+  const partial = lanePoints(rule, laneDates(documents.filter((d) => d.custody_channel !== "listing"), rule.cutoff));
+  assert.equal(at(partial, MAIN, "listing").at, FIRST);
+});
+
+test("two numbers first seen in one document share a spot, and the chosen one is drawn last", () => {
+  const chart = lanePoints(rule, laneDates(documents, rule.cutoff))!;
+  assert.deepEqual(chart.points.filter((p) => p.lane === "contract").map((p) => [p.e164, p.kind]), [[MAIN, "alternate"], [AR, "pick"]]);
 });
