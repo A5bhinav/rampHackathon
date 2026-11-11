@@ -163,7 +163,7 @@ async def make_world(pool, kind: str = "dev", sim_now=None, settings: Settings |
     settings = settings or core_settings()
     mock_app = create_mock_app(MockSettings(database_url="unused", token_secret=MOCK_SECRET, deliver_webhooks=False), pool=pool)
     to_mock = httpx.AsyncClient(transport=httpx.ASGITransport(app=mock_app), base_url="http://ramp-mock")
-    connector = RampConnector(settings, to_mock, limiter=TokenBucket(100_000), sleep=_no_sleep)  # no real backoff waits
+    connector = RampConnector(settings, to_mock, limiter=TokenBucket(100_000), sleep=_no_sleep, pool=pool)  # no real backoff waits
     core_app = create_app(settings, pool=pool, connector=connector)
     to_core = httpx.AsyncClient(transport=httpx.ASGITransport(app=core_app), base_url="http://core")
     mock_app.state.http = to_core  # the mock's webhooks land on the core's real endpoint

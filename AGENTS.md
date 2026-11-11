@@ -110,7 +110,7 @@ falls back to the safe path.
 
 | Flag | Values | Safe default |
 |------|--------|--------------|
-| `DIALBACK_RAMP` | `mock`, `sandbox` | `mock` |
+| `DIALBACK_RAMP` | `mock`, `sandbox` (whether the server has the mock; each dataset picks its Ramp, spec 0096) | `mock` |
 | `DIALBACK_VOICE` | `text`, `live` | `text` |
 | `DIALBACK_READER` | `stub`, `llm` | `stub` |
 | `DIALBACK_RESOLVER` | `stub`, `ledger` | `stub` |

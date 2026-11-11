@@ -82,9 +82,14 @@ The `ramp-mock` URL uses Railway's reference variables (`${{service.VARIABLE}}`)
 | Variable | Required | Meaning |
 |---|---|---|
 | `DATABASE_URL` | yes | Supabase, through the session pooler |
-| `RAMP_BASE_URL` | yes | The mock's private URL (or Ramp's API with `DIALBACK_RAMP=sandbox`, which isn't wired yet) |
-| `DIALBACK_RAMP` | no | `mock` (default) |
+| `RAMP_BASE_URL` | with `mock` | The mock's private URL |
+| `DIALBACK_RAMP` | no | `mock` (default): this server has the mock. `sandbox`: it has none, and needs the sandbox credentials. Each dataset picks its Ramp when it is made (`new-dataset --ramp`, spec 0096) |
 | `MOCK_RAMP_SECRET` | with `mock` | Shared with the mock; per-dataset tokens are derived from it |
+| `RAMP_SANDBOX_CLIENT_ID`, `RAMP_SANDBOX_CLIENT_SECRET` | for sandbox datasets | The Ramp sandbox app's client credentials. Both or neither. Seal the secret (a service variable on the core, not a shared one) |
+| `RAMP_SANDBOX_BASE_URL` | no | Only `https://demo-api.ramp.com` (the default) is accepted, so these credentials never reach production Ramp |
+| `RAMP_SANDBOX_SCOPES` | no | Default `vendors:read vendors:write bills:read bills:write audit_logs:read`; a read-only app sets the three read scopes |
+| `DIALBACK_FULL_SWEEP_SECONDS` | for sandbox datasets | Set `60`, unless the server has a watch list (next row). A bank change waiting for review in Ramp moves no timestamp and writes no event, so only the sweep finds it, and the case should open within about two minutes (specs 0093, 0100). Default `86400` (once a day) |
+| `RAMP_SANDBOX_WATCH_VENDORS` | demo only | Ramp vendor ids, separated by commas or spaces, read on every poll, so their bank changes are caught in seconds (spec 0102). Pair with `DIALBACK_POLL_SECONDS=5` and set `DIALBACK_FULL_SWEEP_SECONDS` to `86400` or unset it: jobs run one after another, so a `60` sweep would hold the poll to about once a minute. A pending change on any other vendor can then take up to a day to be found |
 | `RAMP_WEBHOOK_SECRET` | yes | Verifies `X-Ramp-Signature`; at least 16 characters |
 | `FINGERPRINT_KEY`, `FINGERPRINT_KEY_VERSION` | yes | Keyed fingerprints of bank accounts; at least 32 characters |
 | `DIGITS_KEY`, `DIGITS_KEY_VERSION` | yes | Keyed hash of spoken digits; at least 32 characters |

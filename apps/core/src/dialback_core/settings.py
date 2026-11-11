@@ -53,6 +53,39 @@ def _jwt_secret(environ: dict[str, str], supabase_url: str | None) -> bytes:
 
 
 @dataclass(frozen=True)
+class RampSandbox:
+    """Ramp's sandbox and this server's credentials for it (spec 0096, D2)."""
+    client_id: str
+    client_secret: bytes = field(repr=False)
+    base_url: str = ""
+    scopes: tuple[str, ...] = ()
+    watch_vendors: tuple[str, ...] = ()  # a demo's vendors, read on every poll (spec 0102)
+
+
+RAMP_SANDBOX_URL = "https://demo-api.ramp.com"
+# The scopes the core's calls need: read vendors, bills and the audit log; hold, release, set a payment date.
+RAMP_SANDBOX_SCOPES = ("vendors:read", "vendors:write", "bills:read", "bills:write", "audit_logs:read")
+
+
+def _ramp_sandbox(environ: dict[str, str]) -> RampSandbox | None:
+    """Both credentials, or neither. Only Ramp's sandbox address: these can never reach production Ramp."""
+    client_id = environ.get("RAMP_SANDBOX_CLIENT_ID", "").strip()
+    secret = environ.get("RAMP_SANDBOX_CLIENT_SECRET", "")
+    if not client_id and not secret:
+        return None
+    if not client_id or not secret:
+        raise ConfigurationError("Set both RAMP_SANDBOX_CLIENT_ID and RAMP_SANDBOX_CLIENT_SECRET, or neither")
+    parts = urlsplit(environ.get("RAMP_SANDBOX_BASE_URL", RAMP_SANDBOX_URL).strip())
+    if (parts.scheme, parts.netloc) != ("https", "demo-api.ramp.com") or parts.path not in ("", "/") or parts.query or parts.fragment:
+        raise ConfigurationError(f"RAMP_SANDBOX_BASE_URL must be {RAMP_SANDBOX_URL}: these credentials never reach production Ramp")
+    scopes = tuple(environ.get("RAMP_SANDBOX_SCOPES", " ".join(RAMP_SANDBOX_SCOPES)).split())
+    if not scopes:
+        raise ConfigurationError("RAMP_SANDBOX_SCOPES is empty: a token with no scopes can call nothing")
+    watch = tuple(environ.get("RAMP_SANDBOX_WATCH_VENDORS", "").replace(",", " ").split())
+    return RampSandbox(client_id, secret.encode(), RAMP_SANDBOX_URL, scopes, watch)
+
+
+@dataclass(frozen=True)
 class Settings:
     database_url: str
     ramp_mode: RampMode
@@ -61,6 +94,7 @@ class Settings:
     fingerprint_key: bytes
     fingerprint_key_version: int = 1
     mock_ramp_secret: bytes | None = None
+    ramp_sandbox: RampSandbox | None = None
     resolver_mode: ResolverMode = ResolverMode.STUB
     ramp_requests_per_10s: int = 150          # stay under Ramp's 200 per 10 s with headroom
     # Spoken digits are hashed with this key before anything is stored (spec 0002, D7).
@@ -116,6 +150,9 @@ class Settings:
         if not url:
             raise ConfigurationError("DATABASE_URL is required")
         ramp_mode = read_flag("DIALBACK_RAMP", RampMode, RampMode.MOCK, env)
+        sandbox = _ramp_sandbox(env)
+        if ramp_mode is RampMode.SANDBOX and sandbox is None:
+            raise ConfigurationError("DIALBACK_RAMP=sandbox needs RAMP_SANDBOX_CLIENT_ID and RAMP_SANDBOX_CLIENT_SECRET")
         supabase_url = _supabase_url(env)
         email_mode = read_flag("DIALBACK_EMAIL", EmailMode, EmailMode.OFF, env)
         if email_mode is EmailMode.RESEND:
@@ -136,12 +173,13 @@ class Settings:
             if not anthropic_api_key:
                 raise ConfigurationError("ANTHROPIC_API_KEY is required when DIALBACK_EMAIL_CLASSIFIER=model")
         base = env.get("RAMP_BASE_URL")
-        if not base:
-            raise ConfigurationError("RAMP_BASE_URL is required (the mock's URL, or Ramp's sandbox API)")
+        if ramp_mode is RampMode.MOCK and not base:
+            raise ConfigurationError("RAMP_BASE_URL is required with DIALBACK_RAMP=mock (the mock's URL)")
         return cls(
             database_url=url,
             ramp_mode=ramp_mode,
-            ramp_base_url=base.rstrip("/"),
+            ramp_base_url=(base or "").rstrip("/"),
+            ramp_sandbox=sandbox,
             ramp_webhook_secret=_secret(env, "RAMP_WEBHOOK_SECRET"),
             fingerprint_key=_secret(env, "FINGERPRINT_KEY", 32),
             fingerprint_key_version=int(env.get("FINGERPRINT_KEY_VERSION", "1")),

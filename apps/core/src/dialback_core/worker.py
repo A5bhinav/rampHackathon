@@ -20,7 +20,7 @@ from __future__ import annotations
 import asyncio
 import datetime as dt
 import logging
-from collections.abc import Awaitable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
@@ -144,10 +144,10 @@ class Worker:
 
     # The loop ---------------------------------------------------------------------------------
 
-    async def tick(self, dataset_id: UUID | None = None) -> int:
+    async def tick(self, dataset_id: UUID | None = None, jobs: bool = True) -> int:
         done = await self._contained("Ramp webhook", process_inbound_webhooks(self.pool, self.connector, self.keys,
                                                                               dataset_id=dataset_id))
-        if self.settings.run_jobs:
+        if jobs and self.settings.run_jobs:
             done += await self.jobs.run_due(dataset_id)  # the poller and reconciliation (spec 0003)
         done += await self.fire_timers(dataset_id)
         done += await self.run_commands(dataset_id)
@@ -179,11 +179,18 @@ class Worker:
         raise RuntimeError("the worker kept finding work; is something looping?")
 
     async def run_forever(self, stop: asyncio.Event) -> None:
+        """Case steps and scheduled jobs side by side, so a long sweep doesn't hold up a case (spec 0100, D4)."""
+        loops = [self._repeat(stop, "worker tick", lambda: self.tick(jobs=False))]
+        if self.settings.run_jobs:
+            loops.append(self._repeat(stop, "scheduled jobs", self.jobs.run_due))
+        await asyncio.gather(*loops)
+
+    async def _repeat(self, stop: asyncio.Event, name: str, work: Callable[[], Awaitable[int]]) -> None:
         while not stop.is_set():
             try:
-                busy = await self.tick()
+                busy = await work()
             except Exception:
-                log.exception("worker tick failed")
+                log.exception("%s failed", name)
                 busy = 0
             if not busy:
                 try:
