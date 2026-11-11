@@ -1036,3 +1036,12 @@ ol.slots li.is-filled { animation: slot-in 360ms var(--ease) both; }
 /* Spec 0066, PR 3: the station strip says what its counts are. */
 .rail-card .rail-title { margin: 0 0 12px; font-family: var(--mono, inherit); font-size: 11px; font-weight: 500; letter-spacing: .08em;
   text-transform: uppercase; color: var(--muted); }
+
+/* The admin's People and Demo pages (spec 0095). */
+.admin-controls summary { cursor: pointer; }
+.admin-controls[open] { min-width: min(22rem, 70vw); }
+.admin-change fieldset { border: 0; margin: 0.75rem 0 0; padding: 0; display: grid; gap: 0.4rem; }
+.admin-change legend { font-weight: 600; margin-bottom: 0.25rem; }
+.admin-change .actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.admin-log { display: grid; gap: 0.5rem; padding-left: 1.25rem; }
+main.narrow { max-width: 32rem; margin: 4rem auto; padding: 0 1rem; display: grid; gap: 1rem; }

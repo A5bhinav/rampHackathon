@@ -33,13 +33,23 @@ async def system_tx(pool: AsyncConnectionPool) -> AsyncIterator[AsyncConnection]
         yield conn
 
 
+class AccessOff(RuntimeError):
+    """An admin turned this person's access off (spec 0095, D7). Every request is refused."""
+
+
 @asynccontextmanager
 async def person_tx(pool: AsyncConnectionPool, user_id: UUID, claims: dict) -> AsyncIterator[AsyncConnection]:
-    """Act as the signed-in person, exactly as Supabase's own API would (spec 0002, D9)."""
+    """Act as the signed-in person, exactly as Supabase's own API would (spec 0002, D9). A person
+    whose access is off is refused before anything runs (spec 0095, D7); if the lookup itself
+    fails, the error refuses the request too (R7)."""
     async with pool.connection() as conn, conn.transaction():
         await conn.execute("set local role authenticated")
         await conn.execute("select set_config('request.jwt.claims', %s, true)",
                            (json.dumps({**claims, "sub": str(user_id), "role": "authenticated"}),))
+        off = await (await conn.execute(
+            "select 1 from app.user_profiles where user_id = auth.uid() and disabled_at is not null")).fetchone()
+        if off is not None:
+            raise AccessOff("Your access is turned off. Ask an admin.")
         yield conn
 
 
