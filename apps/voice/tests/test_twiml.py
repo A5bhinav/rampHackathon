@@ -6,13 +6,17 @@ The fetch is signature-verified, so a forged request mints no token (R9)."""
 from __future__ import annotations
 
 import base64
+import dataclasses
 import hashlib
 import hmac
 import uuid
+import xml.etree.ElementTree as ET
 
+import pytest
 from dialback_policy.script import Script
 from dialback_voice import tokens
 from dialback_voice.app import CallDial, TwilioDeps, create_app
+from dialback_voice.twilio.origination import build_connect_twiml
 from fastapi.testclient import TestClient
 
 KEY = b"call-token-key-for-tests-0123456789abcd"
@@ -101,3 +105,85 @@ def test_machine_detection_rides_to_the_call_as_a_parameter():
             assert 'name="answered_by"' not in r.text, answered
         else:
             assert f'<Parameter name="answered_by" value="{expected}"/>' in r.text, answered
+
+
+# Spec 0082, Part A: the TwiML carries the vendor's names as ConversationRelay `hints`, so the
+# recognizer prefers "Acme" over "acne". The hints bias what is heard; nothing is ever spoken (R4).
+
+def _relay(xml: str) -> ET.Element:
+    relay = ET.fromstring(xml.encode("utf-8")).find("./Connect/ConversationRelay")
+    assert relay is not None, xml
+    return relay
+
+
+def _twiml(**kwargs) -> str:
+    return build_connect_twiml(ws_url=f"{WS_BASE}/twilio/relay/{CALL}", call_token="tok",
+                               disclosure="This call is from an AI agent and is recorded.", **kwargs)
+
+
+@pytest.mark.parametrize(("names", "hints"), [
+    # A1: the four examples in D2.
+    (("Acme Fasteners LLC",), "Acme Fasteners LLC,Acme"),
+    (("The Acme Group",), "The Acme Group,Acme"),
+    (("First Solar Inc",), "First Solar Inc"),               # "first" is a common first word
+    (("Yes Energy LLC",), "Yes Energy LLC"),                 # "yes" is under 4 characters
+    # A2: commas become spaces; spaces are trimmed and collapsed.
+    (("Acme Fasteners, LLC",), "Acme Fasteners LLC,Acme"),
+    (("  Acme \u00a0  Fasteners   LLC  ",), "Acme Fasteners LLC,Acme"),
+    (("Acme, Inc.",), "Acme Inc."),                          # one word once the suffix is gone
+    # A2: the first word is as written, with the punctuation around it stripped.
+    (('"Acme" Fasteners',), '"Acme" Fasteners,Acme'),
+    # A written word the guard reads as two ("Acme-Fasteners") is not a first word on its own.
+    (("Acme-Fasteners LLC",), "Acme-Fasteners LLC"),
+    # A2: a whitespace-only or comma-only name gives no hint.
+    (("   ", "Acme Fasteners LLC"), "Acme Fasteners LLC,Acme"),
+    ((" , ,",), None),
+    # A2: duplicates are dropped ignoring case, and the first spelling wins.
+    (("ACME Fasteners LLC", "Acme Fasteners LLC", "acme bolts"), "ACME Fasteners LLC,ACME,acme bolts"),
+    # A2: a hint over 100 characters is skipped; exactly 100 is kept. The first word is its own hint.
+    (("Acme " + "B" * 95,), "Acme " + "B" * 95 + ",Acme"),
+    (("Acme " + "B" * 96,), "Acme"),
+    # A2: at most 10 hints.
+    (tuple(f"Vendor{i}" for i in range(12)), ",".join(f"Vendor{i}" for i in range(10))),
+    (tuple(f"Vendor{i} Supply" for i in range(6)),
+     ",".join(f"Vendor{i} Supply,Vendor{i}" for i in range(5))),
+])
+def test_hints_carry_the_vendor_names(names: tuple[str, ...], hints: str | None):
+    assert _relay(_twiml(vendor_names=names)).get("hints") == hints
+
+
+def test_hints_are_escaped_and_read_back():
+    # A3: quotes, ampersands and angle brackets are escaped, and control characters (Unicode
+    # category C) are dropped before anything else, so the TwiML stays well-formed XML.
+    names = ("Acme \"Bolts\" & <Nuts> O'Neil LLC", "Smith\x0bJones\u200b Supply\x1f")
+    xml = _twiml(vendor_names=names)
+    assert "&amp;" in xml and "&lt;Nuts&gt;" in xml and "&quot;Bolts&quot;" in xml
+    assert "<Nuts>" not in xml and "\x0b" not in xml and "\x1f" not in xml and "\u200b" not in xml
+    assert _relay(xml).get("hints") == "Acme \"Bolts\" & <Nuts> O'Neil LLC,Acme,SmithJones Supply,SmithJones"
+
+
+@pytest.mark.parametrize("answered_by", [None, "human"])
+@pytest.mark.parametrize("names", [(), ("",), ("   ", " , ,"), ("\x0b\u200b",)])
+def test_no_vendor_names_means_no_hints(names: tuple[str, ...], answered_by: str | None):
+    # A4: with no hints the TwiML is exactly what it is without names (compared with the function,
+    # not a frozen string, since other work edits the same attribute line).
+    without = _twiml(answered_by=answered_by)
+    assert _twiml(vendor_names=names, answered_by=answered_by) == without
+    assert _relay(without).get("hints") is None
+
+
+def test_the_route_hints_the_calls_vendor_names_and_never_speaks_them():
+    # A5: the route passes the looked-up call's vendor_names. The names reach the recognizer as
+    # hints and never the welcomeGreeting, so the callee hears nothing of who we are checking (R4).
+    dial = CallDial(case_id=CASE, attempt=1, number_e164=NUMBER, customer_name=CUSTOMER,
+                    callback_number=CALLBACK, vendor_names=("Brightline Office Supply Inc", "Acme Fasteners LLC"))
+    deps = dataclasses.replace(_deps(), lookup_call=lambda cid: dial if cid == CALL else None)
+    client = TestClient(create_app(store=None, internal_api_token=b"t", agent_version="agent-test-0", twilio=deps))
+    path = f"/twilio/twiml/{CALL}"
+    r = client.get(path, headers={"X-Twilio-Signature": _sign(BASE + path, {})})
+    assert r.status_code == 200, r.text
+    relay = _relay(r.text)
+    assert relay.get("hints") == "Brightline Office Supply Inc,Brightline,Acme Fasteners LLC,Acme"
+    greeting = relay.get("welcomeGreeting").lower()
+    assert greeting == Script(CUSTOMER, CALLBACK).disclosure().lower()
+    assert all(word not in greeting for word in ("brightline", "acme", "fasteners", "office"))

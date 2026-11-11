@@ -367,9 +367,9 @@ the vendor unless stated:
 
 ## Landing
 
-Two small PRs, each independent of the other: Part A (hints) and Part B (matcher, which Abhi
-reviews). Part A edits the same `build_connect_twiml` attribute line as open PR #102, so whichever
-merges second rebases and keeps both attributes.
+Two PRs: Part B landed first (PR #123, with D7a and D7b), then Part A (hints, PR #118). Part A edits
+the same `build_connect_twiml` attribute line as PR #102, so whichever merges second rebases and
+keeps both attributes.
 
 ## Out of scope
 
@@ -394,6 +394,9 @@ merges second rebases and keeps both attributes.
 - **Q138 (Abhi, Sami):** should hints and the matcher use the vendor's name as it was before the
   change (a snapshot on the case), rather than Ramp's current record? A clerk can edit both in the
   same session.
+- **Q139 (Sami):** a possessive or hyphenated first word gets no first-word hint ("Mike's Plumbing
+  LLC", "Acme-Fasteners LLC"). Only the full name is sent. Should "Mike's" or "Mike" be sent too?
+  Possessive names are common for small vendors. (From Part A's review.)
 
 ## Commands
 
