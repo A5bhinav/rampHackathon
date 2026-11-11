@@ -108,6 +108,22 @@ def test_a_real_vendor_takes_a_seed_vendors_history(database_url):
     assert not any("Acme" in q for q in quotes) and domains == ["asana.example"]
 
 
+def test_real_vendors_can_all_retell_one_clean_history(database_url):
+    """Spec 0103: Acme's history is the one that proves a number, so all three real vendors use it."""
+    d = demo_dataset(database_url)
+    team = "+12025550100"
+    with psycopg.connect(database_url, autocommit=True, row_factory=dict_row) as c:
+        c.execute("update app.datasets set demo_refs = null where id = %s", (d["dataset_id"],))
+        ramp = {ref: c.execute("select ramp_vendor_id from app.vendors where id = %s", (d["vendors"][ref],)).fetchone()["ramp_vendor_id"]
+                for ref in REFS}
+    real = {ref: (ramp[ref], name) for ref, name in zip(REFS, ("Asana", "Salesforce", "DocuSign"), strict=True)}
+    out = run(load(database_url, phones=dict.fromkeys(REFS, team), with_requests=True, dataset_id=d["dataset_id"],
+                   real=real, like="acme"))
+    assert sorted(out["vendors"]) == sorted(REFS)
+    for ref in REFS:
+        assert selection(database_url, d, ref)["e164"] == team, ref
+
+
 def test_a_real_vendor_must_name_a_seed_vendor(database_url):
     d = demo_dataset(database_url, refs=("acme",))
     with pytest.raises(DemoError, match="zenith"):

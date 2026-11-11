@@ -21,6 +21,8 @@ None.
 - **D2. The ledger.** `dialback-ledger demo load --real-vendor REF=RAMP_VENDOR_ID=NAME` loads only
   the named seed vendors, retelling each history under the real vendor's name. The history is
   synthetic, like the rest of the seed. The team phone still comes from `--phone`, at run time.
+  `--like acme` retells that one seed vendor for every real vendor, each under document ids of its
+  own, since only Acme's history proves a number. REF is then just the real vendor's short name.
 - **D3. Known limit.** A demo dataset on the sandbox counts as the current demo if it is the newest,
   so `dialback-core demo` commands and the email door point at it, and `demo reset` retires it.
 
@@ -30,6 +32,7 @@ None.
 - [x] A real vendor takes a seed vendor's history, name and domain, with no `demo_refs`, and the rule
       picks the team phone.
 - [x] A real vendor naming no seed vendor is refused.
+- [x] Three real vendors can retell one history, and the rule picks the team phone for each.
 
 ## Tests
 
