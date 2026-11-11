@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ScorecardEmpty } from "@/components/scorecard";
 import { PublicHeader } from "@/components/public-header";
-import { RingBand } from "@/components/ring-band";
+import { PageHead } from "@/components/page";
 
 export const metadata: Metadata = { title: "Dialback: scorecard" };
 
@@ -13,16 +13,10 @@ export default function ScorecardPage() {
     <div className="public">
       <PublicHeader links={[{ href: "/", label: "Front door" }, { href: "/corpus", label: "Frozen test cases" }]} />
       <main>
-        <RingBand
-          eyebrow="Scorecard"
-          titleId="sc-h"
-          title="The attack lab isn't built yet, so there is no scorecard."
-          lead={<>
-            The lab would replay hundreds of scams and legitimate-but-odd changes through the real pipeline, on a simulated clock,
+        <PageHead titleId="sc-h" title="Scorecard" lead="The attack lab isn't built yet, so there is no scorecard." />
+        <p className="page-intro muted">The lab would replay hundreds of scams and legitimate-but-odd changes through the real pipeline, on a simulated clock,
             and score how often Dialback is fooled or wrongly blocks a real vendor. Until it runs, this page shows no numbers: we
-            don&apos;t display a result the system didn&apos;t compute.
-          </>}
-        />
+            don&apos;t display a result the system didn&apos;t compute.</p>
         <ScorecardEmpty />
         <section className="two-up">
           <div className="card">

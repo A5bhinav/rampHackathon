@@ -5,7 +5,7 @@ import { OutcomeBadge } from "./badges";
 import { CaseRail } from "./flow";
 import { BrandMark } from "./nav";
 import { Rings } from "./ring-band";
-import type { LiveCallView } from "@/lib/live-call";
+import { callLength, clock, phoneLines, type LiveCallView } from "@/lib/live-call";
 import { refreshDelay } from "@/lib/stations";
 
 // The live call (spec 0065, plan v3 section 4.1): a phone frame on the left, the call's answers on
@@ -43,11 +43,13 @@ export function LiveCall({ initial, stateUrl, caseHref, flowHref }: { initial: L
     return () => { stop = true; window.clearTimeout(timer); };
   }, [view, stateUrl, started, ended]);
 
-  // A running timer only after mount (the server and the browser read different clocks); an
-  // ended call's length is the same everywhere.
-  const end = view.endedAt ? Date.parse(view.endedAt) : now;
-  const elapsed = view.startedAt && end !== null ? clock(end - Date.parse(view.startedAt)) : null;
-  const status = view.phase === "dialing" && view.dialed ? `Dialing ${view.dialed}` : view.status;
+  // A running timer only while on the call and after mount (the server and the browser read
+  // different clocks); an ended call shows its length, or nothing when it took no measurable time.
+  const running = view.phase === "on_call" && !view.endedAt && view.startedAt && now !== null ? clock(now - Date.parse(view.startedAt)) : null;
+  const length = callLength(view.startedAt, view.endedAt);
+  const elapsed = running ?? length;
+  const lines = phoneLines(view);
+  const status = view.phase === "dialing" && view.dialed ? `Dialing ${view.dialed}` : lines.status;
   const tone = view.phase === "decided" ? (view.outcome === "verified" ? "ok" : view.outcome === "not_verified" ? "bad" : "warn")
     : view.phase === "not_connected" ? "warn" : "info";
   const asking = view.phase === "on_call" ? view.disclosure
@@ -59,7 +61,7 @@ export function LiveCall({ initial, stateUrl, caseHref, flowHref }: { initial: L
         <span className="live-vendor">{view.vendor}</span>
         <span className={`badge tone-${tone}`}>{view.stateLabel}</span>
         {view.attempt ? <span className="muted sub">attempt {view.attempt}</span> : null}
-        {elapsed ? <span className="mono live-timer" role="timer" aria-label={`Call time ${elapsed}`}>{elapsed}</span> : null}
+        {elapsed ? <span className="mono live-timer" role="timer" aria-label={`${running ? "Call time" : "Call length"} ${elapsed}`}>{elapsed}</span> : null}
         <span className="live-links"><Link href={caseHref}>Case</Link><Link href={flowHref}>Flow mode</Link></span>
       </header>
       <div className="live-rail"><CaseRail steps={view.steps} /></div>
@@ -67,8 +69,9 @@ export function LiveCall({ initial, stateUrl, caseHref, flowHref }: { initial: L
         <section className="phone-wrap" aria-label="The call">
           <Rings className="rings phone-rings" />
           <div className="phone">
-            <p className="phone-status" aria-live="polite">{status}{elapsed && view.phase === "on_call" ? ` · ${elapsed}` : ""}</p>
-            {view.dialed ? <p className="phone-number mono">{view.dialed}</p> : null}
+            <p className="phone-status" aria-live="polite">{status}{running ? ` · ${running}` : ""}</p>
+            {lines.number ? <p className="phone-number mono">{lines.number}</p> : null}
+            {lines.pick ? <p className={`phone-pick tone-text-${lines.pick.tone}`}>{lines.pick.text}</p> : null}
             <p className="phone-who">{view.vendor}</p>
             {asking ? <p className="phone-bubble">{asking}</p> : null}
             {view.phase === "not_connected" && view.reason ? <p className="phone-note">{view.reason}</p> : null}
@@ -125,7 +128,3 @@ function useNow(ticking: boolean): number | null {
   return now;
 }
 
-function clock(ms: number): string {
-  const s = Math.max(0, Math.floor(ms / 1000));
-  return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
-}

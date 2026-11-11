@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { AlertBanners } from "./alerts";
+import { AlertChip } from "./alerts";
 import { BrandMark, Crumbs, NavLinks } from "./nav";
 import { ViewingAs } from "./viewing-as";
 import type { Dataset, Me } from "@/lib/api-types";
@@ -60,6 +60,7 @@ export async function Shell({ app, datasetId, children }: { app: AppKey; dataset
       <div className="main-col">
         <div className="utilbar">
           <Crumbs datasetId={datasetId} />
+          <AlertChip alerts={alerts} datasetId={datasetId} />
           {present.length ? (
             <details className="present">
               <summary>Present</summary>
@@ -68,7 +69,6 @@ export async function Shell({ app, datasetId, children }: { app: AppKey; dataset
           ) : null}
           {demo ? <ViewingAs active={me.roles.includes("approver") ? "approver" : "clerk"} /> : null}
         </div>
-        <AlertBanners alerts={alerts} datasetId={datasetId} />
         {children}
       </div>
     </div>

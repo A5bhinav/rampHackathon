@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { StateBadge } from "@/components/badges";
+import { PageHead } from "@/components/page";
 import { CoreError, core } from "@/lib/core";
 import { formatAccount } from "@/lib/ramp-portal";
 
@@ -19,11 +20,8 @@ export default async function RampVendors({ params }: { params: Promise<{ datase
   const stateOf = new Map(cases.map((c) => [c.id, c.state]));
   return (
     <main className="ramp">
-      <header className="ramp-head">
-        <p className="section-marker">Ramp (mock) · stand-in for Ramp Bill Pay</p>
-        <h1>Vendors</h1>
-        <p className="muted">Edit a vendor&apos;s payment details here the way a clerk would in Ramp. Dialback watches Ramp and catches the change.</p>
-      </header>
+      <PageHead title="Ramp (mock) vendors"
+        lead="A stand-in for Ramp Bill Pay: edit a vendor's payment details the way a clerk would. Dialback catches the change." />
       {!data.can_change && data.reason ? <div className="callout"><div className="callout-body"><p>{data.reason}</p></div></div> : null}
       <section className="card flush" aria-label="Vendors in Ramp (mock)">
         <div className="table-wrap">

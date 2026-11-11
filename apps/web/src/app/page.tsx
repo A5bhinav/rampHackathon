@@ -29,7 +29,9 @@ export default function FrontDoor() {
             {DOORS.map((d) => <Link key={d.href} className={`button-link${d.tone === "primary" ? " primary" : ""}`} href={d.href}>{d.label}</Link>)}
           </p>
         </section>
-        <ol className="door-stations" aria-label="Every bank change goes through seven stations">
+      </main>
+      <section className="door-strip" aria-label="The seven stations">
+          <ol className="door-stations" aria-label="Every bank change goes through seven stations">
           {STATION_WORDS.map((s, i) => (
             <li key={s.word}>
               <span className="door-node"><Icon name={s.icon} size={16} /></span>
@@ -37,7 +39,7 @@ export default function FrontDoor() {
             </li>
           ))}
         </ol>
-      </main>
+      </section>
     </div>
   );
 }
