@@ -109,3 +109,18 @@ def corpus_pdfs(documents: list[dict]) -> dict[str, bytes]:
             _RENDERED[key] = render_pdf(d)
         out[d["id"]] = _RENDERED[key]
     return out
+
+
+def raw_page(content: str, *, resources: bytes = b"", page_extra: bytes = b"", catalog_extra: bytes = b"",
+             media: bytes = b"[0 0 612 792]", font: bytes = b"/Encoding /WinAnsiEncoding", more: tuple[bytes, ...] = ()) -> bytes:
+    """One page holding `content`, PDF operators written by hand, in Helvetica as /F1: for constructions the
+    renderer doesn't plant. Objects in `more` are numbered from 6."""
+    return raw_pdf(
+        b"<< /Type /Catalog /Pages 2 0 R " + catalog_extra + b" >>",
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        b"<< /Type /Page /Parent 2 0 R /MediaBox " + media + b" /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> "
+        + resources + b" >> " + page_extra + b" >>",
+        stream(content.encode("latin-1")),
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica " + font + b" >>",
+        *more,
+    )

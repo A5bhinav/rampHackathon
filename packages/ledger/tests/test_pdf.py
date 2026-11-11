@@ -232,12 +232,12 @@ def test_refuses(reason, data):
     assert "415" not in str(e.value), "a refusal never shows document text"
 
 
-def test_refuses_unparseable():
-    assert {r for c, r, _ in REFUSED if c in ("garbage", "truncated")} == {"unparseable"}
-
-
-def test_refuses_encrypted():
-    assert {r for c, r, _ in REFUSED if c.startswith("encrypted")} == {"encrypted"}
+@pytest.mark.parametrize("case, reason", [("garbage", "unparseable"), ("truncated", "unparseable"), ("no_pages", "unparseable"),
+                                          ("encrypted", "encrypted"), ("encrypted_owner_only", "encrypted")])
+def test_refuses_by_name(case, reason):
+    with pytest.raises(PdfRefused) as e:
+        read_pdf({c: d for c, _, d in REFUSED}[case])
+    assert e.value.reason == reason
 
 
 def test_refuses_too_big_before_parsing(monkeypatch):
