@@ -108,7 +108,7 @@ function Chosen({ view }: { view: SelectionView }) {
 
 const KIND_WORD = { pick: "chosen", alternate: "alternate", refused: "refused" } as const;
 
-/** First seen, by source: display only, one dot per number per source at its first sighting. */
+/** First seen, by source: display only, one dot per number per source, each at the number's first-seen date. */
 function LaneFigure({ chart, selection }: { chart: LaneChart; selection: Selection }) {
   const pick = chart.points.find((p) => p.kind === "pick");
   const n = (k: keyof typeof KIND_WORD) => new Set(chart.points.filter((p) => p.kind === k).map((p) => p.e164)).size;
@@ -152,7 +152,7 @@ function LaneFigure({ chart, selection }: { chart: LaneChart; selection: Selecti
       <figcaption className="lgraph-caption muted sub">
         <span><span className="min-key" aria-hidden="true" /> {chart.minAge.days}-day minimum age</span>
         <span><span className="after-key" aria-hidden="true" /> Request received {when(selection.cutoff)}</span>
-        <span>Each dot is a number&apos;s first sighting in that source; times in UTC.</span>
+        <span>Each dot is when the number was first seen, repeated in every source it appeared in, not that source&apos;s own date. Times in UTC.</span>
       </figcaption>
     </figure>
   );
