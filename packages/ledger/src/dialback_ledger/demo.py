@@ -2,6 +2,10 @@
 
     dialback-ledger demo load [--dataset ID] [--phone REF=+1...]... [--with-requests]
     dialback-ledger demo request --vendor REF [--dataset ID]
+    dialback-ledger read-pdf FILE
+
+`read-pdf FILE` (spec 0092) prints each line of a real PDF with its visibility, then the phone numbers code
+found in it. It labels and stores nothing.
 
 Run `load` after `dialback-core demo reset`; it writes each seeded vendor's history and own
 domain into the current demo dataset. At beat 2, run `request --vendor REF` right before
@@ -25,6 +29,7 @@ import json
 import os
 import sys
 from importlib.resources import files
+from pathlib import Path
 from uuid import UUID
 
 import phonenumbers as pn
@@ -232,6 +237,29 @@ async def request(database_url: str | None = None, *, vendor: str, dataset_id: U
         return await _request(conn, seed, ds, vendor, vendors[vendor], now or dt.datetime.now(dt.UTC), reader)
 
 
+def read_pdf_command(path: Path) -> int:
+    """`dialback-ledger read-pdf FILE`: each line with its visibility, then the phone candidates code found.
+    Labels nothing and stores nothing."""
+    from .candidates import find_phones
+    from .pdf import PdfRefused, read_pdf
+    from .text import lines
+    try:
+        pages = read_pdf(path.read_bytes())
+    except PdfRefused as exc:
+        print(f"refused: {exc.reason}", file=sys.stderr)
+        return 2
+    except OSError as exc:
+        print(f"refused: can't read {path} ({exc.strerror})", file=sys.stderr)
+        return 2
+    document_lines = lines({"pages": pages})
+    for ln in document_lines:
+        print(f"{ln.page + 1} {ln.visibility:<8} {ln.text}")
+    print("phones:")
+    for c in find_phones(document_lines):
+        print(f"  {c.e164} {c.visibility}")
+    return 0
+
+
 def _pair(text: str) -> tuple[str, str]:
     ref, sep, phone = text.partition("=")
     if not sep:
@@ -242,7 +270,10 @@ def _pair(text: str) -> tuple[str, str]:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="dialback-ledger", description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    demo = parser.add_subparsers(dest="cmd", required=True).add_parser("demo").add_subparsers(dest="action", required=True)
+    commands = parser.add_subparsers(dest="cmd", required=True)
+    rp = commands.add_parser("read-pdf", help="print a PDF's lines with their visibility, and its phone numbers")
+    rp.add_argument("file", type=Path)
+    demo = commands.add_parser("demo").add_subparsers(dest="action", required=True)
     ld = demo.add_parser("load", help="load the seeded vendors' history into the current demo dataset")
     ld.add_argument("--dataset", type=UUID)
     ld.add_argument("--phone", type=_pair, action="append", default=[], metavar="REF=+1...")
@@ -251,6 +282,8 @@ def main(argv: list[str] | None = None) -> int:
     rq.add_argument("--vendor", required=True)
     rq.add_argument("--dataset", type=UUID)
     args = parser.parse_args(argv)
+    if args.cmd == "read-pdf":
+        return read_pdf_command(args.file)
     try:
         if args.action == "load":
             out = asyncio.run(load(phones=dict(args.phone), dataset_id=args.dataset, with_requests=args.with_requests))

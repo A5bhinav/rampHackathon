@@ -2,9 +2,13 @@
 character, so ingest() and everything after it is unchanged."""
 from __future__ import annotations
 
+import datetime as dt
+import hashlib
+
 import pytest
 from _pdfs import (
     classes,
+    corpus_pdfs,
     document_of,
     pdf_of,
     read_spans,
@@ -13,8 +17,13 @@ from _pdfs import (
     text_width,
     unmapped_glyphs_pdf,
 )
+from _world import CASE, DATASET, VENDOR
 from dialback_ledger.candidates import find_phones
+from dialback_ledger.custody import custody_for
+from dialback_ledger.ingest import ingest_all, ingest_pdf
 from dialback_ledger.pdf import PdfRefused, read_pdf
+from dialback_ledger.reader import StubReader
+from dialback_ledger.select import ChangeRequest, DocumentRef, Sighting, select
 from dialback_ledger.text import lines
 from dialback_ledger.visibility import classify
 
@@ -258,3 +267,98 @@ def test_a_link_is_read():
 def test_the_limits_are_the_specs():
     from dialback_ledger import pdf
     assert (pdf.MAX_PAGES, pdf.MAX_BYTES, pdf.TIME_LIMIT_SECONDS) == (20, 10 * 1024 * 1024, 20.0)
+
+
+# --- Into ingestion (D1, D5): ingest_pdf ----------------------------------------------------------------
+
+T0 = dt.datetime(2026, 10, 1, 16, 0, tzinfo=dt.UTC)
+
+
+def _doc(doc_id: str, channel: str, days: int, spans: list[dict], *, sender=None, thread=None, subject=None) -> dict:
+    return {"id": doc_id, "kind": {"email": "email", "listing": "listing"}.get(channel, "contract"),
+            "custody": {"channel": channel, "received_at": (T0 - dt.timedelta(days=days)).isoformat(), "sender": sender,
+                        "thread_id": thread, "subject": subject, "parent_document_id": None},
+            "claimed_date": None, "pages": [{"width": 612, "height": 792, "spans": spans}]}
+
+
+def _vendor_world(**ar_plants) -> list[dict]:
+    """The vendor's AR line in a contract and a listing long before the request, then the request itself."""
+    ar = [span("Main: 206.555.0117", y=86), span("Accounts receivable: (415) 555-0142", **ar_plants)]
+    return [_doc("contract", "contract", 400, ar), _doc("listing", "listing", 300, ar),
+            _doc("request", "email", 0, [span("Please update our bank details.")], sender="ar@acme.example",
+                 thread="req", subject="Updated banking details")]
+
+
+def _select(docs: list[dict]) -> dict:
+    result = ingest_all(docs, extractor_version="stub", reader=StubReader(), pdfs=corpus_pdfs(docs))
+    refs = [DocumentRef(d["id"], d["custody_channel"], d["received_at"], d["sender"], d["thread_id"], d["subject"],
+                        d["received_at"]) for d in result.documents]
+    sightings = [Sighting(o["value_normalized"], o["document_id"], o["source_type"], o["seen_at"], o["visibility"],
+                          o["role"], o["party"], o["seen_at"]) for o in result.observations]
+    return select(case_id=CASE, dataset_id=DATASET, vendor_id=VENDOR, vendor_domains=("acme.example",),
+                  request=ChangeRequest("request", T0, "req", "Updated banking details", "ar@acme.example"),
+                  requested_cutoff=T0 + dt.timedelta(hours=2), case_opened_at=T0 + dt.timedelta(hours=3),
+                  documents=refs, sightings=sightings)
+
+
+def test_a_number_seen_only_in_no_ink_text_is_refused_with_hidden_text_only():
+    by = {c["e164"]: c for c in _select(_vendor_world(trick="cover_rect"))["candidates"]}
+    assert "hidden_text_only" in by["+14155550142"]["reasons"] and not by["+14155550142"]["eligible"]
+
+
+def test_the_same_number_in_visible_text_is_eligible():
+    by = {c["e164"]: c for c in _select(_vendor_world())["candidates"]}
+    assert by["+14155550142"]["eligible"], by["+14155550142"]["reasons"]
+
+
+def test_ingest_pdf_hashes_the_file_and_names_both_versions():
+    (doc, *_) = _vendor_world()
+    data = corpus_pdfs([doc])[doc["id"]]
+    result = ingest_pdf(data, doc, custody_for(doc), extractor_version="stub", reader=StubReader())
+    assert result.documents[0]["sha256"] == hashlib.sha256(data).hexdigest()
+    assert result.observations and {o["extractor_version"] for o in result.observations} == {"pdf-1/stub"}
+
+
+def _refusing(monkeypatch, case: str) -> bytes:
+    if case == "too_slow":
+        from dialback_ledger import pdf
+        monkeypatch.setattr(pdf, "TIME_LIMIT_SECONDS", 0.0)
+        return pdf_of([span(AR)])
+    return {c: d for c, _, d in REFUSED}[case]
+
+
+@pytest.mark.parametrize("case", [c for c, _, _ in REFUSED] + ["too_slow"])
+def test_a_refused_pdf_stores_nothing(monkeypatch, case):
+    (doc, listing, _) = _vendor_world()
+    result = ingest_pdf(corpus_pdfs([listing])[listing["id"]], listing, custody_for(listing), extractor_version="stub",
+                        reader=StubReader())
+    before = (list(result.documents), list(result.observations), list(result.dropped))
+    with pytest.raises(PdfRefused) as e:
+        ingest_pdf(_refusing(monkeypatch, case), doc, custody_for(doc), extractor_version="stub", reader=StubReader(),
+                   result=result)
+    assert e.value.document_id == doc["id"]
+    assert (result.documents, result.observations, result.dropped) == before
+
+
+def test_a_refused_pdf_stops_the_batch():
+    docs = _vendor_world()
+    pdfs = corpus_pdfs(docs) | {"listing": b"not a PDF"}
+    with pytest.raises(PdfRefused) as e:
+        ingest_all(docs, extractor_version="stub", reader=StubReader(), pdfs=pdfs)
+    assert (e.value.document_id, e.value.reason) == ("listing", "unparseable")
+
+
+# --- dialback-ledger read-pdf FILE (D9) ---------------------------------------------------------------
+
+def test_read_pdf_command_prints_lines_and_candidates(tmp_path, capsys, monkeypatch):
+    from dialback_ledger.demo import main
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    path = tmp_path / "doc.pdf"
+    path.write_bytes(pdf_of([span("Main: 206.555.0117", y=86), span(AR, trick="invisible")]))
+    assert main(["read-pdf", str(path)]) == 0
+    out = capsys.readouterr().out.splitlines()
+    assert out[:2] == ["1 visible  Main: 206.555.0117", f"1 no_ink   {AR}"]
+    assert out[2:] == ["phones:", "  +12065550117 visible", "  +14155550142 no_ink"]
+    path.write_bytes(b"not a PDF")
+    assert main(["read-pdf", str(path)]) == 2
+    assert capsys.readouterr().err.strip() == "refused: unparseable"

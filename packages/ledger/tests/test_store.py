@@ -46,9 +46,13 @@ def open_case(url: str, v: dict) -> uuid.UUID:
     return uuid.UUID(r["case_id"])
 
 
-def load(url: str, v: dict, truth: dict, *, request: bool = True) -> None:
+def load(url: str, v: dict, truth: dict, *, request: bool = True, pdfs: bool = False) -> None:
     docs = json.loads((ROOT / "corpus" / truth["documents"]).read_text())
-    result = ingest_all(docs, extractor_version="test", reader=StubReader())
+    if pdfs:                                  # spec 0092, D8: every document as a real PDF
+        from _pdfs import corpus_pdfs
+        result = ingest_all(docs, extractor_version="test", reader=StubReader(), pdfs=corpus_pdfs(docs))
+    else:
+        result = ingest_all(docs, extractor_version="test", reader=StubReader())
 
     async def go():
         async with await psycopg.AsyncConnection.connect(url) as conn, conn.transaction():
@@ -74,11 +78,12 @@ def pick(url, v, case, truth):
                              cutoff=at(truth["ramp_change_at"]), database_url=url))
 
 
+@pytest.mark.parametrize("pdfs", [False, True], ids=["page_model", "pdf"])
 @pytest.mark.parametrize("path", TRUTHS, ids=lambda p: p.stem)
-def test_gate_every_scenario_through_the_database(database_url, path):
+def test_gate_every_scenario_through_the_database(database_url, path, pdfs):
     truth = json.loads(path.read_text())
     v = new_vendor(database_url, truth["vendor"]["name"])
-    load(database_url, v, truth)
+    load(database_url, v, truth, pdfs=pdfs)
     case = open_case(database_url, v)
     out = pick(database_url, v, case, truth)
     doc = stored(database_url, out["number_selection_id"])
