@@ -3,12 +3,12 @@
  "rule_version": "ledger-select-v4",
  "reason_text": {
   "first_seen_in_change_context": "Not provable: this number first appeared in the change request, its thread, a lookalike domain or after the request, which is where a fraudster's number would come from.",
-  "too_few_source_types": "Not provable: it wasn't seen in at least two independent channels before the request (all email counts as one channel, and the old number on file never counts).",
+  "too_few_source_types": "Not provable: it wasn't seen as the vendor's number in at least two independent channels before the request (all email counts as one channel, and the old number on file never counts).",
   "younger_than_minimum_age": "Not provable: it was first seen too recently before the request; the rule needs a number the vendor has used for months.",
   "near_miss_of_older_number": "Not provable: it is one digit off, or two swapped digits away from, an older number of this vendor.",
   "hidden_text_only": "Not provable: it appeared only in text a person couldn't see (white, tiny or off the page).",
-  "not_vendor_party": "Not provable: the documents label it as someone else's number, such as a bank's or a customer's, or their labels disagree.",
-  "fax_line": "Not provable: the documents label it as a fax line."
+  "not_vendor_party": "Not provable: records from at least two independent channels, months before the request, say it isn't the vendor's line, and one labels it as someone else's number, such as a bank's or a customer's.",
+  "fax_line": "Not provable: records from at least two independent channels, months before the request, say it isn't the vendor's line, and one labels it as a fax line."
  },
  "cases": [
   {
