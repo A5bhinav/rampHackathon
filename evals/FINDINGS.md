@@ -1017,8 +1017,12 @@ F1 to F9 hold as built (verified). But the lab still claims more than it shows:
 
 ### C15. The lab after spec 0080 Part B (an unknown label verifies with typed digits; Nov 10)
 
-- **Status:** built on `sami/amd-unknown-typed`, not yet reviewed by a fresh session. Each change
-  follows from the decision (Sami, Nov 10), not from a result.
+- **Status:** built on `sami/amd-unknown-typed` and reviewed by a fresh session (no blocking
+  findings).
+- **What followed from what:** the F1 change follows from the decision (Sami, Nov 10). The F2
+  narrowing and the V03 listing below were both made **after** the first run's results, each with
+  its reason (corrected after the review: this line first said every change followed from the
+  decision).
 - **F1** restates V03: no label (`unknown`) is no longer a missing condition when every
   `account_last4` answer was typed on the keypad. A `machine` label, or no label with spoken digits,
   still is.

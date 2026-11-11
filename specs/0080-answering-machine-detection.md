@@ -199,10 +199,12 @@ Sami decided to build Part B as proposed above, and answered Q133's first part.
    - the label is absent, `digits_typed` is true, and `last_four_result` is set and is not
      `not_provided`.
 
-   NR01 is unchanged. The sentence is unchanged, since "a person, not a machine, answered and gave
-   the answers" stays true. The "not met" text says what was missing: "We could not confirm a
-   person, not a machine, answered: the call was not labeled a person, and the digits were not
-   typed on the keypad."
+   NR01 is unchanged, and so are both of V03's sentences. The API and the decision page render
+   today's sentences for every engine version, so a changed "not met" sentence would be false on
+   the 1.1.0 decisions that recorded it (review fix: the first draft's new sentence said the digits
+   weren't typed, and they almost always were). `SLOT_RULES["account_last4"]` gains V03, since V03
+   now reads the digits' capture method. So the dashboard lists V03 among the rules the digits
+   answer feeds.
 3. **`valid()` requires `digits_typed` to be a real boolean.** Anything else is NR97.
 4. **The engine version becomes `decision-1.2.0`.** Decisions made by 1.1.0 show the existing
    "made by an older engine" note on their checklist (`views.checklist`), as for 1.1.0 in
@@ -210,8 +212,13 @@ Sami decided to build Part B as proposed above, and answered Q133's first part.
 5. **The lab follows the rule.** F1's oracle (`reports.unconfirmed`) restates the verify
    conditions, so an absent label is no longer "missing" there when every `account_last4` answer
    was typed.
-   - F2's `answerer_unknown` move still can't help. An absent label asks for everything `human`
-     does, plus typed digits.
+   - F2's `answerer_unknown` move now starts from `human` only. From `human`, no label asks for
+     everything `human` does plus typed digits, so the move still can't help.
+   - From `machine`, it would replace evidence against the change (NR01), which spec 0048 B4 lets
+     help.
+   - This narrowing, and listing V03 in `UNREACHABLE.md`, were both made after the first run's
+     results (58 F2 labels, and one sweep problem). `evals/FINDINGS.md` C15 records both, each
+     with its reason.
 6. **Q133's second part** (the status route and the `machine` race) stays open. It is out of
    scope here.
 
@@ -222,8 +229,9 @@ Sami decided to build Part B as proposed above, and answered Q133's first part.
   - false for none, for any `speech`, or for a missing `capture_method`.
 - [ ] B2. With the label absent, the effects table above holds: typed digits that match give
   verified, with `V03_live_person` in `rules_fired`. Typed digits that mismatch give NV02, and
-  digits matching the old account give NV03. Spoken digits, or no digits, give needs review with
-  `V03_live_person_unmet`.
+  digits matching the old account give NV03. Spoken digits give needs review with
+  `V03_live_person_unmet`. No digits, which production records as `not_provided`, gives NR06
+  (corrected after the review: the first draft said V03 for no digits too).
 - [ ] B3. A `machine` label still gives NR01, typed digits or not. A `human` label is unchanged:
   `digits_typed` doesn't matter.
 - [ ] B4. `digits_typed` that is not a real boolean gives NR97.
@@ -243,7 +251,8 @@ Sami decided to build Part B as proposed above, and answered Q133's first part.
 | B4 | `packages/decision/tests/test_rules.py::test_each_rule_fires_in_its_block` (an `ALSO` row) |
 | B5 | `packages/decision/tests/test_engine.py::test_a_clean_confirmation_is_verified_with_every_condition_named` (its version pin moves from 1.1.0) |
 | B6 | `packages/decision/tests/test_examples.py::test_worked_example[23-unknown-label-typed-digits]` |
-| B7 | `evals/tests/test_reports.py::test_an_unknown_label_with_typed_digits_is_an_honest_confirmation` |
+| B7 | `evals/tests/test_reports.py::test_an_unknown_label_with_typed_digits_is_an_honest_confirmation`, `::test_f2_unknown_never_replaces_a_machine_label`, `evals/tests/test_rule_sweep.py` |
+| D1 (stored shape) | `apps/core/tests/test_call_facts.py::test_typed_digits_survive_the_stored_shape` (review fix) |
 
 ### Part C (after Part B merges, `apps/voice`)
 
@@ -338,4 +347,9 @@ Part B's acceptance is under "Part B, as built". Part C is its own PR, and adds 
 cd apps/voice && uv run pytest -q
 uv run --no-project --with ruff ruff check apps packages scripts corpus
 python3 scripts/ci/boundaries.py
+# Part B also:
+cd packages/decision && uv run pytest -q
+cd apps/core && uv run pytest -q          # the Postgres tests need a database (DATABASE_URL)
+cd evals && uv run pytest -q -m "not selection_gate and not report_gate"
+cd evals && uv run lab run --split voice && uv run lab reports --examples 2000 --seed 0 && uv run lab sweep
 ```
