@@ -3,7 +3,7 @@
 // line never prints the number, and accounts show routing and last four only (ADR-8).
 import type { CallAttempt, CaseDetail, ChainStatus, DecisionInfo, SelectionView } from "./api-types";
 import { brief, words } from "./format.ts";
-import { split } from "./lineage.ts";
+import { noCallHead, split } from "./lineage.ts";
 import type { StationKey, StationView } from "./stations.ts";
 
 export type CardKey = "change" | "hold" | "number" | "call" | "decision";
@@ -76,7 +76,7 @@ export function numberLine(view: Pick<SelectionView, "selection"> | null): strin
   const s = view.selection;
   if (!s) return "No selection recorded";  // the core's note: "No number selection is recorded for this case yet"
   const pick = split(s).pick;
-  if (!pick) return "No provable number";
+  if (!pick) return noCallHead(s).title;
   const n = pick.source_types.length;
   return `The Trust Ledger's pick · ${n} independent ${n === 1 ? "source" : "sources"} · ${s.rule_version}`;
 }

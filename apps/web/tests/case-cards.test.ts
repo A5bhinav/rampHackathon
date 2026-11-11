@@ -80,6 +80,8 @@ test("the number card's line never prints the number", () => {
   assert.equal(line, "The Trust Ledger's pick · 2 independent sources · ledger-select-v1");
   assert.ok(!line!.includes("555"));
   assert.equal(numberLine(view({ outcome: "no_provable_number", candidates: [], rule_version: "ledger-select-v1" })), "No provable number");
+  // Withheld is not "no provable number": a number is provable and a person verifies (spec 0079).
+  assert.equal(numberLine(view({ outcome: "withheld", candidates: [pick], rule_version: "ledger-select-v3" })), "Withheld for a person");
   assert.equal(numberLine(view(null)), "No selection recorded");
   assert.equal(numberLine(null), null);
 });
