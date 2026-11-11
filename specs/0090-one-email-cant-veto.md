@@ -3,7 +3,7 @@
 **Owner:** Sami (in `packages/ledger`)  **Slice:** evidence  **Target day:** not set
 **Builds on:** spec 0079 (`sami/0079-guard`, #121). This lands after it, stacked on its branch once
 main is merged into that branch (the lab lives on main; the branch is 36 commits behind).
-**Status:** draft. Q153 and Q154 are open; the measured rule changes if Q153 is answered yes.
+**Status:** draft. Q154 is open. The rule below is the one measured (prototype W4).
 
 ## Goal
 
@@ -28,9 +28,11 @@ lookalike pull for support, near-miss logic, ranking, settings.
    `fax` in any case.
 2. **Support counts only the vendor's sightings.** Age, source types and ranking read only sightings
    labeled the vendor's and not a fax. Today a sighting that says "the bank's line" still counts as
-   evidence for the number; the veto hid that. The near-miss check's "which number is older" is
-   Q153 (proposed: today's, every visible sighting outside the change context in a counting
-   channel, labeled or not).
+   evidence for the number; the veto hid that. The near-miss check ("which number is older") and
+   the displayed `first_seen_at` keep today's first sighting: every visible sighting outside the
+   change context in a counting channel, labeled or not (Q153). Otherwise a real line whose oldest
+   sightings carry a label (the stub reader gives a plain "Tel:" line party `unknown`) stops
+   anchoring a planted number one digit off it.
 3. **A label vetoes only when established.** The labels against a number veto it (reasons
    `not_vendor_party`, `fax_line`, as today) only if their documents span at least
    `min_source_types` (2) source types, and the earliest is at least `min_age_days` (90) before the
@@ -66,25 +68,22 @@ lookalike pull for support, near-miss logic, ranking, settings.
 vendor's records were already poisoned (K01), and today's rule calls 0177 there too without the
 warning. Sami, Nov 10: if the attacker's number is the most trusted, something else already failed.
 
-Measured (Nov 10; exploratory: one seed, fixture dates, random labels; FINDINGS A4 and the session
-scratchpad's `umeasure/measure_w_plan.md`, rule W3):
+Measured (Nov 10; exploratory: one seed, fixture dates, random labels). This rule is prototype W4
+inside the guard; FINDINGS A4 and the session scratchpad's `umeasure/measure_w_plan.md` (each
+addendum written before its run) have the three earlier versions and why each changed.
 - **Picks a planted number where today's rule doesn't:** 37 of 2000 pinned generated draws (28
-  distinct), all that last row's shape, and the A6 world's 3 probes.
-- **Calls nobody:** 736 of 2000 (today 816, 0079 948). Honest over-block rows that call nobody: 13 of
-  61 (today 29).
+  distinct; 18 unpinned), all that last row's shape, and 3 of the 4 A6 worlds.
+- **Calls nobody:** 743 of 2000 (today 816, 0079 948). Honest over-block rows that call nobody: 13 of
+  61 (today 29). Over-block planted rows that call the planted number: 8 (today 28, 0079 20).
 - **Unchanged:** the 20 corpus outcomes and the demo picks (neither has a label against any number,
   so they can't test this). On all 441 label-free worlds the output is today's, field for field.
-- **Lab metamorphic checks (2000 pinned), on the inner rule alone, not yet inside the guard:** the
-  label probe (I12) goes from 380 failures to 0 (this lab copy; spec 0079 counted 442 on a later
-  one), and `M_lookalike_helped` stays 0. `M_shared_id_helped` goes from 230 to 263, over the bar
-  set before the run; every extra case is A5's latent first-sorting duplicate id, which
-  production can't reach (ids are primary keys). Q154.
-- **A defect found by the builder check (Nov 10), not in the numbers above:** rule 2 as measured
-  also applied to the near-miss check. A real line whose oldest sightings carry a label (the stub
-  reader gives a plain "Tel:" line party `unknown`) then stops anchoring a planted number one
-  digit off it, and the planted number is called where today's rule calls nobody. It breaks spec
-  0021's properties 5 and 6 on hand-built worlds. Q153.
-- **Still to measure:** the final rule inside the guard, after Q153.
+  The builder check's near-miss worlds call nobody, as today, and spec 0021's suite fails only the
+  three tests listed below.
+- **Lab metamorphic checks (2000 pinned), on what ships:** the label probe (I12) goes from 380
+  failures to 0 (this lab copy; spec 0079 counted 442 on a later one), and `M_lookalike_helped`
+  stays 0. `M_shared_id_helped` goes from 230 (today and 0079) to 271, over the bar set before the
+  run. All 41 extra worlds come from a second document filed under an existing id (A5), which
+  production can't reach (ids are primary keys); none goes the other way. Q154.
 
 ## Contract touched
 
@@ -99,9 +98,12 @@ bank's, now gets that reason). The web copy that repeats them follows.
 - [ ] On every label-free world (generated, corpus, demo), the result is `_select_v1`'s, field for
   field except `rule_version`, `number_selection_id` and `inputs_sha256`, against 0079's frozen copy.
 - [ ] Every number today's rule finds eligible, the new rule finds eligible, in the same order.
+- [ ] A real line one digit from a planted number still anchors it when the real line's oldest
+  sightings carry a label: the builder check's worlds 1, 1b and 1c call nobody, as today.
 - [ ] Spec 0079's guard: the call list is a prefix of the new rule's on the case.
 - [ ] A weak label leaves the contact point `eligible` in `_store` (FINDINGS A26 for weak labels).
-- [ ] The flag off gives spec 0079 exactly; default and unknown values give this rule.
+- [ ] The three flag states of rule 6 give their rules and `rule_version` names; default and unknown
+  values give this rule.
 - [ ] Failure path: a case with no request still gives `no_provable_number` (R7); a world where
   labels are established still refuses the number with today's reason.
 
@@ -112,6 +114,7 @@ bank's, now gets that reason). The web copy that repeats them follows.
 | The six cases | `packages/ledger/tests/test_label_bar.py::test_the_table` |
 | Label-free equals today | `test_label_bar.py::test_no_labels_means_todays_rule` (with 0079's `select_v1_frozen.py`) |
 | Eligibility only grows | `test_label_bar.py::test_todays_eligible_stay_eligible_in_order` |
+| Near-miss anchor kept | `test_label_bar.py::test_labeled_real_line_still_anchors_its_near_miss` (worlds 1, 1b, 1c) |
 | Established labels still veto | `test_label_bar.py::test_two_old_sources_veto`, `::test_attacker_cannot_unestablish` (lookalike pull, same subject) |
 | Storage | `test_label_bar.py::test_weak_label_keeps_contact_point_eligible` (Postgres) |
 | Flag | `packages/ledger/tests/test_flags.py::test_label_bar_defaults_on` |
@@ -143,11 +146,9 @@ bank's, now gets that reason). The web copy that repeats them follows.
 
 - **Q151, resolved:** the accepted cost (the last row). Sami, Nov 10.
 - **Q152, open:** should documents filed as any case's change request never count as support?
-- **Q153, open:** does the near-miss check keep today's "which number is older" (every clean
-  sighting, labeled or not)? Proposed yes: it keeps today's refusals of one-digit-off numbers,
-  including a vendor's main line next to its own fax, which is today's behavior. A yes is a third
-  fix after two (the plan's stop rule), so it is measured again before this spec is approved.
-- **Q154, open:** accept `M_shared_id_helped` rising from 230 to 263, all through A5's latent
+- **Q153, resolved:** the near-miss check keeps today's "which number is older". Sami, Nov 10
+  ("Yes, fix it"); measured again as W4 above.
+- **Q154, open:** accept `M_shared_id_helped` rising from 230 to 271, all through A5's latent
   duplicate ids, or fix A5 first?
 
 ## Commands
