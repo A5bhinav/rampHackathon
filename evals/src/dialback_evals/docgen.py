@@ -512,12 +512,16 @@ class Tally:
     wrong_party: int = 0                           # G4
     overblocks: Counter = dataclasses.field(default_factory=Counter)   # by "stub_readable" / "not_stub_readable"
     overblocks_fax: int = 0                        # of those, vendor fax lines (the rule refuses a fax anyway)
+    overblocks_by: Counter = dataclasses.field(default_factory=Counter)  # by "<author>/<owner>"
+    wrong_roles: int = 0                           # a claimed role labeled another known role (no check reads roles)
+    fax_relabeled: int = 0                         # of those, fax lines: no longer refused as a fax line
     vendor_role_claims: Counter = dataclasses.field(default_factory=Counter)   # the over-block denominators
     g5_compared: int = 0
     g5_same: int = 0
     g6_compared: int = 0
     worlds: int = 0
     worlds_planted: int = 0
+    g7_refused_no_call: int = 0                    # worlds the context's labels leave with no call at all
 
     def add(self, other: Tally) -> None:
         for f in dataclasses.fields(self):
@@ -638,6 +642,10 @@ def check_doc(plan: DocPlan, *, reader, ingest=None, checks: Iterable[str] = DOC
             if o["party"] == "unknown":
                 res.tally.overblocks[split] += 1
                 res.tally.overblocks_fax += n.role == "fax"
+                res.tally.overblocks_by[f"{author}/{n.owner}"] += 1
+        if "G4" in checks and n.role is not None and o["role"] not in ("unknown", n.role):
+            res.tally.wrong_roles += 1
+            res.tally.fax_relabeled += n.role == "fax"
         if "G5" in checks:
             for variant in variants(plan, n, author):
                 moved = next(m for _, m in numbers_with_authors(variant) if m.e164 == n.e164)
@@ -728,16 +736,19 @@ def without_context_numbers(plan: WorldPlan) -> WorldPlan:
                                                      for d in plan.documents))
 
 
-def check_world(plan: WorldPlan, *, reader, rule=None) -> list[Violation]:
+def check_world(plan: WorldPlan, *, reader, rule=None, tally: Tally | None = None) -> list[Violation]:
     """G7 on one world plan, each failure keyed by the change-context number that caused it: every sighting
     whose label alone moves the call when relabeled, or, if none does alone, a minimal set of them whose
     labels together do (so a label that moves nothing is never blamed); for I1, the number's first
-    change-context mention."""
+    change-context mention. With `tally`, it also counts a world the context's labels leave with no call."""
     from dialback_ledger.select import change_context_documents
 
     from .invariants import _frame
     world = world_of(plan, reader=reader)
     labels = g7(world, rule)
+    if tally is not None and run_rule(world, rule).get("e164") is None and \
+            run_rule(_relabeled(world, lambda s: True, rule), rule).get("e164") is not None:
+        tally.g7_refused_no_call += 1
     if not labels:
         return []
     docs = {d.id: d for d in plan.documents}
@@ -798,7 +809,7 @@ def run(*, examples: int, seed: int, reader, rule=None) -> Run:
     docs = draw_docs(examples=examples, seed=seed)
     worlds = draw_worlds(seed=seed)
     result = check_docs(docs, reader=reader)
-    found = [v for w in worlds for v in check_world(w, reader=reader, rule=rule)]
+    found = [v for w in worlds for v in check_world(w, reader=reader, rule=rule, tally=result.tally)]
     result.tally.worlds, result.tally.worlds_planted = len(worlds), sum(w.planted for w in worlds)
     return Run(examples, seed, result, found, {p.id: p for p in [*docs, *worlds]})
 
@@ -925,11 +936,14 @@ def report(found: Run) -> dict:
         "seed": found.seed, "documents": t.documents, "worlds": t.worlds, "worlds_planted": t.worlds_planted,
         "visible_numbers": t.visible_numbers,
         "unsafe_labels": t.unsafe, "wrong_parties": t.wrong_party,
-        "overblocks": {**readable, "fax_lines_among_them": t.overblocks_fax},
+        "overblocks": {**readable, "fax_lines_among_them": t.overblocks_fax,
+                       "by_author_and_owner": dict(sorted(t.overblocks_by.items()))},
+        "wrong_roles": t.wrong_roles, "fax_lines_labeled_another_role": t.fax_relabeled,
         "g5_stability": {"same": t.g5_same, "compared": t.g5_compared,
                          "rate": t.g5_same / t.g5_compared if t.g5_compared else None},
         "g6_compared": t.g6_compared,
         "g7_failing_worlds": len({v.plan for v in found.world_violations}),
+        "g7_refused_no_call_worlds": t.g7_refused_no_call,
         "patterns": dict(sorted(Counter(v.pattern for v in found.violations).items())),
     }
 
@@ -947,8 +961,13 @@ def report_lines(body: dict) -> list[str]:
          f"not stub-readable {o['not_stub_readable']['left_unlabeled']} of "
          f"{o['not_stub_readable']['vendor_claims_with_a_role']} ({o['fax_lines_among_them']} of them fax lines, "
          "which the rule refuses anyway)"),
+        ("over-blocks by author/owner (only vendor/vendor is the vendor's own text): "
+         + ", ".join(f"{k} {v}" for k, v in o["by_author_and_owner"].items())),
+        (f"wrong roles (not gated): {body['wrong_roles']}, {body['fax_lines_labeled_another_role']} of them fax lines "
+         "labeled another role, so no longer refused as fax lines"),
         f"G5 stability: the same label on {g5['same']} of {g5['compared']} rewordings ({rate})",
         f"G6: {body['g6_compared']} original numbers compared with and without their quote",
-        f"G7: {body['g7_failing_worlds']} of {body['worlds']} worlds fail",
+        (f"G7: {body['g7_failing_worlds']} of {body['worlds']} worlds fail (the call moves); in "
+         f"{body['g7_refused_no_call_worlds']} the context's labels leave nobody called (allowed)"),
     ]
     return lines + [f"{pattern}: {count} violation(s)" for pattern, count in body["patterns"].items()]

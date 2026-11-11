@@ -448,7 +448,20 @@ def test_stub_report_has_every_count(tmp_path, capsys):
     assert body["unsafe_labels"] == sum(v.check == "G3" for v in found.violations) > 0
     assert body["wrong_parties"] == sum(v.check == "G4" for v in found.violations) > 0
     over = body["overblocks"]
-    assert set(over) == {"stub_readable", "not_stub_readable", "fax_lines_among_them"}
+    assert set(over) == {"stub_readable", "not_stub_readable", "fax_lines_among_them", "by_author_and_owner"}
+    # Who wrote the over-blocked text, and whose number it is (the fresh review: about half is the attacker's
+    # own text, and refusing the attacker's own number is what select() should do; only the vendor's own
+    # text is A2's honest over-blocking).
+    by = over["by_author_and_owner"]
+    assert sum(by.values()) == over["stub_readable"]["left_unlabeled"] + over["not_stub_readable"]["left_unlabeled"]
+    assert set(by) <= {"vendor/vendor", "attacker/vendor", "attacker/attacker"} and by["vendor/vendor"] > 0
+    assert by["attacker/attacker"] > 0
+    # Roles: no check reads them, so the report counts them; a fax line labeled another role is no longer
+    # refused as a fax line (A20 does this through "Office hours").
+    assert body["wrong_roles"] >= body["fax_lines_labeled_another_role"] > 0
+    # G7 also counts the worlds where change-context text refuses the case and nobody is called (A1's
+    # fail-safe side), which I12 allows.
+    assert body["g7_refused_no_call_worlds"] > 0
     # Stub-readable is computed, not hand-tagged, so both sides of the split hold vendor claims; and by its
     # own definition the stub never leaves a stub-readable vendor claim unlabeled.
     assert over["stub_readable"]["vendor_claims_with_a_role"] > 0 and over["not_stub_readable"]["vendor_claims_with_a_role"] > 0
