@@ -49,7 +49,8 @@ def account_from(j: dict[str, Any], vendor_id: str) -> RampAccount:
     if not isinstance(last4, str) or not FOUR_DIGITS.match(last4):
         raise RampError(f"Ramp's account {j.get('id')} has no four last digits, so a change to it can't be checked")
     return RampAccount(id=j["id"], vendor_id=vendor_id, routing_number="", last4=last4, account_type=None,
-                       bank_name=None, is_active=j.get("status") == "active", created_at=None)
+                       bank_name=None, is_active=j.get("status") == "active", created_at=None,
+                       pending=j.get("status") == "pending_approval")  # spec 0093, D1
 
 
 def bill_from(j: dict[str, Any]) -> RampBill:
@@ -122,7 +123,8 @@ class RampSandboxAdapter(RampHttpAdapter):
         return vendors
 
     async def list_vendor_accounts(self, vendor_id: str) -> list[RampAccount]:
-        return [account_from(a, vendor_id) for a in await self._all_pages(f"/vendors/{vendor_id}/accounts", {"page_size": PAGE})]
+        params = {"page_size": PAGE, "include_pending": "true"}  # spec 0093, D1: changes waiting for review too
+        return [account_from(a, vendor_id) for a in await self._all_pages(f"/vendors/{vendor_id}/accounts", params)]
 
     async def list_bills_for_vendor(self, vendor_id: str) -> list[RampBill]:
         bills = [bill_from(b) for b in await self._all_pages("/bills", {"vendor_id": vendor_id, "page_size": PAGE})]

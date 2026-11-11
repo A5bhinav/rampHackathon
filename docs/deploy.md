@@ -88,6 +88,7 @@ The `ramp-mock` URL uses Railway's reference variables (`${{service.VARIABLE}}`)
 | `RAMP_SANDBOX_CLIENT_ID`, `RAMP_SANDBOX_CLIENT_SECRET` | for sandbox datasets | The Ramp sandbox app's client credentials. Both or neither. Seal the secret (a service variable on the core, not a shared one) |
 | `RAMP_SANDBOX_BASE_URL` | no | Only `https://demo-api.ramp.com` (the default) is accepted, so these credentials never reach production Ramp |
 | `RAMP_SANDBOX_SCOPES` | no | Default `vendors:read vendors:write bills:read bills:write audit_logs:read`; a read-only app sets the three read scopes |
+| `DIALBACK_FULL_SWEEP_SECONDS` | for sandbox datasets | Set `60`. A bank change waiting for review in Ramp moves no timestamp and writes no event, so only the sweep finds it, and the case should open within a minute (spec 0093, D4). Default `86400` (once a day) |
 | `RAMP_WEBHOOK_SECRET` | yes | Verifies `X-Ramp-Signature`; at least 16 characters |
 | `FINGERPRINT_KEY`, `FINGERPRINT_KEY_VERSION` | yes | Keyed fingerprints of bank accounts; at least 32 characters |
 | `DIGITS_KEY`, `DIGITS_KEY_VERSION` | yes | Keyed hash of spoken digits; at least 32 characters |

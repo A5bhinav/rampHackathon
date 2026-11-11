@@ -272,7 +272,15 @@ async def test_accounts_are_mapped_without_inventing_a_routing_number(ramp):
         RampAccount(id="acct-cur", vendor_id=V, routing_number="", last4="4444", account_type=None, bank_name=None,
                     is_active=True, created_at=None)]
     [r] = ramp.api("/accounts")
-    assert r.url.path == f"/developer/v1/vendors/{V}/accounts" and query(r) == {"page_size": ["100"]}
+    assert r.url.path == f"/developer/v1/vendors/{V}/accounts"
+    assert query(r) == {"page_size": ["100"], "include_pending": ["true"]}  # spec 0093, D1
+
+
+async def test_pending_accounts_are_asked_for_and_marked_pending(ramp):
+    # Spec 0093, D1: a change entered in Ramp's dashboard waits for review as a pending account.
+    ramp.accounts[V].append(account("acct-p", "4321", "pending_approval") | {"proposal_id": "prop-1"})
+    accounts = {a.id: (a.is_active, a.pending) for a in await ramp.adapter.list_vendor_accounts(V)}
+    assert accounts == {"acct-old": (False, False), "acct-cur": (True, False), "acct-p": (False, True)}
 
 
 @pytest.mark.parametrize("last_four", [None, "123", "12345", "12a4"])
