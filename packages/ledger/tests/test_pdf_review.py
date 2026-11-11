@@ -20,28 +20,28 @@ OCG = b"<< /Type /OCG /Name (Layer) >>"
 
 UNREADABLE = {
     # A crop box larger than the media box: a viewer shows only the media box.
-    "number_outside_the_media_box": dict(content=f"BT /F1 10 Tf -70 700 Td [{N} -4440 (MMMMMMMMMMMMMMMMMMMM)] TJ ET",
-                                         page_extra=b"/CropBox [-100 0 612 792]"),
+    "number_outside_the_media_box": {"content": f"BT /F1 10 Tf -70 700 Td [{N} -4440 (MMMMMMMMMMMMMMMMMMMM)] TJ ET",
+                                         "page_extra": b"/CropBox [-100 0 612 792]"},
     # A cover or clip that leaves only a sliver of each digit.
-    "covered_but_for_a_sliver": dict(content=f"BT /F1 10 Tf {AT} {N} Tj ET 1 1 1 rg 70 700.4 70 12 re f"),
-    "clipped_to_a_sliver": dict(content=f"q 70 699.9 70 0.5 re W n BT /F1 10 Tf {AT} {N} Tj ET Q"),
+    "covered_but_for_a_sliver": {"content": f"BT /F1 10 Tf {AT} {N} Tj ET 1 1 1 rg 70 700.4 70 12 re f"},
+    "clipped_to_a_sliver": {"content": f"q 70 699.9 70 0.5 re W n BT /F1 10 Tf {AT} {N} Tj ET Q"},
     # The last digit covered and another printed just above it, on its own line.
-    "digit_swapped_by_an_overlay": dict(content=f"BT /F1 10 Tf {AT} {N} Tj ET 1 1 1 rg 122.04 700.3 5.56 9 re f "
-                                                "0 0 0 rg BT /F1 10 Tf 122.04 700.6 Td (7) Tj ET"),
+    "digit_swapped_by_an_overlay": {"content": f"BT /F1 10 Tf {AT} {N} Tj ET 1 1 1 rg 122.04 700.3 5.56 9 re f "
+                                                "0 0 0 rg BT /F1 10 Tf 122.04 700.6 Td (7) Tj ET"},
     # Lines of black letters drawn through the number.
-    "overstruck": dict(content=f"BT /F1 10 Tf {AT} {N} Tj ET BT /F1 10 Tf 72 699.3 Td (MMMMMMMMMMMMM) Tj ET "
-                               "BT /F1 10 Tf 72 700.7 Td (WWWWWWWWWWWWW) Tj ET"),
+    "overstruck": {"content": f"BT /F1 10 Tf {AT} {N} Tj ET BT /F1 10 Tf 72 699.3 Td (MMMMMMMMMMMMM) Tj ET "
+                               "BT /F1 10 Tf 72 700.7 Td (WWWWWWWWWWWWW) Tj ET"},
     # Ink, but no legible shape.
-    "squashed_by_tz": dict(content=f"BT /F1 10 Tf 15 Tz {AT} {N} Tj ET"),
-    "squashed_by_the_matrix": dict(content=f"BT /F1 10 Tf 0.15 0 0 1 72 700 Tm {N} Tj ET"),
-    "stacked_by_character_spacing": dict(content=f"BT /F1 10 Tf -4.8 Tc {AT} {N} Tj ET"),
-    "buried_in_a_wide_stroke": dict(content=f"5 w BT /F1 10 Tf 2 Tr {AT} {N} Tj ET"),
+    "squashed_by_tz": {"content": f"BT /F1 10 Tf 15 Tz {AT} {N} Tj ET"},
+    "squashed_by_the_matrix": {"content": f"BT /F1 10 Tf 0.15 0 0 1 72 700 Tm {N} Tj ET"},
+    "stacked_by_character_spacing": {"content": f"BT /F1 10 Tf -4.8 Tc {AT} {N} Tj ET"},
+    "buried_in_a_wide_stroke": {"content": f"5 w BT /F1 10 Tf 2 Tr {AT} {N} Tj ET"},
     # Mirrored or upside down: the x sort reads it forwards, a person doesn't.
-    "mirrored_by_negative_tz": dict(content="BT /F1 10 Tf -100 Tz 200 700 Td (2410555514) Tj ET"),
-    "upside_down_by_negative_size": dict(content="BT /F1 -10 Tf 200 700 Td (2410555514) Tj ET"),
-    "flipped_by_negative_size_and_tz": dict(content=f"BT /F1 -10 Tf -100 Tz {AT} {N} Tj ET"),
+    "mirrored_by_negative_tz": {"content": "BT /F1 10 Tf -100 Tz 200 700 Td (2410555514) Tj ET"},
+    "upside_down_by_negative_size": {"content": "BT /F1 -10 Tf 200 700 Td (2410555514) Tj ET"},
+    "flipped_by_negative_size_and_tz": {"content": f"BT /F1 -10 Tf -100 Tz {AT} {N} Tj ET"},
     # Text rise: two fragments far apart on the page, on one baseline in the text matrix.
-    "joined_across_the_page_by_text_rise": dict(content=f"BT /F1 10 Tf {AT} (415) Tj -300 Ts (5550142) Tj ET"),
+    "joined_across_the_page_by_text_rise": {"content": f"BT /F1 10 Tf {AT} (415) Tj -300 Ts (5550142) Tj ET"},
 }
 
 
