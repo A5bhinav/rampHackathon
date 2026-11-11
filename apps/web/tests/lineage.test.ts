@@ -94,12 +94,13 @@ test("lanePoints spreads dots that would cover each other, and draws the chosen 
   const pick = s.candidates[0];
   s.candidates[1] = { ...s.candidates[1], first_seen_at: pick.first_seen_at, source_types: ["contract", "email"] };
   const chart = lanePoints(s)!;
+  const pair = [pick.e164, s.candidates[1].e164];
   for (const lane of ["contract", "email"]) {
-    const here = chart.points.filter((p) => p.lane === lane);
+    const here = chart.points.filter((p) => p.lane === lane && pair.includes(p.e164));
     assert.deepEqual(here.map((p) => p.kind), ["alternate", "pick"], lane);   // drawn in this order: the pick on top
     assert.equal(here[0].pct, here[1].pct);
     assert.notEqual(here[0].lift, here[1].lift, `${lane}: the two dots sit at different heights`);
   }
-  const alone = chart.points.filter((p) => p.lane === "listing");
-  assert.deepEqual(alone.map((p) => p.lift), [0]);                             // a dot on its own stays centered
+  const alone = chart.points.filter((p) => p.lane === "listing" || p.e164 === "+14155550143");  // nothing near them
+  assert.deepEqual(alone.map((p) => p.lift), [0, 0]);                          // dots on their own stay centered
 });
