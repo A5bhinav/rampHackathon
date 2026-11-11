@@ -1,6 +1,6 @@
 -- 016: each dataset's Ramp, the mock or the sandbox, is fixed when it is made (spec 0096, D1).
--- A case can't switch Ramps mid-way, a demo stays on the mock (spec 0034), and the one Ramp
--- business the sandbox credentials reach is driven by one current dataset (R1).
+-- A case can't switch Ramps mid-way, and the one Ramp business the sandbox credentials reach is
+-- driven by one current dataset (R1). A demo may be on the sandbox (spec 0103).
 begin;
 \i supabase/tests/_helpers.sql
 
@@ -36,9 +36,12 @@ begin
   assert not exists (select 1 from app.datasets where ramp is null), 'no dataset is without a Ramp';
 
   -- While no sandbox dataset is current, so the one-sandbox rule can't be what refuses these:
-  -- a dataset's Ramp is fixed once made, and a demo dataset is never on the sandbox (spec 0034).
+  -- a dataset's Ramp is fixed once made.
   perform pg_temp.expect_error(format('update app.datasets set ramp = %L where id = %L', 'sandbox', d_mock), null, '%ramp%');
-  perform pg_temp.expect_error($q$select pg_temp.dataset('demo', '016 demo sandbox', 'sandbox')$q$, '23514');
+  -- A demo dataset may be on the sandbox (spec 0103).
+  d_next := pg_temp.dataset('demo', '016 demo sandbox', 'sandbox');
+  assert (select ramp from app.datasets where id = d_next) = 'sandbox', 'a demo dataset can be on the sandbox';
+  update app.datasets set retired_at = now() where id = d_next;
   -- Other columns still change: a dataset can be relabelled or retired.
   update app.datasets set label = '016 mock, relabelled' where id = d_mock;
 

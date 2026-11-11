@@ -35,9 +35,6 @@ from .settings import Settings
 async def _new_dataset(settings: Settings, kind: str, label: str, sim_now: str | None, ramp: str | None = None) -> None:
     """`ramp` defaults to what this server has: the mock, or with DIALBACK_RAMP=sandbox, the sandbox (spec 0096)."""
     ramp = ramp or ("sandbox" if settings.ramp_mode is RampMode.SANDBOX else "mock")
-    if kind == "demo" and ramp == "sandbox":
-        # Spec 0034: shared demo accounts may act on any demo dataset, so none may sit on Ramp's sandbox.
-        raise SystemExit("refused: a demo dataset can't be on Ramp's sandbox; demo datasets use the Ramp mock")
     if ramp == "sandbox" and settings.ramp_sandbox is None:
         raise SystemExit("refused: this server has no Ramp sandbox credentials (RAMP_SANDBOX_CLIENT_ID, RAMP_SANDBOX_CLIENT_SECRET)")
     if ramp == "mock" and settings.ramp_mode is not RampMode.MOCK:

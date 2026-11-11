@@ -23,9 +23,10 @@ import copy
 import datetime as dt
 import json
 import os
+import re
 import sys
 from importlib.resources import files
-from uuid import UUID
+from uuid import UUID, uuid5
 
 import phonenumbers as pn
 import psycopg
@@ -143,7 +144,26 @@ def check(phones: dict[str, str], requests: list[str]) -> dict[str, str]:
     return _phones(phones, seed)
 
 
-async def _dataset(conn: psycopg.AsyncConnection, dataset_id: UUID | None, seed: dict) -> tuple[UUID, dict[str, UUID]]:
+def _with_real_vendors(seed: dict, real: dict[str, tuple[str, str]], like: str | None = None) -> dict:
+    """Spec 0103: only the named vendors, each history retold under a real Ramp vendor's name: its own
+    seed history or, with `like`, that seed vendor's, under document ids of its own."""
+    vendors = {}
+    for ref, (_, name) in real.items():
+        source = like or ref
+        if source not in seed["vendors"]:
+            raise DemoError(f"--real-vendor {source}=…: the demo seed has no vendor {source!r} (it has {', '.join(seed['vendors'])})")
+        v = seed["vendors"][source]
+        safe, slug = json.dumps(name)[1:-1], re.sub(r"[^a-z0-9]", "", name.lower())
+        text = json.dumps(v).replace(v["name"], safe).replace(v["name"].split()[0], safe)
+        text = text.replace(v["domain"], f"{slug}.example").replace(source, slug)
+        for doc in [*v["documents"], v["request"]]:
+            text = text.replace(doc["id"], str(uuid5(UUID(doc["id"]), ref)))
+        vendors[ref] = json.loads(text)
+    return {**seed, "vendors": vendors}
+
+
+async def _dataset(conn: psycopg.AsyncConnection, dataset_id: UUID | None, seed: dict,
+                   real: dict[str, tuple[str, str]] | None = None) -> tuple[UUID, dict[str, UUID]]:
     if dataset_id is None:
         row = await (await conn.execute("select id, demo_refs from app.datasets where kind = 'demo' and retired_at is null "
                                         "order by created_at desc limit 1")).fetchone()
@@ -154,7 +174,7 @@ async def _dataset(conn: psycopg.AsyncConnection, dataset_id: UUID | None, seed:
                                         "and retired_at is null", (dataset_id,))).fetchone()
         if row is None:
             raise DemoError(f"{dataset_id} is not a current demo dataset")
-    refs = (row["demo_refs"] or {}).get("vendors") or {}
+    refs = {ref: ids[0] for ref, ids in real.items()} if real else (row["demo_refs"] or {}).get("vendors") or {}
     if not refs:
         raise DemoError("this demo dataset has no vendor refs: was it made by `dialback-core demo reset`?")
     vendors = {}
@@ -191,17 +211,19 @@ def _url(database_url: str | None) -> str:
 
 
 async def load(database_url: str | None = None, *, phones: dict[str, str], dataset_id: UUID | None = None,
-               with_requests: bool = False, now: dt.datetime | None = None, reader: Reader | None = None) -> dict:
+               with_requests: bool = False, now: dt.datetime | None = None, reader: Reader | None = None,
+               real: dict[str, tuple[str, str]] | None = None, like: str | None = None) -> dict:
     """Write each seeded vendor's history and domain (and, with `with_requests`, its request).
-    `reader` defaults to the one DIALBACK_READER names."""
+    `reader` defaults to the one DIALBACK_READER names. `real` maps a seed vendor to a real Ramp
+    vendor's (id, name), for a demo on Ramp's sandbox (spec 0103)."""
     reader = _reader(reader)
-    seed = load_seed()
+    seed = _with_real_vendors(load_seed(), real, like) if real else load_seed()
     swaps = _phones(phones, seed)
     now = now or dt.datetime.now(dt.UTC)
     delta = now - _when(seed["anchor"])
     summary = {}
     async with await psycopg.AsyncConnection.connect(_url(database_url), row_factory=dict_row) as conn, conn.transaction():
-        ds, vendors = await _dataset(conn, dataset_id, seed)
+        ds, vendors = await _dataset(conn, dataset_id, seed, real)
         for ref, vendor_id in vendors.items():
             v = seed["vendors"][ref]
             swap = (v["phones"]["ar"], swaps[ref]) if ref in swaps else None
@@ -239,6 +261,13 @@ def _pair(text: str) -> tuple[str, str]:
     return ref.strip(), phone.strip()
 
 
+def _real_vendor(text: str) -> tuple[str, tuple[str, str]]:
+    ref, vendor_id, name = (part.strip() for part in (text.split("=", 2) + ["", ""])[:3])
+    if not (ref and vendor_id and name):
+        raise argparse.ArgumentTypeError("expected REF=RAMP_VENDOR_ID=NAME")
+    return ref, (vendor_id, name)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="dialback-ledger", description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -247,13 +276,17 @@ def main(argv: list[str] | None = None) -> int:
     ld.add_argument("--dataset", type=UUID)
     ld.add_argument("--phone", type=_pair, action="append", default=[], metavar="REF=+1...")
     ld.add_argument("--with-requests", action="store_true", help="also load every change request (rehearsals)")
+    ld.add_argument("--real-vendor", type=_real_vendor, action="append", default=[], metavar="REF=RAMP_VENDOR_ID=NAME",
+                    help="a demo on Ramp's sandbox: tell this seed vendor's history under a real vendor's name (spec 0103)")
+    ld.add_argument("--like", metavar="REF", help="with --real-vendor: every real vendor retells this seed vendor's history")
     rq = demo.add_parser("request", help="the change-request email for one vendor (beat 2)")
     rq.add_argument("--vendor", required=True)
     rq.add_argument("--dataset", type=UUID)
     args = parser.parse_args(argv)
     try:
         if args.action == "load":
-            out = asyncio.run(load(phones=dict(args.phone), dataset_id=args.dataset, with_requests=args.with_requests))
+            out = asyncio.run(load(phones=dict(args.phone), dataset_id=args.dataset, with_requests=args.with_requests,
+                                   real=dict(args.real_vendor) or None, like=args.like))
             print(f"loaded the demo ledger into {out['dataset_id']}")
             for ref, s in out["vendors"].items():
                 print(f"  {ref:<11} {s['observations']:>3} new sightings, AR line: {s['phone']}"
