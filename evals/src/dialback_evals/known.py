@@ -1,6 +1,6 @@
 """The strict known-failures list each lab job reads (spec 0048, D3; Q101, decided by Sami on Nov 9).
 
-`evals/known-failures.json` maps each job (lab-smoke, lab-fuzz, lab-reports) to its entries. An entry is a
+`evals/known-failures.json` maps each job (lab-smoke, lab-fuzz, lab-reports, lab-pdf) to its entries. An entry is a
 frozen case or scenario, the labels it fails with, its finding (an item in evals/FINDINGS.md) and the owner
 of the fix. The jobs run on other owners' pull requests, so the list keeps them from being red by design
 without hiding anything new:
@@ -27,7 +27,7 @@ import re
 from collections.abc import Iterable, Mapping
 from pathlib import Path
 
-JOBS = ("lab-smoke", "lab-fuzz", "lab-reports", "lab-docs")
+JOBS = ("lab-smoke", "lab-fuzz", "lab-reports", "lab-docs", "lab-pdf")   # lab-pdf: evals/tests/test_pdf_tricks.py (spec 0092)
 PATTERN_JOBS = frozenset({"lab-docs"})                  # entries keyed by pattern (spec 0052, decision 6)
 PATTERN_FIELDS = ("check", "phrasing", "placement")
 _HEADING = re.compile(r"(?m)^### ([A-Z][0-9]+)\.")

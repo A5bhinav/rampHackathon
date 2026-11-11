@@ -1214,6 +1214,25 @@ are reproduced here.
     another party's.
   - No held-out hash file exists yet, so a held-out run refuses until the set is frozen.
 
+## H. Real PDFs and scans (spec 0092)
+
+### H1. The glyphs say one thing, the text layer another
+
+**Confirmed (ran).** `evals/tests/test_pdf_tricks.py::test_glyph_swap`, on the strict known-failures list as
+`lab-pdf` / `glyph-swap` (spec 0048, D3).
+
+A font whose outlines disagree with its character map shows one digit and extracts another. The plant is
+Bitstream Vera with the outlines of 3 and 8 swapped (renamed, as Vera's license requires). A line whose text layer
+says `(415) 555-0138` shows `(415) 555-0183` on the page. There is ink, so the ink rule passes it, and Part A reads
+the text layer, so it records `+14155550138` as visible: a number no person saw.
+
+An image drawn over text is not this case: the ink rule catches it, because removing the covered text changes
+nothing on the page.
+
+**What closes it:** spec 0092, Part B's pixel check (D14), which reads each visible phone candidate from the rendered
+page with local OCR and marks it `unverified` when the digits differ. The test then turns red, and this comes off the
+list. Until then, a digital PDF's digits are only as honest as its font.
+
 ## E. Process and housekeeping
 
 - `.superpowers/` (the plan ledger and logs) is not git-ignored. Stage files by name.
