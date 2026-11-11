@@ -15,7 +15,20 @@ import uuid
 
 import psycopg
 import pytest
-from _world import REQUEST, T0, at, calls, corpus_world, flags, frozen, in_thread, provable, run, source_doc, world
+from _world import (
+    REQUEST,
+    T0,
+    at,
+    calls,
+    corpus_world,
+    flags,
+    frozen,
+    in_thread,
+    provable,
+    run,
+    source_doc,
+    world,
+)
 from dialback_ledger import select_number
 from dialback_ledger.ingest import ingest_all
 from dialback_ledger.reader import StubReader
