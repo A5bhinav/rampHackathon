@@ -6,6 +6,7 @@ email's content; errors name the status code, never a response body.
 """
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 from dataclasses import dataclass, field
@@ -16,6 +17,9 @@ from urllib.parse import quote
 import httpx
 
 API = "https://api.resend.com"
+# A wall-clock cap on one call to Resend, set by its callers with asyncio.timeout (inbox.py, reply.py):
+# httpx's 10 s timeout applies per operation, so a server that trickles bytes could hold a call longer.
+CALL_TIMEOUT_S = 15.0
 BLOCK_TAGS = frozenset({"p", "div", "br", "tr", "li", "ul", "ol", "table", "h1", "h2", "h3", "h4", "h5", "h6",
                         "blockquote", "pre", "hr", "section", "article", "header", "footer"})
 SKIPPED_TAGS = frozenset({"script", "style", "title"})
@@ -128,7 +132,8 @@ class ResendClient:
         headers = {str(k).lower(): v if isinstance(v, str) else ", ".join(_strings(v))
                    for k, v in (body.get("headers") or {}).items()}
         auth = body.get("authentication")
-        html_text = html_to_text(body.get("html") or "")
+        html = body.get("html") or ""
+        html_text = await asyncio.to_thread(html_to_text, html) if html else ""   # pure work, off the shared event loop
         text = body.get("text") or html_text
         return ReceivedEmail(
             email_id=email_id, message_id=str(body.get("message_id") or headers.get("message-id") or ""),

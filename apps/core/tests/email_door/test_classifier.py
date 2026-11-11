@@ -417,6 +417,22 @@ def test_what_the_real_sdk_raises_maps_to_a_typed_error(respond, reason, caplog)
     assert EMAIL_TEXT not in caplog.text and "Evergreen" not in caplog.text
 
 
+def test_the_client_tries_once_because_the_inbox_retries_spaced(caplog):
+    """Final review I1: the SDK's default 2 retries made one email cost up to about 90 s inside the email
+    step. The inbox already retries a failed email after 30 s, 2 min, 10 min and 30 min."""
+    asked = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        asked.append(request)
+        return httpx2.Response(503, json={"type": "error", "error": {"type": "overloaded_error", "message": "busy"}})
+
+    classifier = sdk_classifier(handler)
+    assert classifier.client.max_retries == 0
+    with pytest.raises(ClassifierFailed) as err:
+        classifier.classify("Bank update", "Please pay our new bank.")
+    assert err.value.reason == "api_error" and len(asked) == 1
+
+
 # The flag and its credentials -----------------------------------------------------------------------------
 
 ENV = {"DATABASE_URL": "postgresql://x", "RAMP_BASE_URL": "http://ramp", "RAMP_WEBHOOK_SECRET": "w" * 16,

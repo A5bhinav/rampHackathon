@@ -1,7 +1,8 @@
 """The core worker: runs every queued command exactly once and fires due timers (ADR-3).
 
-One tick: process stored webhooks, run due scheduled jobs (spec 0003), fire due timers, run
-due commands. Each command is
+One tick: process stored Ramp webhooks, run due scheduled jobs (spec 0003), fire due timers, run
+due commands, then process stored emails (spec 0085, last and time-bounded). An error in either
+inbound step ends that step only. Each command is
 claimed in its own short transaction (FOR UPDATE SKIP LOCKED, with a lease so a crashed
 worker's command is picked up again), run with Ramp and voice calls outside any
 transaction, then finished in a second transaction:
@@ -19,6 +20,7 @@ from __future__ import annotations
 import asyncio
 import datetime as dt
 import logging
+from collections.abc import Awaitable
 from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
@@ -143,15 +145,28 @@ class Worker:
     # The loop ---------------------------------------------------------------------------------
 
     async def tick(self, dataset_id: UUID | None = None) -> int:
-        done = await process_inbound_webhooks(self.pool, self.connector, self.keys, dataset_id=dataset_id)
-        if self.resend is not None:  # the email door (spec 0085)
-            done += await process_inbound_emails(self.pool, self.settings, self.resend, self.keys, dataset_id=dataset_id,
-                                                 classifier=self.classifier)
+        done = await self._contained("Ramp webhook", process_inbound_webhooks(self.pool, self.connector, self.keys,
+                                                                              dataset_id=dataset_id))
         if self.settings.run_jobs:
             done += await self.jobs.run_due(dataset_id)  # the poller and reconciliation (spec 0003)
         done += await self.fire_timers(dataset_id)
         done += await self.run_commands(dataset_id)
+        # The email door last (spec 0085; final review finding I1): its fetches and model calls are slow and
+        # can fail, so it runs after the holds, calls and releases, within its own time budget.
+        if self.resend is not None:
+            done += await self._contained("email", process_inbound_emails(self.pool, self.settings, self.resend, self.keys,
+                                                                          dataset_id=dataset_id, classifier=self.classifier))
         return done
+
+    @staticmethod
+    async def _contained(step: str, work: Awaitable[int]) -> int:
+        """Run one inbound step; an error ends that step only, never the tick, so the commands still run (R1).
+        Only the error's type name is logged: its message can hold a webhook's or an email's values (ADR-8)."""
+        try:
+            return await work
+        except Exception as exc:  # noqa: BLE001  contained; the step runs again next tick
+            log.warning("worker: the %s step failed: %s", step, type(exc).__name__)
+            return 0
 
     async def drain(self, dataset_id: UUID | None = None, max_ticks: int = 50) -> int:
         """Tick until nothing is due. For tests, the smoke run and the lab."""

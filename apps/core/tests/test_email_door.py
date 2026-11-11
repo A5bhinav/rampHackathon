@@ -7,6 +7,7 @@ live email is the request. The door is on for Cobalt only, and the real ledger r
 """
 from __future__ import annotations
 
+import asyncio
 import dataclasses
 import datetime as dt
 import json
@@ -17,6 +18,7 @@ from pathlib import Path
 import psycopg
 import pytest
 from conftest import core_settings, make_world
+from dialback_core import worker as worker_module
 from dialback_core.db import system_tx
 from dialback_core.demo import DemoEnv, change, load_seed, prepare
 from dialback_core.email_door import door
@@ -804,6 +806,62 @@ async def test_a_retired_demo_does_nothing(door_world):
     row = await one(w.pool, "select * from app.inbound_emails where dataset_id = %s and resend_email_id = %s", w.demo_id, email_id)
     assert (row["outcome"], row["flagged"]) == ("door_off", False)
     await assert_no_case(w)
+
+
+# The email step cannot hold back holds and calls (final review finding I1) -------------------------
+
+async def test_the_email_step_runs_after_the_commands_and_its_failure_is_contained(door_world, monkeypatch, caplog):
+    """A clerk's Ramp change is waiting and the email step fails. The tick still places the hold (the
+    commands run before the email step) and does not raise; the log keeps the error's type name only."""
+    caplog.set_level(logging.DEBUG)
+    w = door_world
+    seen = {}
+
+    async def broken(pool, *args, **kwargs):
+        async with system_tx(pool) as conn:
+            seen["holds"] = [r["status"] for r in await (await conn.execute(
+                "select status from app.outbox where dataset_id = %s and command = 'place_hold'", (w.demo_id,))).fetchall()]
+        raise RuntimeError(f"boom {ACCOUNT}")
+    monkeypatch.setattr(worker_module, "process_inbound_emails", broken)
+    await change(w.env, load_seed(SEED), "cobalt")
+    await w.worker.tick(w.demo_id)   # does not raise
+    assert seen["holds"] == ["done"], "the hold was placed before the email step ran"
+    assert (await ramp_hold(w)) is not None
+    assert "RuntimeError" in caplog.text and "boom" not in caplog.text
+    await assert_nowhere(w.pool, caplog, ACCOUNT)
+
+
+async def test_a_failing_ramp_webhook_step_does_not_stop_the_email_step(door_world, monkeypatch, caplog):
+    caplog.set_level(logging.DEBUG)
+    w = door_world
+
+    async def broken(*args, **kwargs):
+        raise RuntimeError(f"webhooks down {ACCOUNT}")
+    monkeypatch.setattr(worker_module, "process_inbound_webhooks", broken)
+    row = await arrive(w)   # the worker drains with the Ramp webhook step failing every tick
+    assert row["outcome"] == "case_opened"
+    assert (await ramp_hold(w)) is not None, "the email's case was held: the commands ran too"
+    assert "RuntimeError" in caplog.text and "webhooks down" not in caplog.text
+
+
+async def test_the_heavy_reads_run_off_the_event_loop(door_world, monkeypatch):
+    """Final review M6: the account scans (up to 1,000,000 characters per part), the bank details and the
+    ledger's text are pure work; on the event loop the API shares they stalled it (about 0.4 s for a large
+    email). This checks where they run (a structural check), not a timing."""
+    w = door_world
+    ran, real = [], asyncio.to_thread
+
+    async def recording(fn, *args, **kwargs):
+        ran.append(getattr(fn, "__name__", repr(fn)))
+        return await real(fn, *args, **kwargs)
+    monkeypatch.setattr(asyncio, "to_thread", recording)
+    row = await arrive(w)
+    assert row["outcome"] == "case_opened"
+    assert {"_accounts_to_mask", "flag_email", "_bank_details", "_ledger_lines"} <= set(ran), ran
+
+
+async def ramp_hold(w):
+    return (await w.connector.for_dataset(w.demo_id).get_vendor(w.demo_refs["cobalt"])).hold_id
 
 
 # The reply (spec 0088, Task 10) ------------------------------------------------------------------

@@ -1,6 +1,8 @@
 """The worker fetches each stored email from Resend and records it without its body (spec 0085, Task 4)."""
 from __future__ import annotations
 
+import asyncio
+import dataclasses
 import json
 import logging
 import uuid
@@ -8,7 +10,7 @@ import uuid
 import httpx
 import pytest
 from dialback_core.db import system_tx
-from dialback_core.email_door import inbox
+from dialback_core.email_door import inbox, reply
 from dialback_core.email_door.door import handle_email
 from dialback_core.email_door.masking import mask_digit_runs
 from dialback_core.email_door.resend import ResendClient, ResendError, html_to_text
@@ -340,6 +342,88 @@ async def test_retries_are_spaced_and_not_made_early(demo):
         await conn.execute("update app.inbound_emails set next_try_at = now() - interval '1 second' where dataset_id = %s", (demo.dataset.id,))
     await demo.worker.tick(demo.dataset.id)
     assert demo.worker.resend.fetched == [email_id, email_id] and 100 < await wait_seconds() <= 120
+
+
+class SlowResend(FakeResend):
+    """TEST DOUBLE: each fetch takes `seconds` on a fake clock."""
+
+    def __init__(self, emails, clock: list[float], seconds: float) -> None:
+        super().__init__(emails)
+        self.clock, self.seconds = clock, seconds
+
+    async def get_received(self, email_id):
+        self.clock[0] += self.seconds
+        return await super().get_received(email_id)
+
+
+async def test_the_email_step_stops_claiming_once_its_time_budget_is_spent(demo):
+    """Final review I1: the per-tick bound was a count (20) only, so slow emails could hold the worker for
+    minutes. Each fetch here takes 3 s on a fake clock and the budget is 5 s: the first claim always goes
+    ahead, a second starts at 3 s, and none starts at 6 s."""
+    ids = [await deliver(demo) for _ in range(5)]
+    clock = [100.0]
+    resend = SlowResend({i: received(i) for i in ids}, clock, 3.0)
+    handled = await inbox.process_inbound_emails(demo.pool, demo.worker.settings, resend, demo.worker.keys,
+                                                 dataset_id=demo.dataset.id, budget_s=5.0, clock=lambda: clock[0])
+    assert handled == 2 and resend.fetched == ids[:2]
+    assert [r["outcome"] for r in await rows(demo)] == ["door_off", "door_off"]
+    assert (inbox.TICK_BUDGET_S, inbox.FETCH_TIMEOUT_S, reply.SEND_TIMEOUT_S) == (5.0, 15.0, 15.0), "the values spec 0085 states"
+
+
+class HangingResend(FakeResend):
+    """TEST DOUBLE: a fetch or a send that never answers (a server that trickles bytes defeats httpx's
+    per-operation timeout the same way)."""
+
+    def __init__(self, emails=None, hang_fetch: bool = True) -> None:
+        super().__init__(emails)
+        self.hang_fetch = hang_fetch
+
+    async def get_received(self, email_id):
+        if self.hang_fetch:
+            self.fetched.append(email_id)
+            await asyncio.Event().wait()
+        return await super().get_received(email_id)
+
+    async def send(self, **kwargs) -> str:
+        await asyncio.Event().wait()
+        return ""
+
+
+async def test_a_fetch_that_never_answers_is_cut_off_and_retried(demo, monkeypatch):
+    monkeypatch.setattr(inbox, "FETCH_TIMEOUT_S", 0.05, raising=False)
+    email_id = await deliver(demo)
+    demo.worker.resend = HangingResend()
+    await asyncio.wait_for(demo.worker.tick(demo.dataset.id), 10)   # the guard: without the cut-off this hangs
+    (row,) = await rows(demo)
+    assert (row["resend_email_id"], row["outcome"], row["tries"], row["error"]) == (email_id, "pending", 1, "TimeoutError")
+    assert row["next_try_at"] is not None and (await delivery(demo))["processed_at"] is None
+
+
+async def test_a_reply_send_that_never_answers_is_cut_off(demo, monkeypatch):
+    """The reply is sent inside the email step too, so a hung send must not hold the worker either."""
+    monkeypatch.setattr(reply, "SEND_TIMEOUT_S", 0.05, raising=False)
+    email_id = await deliver(demo)
+    async with system_tx(demo.pool) as conn:   # a flagged email whose outcome is final, with replies switched on
+        await conn.execute(
+            "insert into app.inbound_emails (dataset_id, resend_email_id, sender, received_at, has_attachments, outcome, flagged) "
+            "values (%s, %s, 'Dana <ar@vendor.example>', now(), false, 'no_vendor', true)", (demo.dataset.id, email_id))
+    settings = dataclasses.replace(demo.worker.settings, reply_from="Dialback <bank-changes@dialback.example>",
+                                   bank_changes_url="https://dialback.example/bank-changes", inbox_address="inbox@dialback.example")
+    await asyncio.wait_for(reply.send_reply(demo.pool, settings, HangingResend(hang_fetch=False), demo.dataset.id, received(email_id)), 10)
+    assert (await rows(demo))[0]["reply"] == "failed"
+
+
+async def test_html_becomes_text_off_the_event_loop(monkeypatch):
+    """Final review M6: html_to_text over a large HTML part is pure work; it runs in a thread (a structural check)."""
+    ran, real = [], asyncio.to_thread
+
+    async def recording(fn, *args, **kwargs):
+        ran.append(fn.__name__)
+        return await real(fn, *args, **kwargs)
+    monkeypatch.setattr(asyncio, "to_thread", recording)
+    client = ResendClient("re_test", mock_client(lambda r: httpx.Response(200, json=resend_json(html="<p>Hi</p>"))))
+    email = await client.get_received("em_html")
+    assert (email.html_text, email.text, ran) == ("Hi", "Hi", ["html_to_text"])
 
 
 async def test_handle_email_acts_once_per_email(demo):

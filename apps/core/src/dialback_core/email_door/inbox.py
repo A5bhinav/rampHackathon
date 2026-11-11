@@ -9,10 +9,19 @@ a non-retryable Resend error fails it at once; a failure before the row exists m
 failed without a row. A failure only ever changes a row that is still `pending`. What is kept of an
 error is a fixed text (for a Resend error) or the exception's type name, never its message, because
 a message can hold an email's values (ADR-8). The email's body is held in memory only.
+
+The worker runs this step last in its tick (worker.py), so it cannot hold back holds, calls and releases
+(final review finding I1). It stops claiming once TICK_BUDGET_S has passed (the first claim always goes
+ahead), and a fetch is cut off after FETCH_TIMEOUT_S, a timeout counting a try like any other error. One
+email can still take a fetch, the model (one attempt, 30 s at most; classifier.py) and the reply's send
+(also cut off; reply.py) after the budget is spent: about 5 + 15 + 30 + 15 s in the worst case.
 """
 from __future__ import annotations
 
+import asyncio
 import json
+import time
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
@@ -23,13 +32,15 @@ from ..detection import Keys
 from ..settings import Settings
 from .door import handle_email, scrub_claimed_notice
 from .masking import mask_digit_runs, strip_nul
-from .resend import ResendError, ResendPort
+from .resend import CALL_TIMEOUT_S, ResendError, ResendPort
 
 if TYPE_CHECKING:
     from .classifier import ChangeClassifier
 
 # Seconds to wait after failed try 1, 2, 3, 4. The fifth failure records outcome `failed`.
 RETRY_SECONDS = (30, 120, 600, 1800)
+TICK_BUDGET_S = 5.0                # no new claim once this much of the tick's email step has passed
+FETCH_TIMEOUT_S = CALL_TIMEOUT_S   # one fetch from Resend, wall clock
 
 
 def _clean(value: Any) -> str:
@@ -82,14 +93,18 @@ async def _waiting(pool: AsyncConnectionPool, dataset_id: UUID, email_id: str) -
 
 
 async def process_inbound_emails(pool: AsyncConnectionPool, settings: Settings, resend: ResendPort, keys: Keys, limit: int = 20,
-                                 dataset_id: UUID | None = None, classifier: ChangeClassifier | None = None) -> int:
+                                 dataset_id: UUID | None = None, classifier: ChangeClassifier | None = None,
+                                 budget_s: float | None = None, clock: Callable[[], float] = time.monotonic) -> int:
     """Fetch and record the stored Resend deliveries (all datasets, or one). Returns how many were finished.
 
     Any error on one email counts a try for that email only; it never stops the others or the rest of the tick.
-    `classifier` is the email door's model (DIALBACK_EMAIL_CLASSIFIER=model), else None.
+    `classifier` is the email door's model (DIALBACK_EMAIL_CLASSIFIER=model), else None. At most `limit`
+    deliveries are claimed, and none after `budget_s` seconds (TICK_BUDGET_S by default) on `clock`.
     """
-    handled, claimed, seen = 0, 0, set()
-    while claimed < limit:  # every claimed row counts, so a tick's work is bounded whatever the fetches do
+    budget = TICK_BUDGET_S if budget_s is None else budget_s
+    handled, claimed, seen, started = 0, 0, set(), clock()
+    # Every claimed row counts, so a tick's work is bounded in count and in time whatever the fetches do.
+    while claimed < limit and (claimed == 0 or clock() - started < budget):
         async with system_tx(pool) as conn:
             # No casts in the claim: whatever the stored text holds, it must never make the claim itself fail.
             # `for no key update`: the inbound_emails row's foreign key to a delivery takes a key-share lock,
@@ -128,7 +143,8 @@ async def process_inbound_emails(pool: AsyncConnectionPool, settings: Settings, 
                     error = "duplicate: this email was already recorded"
                 elif state is not None:
                     try:
-                        email = await resend.get_received(email_id)
+                        async with asyncio.timeout(FETCH_TIMEOUT_S):   # a TimeoutError counts a try
+                            email = await resend.get_received(email_id)
                         await handle_email(pool, settings, keys, resend, row["dataset_id"], row["id"], email, classifier)
                     except Exception as exc:  # noqa: BLE001  one email's failure must not stop the worker
                         # Only our own ResendError text is kept; any other error is kept as its type name, because

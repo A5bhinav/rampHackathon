@@ -15,6 +15,7 @@ suppressed. Authenticated means Resend saw DMARC or DKIM pass on its own mail se
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 from dataclasses import dataclass
@@ -24,7 +25,7 @@ from uuid import UUID
 
 from ..db import dataset_now, system_tx
 from .masking import mask_digit_runs, strip_nul
-from .resend import ReceivedEmail, ResendPort
+from .resend import CALL_TIMEOUT_S, ReceivedEmail, ResendPort
 
 if TYPE_CHECKING:
     from psycopg_pool import AsyncConnectionPool
@@ -38,6 +39,7 @@ REPLY_TEXT = ("We never change payment details because of an email. Every change
               "account contact at {company} using details you already have for them. We will never ask you to confirm "
               "by replying to an email or calling a number someone sent you.\n\n{url}")
 SUBJECT = "Re: your message about payment details"
+SEND_TIMEOUT_S = CALL_TIMEOUT_S   # one send, wall clock: a timeout is recorded as a failed reply
 MAX_MESSAGE_ID = 250
 MESSAGE_ID = re.compile(r"<[\x21-\x7e]+>")   # printable ASCII, no spaces
 PER_SENDER_PER_DAY = 1
@@ -139,8 +141,9 @@ async def send_reply(pool: AsyncConnectionPool, settings: Settings, resend: Rese
         message_id = strip_nul(email.message_id)
         in_reply_to = message_id if len(message_id) <= MAX_MESSAGE_ID and MESSAGE_ID.fullmatch(message_id) else None
         try:
-            await resend.send(sender=settings.reply_from or "", to=address or "", subject=subject, text=text,
-                              in_reply_to=in_reply_to, idempotency_key=f"reply-{email.email_id}")
+            async with asyncio.timeout(SEND_TIMEOUT_S):   # it runs in the worker's email step (inbox.py)
+                await resend.send(sender=settings.reply_from or "", to=address or "", subject=subject, text=text,
+                                  in_reply_to=in_reply_to, idempotency_key=f"reply-{email.email_id}")
         except Exception as exc:  # noqa: BLE001  the text can hold the address; keep only the type name
             log.warning("email door: the reply to inbound email %s failed: %s", email.email_id, type(exc).__name__)
             async with system_tx(pool) as conn:

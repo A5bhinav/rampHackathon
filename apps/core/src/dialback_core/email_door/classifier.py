@@ -28,7 +28,8 @@ MODEL = "claude-haiku-5-5"   # pinned here and nowhere else (the production defa
 API_BASE_URL = "https://api.anthropic.com"   # pinned: no host setting can send email text elsewhere
 EFFORT = "medium"            # set explicitly; no `thinking` setting: thinking tokens count against max_tokens
 MAX_TOKENS = 8192            # thinking tokens count against it
-TIMEOUT_S = 30.0             # per attempt; the SDK's default retries apply
+TIMEOUT_S = 30.0             # the one attempt
+MAX_RETRIES = 0              # the inbox retries a failed email, spaced (inbox.RETRY_SECONDS); SDK retries held the worker
 FALLBACK_BETA = "server-side-fallback-2026-07-01"
 FALLBACKS = "default"        # a refused request is re-run server-side on the model Anthropic picks for its category
 NO_FALLBACK_MODELS = frozenset({"claude-haiku-5-5"})   # no server-side refusal fallback: use the plain endpoint
@@ -89,8 +90,10 @@ def quiet_sdk_logs() -> None:
 
 def anthropic_client(api_key: str, http_client: httpx2.Client | None = None) -> anthropic.Anthropic:
     """The SDK client: the given key, the pinned API base URL (not ANTHROPIC_BASE_URL), a 30-second
-    timeout and the SDK's default retries."""
-    return anthropic.Anthropic(api_key=api_key, base_url=API_BASE_URL, timeout=TIMEOUT_S, http_client=http_client)
+    timeout and no SDK retries. With the SDK's default 2 retries one email could hold the worker's email
+    step for about 90 s (final review finding I1); a failure is retried by the inbox instead."""
+    return anthropic.Anthropic(api_key=api_key, base_url=API_BASE_URL, timeout=TIMEOUT_S, max_retries=MAX_RETRIES,
+                               http_client=http_client)
 
 
 Reason = Literal["timeout", "api_error", "refusal", "max_tokens", "schema"]

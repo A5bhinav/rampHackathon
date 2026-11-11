@@ -162,6 +162,22 @@ def _bank_details(parts: tuple[str, ...], on_file_routing: str | None) -> _Detai
     return _Details(routings, [(routing_for(a), a) for a in accounts])
 
 
+def _accounts_to_mask(text: str, html: str, subject: str) -> list[str]:
+    """Every account in the text part, the HTML part and the subject, each read up to MASK_REACH characters,
+    once each. They reveal a planted header and mask the ledger's copy. Full numbers: memory only (ADR-8)."""
+    return list(dict.fromkeys(find_accounts(text, limit=MASK_REACH) + find_accounts(html, limit=MASK_REACH)
+                              + find_accounts(subject, limit=MASK_REACH)))
+
+
+def _ledger_lines(text: str, html: str, secrets: list[str]) -> str:
+    """The ledger's copy: ledger_text of the text part, and of the HTML part only when it says something the
+    text part doesn't (compared with whitespace collapsed), every account in `secrets` masked."""
+    lines = ledger_text(text, also_mask=secrets)
+    if " ".join(html.split()) != " ".join(text.split()):
+        lines += "\n" + ledger_text(html, also_mask=secrets)
+    return lines
+
+
 def _digits(value: str | None) -> str:
     return "".join(str(unicodedata.decimal(c)) for c in strip_nul(value or "") if c.isdecimal())
 
@@ -381,8 +397,7 @@ async def _act(pool: AsyncConnectionPool, settings: Settings, keys: Keys, datase
     # planted where the door keeps headers as they are fails the email, and those headers are scrubbed. The
     # accounts are read from each part and the subject up to MASK_REACH characters; they also mask the
     # ledger's copy below.
-    secrets = list(dict.fromkeys(find_accounts(text, limit=MASK_REACH) + find_accounts(html, limit=MASK_REACH)
-                                 + find_accounts(subject, limit=MASK_REACH)))
+    secrets = await asyncio.to_thread(_accounts_to_mask, text, html, subject)   # pure work, off the shared event loop
     if _planted(secrets, [state["message_id"], email.message_id, email.headers.get("message-id"), thread_id_of(email),
                           sender_domain(email.sender)]):
         log.warning("email door: inbound email %s has an account number in its headers; failed and scrubbed", email.email_id)
@@ -402,7 +417,7 @@ async def _act(pool: AsyncConnectionPool, settings: Settings, keys: Keys, datase
             "select id, routing_number, account_last4 from app.bank_accounts where vendor_id = %s and is_current "
             "order by first_seen_at desc, created_at desc limit 1", (match.vendor_id,))).fetchone()
     on_file = (current["routing_number"], current["account_last4"]) if current else None
-    details = _bank_details((text, html), on_file and on_file[0])
+    details = await asyncio.to_thread(_bank_details, (text, html), on_file and on_file[0])
     routings, pairs = details.routings, details.pairs
     flagged_by = decision.by if decision.flagged else None
     if (flagged_by is None and match.vendor_id in door and routings and pairs
@@ -417,9 +432,7 @@ async def _act(pool: AsyncConnectionPool, settings: Settings, keys: Keys, datase
     requested = max(((r, a) for r, a in pairs if (r, a.digits[-4:]) != on_file), key=lambda p: len(p[1].digits), default=None)
     shown = requested or (pairs[0] if pairs else None)
     routing = shown[0] if shown else (routings[0].digits if routings else None)
-    lines = ledger_text(text, also_mask=secrets)
-    if " ".join(html.split()) != " ".join(text.split()):
-        lines += "\n" + ledger_text(html, also_mask=secrets)
+    lines = await asyncio.to_thread(_ledger_lines, text, html, secrets)
     document = ledger_document(email, lines, mask_digit_runs(subject), state["received_at"], thread_id_of(email))
     red_flags = [*match.red_flags, *_header_flags(email)]
     if match.vendor_id is not None:
