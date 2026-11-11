@@ -26,8 +26,8 @@ export function TourPanel() {
   if (!step) return null;
   const action = tourAction(step);
   return (
-    <aside className="tour" aria-label="Guided demo">
-      <p className="tour-count"><span>Guided demo</span><span>{step.n} of {TOUR.length}</span></p>
+    <aside className="tour" aria-label={`Step ${step.n} of ${TOUR.length}`}>
+      <p className="tour-count">Step {step.n} of {TOUR.length}</p>
       <ol className="tour-bar" aria-hidden="true">
         {TOUR.map((t) => <li key={t.n} className={t.n <= step.n ? "is-on" : ""} />)}
       </ol>
