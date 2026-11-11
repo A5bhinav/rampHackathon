@@ -1,0 +1,8 @@
+{
+  "subject": "Updated ACH info",
+  "sender": "Linda Chu <lchu@brightpath-consulting.example>",
+  "text": "Hi AP,\n\nPlease see below, new ACH info for Brightpath Consulting.\n\nRouting Number\n021000021\nAccount Number\n9983\n1120\n4477\n\nLet me know if you need a W-9 as well.",
+  "label": "change_request",
+  "vendor": null,
+  "note": "HTML-to-text with odd line breaks, digits split over lines; valid routing."
+}

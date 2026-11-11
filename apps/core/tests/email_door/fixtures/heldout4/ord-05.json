@@ -1,0 +1,8 @@
+{
+  "subject": "FW: Bank details update - looks off??",
+  "sender": "Renee Okafor <rokafor@tallismfg.com>",
+  "text": "Security team, this came in overnight. Sender domain is one letter off from the real Acme address. I haven't responded or touched the vendor record. Can you look at it and block the domain?\n\nRenee\n\n-----Original Message-----\nFrom: Dana Whitfield <dwhitfield@acmefastners.com>\nSent: Monday, November 9, 2026 11:47 PM\nTo: AP\nSubject: Bank details update\n\nPlease send all future payments to our new account, routing 084000026, account 41200933871. Urgent.",
+  "label": "ordinary",
+  "vendor": "acme",
+  "note": "Suspected fraud forwarded to security. The email's actual ask is to investigate, not to pay."
+}

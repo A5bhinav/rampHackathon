@@ -1,0 +1,8 @@
+{
+  "subject": "Action required: update your payment method",
+  "sender": "Billing <billing@cloudcrm.example>",
+  "text": "Hi Tallis Manufacturing,\n\nWe couldn't process your subscription renewal because the card ending in 4417 has expired. Please update your payment method to avoid interruption of service.\n\nUpdate payment details: https://app.cloudcrm.example/billing\n\nAmount due: $1,188.00\n\nThe CloudCRM Billing Team",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Asks to update the card the reader pays with, not where money lands."
+}

@@ -1,0 +1,8 @@
+{
+  "subject": "Aenderung unserer Bankverbindung",
+  "sender": "Buchhaltung Brightline <buchhaltung@brightline-office.de>",
+  "text": "Sehr geehrte Damen und Herren,\n\nbitte beachten Sie, dass sich die Bankverbindung der Brightline Office Supply Inc. geaendert hat. Bitte ueberweisen Sie alle offenen und zukuenftigen Rechnungsbetraege ausschliesslich auf das folgende Konto:\n\nKontoinhaber: Brightline Office Supply Inc.\nBank: Deutsche Bank AG\nIBAN: DE44 5001 0517 5407 3249 31\nBIC: DEUTDEFFXXX\n\nDie bisherige Bankverbindung ist ab sofort nicht mehr gueltig.\n\nMit freundlichen Gruessen\nBuchhaltung\nBrightline Office Supply Inc.",
+  "label": "change_request",
+  "vendor": "brightline",
+  "note": "German-language bank change, umlauts written out as ae/oe/ue, IBAN instead of ABA numbers."
+}

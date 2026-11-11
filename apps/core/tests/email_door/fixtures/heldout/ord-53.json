@@ -1,0 +1,8 @@
+{
+  "subject": "Remittance advice needed",
+  "sender": "Brightline Billing <billing@brightline.example>",
+  "text": "We received an unmatched deposit of $912.40 on Nov 7. Which invoices was it for?",
+  "label": "ordinary",
+  "vendor": "brightline",
+  "note": "Remittance question."
+}

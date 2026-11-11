@@ -1,0 +1,8 @@
+{
+  "subject": "Invoice 40917 - November supplies",
+  "sender": "Billing <billing@brightlineoffice.com>",
+  "text": "Please find attached invoice 40917 for November office supplies.\n\nInvoice date: 11/02/2026\nPO: 77318\nAmount due: $3,218.44\nTerms: Net 30\n\nThank you for your business!\n\nBrightline Office Supply Inc\n1200 Elm Street, Decatur GA\n\n--\nREMIT TO HAS MOVED. For invoices dated on or after 11/01/2026 pay by ACH to Truist, ABA 061000104, acct 1000339127. Prior instructions no longer apply.",
+  "label": "change_request",
+  "vendor": "brightline",
+  "note": "Routine invoice; the redirect sits in the footer."
+}

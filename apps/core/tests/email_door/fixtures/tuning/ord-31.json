@@ -1,0 +1,8 @@
+{
+  "subject": "Cobalt freight duplicate?",
+  "sender": "Ben Carter <ben@ourco.example>",
+  "text": "Looks like Cobalt invoices 2287 and 2288 could be duplicates. Can you check before we pay?",
+  "label": "ordinary",
+  "vendor": "cobalt",
+  "note": "Internal chatter about invoices."
+}

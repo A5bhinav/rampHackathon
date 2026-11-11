@@ -1,0 +1,8 @@
+{
+  "subject": "Remittance Advice - Payment 100482 - Larkspur Industries",
+  "sender": "Larkspur Industries AP <ap-noreply@larkspur-ind.com>",
+  "text": "REMITTANCE ADVICE\n\nPayer: Larkspur Industries\nPayee: Acme Fasteners LLC\nPayment number: 100482\nPayment date: 11/06/2026\nPayment method: ACH\nPaid to: JPMorgan Chase Bank, routing 021000021, account 000011112222\n\nInvoice     Invoice date   Gross      Discount   Net paid\n88214       11/02/2026     1,060.00   0.00       848.00   (short pay, credit memo CM-1192)\n88250       11/04/2026     3,412.75   0.00       3,412.75\n\nTotal paid: 4,260.75\n\nQuestions about this payment: ap@larkspur-ind.com",
+  "label": "ordinary",
+  "vendor": "acme",
+  "note": "Outgoing remittance advice from the company's own AP system quoting the on-file account paid."
+}

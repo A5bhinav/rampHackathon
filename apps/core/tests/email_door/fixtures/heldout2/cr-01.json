@@ -1,0 +1,8 @@
+{
+  "subject": "Notification of Change in Banking Information - Acme Fasteners LLC",
+  "sender": "Acme Fasteners LLC Accounts Receivable <ar@acmefasteners.com>",
+  "text": "Please see the letter below. A signed copy is also attached for your records.\n\n-----\n\nACME FASTENERS LLC\n4410 Industrial Parkway\nDayton, OH 45414\n\nNovember 6, 2026\n\nTo: Accounts Payable Department\nLarkspur Industries\n\nRE: Notification of Change in Banking Information\n\nDear Valued Customer,\n\nPlease be advised that, as part of a consolidation of our treasury operations, Acme Fasteners LLC will be transitioning its primary operating account to a new financial institution. Effective with all payments issued on or after December 1, 2026, please remit ACH and wire payments using the following instructions:\n\nBank Name: Bank of America, N.A.\nABA Routing Number: 026009593\nAccount Number: 4830 2219 7710\nAccount Name: Acme Fasteners LLC\nAccount Type: Business Checking\n\nPayments sent to our previous account will be accepted through November 30, 2026. After that date the previous account will be closed and any payments sent to it may be returned or delayed.\n\nPlease update your vendor master file accordingly. Should you have any questions, please contact our office at the number below.\n\nWe appreciate your continued business.\n\nSincerely,\n\nMargaret Ostrowski\nController\nAcme Fasteners LLC\n(937) 555-0148",
+  "label": "change_request",
+  "vendor": "acme",
+  "note": "Formal bank-change letter pasted as text: new bank, routing and account, effective date, old account closing."
+}

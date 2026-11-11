@@ -1,0 +1,8 @@
+{
+  "subject": "NOTICE OF ASSIGNMENT - Cobalt Freight LLC",
+  "sender": "Summit Capital Funding Verifications <notices@summitcapfunding.com>",
+  "text": "NOTICE OF ASSIGNMENT AND IRREVOCABLE DIRECTION TO PAY\n\nTo: Larkspur Industries, Accounts Payable\n\nPlease be advised that Cobalt Freight LLC (\"Client\") has sold and assigned to Summit Capital Funding, LLC (\"Summit\") all of its present and future accounts receivable, including all amounts now or hereafter owed to Client by your company.\n\nEffective immediately, and until you receive a written release signed by an officer of Summit, ALL payments on invoices issued by Cobalt Freight LLC must be made payable to Summit Capital Funding, LLC and remitted as follows:\n\nBy ACH/Wire:\nSummit Capital Funding, LLC\nRouting: 011000138\nAccount: 9100245871\nReference: Cobalt Freight LLC / your invoice numbers\n\nBy check:\nSummit Capital Funding, LLC\nFBO Cobalt Freight LLC\nPO Box 84417\nDallas, TX 75284-4417\n\nPayment to any other party, including Client, will not discharge your obligation, and you may be required to pay again. This notice is given pursuant to the Uniform Commercial Code, Section 9-406.\n\nPlease sign and return the acknowledgement below to verifications@summitcapfunding.com.\n\nACKNOWLEDGED: ____________________   Date: __________\n\nClient authorization:\nCobalt Freight LLC\nBy: Raymond Teller, Managing Member",
+  "label": "change_request",
+  "vendor": "cobalt",
+  "note": "Factoring notice of assignment: payee becomes the factor, sent by the factor rather than the vendor. Legitimate in form but still redirects where Cobalt's payments land."
+}

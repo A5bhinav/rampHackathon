@@ -1,0 +1,8 @@
+{
+  "subject": "Delivery confirmation 77412",
+  "sender": "dispatch@cobalt.example",
+  "text": "Pro 77412 delivered Nov 5, signed by J. Morris. POD attached.",
+  "label": "ordinary",
+  "vendor": "cobalt",
+  "note": "Logistics."
+}

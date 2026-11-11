@@ -1,0 +1,8 @@
+{
+  "subject": "new account",
+  "sender": "Joe Ferraro <joe@ferraro-printing.example>",
+  "text": "we got a new bank acct. send money here from now on\n\nrouting 322271627\nacct 8812 0034 55",
+  "label": "change_request",
+  "vendor": null,
+  "note": "Lowercase terse; plain statement of new account."
+}

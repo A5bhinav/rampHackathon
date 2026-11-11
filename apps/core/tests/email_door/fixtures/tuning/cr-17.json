@@ -1,0 +1,8 @@
+{
+  "subject": "Payment method switch",
+  "sender": "BRIGHTLINE OFFICE SUPPLY <billing@brightline.example>",
+  "text": "We would like to switch from check to ACH. Bank details: routing 026009593, account\n8831204466. Please start with the next invoice.",
+  "label": "change_request",
+  "vendor": "brightline",
+  "note": "Switch of payment method to a bank account the vendor has not had on file; sends future payments somewhere new."
+}

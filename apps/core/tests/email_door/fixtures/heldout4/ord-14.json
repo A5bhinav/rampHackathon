@@ -1,0 +1,8 @@
+{
+  "subject": "Treasury: disbursement bank move in January",
+  "sender": "Priya Raman <priya.raman@tallismfg.com>",
+  "text": "All,\n\nStarting January 4 Tallis will make vendor payments out of our new PNC disbursement account rather than Wells Fargo. Check stock and ACH company IDs will be different. Vendors may ask why the originator name looks different on their statements. Vendor bank details in the master file are unaffected.\n\nPriya Raman\nCFO",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Our own paying account moves; vendors' receiving accounts do not."
+}

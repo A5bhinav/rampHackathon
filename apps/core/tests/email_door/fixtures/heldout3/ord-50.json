@@ -1,0 +1,8 @@
+{
+  "subject": "Updated procedure: vendor bank change form VM-7 rev 4",
+  "sender": "Treasury <treasury@northgate-mfg.com>",
+  "text": "AP team,\n\nVM-7 has been revised (rev 4, attached). Changes:\n\n- New field for the callback phone number source (must be vendor master or a prior invoice, never the request itself)\n- Second approver must now be outside AP\n- A 3-business-day hold applies between approval and the first payment to a new account\n- Changes submitted through SupplierHub still require the form\n\nUse rev 4 for all requests received from Monday.\n\nTreasury",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Internal procedure change about bank-change handling."
+}

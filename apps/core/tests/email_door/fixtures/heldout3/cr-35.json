@@ -1,0 +1,8 @@
+{
+  "subject": "Acme Fasteners LLC sent you a document to review and sign: Updated ACH Authorization",
+  "sender": "DocuSign <dse@docusign.net>",
+  "text": "Denise Caruso (dcaruso@acmefasteners.com) has sent you a document to review and sign.\n\nDocument: Updated ACH Authorization - Acme Fasteners LLC - Nov 2026.pdf\nMessage from sender: \"Hi, attached is our updated ACH form with the new bank account. Please sign to acknowledge and apply to future payments. Thanks!\"\n\nREVIEW DOCUMENT\n\nDo not share this email. This email contains a secure link to DocuSign.",
+  "label": "change_request",
+  "vendor": "acme",
+  "note": "E-signature notification wording; the sender's message asks the reader to apply a new bank account to future payments."
+}

@@ -1,0 +1,8 @@
+{
+  "subject": "Credit application follow-up",
+  "sender": "Brightline Credit <credit@brightline.example>",
+  "text": "We still need the signed credit application and trade references before we can raise your credit limit.",
+  "label": "ordinary",
+  "vendor": "brightline",
+  "note": "Credit application."
+}

@@ -1,0 +1,8 @@
+{
+  "subject": "ACH details",
+  "sender": "Oscar Diaz <oscar@diaz-pest.example>",
+  "text": "For ACH to Diaz Pest Control: routing 322271627, account 7701-0098-21. This is a\nnew account, replaces the old one.",
+  "label": "change_request",
+  "vendor": null,
+  "note": "Replaces old, grouped hyphen."
+}

@@ -1,0 +1,8 @@
+{
+  "subject": "Factura A-2291 octubre",
+  "sender": "Lucia Herrera <cobranza@distribuidoranortena.example>",
+  "text": "Estimados:\n\nAdjuntamos la factura A-2291 correspondiente a octubre, por un monto de 48,300.00 MXN. Favor de realizar el pago a la cuenta de siempre dentro de los 30 dias.\n\nSaludos cordiales,\nLucia Herrera",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Spanish invoice; says to pay the usual account."
+}

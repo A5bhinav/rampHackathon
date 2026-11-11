@@ -1,0 +1,8 @@
+{
+  "subject": "November statement and wire reference",
+  "sender": "Sam Ortiz <ar@brightline.example>",
+  "text": "Statement for November is attached, closing balance $1,956.40.\n\nFor convenience, payment details as always: routing 021000021, account 000044445555, ACH or wire. Nothing on this has moved, so no action is needed on your side other than paying what is open.",
+  "label": "ordinary",
+  "vendor": "brightline",
+  "note": "Statement quoting full on-file details with 'nothing has moved'; ordinary."
+}

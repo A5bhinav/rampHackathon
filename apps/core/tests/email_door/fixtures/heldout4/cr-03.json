@@ -1,0 +1,8 @@
+{
+  "subject": "Aviso importante - datos de pago",
+  "sender": "Lucia Herrera <cobranza@distribuidoranortena.example>",
+  "text": "Estimados senores:\n\nPor medio de la presente les comunicamos que, a partir del proximo pago, las transferencias a favor de Distribuidora Nortena S.A. de C.V. deberan realizarse a nuestra cuenta en BBVA, CLABE 012180001234567891, a nombre de la misma razon social.\n\nLes pedimos dejar de utilizar la cuenta de Banorte que tienen registrada.\n\nQuedamos a sus ordenes para cualquier aclaracion.\n\nAtentamente,\nLucia Herrera\nCuentas por Cobrar",
+  "label": "change_request",
+  "vendor": null,
+  "note": "Spanish; asks to stop using the registered account and pay a different one."
+}

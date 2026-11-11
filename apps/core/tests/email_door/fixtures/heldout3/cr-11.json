@@ -1,0 +1,8 @@
+{
+  "subject": "Hold on next payment - new banking details to follow",
+  "sender": "Denise Caruso <dcaruso@acmefasteners.com>",
+  "text": "Hi,\n\nPlease do not release the payment for invoices 88213 and 88240 to our usual account. We are in the middle of a bank migration and our controller will call your AP line tomorrow with the new account and routing numbers. For security we will not send the numbers by email.\n\nOnce you have them, please apply them to all future payments as well.\n\nThanks for your patience,\nDenise",
+  "label": "change_request",
+  "vendor": "acme",
+  "note": "Asks to redirect future payments but contains no numbers; the details are promised through a separate channel."
+}

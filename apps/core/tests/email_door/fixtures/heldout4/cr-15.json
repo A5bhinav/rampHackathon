@@ -1,0 +1,8 @@
+{
+  "subject": "Payment allocation going forward",
+  "sender": "Accounting <accounting@brightlineoffice.com>",
+  "text": "Hi,\n\nStarting with the December statement, could you please split our payments: 60% to the account you have on file, and 40% to our paper supplier, Delta Paper Mills, since they're now being paid directly from receipts under our supply agreement. Delta's ACH info is on the attached.\n\nThanks for accommodating this.\n\nBrightline Accounting",
+  "label": "change_request",
+  "vendor": "brightline",
+  "note": "Partial redirect to a third party."
+}

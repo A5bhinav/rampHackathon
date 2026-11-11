@@ -1,0 +1,8 @@
+{
+  "subject": "Cobalt Freight - statement for Oct",
+  "sender": "Cobalt AR <ar@cobalt.example>",
+  "text": "Statement attached. Balance forward $0, new charges $9,880. Our banking details have not changed and are as per the master agreement.",
+  "label": "ordinary",
+  "vendor": "cobalt",
+  "note": "Says details not changed."
+}

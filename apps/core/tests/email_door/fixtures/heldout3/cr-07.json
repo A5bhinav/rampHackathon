@@ -1,0 +1,8 @@
+{
+  "subject": "Please stop mailing checks - ACH enrollment",
+  "sender": "Brightline Office Supply <billing@brightlineoffice.com>",
+  "text": "Hello Northgate AP,\n\nWe are retiring paper checks for all customers. Starting with your next payment, please pay Brightline Office Supply Inc electronically:\n\nRouting: 011000138\nAccount: 5590023311\nBank: Citizens Bank\n\nIf you require an ACH authorization form on our letterhead, reply to this email and we will send one over.\n\nThank you,\nBrightline Billing Team",
+  "label": "change_request",
+  "vendor": "brightline",
+  "note": "Framed as a payment-method switch, but the ACH account given differs from the account on file, so payments would land somewhere new."
+}

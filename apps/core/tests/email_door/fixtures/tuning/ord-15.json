@@ -1,0 +1,8 @@
+{
+  "subject": "W-9 request",
+  "sender": "Dana Whitfield <ar@acme.example>",
+  "text": "Hello, our new compliance officer is asking for a current W-9 for your company for our\ncustomer file. Could you send one when you can?",
+  "label": "ordinary",
+  "vendor": "acme",
+  "note": "W-9 request directed at the AP team."
+}

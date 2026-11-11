@@ -1,0 +1,8 @@
+{
+  "subject": "Virtual card issued - Cobalt Freight",
+  "sender": "Card Notifications <notifications@spendcard.example>",
+  "text": "A virtual card ending in 7713 has been issued for Cobalt Freight, limit $5,000.00, to pay for November spot shipments. Requested by Marcus Tate. Approved by Martin Feld.",
+  "label": "ordinary",
+  "vendor": "cobalt",
+  "note": ""
+}

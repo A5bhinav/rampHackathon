@@ -1,0 +1,8 @@
+{
+  "subject": "New vendor setup - Delta Packaging Co",
+  "sender": "Steve Kaminski <skaminski@larkspur-ind.com>",
+  "text": "Hi AP,\n\nProcurement approved Delta Packaging Co as a new corrugated supplier (contract signed 11/4). Attached are their W-9, certificate of insurance, and bank letter on their bank's letterhead. Please set them up in the vendor master so we can pay their first invoice on Net 30.\n\nFrom the bank letter:\nDelta Packaging Co\nFifth Third Bank, routing 042000314, account 7730 1182 0456\n\nThanks,\nSteve",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "Borderline: brand-new vendor onboarding with bank details. There is no existing payment destination being changed, so it is vendor setup rather than a change request. Labeled ordinary; it still deserves its own verification in real life."
+}

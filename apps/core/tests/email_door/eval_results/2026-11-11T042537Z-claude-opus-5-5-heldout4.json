@@ -1,0 +1,35 @@
+{
+  "set": "heldout4",
+  "model": "claude-opus-5-5",
+  "flagger": "model",
+  "prompt_version": "v2",
+  "prompt_sha256": "168990eec3fdf1a23332ca8ff9c189c5570d20bbcf58964659aa9a51baf7ec30",
+  "emails": 110,
+  "change_requests_total": 37,
+  "change_requests_flagged": 37,
+  "change_requests_by_model": 37,
+  "ordinary_total": 70,
+  "ordinary_flagged": 1,
+  "ordinary_by_model": 1,
+  "failures": {},
+  "failed": {},
+  "missed": [],
+  "false_flags": [
+    "ord-05.json"
+  ],
+  "calls": 110,
+  "input_tokens": 93885,
+  "output_tokens": 3952,
+  "cost_usd": 0.45458,
+  "latency_p50_s": 2.1092848330154084,
+  "latency_p95_s": 5.139831124979537,
+  "on_file_only": {
+    "cr-38.json": false,
+    "cr-39.json": false,
+    "cr-40.json": false
+  },
+  "heldout2_revised": false,
+  "excluded_after_heldout2_revision": {},
+  "bar_without_on_file_only": "PASS",
+  "bar_with_on_file_only": "FAIL"
+}

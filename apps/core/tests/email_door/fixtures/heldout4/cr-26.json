@@ -1,0 +1,8 @@
+{
+  "subject": "FW: Vendor update for your AP team",
+  "sender": "Luis Ferrer <lferrer@acmefasteners.com>",
+  "text": "Hey Marcus - not my department but finance asked all the reps to get this to the right person at their accounts. Can you pass it to whoever pays us? See below. Also let me know about the M8 flange bolts when you can, I can hold that price until Friday.\n\nLuis Ferrer\nOutside Sales, Acme Fasteners\nCell 330-555-0133\n\nFrom: Acme Finance <finance@acmefasteners.com>\nSent: Friday, November 6, 2026 3:41 PM\nTo: Sales-All\nSubject: Vendor update for your AP team\n\nTeam, please let your accounts know we have consolidated with PNC. Customers should direct remittances to the PNC account from the next cycle. The instruction letter is attached; ask them to confirm with us once it's loaded.\n\nAcme Finance\n\nCONFIDENTIALITY NOTICE: This e-mail and any attachments are for the exclusive use of the intended recipient(s). If you have received it in error please notify the sender and delete it.",
+  "label": "change_request",
+  "vendor": "acme",
+  "note": "Sales rep forwarding a finance notice, no account numbers in the mail."
+}

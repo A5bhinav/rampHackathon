@@ -1,0 +1,8 @@
+{
+  "subject": "Alteracao de dados bancarios - Oliveira Embalagens",
+  "sender": "financeiro@oliveiraembalagens.com.br",
+  "text": "Prezados,\n\nInformamos que a Oliveira Embalagens Ltda alterou sua conta bancaria para recebimento de pagamentos. Solicitamos a atualizacao do cadastro de fornecedor para que as proximas faturas sejam pagas na nova conta:\n\nBanco: Itau Unibanco\nAgencia: 0912\nConta corrente: 44871-3\nCNPJ: 12.345.678/0001-90\nFavorecido: Oliveira Embalagens Ltda\n\nPara pagamentos internacionais: SWIFT ITAUBRSP, IBAN BR15 0000 0000 0912 0000 4487 13C 1\n\nAgradecemos a confirmacao.\n\nAtenciosamente,\nDepartamento Financeiro",
+  "label": "change_request",
+  "vendor": null,
+  "note": "Portuguese-language change from an unknown vendor; Brazilian bank fields rather than ABA numbers."
+}

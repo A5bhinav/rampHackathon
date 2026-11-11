@@ -1,0 +1,8 @@
+{
+  "subject": "Annual details check",
+  "sender": "Morgan Pryce <ar@cobalt.example>",
+  "text": "Doing our annual file review. Please confirm you still pay Cobalt to the same account\nas before. No updates on our side.",
+  "label": "ordinary",
+  "vendor": "cobalt",
+  "note": "Near miss, confirmation."
+}

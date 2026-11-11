@@ -1,0 +1,8 @@
+{
+  "subject": "Re: PO 88410",
+  "sender": "Marisol Vega <mvega@brightline.example>",
+  "text": "I should have mentioned this on the call. For anything outstanding to us, please make\npayment to the account ending 5521 at our new bank instead of the account you have.",
+  "label": "change_request",
+  "vendor": "brightline",
+  "note": "Partial digits, redirect outstanding payments."
+}

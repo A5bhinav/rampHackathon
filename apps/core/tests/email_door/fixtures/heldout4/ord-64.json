@@ -1,0 +1,8 @@
+{
+  "subject": "Your account is moving to our Dallas branch",
+  "sender": "Customer Service <service@southwestbearing.example>",
+  "text": "Dear Customer,\n\nWith the closing of our Tulsa branch, your account is being transferred to our Dallas location. Your orders will ship from Dallas from December 1. Your pricing and sales rep stay the same, and your invoices and payment instructions are unaffected.\n\nSouthwest Bearing Supply",
+  "label": "ordinary",
+  "vendor": null,
+  "note": "'Account transferred' means the customer relationship."
+}

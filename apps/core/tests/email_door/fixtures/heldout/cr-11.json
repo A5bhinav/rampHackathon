@@ -1,0 +1,8 @@
+{
+  "subject": "payment instructions - confidential",
+  "sender": "Morgan Pryce <ar@cobalt.example>",
+  "text": "This is confidential so please do not share it with anyone internally. We need our\npayments rerouted: 0009 0001 7733, ABA 026009593. If anyone from your team phones us,\ndirect them to me only.",
+  "label": "change_request",
+  "vendor": "cobalt",
+  "note": "Secrecy pressure plus new account."
+}

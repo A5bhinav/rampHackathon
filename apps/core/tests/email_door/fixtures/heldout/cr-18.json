@@ -1,0 +1,8 @@
+{
+  "subject": "bank change",
+  "sender": "Sam Ortiz <ar@brightline.example>",
+  "text": "Hey, our bank is changing again (long story). Can you get ready to switch to a new\naccount? Numbers will arrive Monday.",
+  "label": "change_request",
+  "vendor": "brightline",
+  "note": "Heads-up that change is coming; asks reader to prepare to switch."
+}

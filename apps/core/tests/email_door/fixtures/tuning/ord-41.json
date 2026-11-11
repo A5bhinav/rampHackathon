@@ -1,0 +1,8 @@
+{
+  "subject": "Invoice 3402 dispute",
+  "sender": "Sam Ortiz <ar@brightline.example>",
+  "text": "We shipped 40 boxes, not 20, so invoice 3402 is right. Please check your receiving record.",
+  "label": "ordinary",
+  "vendor": "brightline",
+  "note": "Dispute."
+}

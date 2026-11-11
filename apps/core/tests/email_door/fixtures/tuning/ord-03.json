@@ -1,0 +1,8 @@
+{
+  "subject": "Cobalt Freight LLC invoice 2310",
+  "sender": "Morgan Pryce <ar@cobalt.example>",
+  "text": "Hi AP,\n\nAttached is invoice 2310 for October linehaul, $18,450.00.\nBank on file for ACH: ending 8888.\nCheers,\nMorgan",
+  "label": "ordinary",
+  "vendor": "cobalt",
+  "note": "On-file account last four only."
+}

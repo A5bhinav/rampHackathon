@@ -1,0 +1,8 @@
+{
+  "subject": "Re: Re: Invoice 1702 remittance",
+  "sender": "Dana Whitfield <ar@acme.example>",
+  "text": "Dana here. Following up on my voicemail. The ACH instructions in our last invoice are wrong,\nplease do not use them, correct ones coming in a follow-up message today. Thank you for your\npatience.",
+  "label": "change_request",
+  "vendor": "acme",
+  "note": "Says current instructions are wrong and promises corrected details; implies change of destination."
+}

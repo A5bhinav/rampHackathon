@@ -1,0 +1,8 @@
+{
+  "subject": "Invoice 2310 revised",
+  "sender": "Morgan Pryce <ar@cobalt.example>",
+  "text": "Revised invoice 2310 attached with the corrected fuel surcharge, $18,120.00. Remit to the account we have on file as usual.",
+  "label": "ordinary",
+  "vendor": "cobalt",
+  "note": "Revised invoice; usual account."
+}

@@ -1,0 +1,8 @@
+{
+  "subject": "Thank you",
+  "sender": "Dana Whitfield <ar@acme.example>",
+  "text": "Thanks for the quick payment last week. Appreciate it!",
+  "label": "ordinary",
+  "vendor": "acme",
+  "note": "Thanks note."
+}

@@ -1,7 +1,8 @@
 """The core worker: runs every queued command exactly once and fires due timers (ADR-3).
 
-One tick: process stored webhooks, run due scheduled jobs (spec 0003), fire due timers, run
-due commands. Each command is
+One tick: process stored Ramp webhooks, run due scheduled jobs (spec 0003), fire due timers, run
+due commands, then process stored emails (spec 0085, last and time-bounded). An error in either
+inbound step ends that step only. Each command is
 claimed in its own short transaction (FOR UPDATE SKIP LOCKED, with a lease so a crashed
 worker's command is picked up again), run with Ramp and voice calls outside any
 transaction, then finished in a second transaction:
@@ -34,6 +35,9 @@ from .call_facts import call_facts
 from .calling_window import CallingWindow
 from .db import dataset_now, system_tx
 from .detection import Keys, process_inbound_webhooks
+from .email_door.classifier import ChangeClassifier
+from .email_door.inbox import process_inbound_emails
+from .email_door.resend import ResendPort
 from .events import TransitionRefused, apply_event
 from .jobs import Jobs, unique_worker_name
 from .ports import CallerError, CallPlacer, ChangeContext, LedgerChangeContext, NumberResolver, PreDialRefused
@@ -122,8 +126,11 @@ select type, body_jcs::jsonb -> 'body' as body
 class Worker:
     def __init__(self, pool: AsyncConnectionPool, settings: Settings, connector: RampConnector, resolver: NumberResolver,
                  caller: CallPlacer, name: str | None = None, sleep=asyncio.sleep,
-                 change_context: ChangeContext | None = None) -> None:
+                 change_context: ChangeContext | None = None, resend: ResendPort | None = None,
+                 classifier: ChangeClassifier | None = None) -> None:
         self.pool, self.settings, self.connector = pool, settings, connector
+        self.resend = resend
+        self.classifier = classifier   # the email door's model, with DIALBACK_EMAIL_CLASSIFIER=model only
         self.resolver, self.caller, self.name, self._sleep = resolver, caller, name or unique_worker_name(), sleep
         self.change_context = change_context or LedgerChangeContext()
         self.keys = Keys(settings.fingerprint_key, settings.fingerprint_key_version)
@@ -138,12 +145,28 @@ class Worker:
     # The loop ---------------------------------------------------------------------------------
 
     async def tick(self, dataset_id: UUID | None = None, jobs: bool = True) -> int:
-        done = await process_inbound_webhooks(self.pool, self.connector, self.keys, dataset_id=dataset_id)
+        done = await self._contained("Ramp webhook", process_inbound_webhooks(self.pool, self.connector, self.keys,
+                                                                              dataset_id=dataset_id))
         if jobs and self.settings.run_jobs:
             done += await self.jobs.run_due(dataset_id)  # the poller and reconciliation (spec 0003)
         done += await self.fire_timers(dataset_id)
         done += await self.run_commands(dataset_id)
+        # The email door last (spec 0085; final review finding I1): its fetches and model calls are slow and
+        # can fail, so it runs after the holds, calls and releases, within its own time budget.
+        if self.resend is not None:
+            done += await self._contained("email", process_inbound_emails(self.pool, self.settings, self.resend, self.keys,
+                                                                          dataset_id=dataset_id, classifier=self.classifier))
         return done
+
+    @staticmethod
+    async def _contained(step: str, work: Awaitable[int]) -> int:
+        """Run one inbound step; an error ends that step only, never the tick, so the commands still run (R1).
+        Only the error's type name is logged: its message can hold a webhook's or an email's values (ADR-8)."""
+        try:
+            return await work
+        except Exception as exc:  # noqa: BLE001  contained; the step runs again next tick
+            log.warning("worker: the %s step failed: %s", step, type(exc).__name__)
+            return 0
 
     async def drain(self, dataset_id: UUID | None = None, max_ticks: int = 50) -> int:
         """Tick until nothing is due. For tests, the smoke run and the lab."""

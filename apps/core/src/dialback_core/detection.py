@@ -208,7 +208,7 @@ async def process_inbound_webhooks(pool: AsyncConnectionPool, connector: RampCon
         async with system_tx(pool) as conn:
             row = await (await conn.execute(
                 "select id, dataset_id, event_type, raw_body from app.inbound_webhooks "
-                "where processed_at is null and signature_valid and not (id = any(%s::bigint[])) "
+                "where source = 'ramp' and processed_at is null and signature_valid and not (id = any(%s::bigint[])) "
                 "and (%s::uuid is null or dataset_id = %s::uuid) "
                 "order by received_at, id for update skip locked limit 1", (list(seen), dataset_id, dataset_id))).fetchone()
             if row is None:

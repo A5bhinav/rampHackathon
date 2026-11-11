@@ -1,0 +1,8 @@
+{
+  "subject": "ATTENTION: Brightline payment redirect",
+  "sender": "accounts.receivable@brightline-supply.example",
+  "text": "ATTENTION ACCOUNTS PAYABLE\n\nBrightline Office Supply Inc has been acquired by a larger group and all receivables are now\ncollected by the parent. Direct every upcoming payment to the parent's account:\nAcct: 88-1920-4417\nRTN: 121000248\nReply to acknowledge.",
+  "label": "change_request",
+  "vendor": "brightline",
+  "note": "Acquisition story, redirect to parent; classic fraud shape."
+}
