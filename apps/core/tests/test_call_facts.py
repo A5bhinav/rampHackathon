@@ -73,6 +73,25 @@ def test_the_company_matches_a_trade_name():
     assert said("Not Acme Supply, this is Globex") is False, "a refusal word is False (NR03)"
 
 
+def test_typed_digits_survive_the_stored_shape():  # spec 0080, Part B (review fix)
+    # The worker decides from the stored body, whose digits `protect` has hashed. The capture method must
+    # survive that, so an unlabeled call with typed digits verifies and one with spoken digits does not.
+    from dialback_core.answers import protect
+    clean = [a for a in ANSWERS if a["slot"] != "flag"]
+    key = b"k" * 32
+
+    def stored(method):
+        digits = {**_answer("account_last4", "4821", 13), "capture_method": method}
+        body = protect({"schema_version": "call-answers/v0", "call_id": CALL, "answers": [*clean, digits]}, key, 1)
+        assert body["answers"][-1]["value"] != "4821"        # hashed, as the core stores it
+        return call_facts(_report(answers=body, answered_by=None), CASE, GENERATION, CONTEXT)
+
+    typed = stored("keypad")
+    assert (typed.answered_by, typed.digits_typed) == (None, True) and decide(typed).outcome == "verified"
+    spoken = stored("speech")
+    assert spoken.digits_typed is False and decide(spoken).outcome == "needs_review"
+
+
 def test_the_report_and_the_context_carry_through():
     facts = call_facts(_report(), CASE, GENERATION, CONTEXT)
     assert (facts.call_result, facts.last_four_result, facts.dialed_out, facts.dialed_number_is_pick,
